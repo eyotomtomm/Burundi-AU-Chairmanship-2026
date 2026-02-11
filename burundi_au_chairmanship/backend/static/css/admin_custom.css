@@ -1,0 +1,190 @@
+/* ═══════════════════════════════════════════════════════════════
+   Burundi AU Chairmanship – Custom Admin Styles
+   Colors: Green #1EB53A · Red #CE1126 · Gold #D4AF37 · White
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Login page ──────────────────────────────────────────────── */
+.login-page .card {
+  border-top: 4px solid #1EB53A;
+}
+.login-page .btn-primary {
+  background-color: #1EB53A !important;
+  border-color: #1EB53A !important;
+}
+.login-page .btn-primary:hover {
+  background-color: #179a30 !important;
+  border-color: #179a30 !important;
+}
+
+/* ── Dashboard stats cards ───────────────────────────────────── */
+.info-box {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.info-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.small-box {
+  border-radius: 12px;
+  transition: transform 0.2s ease;
+}
+.small-box:hover {
+  transform: translateY(-3px);
+}
+
+/* ── Navbar brand accent ─────────────────────────────────────── */
+.main-header .navbar-brand {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* ── Sidebar tweaks ──────────────────────────────────────────── */
+.sidebar .nav-sidebar .nav-link.active {
+  background-color: #1EB53A !important;
+  color: #fff !important;
+  border-radius: 8px;
+  margin: 2px 8px;
+}
+.sidebar .nav-sidebar .nav-link:hover {
+  background-color: rgba(30, 181, 58, 0.15);
+  border-radius: 8px;
+  margin: 2px 8px;
+}
+.sidebar .brand-link {
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  padding: 14px 8px;
+}
+
+/* ── Content area ────────────────────────────────────────────── */
+.content-wrapper {
+  background: #f4f6f9;
+}
+.dark-mode .content-wrapper {
+  background: #1a1a2e;
+}
+
+/* ── Cards & tables ──────────────────────────────────────────── */
+.card {
+  border-radius: 12px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  border: none;
+}
+.card-header {
+  border-radius: 12px 12px 0 0 !important;
+  font-weight: 600;
+}
+.table th {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.5px;
+  color: #6c757d;
+}
+.table td {
+  vertical-align: middle;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn-success,
+.bg-success {
+  background-color: #1EB53A !important;
+  border-color: #1EB53A !important;
+}
+.btn-success:hover {
+  background-color: #179a30 !important;
+  border-color: #179a30 !important;
+}
+.btn-outline-success {
+  color: #1EB53A !important;
+  border-color: #1EB53A !important;
+}
+.btn-outline-success:hover {
+  background-color: #1EB53A !important;
+  color: #fff !important;
+}
+
+/* ── Breadcrumb ──────────────────────────────────────────────── */
+.content-header .breadcrumb {
+  background: transparent;
+}
+
+/* ── Model action buttons ────────────────────────────────────── */
+.object-tools a {
+  border-radius: 6px !important;
+  background-color: #1EB53A !important;
+}
+.object-tools a:hover {
+  background-color: #179a30 !important;
+}
+
+/* ── Fieldsets ────────────────────────────────────────────────── */
+fieldset {
+  border-radius: 10px;
+}
+fieldset .card-header {
+  background: linear-gradient(135deg, #1EB53A 0%, #179a30 100%) !important;
+  color: #fff !important;
+}
+
+/* ── Image previews in list view ─────────────────────────────── */
+td img {
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.main-footer {
+  font-size: 0.85rem;
+  border-top: 2px solid #1EB53A;
+}
+
+/* ── Pagination ──────────────────────────────────────────────── */
+.page-item.active .page-link {
+  background-color: #1EB53A;
+  border-color: #1EB53A;
+}
+.page-link {
+  color: #1EB53A;
+}
+.page-link:hover {
+  color: #179a30;
+}
+
+/* ── Select2 / Dropdowns ─────────────────────────────────────── */
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background-color: #1EB53A !important;
+}
+
+/* ── Gold accent highlights ──────────────────────────────────── */
+.badge-warning,
+.bg-warning {
+  background-color: #D4AF37 !important;
+}
+
+/* ── Burundi flag stripe on the very top ─────────────────────── */
+body::before {
+  content: '';
+  display: block;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    #CE1126 0%, #CE1126 33%,
+    #fff 33%, #fff 50%,
+    #1EB53A 50%, #1EB53A 100%
+  );
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
+.main-header {
+  margin-top: 3px;
+}
+
+/* ── Smooth transitions everywhere ───────────────────────────── */
+a, .btn, .nav-link, .card, .info-box, .small-box {
+  transition: all 0.2s ease;
+}

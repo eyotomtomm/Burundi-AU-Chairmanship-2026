@@ -1,0 +1,59 @@
+name: burundi_au_chairmanship
+description: Burundi AU Chairmanship Official App - Digital Magazine, Consular Services, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.2
+
+  # UI Components
+  cupertino_icons: ^1.0.8
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  carousel_slider: ^5.0.0
+
+  # URL Launcher
+  url_launcher: ^6.3.1
+
+  # Storage
+  shared_preferences: ^2.3.3
+
+  # Utilities
+  intl: ^0.20.2
+  http: ^1.2.2
+
+  # Video Player for Live Feeds
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+
+  # Fonts
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/patterns/
+    - assets/fonts/
+
+  fonts:
+    - family: HeatherGreen
+      fonts:
+        - asset: assets/fonts/HeatherGreen-Regular.ttf

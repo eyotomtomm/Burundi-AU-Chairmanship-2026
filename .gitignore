@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+*.swp
+
+# Claude
+.claude/
+
+# Flutter build
+burundi_au_chairmanship/build/
+burundi_au_chairmanship/.dart_tool/
+burundi_au_chairmanship/.flutter-plugins-dependencies
+
+# Backend
+burundi_au_chairmanship/backend/db.sqlite3
+burundi_au_chairmanship/backend/.env
+burundi_au_chairmanship/backend/__pycache__/
+burundi_au_chairmanship/backend/core/__pycache__/
+burundi_au_chairmanship/backend/config/__pycache__/
+burundi_au_chairmanship/backend/media/
+**/__pycache__/
+*.pyc
+
+# macOS build
+burundi_au_chairmanship/macos/Flutter/ephemeral/

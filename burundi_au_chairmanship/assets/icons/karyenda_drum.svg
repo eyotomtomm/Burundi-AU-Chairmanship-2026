@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- White background -->
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+
+  <!-- DRUM BASE/PEDESTAL (bottom colored bands) -->
+  <!-- Bottom wider base -->
+  <ellipse cx="512" cy="880" rx="160" ry="30" fill="#1B6B3D"/>
+
+  <!-- Green band -->
+  <rect x="352" y="850" width="320" height="40" fill="#1B6B3D"/>
+  <path d="M 352 850 Q 512 840 672 850 L 672 890 Q 512 900 352 890 Z" fill="#1B6B3D"/>
+
+  <!-- White band -->
+  <rect x="360" y="810" width="304" height="40" fill="#FFFFFF"/>
+  <path d="M 360 810 Q 512 805 664 810 L 664 850 Q 512 855 360 850 Z" fill="#FFFFFF"/>
+
+  <!-- Red band -->
+  <rect x="368" y="770" width="288" height="40" fill="#E63946"/>
+  <path d="M 368 770 Q 512 765 656 770 L 656 810 Q 512 815 368 810 Z" fill="#E63946"/>
+
+  <!-- Beige/Tan band -->
+  <rect x="376" y="730" width="272" height="40" fill="#D4AF37"/>
+  <path d="M 376 730 Q 512 725 648 730 L 648 770 Q 512 775 376 770 Z" fill="#D4AF37"/>
+
+  <!-- Black band with BURUNDI...GISHORA text -->
+  <rect x="384" y="680" width="256" height="50" fill="#1A1A1A"/>
+  <path d="M 384 680 Q 512 675 640 680 L 640 730 Q 512 735 384 730 Z" fill="#1A1A1A"/>
+  <text x="512" y="713" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#FFFFFF" text-anchor="middle" letter-spacing="2">BURUNDI...GISHORA</text>
+
+  <!-- MAIN DRUM BODY with Flag Pattern -->
+  <!-- Drum cylinder body (with slight 3D effect) -->
+  <defs>
+    <linearGradient id="drumShading" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#CCCCCC;stop-opacity:0.3" />
+      <stop offset="50%" style="stop-color:#FFFFFF;stop-opacity:0" />
+      <stop offset="100%" style="stop-color:#999999;stop-opacity:0.2" />
+    </linearGradient>
+  </defs>
+
+  <!-- Drum sides (perspective) -->
+  <rect x="390" y="280" width="244" height="400" fill="#F5F5F5" opacity="0.9"/>
+
+  <!-- Flag pattern on drum body -->
+  <!-- White center circle/ellipse area -->
+  <ellipse cx="512" cy="480" rx="140" ry="160" fill="#FFFFFF"/>
+
+  <!-- Green left triangle -->
+  <path d="M 390 280 L 390 680 L 512 480 Z" fill="#1B6B3D"/>
+
+  <!-- Green right triangle -->
+  <path d="M 634 280 L 634 680 L 512 480 Z" fill="#1B6B3D"/>
+
+  <!-- Red top triangle -->
+  <path d="M 390 280 L 634 280 L 512 480 Z" fill="#E63946"/>
+
+  <!-- Red bottom triangle -->
+  <path d="M 390 680 L 634 680 L 512 480 Z" fill="#E63946"/>
+
+  <!-- White diagonal cross (overlaying) -->
+  <ellipse cx="512" cy="480" rx="130" ry="150" fill="#FFFFFF"/>
+
+  <!-- Three red stars in vertical line in center -->
+  <g fill="#E63946">
+    <!-- Top star -->
+    <path d="M 512 420 L 519 438 L 538 438 L 523 449 L 530 467 L 512 456 L 494 467 L 501 449 L 486 438 L 505 438 Z" transform="scale(1.2) translate(-61, -50)"/>
+
+    <!-- Middle star -->
+    <path d="M 512 480 L 519 498 L 538 498 L 523 509 L 530 527 L 512 516 L 494 527 L 501 509 L 486 498 L 505 498 Z" transform="scale(1.2) translate(-61, -50)"/>
+
+    <!-- Bottom star -->
+    <path d="M 512 540 L 519 558 L 538 558 L 523 569 L 530 587 L 512 576 L 494 587 L 501 569 L 486 558 L 505 558 Z" transform="scale(1.2) translate(-61, -50)"/>
+  </g>
+
+  <!-- FIBER/GRASS TOP -->
+  <!-- Top drum rim -->
+  <ellipse cx="512" cy="280" rx="122" ry="25" fill="#8B6914"/>
+
+  <!-- Natural fiber texture (thick, flowing grass) -->
+  <g opacity="0.95">
+    <!-- Create many overlapping strands for realistic fiber look -->
+    <ellipse cx="512" cy="260" rx="135" ry="50" fill="#C19A6B"/>
+    <ellipse cx="512" cy="255" rx="140" ry="48" fill="#B8935E"/>
+    <ellipse cx="512" cy="250" rx="145" ry="46" fill="#A68751"/>
+
+    <!-- Fiber strands (vertical lines with slight curves) -->
+    <g stroke="#8B6914" stroke-width="3" opacity="0.7" fill="none">
+      <path d="M 380 240 Q 378 255 380 270"/>
+      <path d="M 395 235 Q 393 252 395 268"/>
+      <path d="M 410 232 Q 408 250 410 267"/>
+      <path d="M 425 230 Q 423 248 425 266"/>
+      <path d="M 440 228 Q 438 247 440 265"/>
+      <path d="M 455 227 Q 453 246 455 264"/>
+      <path d="M 470 226 Q 468 245 470 263"/>
+      <path d="M 485 225 Q 483 244 485 262"/>
+      <path d="M 500 225 Q 498 244 500 262"/>
+      <path d="M 515 225 Q 513 244 515 262"/>
+      <path d="M 530 225 Q 528 244 530 262"/>
+      <path d="M 545 226 Q 543 245 545 263"/>
+      <path d="M 560 227 Q 558 246 560 264"/>
+      <path d="M 575 228 Q 573 247 575 265"/>
+      <path d="M 590 230 Q 588 248 590 266"/>
+      <path d="M 605 232 Q 603 250 605 267"/>
+      <path d="M 620 235 Q 618 252 620 268"/>
+      <path d="M 635 240 Q 633 255 635 270"/>
+    </g>
+
+    <!-- More fiber texture layers -->
+    <g stroke="#A68751" stroke-width="2" opacity="0.5" fill="none">
+      <path d="M 370 245 Q 368 258 370 272"/>
+      <path d="M 390 238 Q 388 254 390 270"/>
+      <path d="M 420 233 Q 418 251 420 268"/>
+      <path d="M 450 230 Q 448 249 450 266"/>
+      <path d="M 480 228 Q 478 247 480 264"/>
+      <path d="M 510 228 Q 508 247 510 264"/>
+      <path d="M 540 228 Q 538 247 540 264"/>
+      <path d="M 570 230 Q 568 249 570 266"/>
+      <path d="M 600 233 Q 598 251 600 268"/>
+      <path d="M 630 238 Q 628 254 630 270"/>
+      <path d="M 650 245 Q 648 258 650 272"/>
+    </g>
+
+    <!-- Rope/cord wrapped around fiber -->
+    <path d="M 380 260 Q 450 255 512 258 Q 574 255 644 260" stroke="#654321" stroke-width="6" fill="none" opacity="0.6"/>
+    <path d="M 385 268 Q 455 263 512 266 Q 569 263 639 268" stroke="#654321" stroke-width="5" fill="none" opacity="0.5"/>
+  </g>
+
+  <!-- HORIZONTAL WOODEN STICKS (piercing through drum) -->
+  <!-- Left stick -->
+  <ellipse cx="280" cy="240" rx="80" ry="18" fill="#D2A76A" transform="rotate(-5 280 240)"/>
+  <rect x="200" y="222" width="190" height="36" rx="18" fill="#C19A6B" transform="rotate(-5 295 240)"/>
+  <!-- Stick texture/grain -->
+  <line x1="210" y1="235" x2="380" y2="230" stroke="#A68751" stroke-width="2" opacity="0.4"/>
+  <line x1="215" y1="245" x2="385" y2="240" stroke="#A68751" stroke-width="2" opacity="0.4"/>
+
+  <!-- Right stick -->
+  <ellipse cx="744" cy="240" rx="80" ry="18" fill="#D2A76A" transform="rotate(5 744 240)"/>
+  <rect x="634" y="222" width="190" height="36" rx="18" fill="#C19A6B" transform="rotate(5 729 240)"/>
+  <!-- Stick texture/grain -->
+  <line x1="644" y1="230" x2="814" y2="235" stroke="#A68751" stroke-width="2" opacity="0.4"/>
+  <line x1="639" y1="240" x2="809" y2="245" stroke="#A68751" stroke-width="2" opacity="0.4"/>
+
+  <!-- DRUMSTICKS at bottom (separate from drum) -->
+  <!-- Left drumstick -->
+  <g transform="translate(650, 920)">
+    <!-- Wooden stick body -->
+    <rect x="0" y="0" width="120" height="16" rx="8" fill="#C19A6B" transform="rotate(-25 60 8)"/>
+    <!-- Flag colors on tip -->
+    <ellipse cx="10" cy="8" rx="12" ry="10" fill="#E63946" transform="rotate(-25 60 8)"/>
+    <rect x="0" y="3" width="25" height="10" fill="#FFFFFF" transform="rotate(-25 60 8)"/>
+    <rect x="15" y="3" width="15" height="10" fill="#1B6B3D" transform="rotate(-25 60 8)"/>
+  </g>
+
+  <!-- Right drumstick -->
+  <g transform="translate(720, 940)">
+    <!-- Wooden stick body -->
+    <rect x="0" y="0" width="120" height="16" rx="8" fill="#C19A6B" transform="rotate(15 60 8)"/>
+    <!-- Flag colors on tip -->
+    <ellipse cx="10" cy="8" rx="12" ry="10" fill="#E63946" transform="rotate(15 60 8)"/>
+    <rect x="0" y="3" width="25" height="10" fill="#FFFFFF" transform="rotate(15 60 8)"/>
+    <rect x="15" y="3" width="15" height="10" fill="#1B6B3D" transform="rotate(15 60 8)"/>
+  </g>
+
+  <!-- Add subtle shading for 3D effect -->
+  <rect x="390" y="280" width="244" height="400" fill="url(#drumShading)"/>
+</svg>

@@ -117,8 +117,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ─── CORS — allow Flutter app to connect ──────────────────────
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 if not DEBUG:
-    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-
+    CORS_ALLOWED_ORIGINS = [
+        'https://burundi4africa.com',
+        'https://www.burundi4africa.com',
+    ]
 # ─── DRF settings ─────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [

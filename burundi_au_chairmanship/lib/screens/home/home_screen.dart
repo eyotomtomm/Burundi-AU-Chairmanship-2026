@@ -2372,7 +2372,9 @@ class _MoreTab extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   child: GestureDetector(
                     onTap: () {
-                      if (!isLoggedIn) {
+                      if (isLoggedIn) {
+                        Navigator.pushNamed(context, '/profile');
+                      } else {
                         Navigator.pushNamed(context, '/auth');
                       }
                     },
@@ -2417,18 +2419,7 @@ class _MoreTab extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (isLoggedIn)
-                          IconButton(
-                            icon: const Icon(Icons.logout, color: AppColors.burundiRed),
-                            onPressed: () async {
-                              await authProvider.signOut();
-                              if (context.mounted) {
-                                Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
-                              }
-                            },
-                          )
-                        else
-                          Icon(Icons.chevron_right, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        Icon(Icons.chevron_right, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                       ],
                     ),
                   ),

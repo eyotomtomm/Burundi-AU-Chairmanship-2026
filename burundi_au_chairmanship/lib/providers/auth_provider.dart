@@ -149,6 +149,39 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> updateProfile(String name) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final api = ApiService();
+      final data = await api.updateProfile({'name': name});
+
+      final updatedName = data['name'] ?? name;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', updatedName);
+
+      _userName = updatedName;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      // Fallback: update locally if server unreachable
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', name);
+      _userName = name;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    }
+  }
+
   Future<bool> deleteAccount() async {
     _isLoading = true;
     _errorMessage = null;

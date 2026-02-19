@@ -108,6 +108,29 @@ class ApiService {
     return await _get('auth/profile/', auth: true);
   }
 
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$_baseUrl/auth/profile/update/'),
+            headers: await _headers(auth: true),
+            body: json.encode(data),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      final body = json.decode(response.body);
+      String message = 'Failed to update profile';
+      if (body is Map && body.containsKey('detail')) {
+        message = body['detail'];
+      }
+      throw ApiException(message, response.statusCode);
+    } on http.ClientException {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
+  }
+
   Future<Map<String, dynamic>> deleteAccount() async {
     try {
       final response = await http

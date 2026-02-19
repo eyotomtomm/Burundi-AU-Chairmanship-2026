@@ -21,6 +21,7 @@ import 'screens/news/news_screen.dart';
 import 'screens/magazine/magazine_screen.dart';
 import 'screens/translate/translate_screen.dart';
 import 'screens/weather/weather_screen.dart';
+import 'screens/profile/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -96,6 +97,7 @@ class BurundiAUApp extends StatelessWidget {
               '/magazine': (context) => const MagazineScreen(),
               '/translate': (context) => const TranslateScreen(),
               '/weather': (context) => const WeatherScreen(),
+              '/profile': (context) => const ProfileScreen(),
             },
 
             // Route not found

@@ -30,11 +30,11 @@ class AppColors {
   static const Color darkTextSecondary = Color(0xFFB3B3B3);
   static const Color darkDivider = Color(0xFF2C2C2C);
 
-  // Semantic Colors
-  static const Color success = Color(0xFF4CAF50);
-  static const Color warning = Color(0xFFFF9800);
-  static const Color error = Color(0xFFF44336);
-  static const Color info = Color(0xFF2196F3);
+  // Semantic Colors (Burundi palette only - Green, Gold, Red)
+  static const Color success = Color(0xFF1EB53A); // Burundi Green
+  static const Color warning = Color(0xFFFF9800); // Orange
+  static const Color error = Color(0xFFCE1126); // Burundi Red
+  static const Color info = Color(0xFFD4AF37); // AU Gold instead of blue
 
   // Emergency SOS
   static const Color emergency = Color(0xFFDC143C);

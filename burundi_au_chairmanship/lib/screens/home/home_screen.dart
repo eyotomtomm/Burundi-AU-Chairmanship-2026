@@ -11,9 +11,11 @@ import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/magazine_model.dart';
+import '../magazine/pdf_viewer_screen.dart';
 import '../../models/location_model.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _HomeTab(onSwitchTab: (index) => setState(() => _currentIndex = index)),
           _MagazineTab(),
-          _ConsularTab(),
           _LocationsTab(),
           _MoreTab(),
         ],
@@ -70,11 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.auto_stories_rounded),
               activeIcon: const Icon(Icons.auto_stories_rounded),
               label: l10n.magazine,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.account_balance_rounded),
-              activeIcon: const Icon(Icons.account_balance_rounded),
-              label: l10n.consular,
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.location_on_rounded),
@@ -114,6 +110,7 @@ class _HomeTabState extends State<_HomeTab> {
   List<HeroSlide>? _apiHeroSlides;
   List<Article>? _apiArticles;
   List<Map<String, dynamic>>? _apiFeatureCards;
+  List<Map<String, dynamic>>? _apiPriorityAgendas;
 
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
@@ -215,10 +212,14 @@ class _HomeTabState extends State<_HomeTab> {
         };
       }).toList();
 
+      // Fetch priority agendas
+      final priorityAgendas = await api.getPriorityAgendas();
+
       setState(() {
         _apiHeroSlides = heroSlides;
         _apiArticles = articles;
         _apiFeatureCards = featureCards;
+        _apiPriorityAgendas = priorityAgendas;
       });
     } catch (_) {
       // Fallback data will be used via computed getters
@@ -299,7 +300,7 @@ class _HomeTabState extends State<_HomeTab> {
         ),
         SliverToBoxAdapter(
           child: SizedBox(
-            height: 220,
+            height: 260,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -307,14 +308,26 @@ class _HomeTabState extends State<_HomeTab> {
               itemBuilder: (context, index) {
                 final article = _articles[index];
                 return _NewsCard(
-                  title: article.getTitle(langCode),
-                  subtitle: article.getContent(langCode),
-                  imageUrl: article.imageUrl,
-                  date: '${article.publishDate.day}/${article.publishDate.month}/${article.publishDate.year}',
+                  article: article,
+                  langCode: langCode,
                   onTap: () {},
                 );
               },
             ),
+          ),
+        ),
+
+        // Priority Agendas Section
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+            child: _buildSectionTitle(context, 'Priority Agendas'),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildPriorityAgendasSection(context),
           ),
         ),
 
@@ -336,123 +349,27 @@ class _HomeTabState extends State<_HomeTab> {
             ),
             delegate: SliverChildListDelegate([
               _FeatureItem(
-                title: l10n.digitalMagazine,
-                subtitle: l10n.digitalMagazineDesc,
-                icon: Icons.menu_book,
-                color: AppColors.burundiGreen,
-                onTap: () {},
-              ),
-              _FeatureItem(
-                title: l10n.consularServices,
-                subtitle: l10n.consularServicesDesc,
-                icon: Icons.account_balance,
-                color: AppColors.auGold,
-                onTap: () {},
-              ),
-              _FeatureItem(
-                title: l10n.embassyLocations,
-                subtitle: l10n.embassyLocationsDesc,
-                icon: Icons.location_on,
-                color: AppColors.info,
-                onTap: () {},
-              ),
-              _FeatureItem(
-                title: l10n.liveFeeds,
-                subtitle: l10n.liveFeedsDesc,
-                icon: Icons.live_tv,
-                color: AppColors.burundiRed,
-                onTap: () => Navigator.pushNamed(context, '/live-feeds'),
-              ),
-            ]),
-          ),
-        ),
-
-        // More Features
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.2,
-            ),
-            delegate: SliverChildListDelegate([
-              _FeatureItem(
-                title: l10n.resources,
-                subtitle: l10n.resourcesDesc,
-                icon: Icons.folder,
-                color: AppColors.patternOrange,
-                onTap: () => Navigator.pushNamed(context, '/resources'),
-              ),
-              _FeatureItem(
-                title: l10n.quickReference,
-                subtitle: l10n.quickReferenceDesc,
-                icon: Icons.info,
-                color: AppColors.patternBrown,
-                onTap: () {},
-              ),
-              _FeatureItem(
                 title: 'Gallery',
-                subtitle: 'Photos & Videos',
-                icon: Icons.photo_library,
-                color: Colors.purple,
-                onTap: () {},
+                subtitle: 'Browse photo albums',
+                icon: Icons.photo_library_rounded,
+                color: AppColors.burundiGreen,
+                onTap: () => Navigator.pushNamed(context, '/gallery'),
               ),
               _FeatureItem(
-                title: l10n.emergencySos,
-                subtitle: l10n.emergencySosDesc,
-                icon: Icons.emergency,
-                color: AppColors.emergency,
-                onTap: () => Navigator.pushNamed(context, '/emergency'),
-                isEmergency: true,
+                title: 'Videos',
+                subtitle: 'Watch highlights & speeches',
+                icon: Icons.play_circle_rounded,
+                color: AppColors.burundiRed,
+                onTap: () => Navigator.pushNamed(context, '/videos'),
+              ),
+              _FeatureItem(
+                title: 'Social Media',
+                subtitle: 'Connect with us online',
+                icon: Icons.share_rounded,
+                color: AppColors.auGold,
+                onTap: () => Navigator.pushNamed(context, '/social-media'),
               ),
             ]),
-          ),
-        ),
-
-        // Additional Features
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-            child: _buildSectionTitle(context, 'More Services'),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                _ServiceListItem(
-                  title: 'Travel Advisory',
-                  subtitle: 'Latest travel information and alerts',
-                  icon: Icons.flight,
-                  color: AppColors.burundiGreen,
-                  onTap: () {},
-                ),
-                _ServiceListItem(
-                  title: 'Cultural Events',
-                  subtitle: 'Upcoming cultural programs',
-                  icon: Icons.celebration,
-                  color: AppColors.auGold,
-                  onTap: () {},
-                ),
-                _ServiceListItem(
-                  title: 'Business Connect',
-                  subtitle: 'Trade and investment opportunities',
-                  icon: Icons.business_center,
-                  color: AppColors.info,
-                  onTap: () {},
-                ),
-                _ServiceListItem(
-                  title: 'Education',
-                  subtitle: 'Scholarship and study information',
-                  icon: Icons.school,
-                  color: AppColors.patternOrange,
-                  onTap: () {},
-                ),
-              ],
-            ),
           ),
         ),
 
@@ -922,7 +839,7 @@ class _HomeTabState extends State<_HomeTab> {
       {'title': l10n.translate('live'), 'icon': Icons.play_circle_filled_rounded, 'hasLiveDot': true,
         'onTap': () => Navigator.pushNamed(context, '/live-feeds')},
       {'title': l10n.magazine, 'icon': Icons.auto_stories_rounded,
-        'onTap': () => Navigator.pushNamed(context, '/magazine')},
+        'onTap': () => widget.onSwitchTab?.call(1)},
       {'title': l10n.resources, 'icon': Icons.folder_copy_rounded,
         'onTap': () => Navigator.pushNamed(context, '/resources')},
       {'title': 'News', 'icon': Icons.article_rounded,
@@ -936,6 +853,216 @@ class _HomeTabState extends State<_HomeTab> {
     ];
 
     return _QuickAccessGrid(items: items);
+  }
+
+  Widget _buildPriorityAgendasSection(BuildContext context) {
+    // Map slugs to routes and icons
+    final slugRoutes = {
+      'water-sanitation': {'route': '/water-sanitation', 'icon': Icons.water_drop},
+      'arise-initiative': {'route': '/arise-initiative', 'icon': Icons.trending_up},
+      'peace-security': {'route': '/peace-security', 'icon': Icons.security},
+    };
+
+    // Use API data if available, otherwise fallback
+    final agendas = _apiPriorityAgendas ?? [
+      {
+        'title': 'Water & Sanitation',
+        'description': 'Clean water access and sanitation infrastructure for all',
+        'slug': 'water-sanitation',
+        'hero_image': null,
+      },
+      {
+        'title': 'A-RISE Initiative',
+        'description': 'Africa Rising Initiative for Sustainable Economy',
+        'slug': 'arise-initiative',
+        'hero_image': null,
+      },
+      {
+        'title': 'Peace & Security',
+        'description': 'Building a stable and secure Africa',
+        'slug': 'peace-security',
+        'hero_image': null,
+      },
+    ];
+
+    final langCode = Localizations.localeOf(context).languageCode;
+
+    // Theme colors per agenda for fallback backgrounds
+    final slugColors = {
+      'water-sanitation': [const Color(0xFF0077B6), const Color(0xFF00B4D8)],
+      'arise-initiative': [const Color(0xFFB8860B), const Color(0xFFDAA520)],
+      'peace-security': [const Color(0xFF1B5E20), const Color(0xFF2E7D32)],
+    };
+
+    return Column(
+      children: agendas.map((agenda) {
+        final slug = agenda['slug'] as String;
+        final routeInfo = slugRoutes[slug];
+        if (routeInfo == null) return const SizedBox.shrink();
+
+        final title = langCode == 'fr' ? (agenda['title_fr'] ?? agenda['title']) : agenda['title'];
+        final description = langCode == 'fr' ? (agenda['description_fr'] ?? agenda['description']) : agenda['description'];
+        final heroImage = agenda['hero_image'];
+        final hasImage = heroImage != null && heroImage.toString().isNotEmpty;
+        final fallbackColors = slugColors[slug] ?? [AppColors.burundiGreen, AppColors.auGold];
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: InkWell(
+            onTap: () => Navigator.pushNamed(context, routeInfo['route'] as String),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 130,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: fallbackColors[0].withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Background - hero image or themed gradient
+                    if (hasImage)
+                      CachedNetworkImage(
+                        imageUrl: heroImage.toString().replaceAll('127.0.0.1', 'localhost'),
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: fallbackColors,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: fallbackColors,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: fallbackColors,
+                          ),
+                        ),
+                      ),
+
+                    // Dark overlay for text readability (stronger on images)
+                    if (hasImage)
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.65),
+                              Colors.black.withValues(alpha: 0.3),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.3),
+                              Colors.black.withValues(alpha: 0.05),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    // Content
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Icon(
+                              routeInfo['icon'] as IconData,
+                              size: 32,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  title as String,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  description as String,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
   }
 
   Widget _buildSectionTitle(BuildContext context, String title, {bool showSeeAll = false}) {
@@ -967,7 +1094,7 @@ class _HomeTabState extends State<_HomeTab> {
         ),
         if (showSeeAll)
           TextButton(
-            onPressed: () {},
+            onPressed: () => Navigator.pushNamed(context, '/news'),
             child: const Row(
               children: [
                 Text(
@@ -1153,17 +1280,13 @@ class _FeatureItem extends StatelessWidget {
 
 // News Card Widget
 class _NewsCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String imageUrl;
-  final String date;
+  final Article article;
+  final String langCode;
   final VoidCallback onTap;
 
   const _NewsCard({
-    required this.title,
-    required this.subtitle,
-    required this.imageUrl,
-    required this.date,
+    required this.article,
+    required this.langCode,
     required this.onTap,
   });
 
@@ -1171,6 +1294,9 @@ class _NewsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final catColor = article.category?.parsedColor ?? AppColors.burundiGreen;
+    final catLabel = article.category?.getDisplayName(langCode) ?? '';
+    final date = '${article.publishDate.day}/${article.publishDate.month}/${article.publishDate.year}';
 
     return GestureDetector(
       onTap: onTap,
@@ -1191,56 +1317,95 @@ class _NewsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image placeholder with gradient
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.burundiGreen.withValues(alpha: 0.8),
-                    AppColors.burundiGreen.withValues(alpha: 0.4),
-                  ],
-                ),
-              ),
-              child: Stack(
-                children: [
-                  // Pattern overlay
-                  CustomPaint(
-                    size: const Size(260, 120),
-                    painter: _CardPatternPainter(),
-                  ),
-                  // Image placeholder
-                  Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 40,
-                      color: Colors.white.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  // Date badge
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: AppColors.auGold,
-                        borderRadius: BorderRadius.circular(12),
+            // Image with category badge
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+              child: SizedBox(
+                height: 120,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (article.imageUrl.isNotEmpty)
+                      CachedNetworkImage(
+                        imageUrl: article.imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                catColor.withValues(alpha: 0.6),
+                                catColor.withValues(alpha: 0.3),
+                              ],
+                            ),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: catColor.withValues(alpha: 0.2),
+                          child: Icon(Icons.article_rounded, size: 40, color: Colors.white.withValues(alpha: 0.5)),
+                        ),
+                      )
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              catColor.withValues(alpha: 0.8),
+                              catColor.withValues(alpha: 0.4),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(Icons.article_rounded, size: 40, color: Colors.white.withValues(alpha: 0.5)),
+                        ),
                       ),
-                      child: Text(
-                        date,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    // Category badge
+                    if (catLabel.isNotEmpty)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: catColor,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            catLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    // Date badge
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.auGold,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          date,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -1250,23 +1415,66 @@ class _NewsCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      article.getTitle(langCode),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Expanded(
-                      child: Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    const Spacer(),
+                    // Engagement stats row
+                    Row(
+                      children: [
+                        Icon(Icons.visibility_rounded, size: 13,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${article.viewCount}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        const SizedBox(width: 10),
+                        Icon(Icons.chat_bubble_outline_rounded, size: 13,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${article.commentCount}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Icon(
+                          article.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          size: 13,
+                          color: article.isLiked
+                              ? AppColors.burundiRed
+                              : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${article.likeCount}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            color: article.isLiked
+                                ? AppColors.burundiRed
+                                : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          article.author,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1401,15 +1609,34 @@ class _MagazineTab extends StatefulWidget {
   State<_MagazineTab> createState() => _MagazineTabState();
 }
 
-class _MagazineTabState extends State<_MagazineTab> {
+class _MagazineTabState extends State<_MagazineTab> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<MagazineEdition>? _editions;
   List<Article>? _articles;
   bool _isLoading = true;
 
+  // Search & filters
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  int? _selectedYear;
+  int? _selectedMonth;
+  String? _selectedCategory;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) setState(() {});
+    });
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -1431,36 +1658,127 @@ class _MagazineTabState extends State<_MagazineTab> {
     }
   }
 
+  Future<void> _toggleLike(MagazineEdition edition) async {
+    // Optimistic update
+    final index = _editions?.indexWhere((e) => e.id == edition.id) ?? -1;
+    if (index == -1) return;
+    final wasLiked = edition.isLiked;
+    setState(() {
+      _editions![index] = edition.copyWith(
+        isLiked: !wasLiked,
+        likeCount: edition.likeCount + (wasLiked ? -1 : 1),
+      );
+    });
+    try {
+      await ApiService().post('magazines/${edition.id}/toggle_like/', {});
+    } catch (_) {
+      // Revert on failure
+      if (!mounted) return;
+      setState(() {
+        _editions![index] = edition;
+      });
+    }
+  }
+
+  void _openPdf(BuildContext context, MagazineEdition edition) {
+    final langCode = context.read<LanguageProvider>().languageCode;
+    final url = edition.openablePdfUrl;
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('PDF not available yet. Please check back later.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PdfViewerScreen(
+          pdfUrl: url,
+          title: edition.getTitle(langCode),
+          magazineId: edition.id,
+        ),
+      ),
+    );
+  }
+
+  List<MagazineEdition> get _filteredEditions {
+    var list = _editions ?? [];
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((e) =>
+          e.title.toLowerCase().contains(q) ||
+          e.titleFr.toLowerCase().contains(q)).toList();
+    }
+    if (_selectedYear != null) {
+      list = list.where((e) => e.publishDate.year == _selectedYear).toList();
+    }
+    if (_selectedMonth != null) {
+      list = list.where((e) => e.publishDate.month == _selectedMonth).toList();
+    }
+    return list;
+  }
+
+  List<Article> get _filteredArticles {
+    var list = _articles ?? [];
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((a) =>
+          a.title.toLowerCase().contains(q) ||
+          a.titleFr.toLowerCase().contains(q)).toList();
+    }
+    if (_selectedCategory != null) {
+      list = list.where((a) => a.category?.name == _selectedCategory).toList();
+    }
+    return list;
+  }
+
+  Set<int> get _availableYears {
+    return (_editions ?? []).map((e) => e.publishDate.year).toSet();
+  }
+
+  Set<String> get _availableCategories {
+    return (_articles ?? [])
+        .where((a) => a.category != null)
+        .map((a) => a.category!.name)
+        .toSet();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final langCode = context.watch<LanguageProvider>().languageCode;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final editions = _editions ?? [];
-    final articles = _articles ?? [];
+
     if (_isLoading) return const Center(child: CircularProgressIndicator());
-    if (editions.isEmpty) return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.auto_stories, size: 64, color: AppColors.burundiGreen.withValues(alpha: 0.4)),
-          const SizedBox(height: 16),
-          Text(l10n.noData, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          TextButton(onPressed: _loadData, child: Text(l10n.retry)),
-        ],
-      ),
-    );
-    final featured = editions.first;
+
+    final editions = _editions ?? [];
+    if (editions.isEmpty && (_articles ?? []).isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_stories, size: 64, color: AppColors.burundiGreen.withValues(alpha: 0.4)),
+            const SizedBox(height: 16),
+            Text(l10n.noData, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            TextButton(onPressed: _loadData, child: Text(l10n.retry)),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
           // Gradient app bar
           SliverAppBar(
             expandedHeight: 120,
             pinned: true,
+            forceElevated: innerBoxIsScrolled,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 l10n.digitalMagazine,
@@ -1479,503 +1797,686 @@ class _MagazineTabState extends State<_MagazineTab> {
                 ),
               ),
             ),
-          ),
-
-          // Featured Edition
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.translate('featured_edition'),
-                    style: theme.textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 220,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: const LinearGradient(
-                        colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                          blurRadius: 15,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        CustomPaint(
-                          size: const Size(double.infinity, 220),
-                          painter: _CardPatternPainter(),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Row(
-                            children: [
-                              // Cover placeholder
-                              Container(
-                                width: 120,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.menu_book, color: Colors.white.withValues(alpha: 0.7), size: 40),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'AU\nSUMMIT',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.9),
-                                        fontFamily: 'HeatherGreen',
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.auGold,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text('FEATURED', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      featured.getTitle(langCode),
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'HeatherGreen'),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      featured.getDescription(langCode),
-                                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12, height: 1.3),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.download, size: 16, color: AppColors.burundiGreen),
-                                          SizedBox(width: 6),
-                                          Text('Download', style: TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.bold, fontSize: 12)),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Past Editions
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Text(l10n.translate('past_editions'), style: theme.textTheme.headlineMedium),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 180,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: editions.length,
-                itemBuilder: (context, index) {
-                  final edition = editions[index];
-                  final colors = [
-                    [AppColors.burundiGreen, const Color(0xFF4CAF50)],
-                    [AppColors.burundiRed, const Color(0xFFE57373)],
-                    [AppColors.auGold, const Color(0xFFFFD54F)],
-                  ];
-                  final gradientColors = colors[index % colors.length];
-                  return Container(
-                    width: 140,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: gradientColors),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(48),
+              child: Container(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: AppColors.burundiGreen,
+                  unselectedLabelColor: isDark ? AppColors.darkTextSecondary : Colors.grey[600],
+                  indicatorColor: AppColors.burundiGreen,
+                  indicatorWeight: 3,
+                  tabs: [
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.auto_stories, color: Colors.white.withValues(alpha: 0.8), size: 36),
-                          const SizedBox(height: 10),
-                          Text(
-                            edition.getTitle(langCode),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${edition.publishDate.day}/${edition.publishDate.month}/${edition.publishDate.year}',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
-                          ),
+                          const Icon(Icons.auto_stories, size: 18),
+                          const SizedBox(width: 6),
+                          Text(l10n.translate('magazines')),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // Articles
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Text(l10n.translate('articles'), style: theme.textTheme.headlineMedium),
-            ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final article = articles[index];
-                final categoryColors = {
-                  'Politics': AppColors.burundiGreen,
-                  'Economy': AppColors.auGold,
-                  'Culture': AppColors.burundiRed,
-                };
-                final catColor = categoryColors[article.category] ?? AppColors.info;
-                return Container(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurface : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.article_outlined, size: 18),
+                          const SizedBox(width: 6),
+                          Text(l10n.translate('articles')),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      // Image placeholder
-                      Container(
-                        width: 100,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [catColor, catColor.withValues(alpha: 0.6)]),
-                          borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-                        ),
-                        child: Center(
-                          child: Icon(Icons.article, color: Colors.white.withValues(alpha: 0.6), size: 32),
-                        ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: catColor.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(article.category, style: TextStyle(color: catColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    '${article.publishDate.day}/${article.publishDate.month}/${article.publishDate.year}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                article.getTitle(langCode),
-                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                article.getContent(langCode),
-                                style: theme.textTheme.bodySmall?.copyWith(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              childCount: articles.length,
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== CONSULAR TAB ====================
-class _ConsularTab extends StatelessWidget {
-  static const _services = [
-    {'title': 'Visa Services', 'description': 'Apply for tourist, business, or transit visas', 'icon': Icons.card_membership},
-    {'title': 'Passport Services', 'description': 'New passports, renewals, and replacements', 'icon': Icons.badge},
-    {'title': 'Citizen Registration', 'description': 'Birth, marriage, and civil registration', 'icon': Icons.how_to_reg},
-    {'title': 'Travel Advisory', 'description': 'Current travel alerts and safety info', 'icon': Icons.flight_takeoff},
-    {'title': 'Appointments', 'description': 'Schedule consular service appointments', 'icon': Icons.calendar_month},
-    {'title': 'Legal Assistance', 'description': 'Notarial services and legal support', 'icon': Icons.gavel},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final serviceColors = [
-      AppColors.burundiGreen,
-      AppColors.burundiRed,
-      AppColors.auGold,
-      AppColors.info,
-      const Color(0xFF7B1FA2),
-      AppColors.patternBrown,
-    ];
-
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // Gradient header
-          SliverAppBar(
-            expandedHeight: 120,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                l10n.consularServices,
-                style: const TextStyle(fontFamily: 'HeatherGreen', fontSize: 20),
-              ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.burundiRed, Color(0xFF8B0000)],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Service Cards Grid
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.95,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final service = _services[index];
-                  final color = serviceColors[index % serviceColors.length];
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: [color, color.withValues(alpha: 0.7)]),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(service['icon'] as IconData, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          service['title'] as String,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Flexible(
-                          child: Text(
-                            service['description'] as String,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const Spacer(),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Icon(Icons.arrow_forward_ios, size: 14, color: color),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                childCount: _services.length,
-              ),
-            ),
-          ),
-
-          // Emergency Contacts Section
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Text(
-                l10n.translate('emergency_contacts'),
-                style: theme.textTheme.headlineMedium,
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.emergency.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.emergency.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  children: [
-                    _EmergencyContactRow(
-                      icon: Icons.account_balance,
-                      label: l10n.translate('embassy'),
-                      number: AppConstants.embassyNumber,
-                    ),
-                    const Divider(height: 20),
-                    _EmergencyContactRow(
-                      icon: Icons.local_police,
-                      label: l10n.translate('police'),
-                      number: AppConstants.policeNumber,
-                    ),
-                    const Divider(height: 20),
-                    _EmergencyContactRow(
-                      icon: Icons.local_hospital,
-                      label: l10n.translate('ambulance'),
-                      number: AppConstants.ambulanceNumber,
-                    ),
-                    const Divider(height: 20),
-                    _EmergencyContactRow(
-                      icon: Icons.local_fire_department,
-                      label: l10n.translate('fire_department'),
-                      number: AppConstants.fireNumber,
                     ),
                   ],
                 ),
               ),
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
+        body: Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) => setState(() => _searchQuery = val),
+                decoration: InputDecoration(
+                  hintText: l10n.translate('search'),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            // Filter chips
+            _buildFilterChips(langCode, isDark),
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildMagazinesGrid(context, langCode, isDark),
+                  _buildArticlesList(context, langCode, isDark, theme),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips(String langCode, bool isDark) {
+    final isMagazineTab = _tabController.index == 0;
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        children: isMagazineTab
+            ? _buildMagazineFilters(isDark)
+            : _buildArticleFilters(langCode, isDark),
+      ),
+    );
+  }
+
+  List<Widget> _buildMagazineFilters(bool isDark) {
+    final chips = <Widget>[];
+    // Year chips
+    final years = _availableYears.toList()..sort((a, b) => b.compareTo(a));
+    for (final year in years) {
+      final selected = _selectedYear == year;
+      chips.add(Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilterChip(
+          label: Text('$year'),
+          selected: selected,
+          onSelected: (val) => setState(() => _selectedYear = val ? year : null),
+          selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+          checkmarkColor: AppColors.burundiGreen,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            color: selected ? AppColors.burundiGreen : (isDark ? Colors.grey[300] : Colors.grey[700]),
+          ),
+          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+          side: BorderSide(
+            color: selected ? AppColors.burundiGreen : Colors.transparent,
+          ),
+          visualDensity: VisualDensity.compact,
+        ),
+      ));
+    }
+    // Month chips
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (int i = 0; i < months.length; i++) {
+      final monthNum = i + 1;
+      final selected = _selectedMonth == monthNum;
+      chips.add(Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: FilterChip(
+          label: Text(months[i]),
+          selected: selected,
+          onSelected: (val) => setState(() => _selectedMonth = val ? monthNum : null),
+          selectedColor: AppColors.auGold.withValues(alpha: 0.2),
+          checkmarkColor: AppColors.auGold,
+          labelStyle: TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            color: selected ? AppColors.auGold : (isDark ? Colors.grey[400] : Colors.grey[600]),
+          ),
+          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[50],
+          side: BorderSide(
+            color: selected ? AppColors.auGold : Colors.transparent,
+          ),
+          visualDensity: VisualDensity.compact,
+        ),
+      ));
+    }
+    return chips;
+  }
+
+  List<Widget> _buildArticleFilters(String langCode, bool isDark) {
+    final cats = _availableCategories.toList()..sort();
+    // "All" chip
+    final allSelected = _selectedCategory == null;
+    final chips = <Widget>[
+      Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilterChip(
+          label: const Text('All'),
+          selected: allSelected,
+          onSelected: (_) => setState(() => _selectedCategory = null),
+          selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+          checkmarkColor: AppColors.burundiGreen,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: allSelected ? FontWeight.bold : FontWeight.normal,
+            color: allSelected ? AppColors.burundiGreen : (isDark ? Colors.grey[300] : Colors.grey[700]),
+          ),
+          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+          side: BorderSide(color: allSelected ? AppColors.burundiGreen : Colors.transparent),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+    ];
+    for (final cat in cats) {
+      final selected = _selectedCategory == cat;
+      // Find matching category to get color
+      final catObj = (_articles ?? [])
+          .where((a) => a.category?.name == cat)
+          .map((a) => a.category)
+          .first;
+      final catColor = catObj?.parsedColor ?? AppColors.burundiGreen;
+      chips.add(Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: FilterChip(
+          label: Text(catObj?.getDisplayName(langCode) ?? cat),
+          selected: selected,
+          onSelected: (val) => setState(() => _selectedCategory = val ? cat : null),
+          selectedColor: catColor.withValues(alpha: 0.2),
+          checkmarkColor: catColor,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            color: selected ? catColor : (isDark ? Colors.grey[300] : Colors.grey[700]),
+          ),
+          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+          side: BorderSide(color: selected ? catColor : Colors.transparent),
+          visualDensity: VisualDensity.compact,
+        ),
+      ));
+    }
+    return chips;
+  }
+
+  Widget _buildMagazinesGrid(BuildContext context, String langCode, bool isDark) {
+    final filtered = _filteredEditions;
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            Text('No magazines found', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => _isLoading = true);
+        await _loadData();
+      },
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.62,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final mag = filtered[index];
+          return _buildMagCard(context, mag, langCode, isDark);
+        },
+      ),
+    );
+  }
+
+  void _showMagInfo(BuildContext context, MagazineEdition magazine, String langCode) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (_, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Portrait image gallery (cover + additional images)
+              if (magazine.coverImageUrl.isNotEmpty || magazine.images.isNotEmpty)
+                SizedBox(
+                  height: 280,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 1 + magazine.images.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final imageUrl = index == 0
+                          ? magazine.coverImageUrl
+                          : magazine.images[index - 1].imageUrl;
+                      final caption = index == 0
+                          ? null
+                          : magazine.images[index - 1].getCaption(langCode);
+                      return Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              height: caption != null && caption.isNotEmpty ? 250 : 280,
+                              width: 190,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => Container(
+                                width: 190,
+                                height: caption != null && caption.isNotEmpty ? 250 : 280,
+                                decoration: BoxDecoration(
+                                  color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                              ),
+                              errorWidget: (_, _, _) => Container(
+                                width: 190,
+                                height: caption != null && caption.isNotEmpty ? 250 : 280,
+                                decoration: BoxDecoration(
+                                  color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.auto_stories, size: 40, color: AppColors.burundiGreen),
+                                    SizedBox(height: 8),
+                                    Text('Magazine', style: TextStyle(color: AppColors.burundiGreen)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (caption != null && caption.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: SizedBox(
+                                width: 190,
+                                child: Text(
+                                  caption,
+                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                magazine.getTitle(langCode),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'HeatherGreen'),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                DateFormat('MMMM dd, yyyy').format(magazine.publishDate),
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              // Stats row
+              Row(
+                children: [
+                  _infoStat(Icons.visibility, '${magazine.viewCount}', 'Views'),
+                  const SizedBox(width: 16),
+                  _infoStat(Icons.favorite, '${magazine.likeCount}', 'Likes'),
+                  if (magazine.pageCount > 0) ...[
+                    const SizedBox(width: 16),
+                    _infoStat(Icons.description, '${magazine.pageCount}', 'Pages'),
+                  ],
+                  if (magazine.fileSize.isNotEmpty) ...[
+                    const SizedBox(width: 16),
+                    _infoStat(Icons.storage, magazine.fileSize, 'Size'),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                magazine.getDescription(langCode),
+                style: const TextStyle(fontSize: 15, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openPdf(context, magazine);
+                  },
+                  icon: const Icon(Icons.menu_book),
+                  label: Text(magazine.hasPdf ? 'Read Magazine' : 'PDF Not Available'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.burundiGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoStat(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: AppColors.burundiGreen),
+        const SizedBox(height: 3),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+      ],
+    );
+  }
+
+  Widget _buildMagCard(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        onTap: () => _openPdf(context, magazine),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cover image
+            Expanded(
+              flex: 3,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CachedNetworkImage(
+                    imageUrl: magazine.coverImageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => Container(
+                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    errorWidget: (_, _, _) => Container(
+                      color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                      child: const Icon(Icons.auto_stories_rounded, size: 36, color: AppColors.burundiGreen),
+                    ),
+                  ),
+                  // Info button (top-right)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: GestureDetector(
+                      onTap: () => _showMagInfo(context, magazine, langCode),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.info_outline, size: 15, color: AppColors.burundiGreen),
+                      ),
+                    ),
+                  ),
+                  // PDF badge
+                  if (magazine.hasPdf)
+                    Positioned(
+                      bottom: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.burundiRed,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.picture_as_pdf, size: 11, color: Colors.white),
+                            SizedBox(width: 3),
+                            Text('PDF', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (magazine.isFeatured)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.auGold,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'FEATURED',
+                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Info section
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+              child: Text(
+                magazine.getTitle(langCode),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'HeatherGreen',
+                  color: isDark ? AppColors.darkText : AppColors.lightText,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                DateFormat('MMM yyyy').format(magazine.publishDate),
+                style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+              ),
+            ),
+            const SizedBox(height: 6),
+            // Stat pills
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Row(
+                children: [
+                  _miniPill(Icons.visibility, '${magazine.viewCount}', isDark),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => _toggleLike(magazine),
+                    child: _miniPill(
+                      magazine.isLiked ? Icons.favorite : Icons.favorite_border,
+                      '${magazine.likeCount}',
+                      isDark,
+                      iconColor: magazine.isLiked ? Colors.red : Colors.red[400],
+                    ),
+                  ),
+                  if (magazine.pageCount > 0) ...[
+                    const Spacer(),
+                    _miniPill(Icons.description, '${magazine.pageCount}p', isDark),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniPill(IconData icon, String value, bool isDark, {Color? iconColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: iconColor ?? (isDark ? Colors.grey[400] : Colors.grey[500])),
+          const SizedBox(width: 3),
+          Text(value, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.grey[300] : Colors.grey[700])),
         ],
       ),
     );
   }
-}
 
-class _EmergencyContactRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String number;
-
-  const _EmergencyContactRow({
-    required this.icon,
-    required this.label,
-    required this.number,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.emergency, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-              Text(number, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ),
+  Widget _buildArticlesList(BuildContext context, String langCode, bool isDark, ThemeData theme) {
+    final filtered = _filteredArticles;
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 12),
+            Text('No articles found', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+          ],
         ),
-        GestureDetector(
-          onTap: () => launchUrl(Uri.parse('tel:$number')),
-          child: Container(
-            padding: const EdgeInsets.all(8),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => _isLoading = true);
+        await _loadData();
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final article = filtered[index];
+          final catColor = article.category?.parsedColor ?? AppColors.info;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: AppColors.emergency.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              color: isDark ? AppColors.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: const Icon(Icons.phone, color: AppColors.emergency, size: 20),
-          ),
-        ),
-      ],
+            child: Row(
+              children: [
+                // Image / category color
+                Container(
+                  width: 100,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [catColor, catColor.withValues(alpha: 0.6)]),
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.article, color: Colors.white.withValues(alpha: 0.6), size: 32),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: catColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                article.category?.getDisplayName(langCode) ?? '',
+                                style: TextStyle(color: catColor, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              DateFormat('d/M/yyyy').format(article.publishDate),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          article.getTitle(langCode),
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          article.getContent(langCode),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

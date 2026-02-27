@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
@@ -141,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                             child: Text(
                               'REPUBLIC OF BURUNDI',
-                              style: GoogleFonts.oswald(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.burundiWhite.withValues(alpha: 0.95),
@@ -159,7 +158,7 @@ class _SplashScreenState extends State<SplashScreen>
                             ).createShader(bounds),
                             child: Text(
                               'AFRICAN UNION',
-                              style: GoogleFonts.oswald(
+                              style: TextStyle(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -176,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                               const SizedBox(width: 15),
                               Text(
                                 'CHAIRMANSHIP 2026',
-                                style: GoogleFonts.oswald(
+                                style: TextStyle(
                                   fontSize: 25,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.burundiWhite,

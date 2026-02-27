@@ -24,7 +24,7 @@ class AppConstants {
   static const String summitTheme = 'Africa We Want: Building a Resilient and Prosperous Continent';
 
   // API Endpoints
-  static const String baseApiUrl = 'http://127.0.0.1:8000/api';
+  static const String baseApiUrl = 'http://localhost:8000/api';
 
   // Storage Keys
   static const String themeKey = 'theme_mode';

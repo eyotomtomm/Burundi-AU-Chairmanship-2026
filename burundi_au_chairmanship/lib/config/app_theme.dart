@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 class AppTheme {
@@ -91,27 +90,27 @@ class AppTheme {
         fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
-      titleLarge: GoogleFonts.oswald(
+      titleLarge: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
         color: AppColors.lightText,
       ),
-      titleMedium: GoogleFonts.oswald(
+      titleMedium: const TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w500,
         color: AppColors.lightText,
       ),
-      bodyLarge: GoogleFonts.oswald(
+      bodyLarge: const TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: AppColors.lightText,
       ),
-      bodyMedium: GoogleFonts.oswald(
+      bodyMedium: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: AppColors.lightTextSecondary,
       ),
-      labelLarge: GoogleFonts.oswald(
+      labelLarge: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: AppColors.lightText,
@@ -218,27 +217,27 @@ class AppTheme {
         fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
-      titleLarge: GoogleFonts.oswald(
+      titleLarge: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.w600,
         color: AppColors.darkText,
       ),
-      titleMedium: GoogleFonts.oswald(
+      titleMedium: const TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w500,
         color: AppColors.darkText,
       ),
-      bodyLarge: GoogleFonts.oswald(
+      bodyLarge: const TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w400,
         color: AppColors.darkText,
       ),
-      bodyMedium: GoogleFonts.oswald(
+      bodyMedium: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         color: AppColors.darkTextSecondary,
       ),
-      labelLarge: GoogleFonts.oswald(
+      labelLarge: const TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: AppColors.darkText,

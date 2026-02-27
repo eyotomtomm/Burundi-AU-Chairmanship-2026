@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -79,7 +78,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
       appBar: AppBar(
         title: Text(
           l10n.translate('translate'),
-          style: GoogleFonts.oswald(fontWeight: FontWeight.w600),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
@@ -114,7 +113,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                           Text(labels[entry.key]!),
                         ],
                       ),
-                      labelStyle: GoogleFonts.oswald(
+                      labelStyle: TextStyle(
                         fontSize: 13,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                         color: isSelected ? Colors.white : (isDark ? AppColors.darkText : AppColors.lightText),
@@ -139,15 +138,15 @@ class _TranslateScreenState extends State<TranslateScreen> {
               children: [
                 Expanded(
                   flex: 2,
-                  child: Text('Kirundi', style: GoogleFonts.oswald(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
+                  child: Text('Kirundi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('English', style: GoogleFonts.oswald(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.burundiRed)),
+                  child: Text('English', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.burundiRed)),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Français', style: GoogleFonts.oswald(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.auGold)),
+                  child: Text('Français', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.auGold)),
                 ),
               ],
             ),
@@ -173,7 +172,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                         flex: 2,
                         child: Text(
                           phrase['kirundi']!,
-                          style: GoogleFonts.oswald(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                             color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -184,7 +183,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                         flex: 2,
                         child: Text(
                           phrase['en']!,
-                          style: GoogleFonts.oswald(
+                          style: TextStyle(
                             fontSize: 14,
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                           ),
@@ -194,7 +193,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                         flex: 2,
                         child: Text(
                           phrase['fr']!,
-                          style: GoogleFonts.oswald(
+                          style: TextStyle(
                             fontSize: 14,
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                           ),

@@ -1,6 +1,6 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
@@ -78,7 +78,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     // App title
                     Text(
                       'BURUNDI',
-                      style: GoogleFonts.oswald(
+                      style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: AppColors.burundiGreen,
@@ -88,7 +88,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     const SizedBox(height: 2),
                     Text(
                       'AU CHAIRMANSHIP 2026',
-                      style: GoogleFonts.oswald(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -161,7 +161,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             onPressed: () => _skipAuth(context),
             icon: Text(
               l10n.skipForNow,
-              style: GoogleFonts.oswald(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: AppColors.burundiGreen,
@@ -191,7 +191,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         ),
         child: Text(
           label,
-          style: GoogleFonts.oswald(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
             color: isSelected
@@ -242,11 +242,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
         unselectedLabelColor: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-        labelStyle: GoogleFonts.oswald(
+        labelStyle: TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 15,
         ),
-        unselectedLabelStyle: GoogleFonts.oswald(
+        unselectedLabelStyle: TextStyle(
           fontWeight: FontWeight.w400,
           fontSize: 15,
         ),
@@ -268,7 +268,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           // Welcome text
           Text(
             l10n.welcomeBack,
-            style: GoogleFonts.oswald(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w600,
               color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -277,7 +277,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           const SizedBox(height: 4),
           Text(
             l10n.signInContinue,
-            style: GoogleFonts.oswald(
+            style: TextStyle(
               fontSize: 14,
               color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
             ),
@@ -320,7 +320,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               style: TextButton.styleFrom(padding: EdgeInsets.zero),
               child: Text(
                 l10n.forgotPassword,
-                style: GoogleFonts.oswald(
+                style: TextStyle(
                   fontSize: 13,
                   color: AppColors.burundiGreen,
                 ),
@@ -335,6 +335,68 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             onPressed: () => _signIn(context),
             isLoading: context.watch<AuthProvider>().isLoading,
             color: AppColors.burundiGreen,
+          ),
+          const SizedBox(height: 20),
+
+          // OR divider
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Social Sign-In buttons (side by side)
+          Row(
+            children: [
+              // Google Sign-In button
+              Expanded(
+                child: _buildSocialButton(
+                  label: 'Google',
+                  iconPath: 'assets/icons/google_logo.png',
+                  onPressed: () => _signInWithGoogle(context),
+                  backgroundColor: Colors.white,
+                  textColor: Colors.black87,
+                  borderColor: Colors.grey[300]!,
+                  isLoading: context.watch<AuthProvider>().isLoading,
+                ),
+              ),
+              if (Platform.isIOS) const SizedBox(width: 12),
+              // Apple Sign-In button (iOS only)
+              if (Platform.isIOS)
+                Expanded(
+                  child: _buildSocialButton(
+                    label: 'Apple',
+                    icon: Icons.apple,
+                    onPressed: () => _signInWithApple(context),
+                    backgroundColor: Colors.black,
+                    textColor: Colors.white,
+                    borderColor: Colors.black,
+                    isLoading: context.watch<AuthProvider>().isLoading,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
 
@@ -354,7 +416,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               children: [
                 Text(
                   l10n.skipForNow,
-                  style: GoogleFonts.oswald(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 1,
@@ -378,7 +440,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         children: [
           Text(
             l10n.createAccount,
-            style: GoogleFonts.oswald(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w600,
               color: isDark ? AppColors.darkText : AppColors.lightText,
@@ -387,7 +449,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           const SizedBox(height: 4),
           Text(
             'Join the Burundi AU community',
-            style: GoogleFonts.oswald(
+            style: TextStyle(
               fontSize: 14,
               color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
             ),
@@ -456,6 +518,68 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isLoading: context.watch<AuthProvider>().isLoading,
             color: AppColors.burundiRed,
           ),
+          const SizedBox(height: 20),
+
+          // OR divider
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Social Sign-In buttons (side by side)
+          Row(
+            children: [
+              // Google Sign-In button
+              Expanded(
+                child: _buildSocialButton(
+                  label: 'Google',
+                  iconPath: 'assets/icons/google_logo.png',
+                  onPressed: () => _signInWithGoogle(context),
+                  backgroundColor: Colors.white,
+                  textColor: Colors.black87,
+                  borderColor: Colors.grey[300]!,
+                  isLoading: context.watch<AuthProvider>().isLoading,
+                ),
+              ),
+              if (Platform.isIOS) const SizedBox(width: 12),
+              // Apple Sign-In button (iOS only)
+              if (Platform.isIOS)
+                Expanded(
+                  child: _buildSocialButton(
+                    label: 'Apple',
+                    icon: Icons.apple,
+                    onPressed: () => _signInWithApple(context),
+                    backgroundColor: Colors.black,
+                    textColor: Colors.white,
+                    borderColor: Colors.black,
+                    isLoading: context.watch<AuthProvider>().isLoading,
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
 
           // Continue as Guest button
@@ -474,7 +598,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               children: [
                 Text(
                   l10n.skipForNow,
-                  style: GoogleFonts.oswald(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 1,
@@ -503,10 +627,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
-      style: GoogleFonts.oswald(fontSize: 15),
+      style: TextStyle(fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: GoogleFonts.oswald(
+        hintStyle: TextStyle(
           color: isDark ? AppColors.darkTextSecondary : Colors.grey[400],
           fontSize: 15,
         ),
@@ -561,7 +685,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               )
             : Text(
                 label,
-                style: GoogleFonts.oswald(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1,
@@ -571,6 +695,50 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     );
   }
 
+  Widget _buildSocialButton({
+    required String label,
+    String? iconPath,
+    IconData? icon,
+    required VoidCallback onPressed,
+    required Color backgroundColor,
+    required Color textColor,
+    required Color borderColor,
+    required bool isLoading,
+  }) {
+    return SizedBox(
+      height: 50,
+      child: OutlinedButton(
+        onPressed: isLoading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: textColor,
+          side: BorderSide(color: borderColor),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (iconPath != null)
+              Image.asset(iconPath, width: 20, height: 20, errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.image_not_supported, size: 20);
+              })
+            else if (icon != null)
+              Icon(icon, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _signIn(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
@@ -593,6 +761,36 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (success && mounted) {
       Navigator.of(context).pushReplacementNamed('/home');
     }
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithGoogle();
+    if (success && mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else if (mounted && authProvider.errorMessage != null) {
+      _showErrorSnackBar(context, authProvider.errorMessage!);
+    }
+  }
+
+  Future<void> _signInWithApple(BuildContext context) async {
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithApple();
+    if (success && mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else if (mounted && authProvider.errorMessage != null) {
+      _showErrorSnackBar(context, authProvider.errorMessage!);
+    }
+  }
+
+  void _showErrorSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.burundiRed,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _skipAuth(BuildContext context) {

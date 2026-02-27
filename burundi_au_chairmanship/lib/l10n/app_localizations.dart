@@ -31,7 +31,6 @@ class AppLocalizations {
       // Navigation
       'home': 'Home',
       'magazine': 'Magazine',
-      'consular': 'Consular',
       'locations': 'Locations',
       'more': 'More',
 
@@ -64,8 +63,6 @@ class AppLocalizations {
       // Features
       'digital_magazine': 'Digital Magazine',
       'digital_magazine_desc': 'Read the latest publications and news',
-      'consular_services': 'Consular Services',
-      'consular_services_desc': 'Access consular services and information',
       'embassy_locations': 'Embassy Locations',
       'embassy_locations_desc': 'Find embassy and event locations',
       'live_feeds': 'Live Feeds',
@@ -87,14 +84,6 @@ class AppLocalizations {
       'share_location': 'Share Location',
       'emergency_help': 'Emergency Help',
       'tap_for_help': 'Tap for immediate assistance',
-
-      // Consular
-      'visa_services': 'Visa Services',
-      'passport_services': 'Passport Services',
-      'citizen_services': 'Citizen Services',
-      'notary_services': 'Notary Services',
-      'travel_advisory': 'Travel Advisory',
-      'appointment': 'Book Appointment',
 
       // Magazine
       'latest_edition': 'Latest Edition',
@@ -174,6 +163,33 @@ class AppLocalizations {
       'personal_info': 'Personal Information',
       'data_privacy': 'Data & Privacy',
       'danger_zone': 'Danger Zone',
+
+      // News / Articles engagement
+      'news': 'News',
+      'all_categories': 'All',
+      'politics': 'Politics',
+      'economy': 'Economy',
+      'culture': 'Culture',
+      'diplomacy': 'Diplomacy',
+      'featured': 'Featured',
+      'views': 'views',
+      'comments': 'Comments',
+      'likes': 'likes',
+      'like': 'Like',
+      'add_comment': 'Add a comment...',
+      'login_to_comment': 'Sign in to comment',
+      'login_to_like': 'Sign in to like',
+      'delete_comment': 'Delete Comment',
+      'delete_comment_confirm': 'Are you sure you want to delete this comment?',
+      'comment_posted': 'Comment posted',
+      'comment_deleted': 'Comment deleted',
+      'just_now': 'Just now',
+      'minutes_ago': 'min ago',
+      'hours_ago': 'h ago',
+      'days_ago': 'd ago',
+      'no_comments_yet': 'No comments yet. Be the first!',
+      'gallery': 'Gallery',
+      'watch_video': 'Watch Video',
     },
     'fr': {
       // App
@@ -194,7 +210,6 @@ class AppLocalizations {
       // Navigation
       'home': 'Accueil',
       'magazine': 'Magazine',
-      'consular': 'Consulaire',
       'locations': 'Emplacements',
       'more': 'Plus',
 
@@ -227,8 +242,6 @@ class AppLocalizations {
       // Features
       'digital_magazine': 'Magazine numérique',
       'digital_magazine_desc': 'Lisez les dernières publications et actualités',
-      'consular_services': 'Services consulaires',
-      'consular_services_desc': 'Accédez aux services et informations consulaires',
       'embassy_locations': "Emplacements de l'ambassade",
       'embassy_locations_desc': "Trouvez les emplacements de l'ambassade et des événements",
       'live_feeds': 'Diffusions en direct',
@@ -250,14 +263,6 @@ class AppLocalizations {
       'share_location': 'Partager la position',
       'emergency_help': "Aide d'urgence",
       'tap_for_help': 'Appuyez pour une assistance immédiate',
-
-      // Consular
-      'visa_services': 'Services de visa',
-      'passport_services': 'Services de passeport',
-      'citizen_services': 'Services aux citoyens',
-      'notary_services': 'Services notariaux',
-      'travel_advisory': 'Conseils aux voyageurs',
-      'appointment': 'Prendre rendez-vous',
 
       // Magazine
       'latest_edition': 'Dernière édition',
@@ -337,6 +342,33 @@ class AppLocalizations {
       'personal_info': 'Informations personnelles',
       'data_privacy': 'Données et confidentialité',
       'danger_zone': 'Zone de danger',
+
+      // News / Articles engagement
+      'news': 'Actualités',
+      'all_categories': 'Tout',
+      'politics': 'Politique',
+      'economy': 'Économie',
+      'culture': 'Culture',
+      'diplomacy': 'Diplomatie',
+      'featured': 'En vedette',
+      'views': 'vues',
+      'comments': 'Commentaires',
+      'likes': 'j\'aime',
+      'like': 'J\'aime',
+      'add_comment': 'Ajouter un commentaire...',
+      'login_to_comment': 'Connectez-vous pour commenter',
+      'login_to_like': 'Connectez-vous pour aimer',
+      'delete_comment': 'Supprimer le commentaire',
+      'delete_comment_confirm': 'Êtes-vous sûr de vouloir supprimer ce commentaire?',
+      'comment_posted': 'Commentaire publié',
+      'comment_deleted': 'Commentaire supprimé',
+      'just_now': 'À l\'instant',
+      'minutes_ago': 'min',
+      'hours_ago': 'h',
+      'days_ago': 'j',
+      'no_comments_yet': 'Aucun commentaire. Soyez le premier!',
+      'gallery': 'Galerie',
+      'watch_video': 'Regarder la vidéo',
     },
   };
 
@@ -362,7 +394,6 @@ class AppLocalizations {
   // Navigation
   String get home => translate('home');
   String get magazine => translate('magazine');
-  String get consular => translate('consular');
   String get locations => translate('locations');
   String get more => translate('more');
 
@@ -387,8 +418,6 @@ class AppLocalizations {
   // Features
   String get digitalMagazine => translate('digital_magazine');
   String get digitalMagazineDesc => translate('digital_magazine_desc');
-  String get consularServices => translate('consular_services');
-  String get consularServicesDesc => translate('consular_services_desc');
   String get embassyLocations => translate('embassy_locations');
   String get embassyLocationsDesc => translate('embassy_locations_desc');
   String get liveFeeds => translate('live_feeds');

@@ -10,3 +10,5 @@ dj-database-url>=2.1
 whitenoise>=6.5
 django-storages>=1.14
 boto3>=1.28
+firebase-admin>=6.4.0
+PyMuPDF>=1.23.0

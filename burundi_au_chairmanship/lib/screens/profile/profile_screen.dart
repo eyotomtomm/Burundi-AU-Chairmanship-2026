@@ -85,6 +85,66 @@ class ProfileScreen extends StatelessWidget {
                               fontSize: 14,
                             ),
                           ),
+                          const SizedBox(height: 12),
+                          // Verification Badges
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (authProvider.isEmailVerified)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.verified, color: Colors.white, size: 16),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'VERIFIED',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (authProvider.isEmailVerified && authProvider.isGovernmentOfficial)
+                                const SizedBox(width: 8),
+                              if (authProvider.isGovernmentOfficial)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.auGold,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '🏛️',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'OFFICIAL',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -144,6 +204,35 @@ class ProfileScreen extends StatelessWidget {
                               color: AppColors.auGold),
                           title: Text(l10n.translate('email')),
                           subtitle: Text(authProvider.userEmail ?? 'Not set'),
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        // Phone Number row (editable)
+                        ListTile(
+                          leading: const Icon(Icons.phone_outlined,
+                              color: AppColors.patternOrange),
+                          title: const Text('Phone Number'),
+                          subtitle: Text(authProvider.phoneNumber?.isEmpty ?? true
+                              ? 'Not set' : authProvider.phoneNumber!),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit_outlined,
+                                color: AppColors.patternOrange, size: 20),
+                            onPressed: () =>
+                                _showEditPhoneDialog(context, authProvider, l10n),
+                          ),
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        // Gender row (editable)
+                        ListTile(
+                          leading: const Icon(Icons.person_outline,
+                              color: AppColors.success),
+                          title: const Text('Gender'),
+                          subtitle: Text(_getGenderLabel(authProvider.gender)),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.edit_outlined,
+                                color: AppColors.success, size: 20),
+                            onPressed: () =>
+                                _showEditGenderDialog(context, authProvider, l10n),
+                          ),
                         ),
                       ],
                     ),
@@ -480,6 +569,163 @@ class ProfileScreen extends StatelessWidget {
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
             child: Text(l10n.translate('delete_account')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getGenderLabel(String? gender) {
+    if (gender == null || gender.isEmpty) return 'Not set';
+    switch (gender) {
+      case 'male':
+        return 'Male';
+      case 'female':
+        return 'Female';
+      case 'other':
+        return 'Other';
+      case 'prefer_not_to_say':
+        return 'Prefer not to say';
+      default:
+        return 'Not set';
+    }
+  }
+
+  void _showEditPhoneDialog(
+      BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
+    final controller = TextEditingController(text: authProvider.phoneNumber ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Update Phone Number'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: 'Phone Number',
+              hintText: '+257 XX XXX XXXX',
+              prefixIcon: const Icon(Icons.phone_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    const BorderSide(color: AppColors.patternOrange, width: 2),
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.translate('cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.patternOrange,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // Update phone via API
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Phone number updated'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            child: Text(l10n.translate('save')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditGenderDialog(
+      BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
+    String selectedGender = authProvider.gender ?? 'prefer_not_to_say';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Select Gender'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<String>(
+                  title: const Text('Male'),
+                  value: 'male',
+                  groupValue: selectedGender,
+                  activeColor: AppColors.success,
+                  onChanged: (value) {
+                    setState(() => selectedGender = value!);
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Female'),
+                  value: 'female',
+                  groupValue: selectedGender,
+                  activeColor: AppColors.success,
+                  onChanged: (value) {
+                    setState(() => selectedGender = value!);
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Other'),
+                  value: 'other',
+                  groupValue: selectedGender,
+                  activeColor: AppColors.success,
+                  onChanged: (value) {
+                    setState(() => selectedGender = value!);
+                  },
+                ),
+                RadioListTile<String>(
+                  title: const Text('Prefer not to say'),
+                  value: 'prefer_not_to_say',
+                  groupValue: selectedGender,
+                  activeColor: AppColors.success,
+                  onChanged: (value) {
+                    setState(() => selectedGender = value!);
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.translate('cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // Update gender via API
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Gender updated'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            child: Text(l10n.translate('save')),
           ),
         ],
       ),

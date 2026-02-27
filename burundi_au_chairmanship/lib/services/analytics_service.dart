@@ -179,7 +179,6 @@ class AnalyticsService {
 class AnalyticsScreens {
   static const String home = 'Home';
   static const String magazine = 'Magazine';
-  static const String consular = 'Consular';
   static const String locations = 'Locations';
   static const String more = 'More';
   static const String auth = 'Authentication';

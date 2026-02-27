@@ -20,5 +20,13 @@ burundi_au_chairmanship/backend/media/
 **/__pycache__/
 *.pyc
 
+# Firebase credentials (NEVER COMMIT THESE)
+burundi_au_chairmanship/backend/config/firebase-adminsdk.json
+burundi_au_chairmanship/ios/Runner/GoogleService-Info.plist
+burundi_au_chairmanship/android/app/google-services.json
+burundi_au_chairmanship/lib/firebase_options.dart
+GoogleService-Info*.plist
+google-services*.json
+
 # macOS build
 burundi_au_chairmanship/macos/Flutter/ephemeral/

@@ -6,6 +6,9 @@
 - iOS Simulator or Android Emulator
 - Django backend dependencies installed
 
+demo@burundi.gov
+demo2026
+
 ## Quick Start (Both Frontend & Backend)
 
 ### 1. Start the Backend Server

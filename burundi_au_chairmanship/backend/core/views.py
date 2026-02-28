@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db.models import Count, Exists, OuterRef, F
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -93,14 +94,14 @@ def delete_account(request):
     Required for Apple App Store compliance (Guideline 5.1.1)
     """
     user = request.user
-    user_email = user.email
 
     # Delete user (Django will cascade delete related data)
     user.delete()
 
+    # Security: Don't leak email in response
     return Response({
-        'message': f'Account {user_email} has been permanently deleted.',
-        'detail': 'Your account and all associated data have been removed.'
+        'message': 'Your account has been permanently deleted.',
+        'detail': 'All associated data has been removed.'
     }, status=status.HTTP_200_OK)
 
 
@@ -398,8 +399,13 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         article = self.get_object()
         return Response({'view_count': article.view_count})
 
-    @action(detail=True, methods=['get', 'post'], url_path='comments')
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
     def comments(self, request, pk=None):
+        """
+        Get or post comments on an article.
+
+        POST is throttled to prevent spam (10/min).
+        """
         article = self.get_object()
         if request.method == 'GET':
             comments = article.comments.select_related('user', 'user__profile').all()
@@ -408,9 +414,25 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         # POST — require auth
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+
         content = request.data.get('content', '').strip()
+
+        # Input validation
         if not content:
             return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Length validation (prevent spam)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Basic HTML sanitization (remove tags)
+        import re
+        content = re.sub(r'<[^>]+>', '', content)  # Strip HTML tags
+        content = content.replace('<', '&lt;').replace('>', '&gt;')  # Escape remaining brackets
+
         comment = ArticleComment.objects.create(user=request.user, article=article, content=content)
         serializer = ArticleCommentSerializer(comment, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -544,6 +566,30 @@ def app_settings(request):
         serializer = AppSettingsSerializer(settings)
         return Response(serializer.data)
     return Response({})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """
+    Health check endpoint for load balancers and monitoring.
+
+    Returns 200 OK if the service is healthy.
+    """
+    from django.db import connection
+
+    # Check database connection
+    try:
+        connection.ensure_connection()
+        db_status = 'healthy'
+    except Exception:
+        db_status = 'unhealthy'
+
+    return Response({
+        'status': 'healthy' if db_status == 'healthy' else 'degraded',
+        'database': db_status,
+        'timestamp': timezone.now().isoformat(),
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])

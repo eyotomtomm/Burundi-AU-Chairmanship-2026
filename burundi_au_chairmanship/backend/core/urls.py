@@ -21,6 +21,7 @@ router.register('social-media', views.SocialMediaLinkViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('health/', views.health_check, name='health-check'),  # For load balancers/monitoring
     path('settings/', views.app_settings, name='app-settings'),
     path('home-feed/', views.home_feed, name='home-feed'),
 

@@ -1,7 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'dart:io' show Platform;
 import '../services/api_service.dart';
 
 /// Top-level function for handling background messages
@@ -30,10 +30,13 @@ class FirebaseMessagingService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
+  GlobalKey<NavigatorState>? _navigatorKey;
+
   /// Initialize Firebase Messaging and request permissions
   ///
   /// Should be called during app startup
-  Future<void> initialize() async {
+  Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
+    _navigatorKey = navigatorKey;
     // Request notification permissions
     NotificationSettings settings = await _messaging.requestPermission(
       alert: true,
@@ -141,15 +144,31 @@ class FirebaseMessagingService {
       print('Data: ${message.data}');
     }
 
-    // TODO: Navigate based on notification data
-    // Example navigation logic:
-    // final type = message.data['type'];
-    // if (type == 'article') {
-    //   final articleId = message.data['article_id'];
-    //   // Navigate to article detail screen
-    // } else if (type == 'event') {
-    //   // Navigate to events screen
-    // }
+    // Navigate based on notification data
+    if (_navigatorKey?.currentState == null) return;
+
+    final data = message.data;
+    final type = data['type'];
+
+    if (type == 'article') {
+      // Navigate to news screen (article list)
+      _navigatorKey?.currentState?.pushNamed('/news');
+    } else if (type == 'magazine') {
+      // Navigate to magazine screen
+      _navigatorKey?.currentState?.pushNamed('/magazine');
+    } else if (type == 'event') {
+      // Navigate to calendar screen
+      _navigatorKey?.currentState?.pushNamed('/calendar');
+    } else if (type == 'gallery') {
+      // Navigate to gallery screen
+      _navigatorKey?.currentState?.pushNamed('/gallery');
+    } else if (type == 'video') {
+      // Navigate to videos screen
+      _navigatorKey?.currentState?.pushNamed('/videos');
+    } else {
+      // Default: Navigate to home screen
+      _navigatorKey?.currentState?.pushNamed('/home');
+    }
   }
 
   /// Handle local notification tap
@@ -158,7 +177,33 @@ class FirebaseMessagingService {
     if (kDebugMode) {
       print('Local notification tapped: ${response.payload}');
     }
-    // TODO: Navigate based on payload
+
+    // Navigate based on payload (if present)
+    if (response.payload != null && _navigatorKey?.currentState != null) {
+      try {
+        final data = response.payload!.split(':');
+        if (data.length >= 2) {
+          final type = data[0];
+          // final id = data[1]; // Can be used for detail navigation if needed
+
+          if (type == 'article') {
+            _navigatorKey?.currentState?.pushNamed('/news');
+          } else if (type == 'magazine') {
+            _navigatorKey?.currentState?.pushNamed('/magazine');
+          } else if (type == 'event') {
+            _navigatorKey?.currentState?.pushNamed('/calendar');
+          } else if (type == 'gallery') {
+            _navigatorKey?.currentState?.pushNamed('/gallery');
+          } else if (type == 'video') {
+            _navigatorKey?.currentState?.pushNamed('/videos');
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error parsing notification payload: $e');
+        }
+      }
+    }
   }
 
   /// Send FCM token to Django backend

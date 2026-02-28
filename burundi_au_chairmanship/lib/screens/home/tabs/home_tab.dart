@@ -10,6 +10,7 @@ import '../../../providers/language_provider.dart';
 import '../../../models/api_models.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/api_service.dart';
+import '../../news/article_detail_screen.dart';
 import '../painters/zigzag_line_painter.dart';
 import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
@@ -237,7 +238,14 @@ class _HomeTabState extends State<HomeTab> {
                 return NewsCard(
                   article: article,
                   langCode: langCode,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ArticleDetailScreen(article: article),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -462,26 +470,18 @@ class _HomeTabState extends State<HomeTab> {
                           const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate), title: Text('Translate'), dense: true, contentPadding: EdgeInsets.zero)),
                         ],
                       ),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                            onPressed: () {},
-                          ),
-                          Consumer<ThemeProvider>(
-                            builder: (context, themeProvider, _) {
-                              return IconButton(
-                                icon: Icon(
-                                  themeProvider.isDarkMode
-                                      ? Icons.light_mode_outlined
-                                      : Icons.dark_mode_outlined,
-                                  color: Colors.white,
-                                ),
-                                onPressed: () => themeProvider.toggleTheme(),
-                              );
-                            },
-                          ),
-                        ],
+                      Consumer<ThemeProvider>(
+                        builder: (context, themeProvider, _) {
+                          return IconButton(
+                            icon: Icon(
+                              themeProvider.isDarkMode
+                                  ? Icons.light_mode_outlined
+                                  : Icons.dark_mode_outlined,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => themeProvider.toggleTheme(),
+                          );
+                        },
                       ),
                     ],
                   ),

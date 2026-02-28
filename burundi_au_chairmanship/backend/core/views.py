@@ -14,6 +14,7 @@ from .models import (
     Event, LiveFeed, Resource, EmergencyContact, AppSettings,
     FeatureCard, ArticleComment, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
+    Notification,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -22,6 +23,7 @@ from .serializers import (
     FeatureCardSerializer, RegisterSerializer, UserSerializer,
     ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
     GalleryAlbumSerializer, VideoSerializer, SocialMediaLinkSerializer,
+    NotificationSerializer,
 )
 
 
@@ -555,6 +557,69 @@ class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SocialMediaLink.objects.filter(is_active=True)
     serializer_class = SocialMediaLinkSerializer
     pagination_class = None
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only notifications endpoint.
+    - Shows active notifications only
+    - For authenticated users: shows global + targeted notifications
+    - For anonymous users: shows only global notifications
+    - Custom actions: mark_as_read, mark_all_as_read
+    """
+    permission_classes = [AllowAny]
+    serializer_class = NotificationSerializer
+
+    def get_queryset(self):
+        """Filter notifications based on user authentication"""
+        qs = Notification.objects.filter(is_active=True)
+
+        if self.request.user.is_authenticated:
+            # Show global notifications + user-targeted notifications
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(is_global=True) | Q(target_users=self.request.user)
+            ).distinct()
+        else:
+            # Show only global notifications for anonymous users
+            qs = qs.filter(is_global=True)
+
+        return qs
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def mark_as_read(self, request, pk=None):
+        """
+        Mark a single notification as read for the current user.
+        Requires authentication.
+        """
+        notification = self.get_object()
+        notification.read_by.add(request.user)
+
+        return Response({
+            'message': 'Notification marked as read',
+            'is_read': True
+        })
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def mark_all_as_read(self, request):
+        """
+        Mark all notifications as read for the current user.
+        Requires authentication.
+        """
+        # Get all active notifications for the user
+        notifications = self.get_queryset()
+
+        # Add user to read_by for each notification
+        count = 0
+        for notification in notifications:
+            if not notification.read_by.filter(id=request.user.id).exists():
+                notification.read_by.add(request.user)
+                count += 1
+
+        return Response({
+            'message': f'{count} notification(s) marked as read',
+            'marked_count': count
+        })
 
 
 @api_view(['GET'])

@@ -32,6 +32,7 @@ import 'screens/agenda/peace_security_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
 import 'screens/videos/videos_screen.dart';
 import 'screens/social_media/social_media_screen.dart';
+import 'screens/notifications/notifications_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -148,6 +149,7 @@ class BurundiAUApp extends StatelessWidget {
               '/gallery': (context) => const GalleryScreen(),
               '/videos': (context) => const VideosScreen(),
               '/social-media': (context) => const SocialMediaScreen(),
+              '/notifications': (context) => const NotificationsScreen(),
             },
 
             // Route not found

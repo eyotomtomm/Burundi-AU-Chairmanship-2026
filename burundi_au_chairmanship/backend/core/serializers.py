@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from .models import (
     HeroSlide, MagazineEdition, MagazineImage, Article, EmbassyLocation,
-    Event, LiveFeed, Resource, EmergencyContact, AppSettings,
+    Event, LiveFeed, Resource, EmergencyContact, Notification, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink,
@@ -208,6 +208,22 @@ class FeatureCardSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'image', 'gradient_start', 'gradient_end', 'icon_name',
                   'action_type', 'action_value', 'order']
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    is_read = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'title_fr', 'message', 'message_fr',
+                  'notification_type', 'action_type', 'action_value',
+                  'is_read', 'created_at']
+
+    def get_is_read(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.read_by.filter(id=request.user.id).exists()
+        return False
 
 
 class AppSettingsSerializer(serializers.ModelSerializer):

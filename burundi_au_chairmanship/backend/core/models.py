@@ -419,6 +419,63 @@ class FeatureCard(models.Model):
         return self.title
 
 
+class Notification(models.Model):
+    """User notifications for important updates and announcements"""
+    TYPE_CHOICES = [
+        ('general', 'General Announcement'),
+        ('article', 'New Article'),
+        ('magazine', 'New Magazine'),
+        ('event', 'Event Reminder'),
+        ('system', 'System Update'),
+    ]
+
+    title = models.CharField(max_length=200, help_text='Notification title')
+    title_fr = models.CharField(max_length=200, blank=True, help_text='French title')
+    message = models.TextField(help_text='Notification message')
+    message_fr = models.TextField(blank=True, help_text='French message')
+    notification_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='general')
+
+    # Optional link to content
+    action_type = models.CharField(
+        max_length=10,
+        choices=[('none', 'No Action'), ('url', 'External URL'), ('route', 'App Route')],
+        default='none',
+        help_text='What happens when user taps notification'
+    )
+    action_value = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='URL or route name (e.g., /news, /magazine)'
+    )
+
+    # Targeting
+    is_global = models.BooleanField(
+        default=True,
+        help_text='Send to all users (uncheck to send to specific users)'
+    )
+    target_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='targeted_notifications',
+        help_text='Specific users (only if not global)'
+    )
+
+    # Status
+    is_active = models.BooleanField(default=True, help_text='Active notifications appear in app')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Read status (many-to-many with users who read it)
+    read_by = models.ManyToManyField(User, blank=True, related_name='read_notifications')
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Notification'
+        verbose_name_plural = 'Notifications'
+
+    def __str__(self):
+        return f'{self.title} ({self.notification_type})'
+
+
 class AppSettings(models.Model):
     summit_year = models.CharField(max_length=10, default='2026')
     summit_theme = models.CharField(max_length=300)

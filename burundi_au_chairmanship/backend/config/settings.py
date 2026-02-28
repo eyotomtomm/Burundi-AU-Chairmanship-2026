@@ -5,14 +5,42 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-burundi-au-dev-key-change-in-production',
-)
+# Security: DEBUG should default to False (fail-secure)
+# Explicitly set DJANGO_DEBUG=True for development
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
+# Security: SECRET_KEY MUST be set via environment variable
+# No fallback value to prevent accidentally running with known key
+try:
+    SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
+except KeyError:
+    raise RuntimeError(
+        "CRITICAL: DJANGO_SECRET_KEY environment variable is not set.\n"
+        "This is required for security (session cookies, CSRF tokens, JWT signatures).\n\n"
+        "Generate a secure key with:\n"
+        "  python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'\n\n"
+        "Then set it:\n"
+        "  export DJANGO_SECRET_KEY='your-generated-key-here'\n\n"
+        "For local development, create a .env file or add to your shell profile."
+    )
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+# Security: ALLOWED_HOSTS must be explicitly set
+# No default to '*' to prevent Host header attacks
+allowed_hosts_env = os.environ.get('DJANGO_ALLOWED_HOSTS', '')
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
+elif DEBUG:
+    # Only allow localhost in development
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+else:
+    # Production MUST have explicit ALLOWED_HOSTS
+    raise RuntimeError(
+        "CRITICAL: DJANGO_ALLOWED_HOSTS environment variable is not set.\n"
+        "This is required in production to prevent HTTP Host header attacks.\n\n"
+        "Set it to your domain(s):\n"
+        "  export DJANGO_ALLOWED_HOSTS='api.burundi4africa.com,burundi4africa.com'\n\n"
+        "Multiple hosts should be comma-separated."
+    )
 
 INSTALLED_APPS = [
     'jazzmin',
@@ -25,6 +53,7 @@ INSTALLED_APPS = [
     # Third party
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # For token revocation
     'corsheaders',
     'storages',
     # Local
@@ -115,6 +144,17 @@ if not DEBUG:
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ─── File Upload Settings ──────────────────────────────────────
+# Maximum file sizes
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50 MB
+
+# Allowed file types for uploads
+ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'zip']
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
+
 # ─── CORS — allow Flutter app to connect ──────────────────────
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 if not DEBUG:
@@ -124,8 +164,10 @@ if not DEBUG:
     ]
 # ─── DRF settings ─────────────────────────────────────────────
 REST_FRAMEWORK = {
+    # Security: Default to requiring authentication (fail-secure)
+    # Public endpoints must explicitly set permission_classes = [AllowAny]
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -139,15 +181,22 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
         'user': '1000/hour',
+        'view_count': '1/min',  # 1 view per content item per minute (prevents manipulation)
+        'like_toggle': '10/min',  # 10 like toggles per minute (prevents spam)
     },
 }
 
-# ─── JWT settings ──────────────────────────────────────────────
+# ─── JWT settings with auto-logout ────────────────────────────
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
-    'ROTATE_REFRESH_TOKENS': True,
+    # Security: Short access token lifetime (industry standard: 15-60 minutes)
+    # Limits exposure if token is stolen, forces regular re-authentication
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),  # 15 minutes (secure)
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # 7 days (good UX for mobile)
+    'ROTATE_REFRESH_TOKENS': True,  # Auto-rotate on refresh
+    'BLACKLIST_AFTER_ROTATION': True,  # Invalidate old refresh tokens
+    'UPDATE_LAST_LOGIN': True,  # Track last login time
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
 # ─── Jazzmin Admin Theme ──────────────────────────────────────

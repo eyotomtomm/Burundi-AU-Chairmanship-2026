@@ -1,5 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'dart:io' show Platform;
 import '../services/api_service.dart';
 
@@ -9,9 +10,12 @@ import '../services/api_service.dart';
 /// Firebase background message handlers
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('Background message received: ${message.messageId}');
-  print('Title: ${message.notification?.title}');
-  print('Body: ${message.notification?.body}');
+  // Only log in debug mode to prevent sensitive data leakage
+  if (kDebugMode) {
+    print('Background message received: ${message.messageId}');
+    print('Title: ${message.notification?.title}');
+    print('Body: ${message.notification?.body}');
+  }
 }
 
 /// Service for Firebase Cloud Messaging (Push Notifications)
@@ -41,13 +45,18 @@ class FirebaseMessagingService {
       provisional: false,
     );
 
-    print('Notification permission status: ${settings.authorizationStatus}');
+    if (kDebugMode) {
+      print('Notification permission status: ${settings.authorizationStatus}');
+    }
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       // Get FCM token and send to backend
       String? token = await _messaging.getToken();
       if (token != null) {
-        print('FCM Token: $token');
+        // Security: NEVER log FCM tokens in production (accessible in system logs)
+        if (kDebugMode) {
+          print('FCM Token obtained (length: ${token.length})');
+        }
         await _sendTokenToBackend(token);
       }
 
@@ -94,7 +103,9 @@ class FirebaseMessagingService {
   /// When the app is in the foreground, Firebase doesn't automatically show
   /// notifications, so we use flutter_local_notifications to display them
   void _handleForegroundMessage(RemoteMessage message) {
-    print('Foreground message received: ${message.messageId}');
+    if (kDebugMode) {
+      print('Foreground message received: ${message.messageId}');
+    }
 
     final notification = message.notification;
     if (notification != null) {
@@ -124,8 +135,11 @@ class FirebaseMessagingService {
 
   /// Handle notification tap (when app is in background or foreground)
   void _handleNotificationTap(RemoteMessage message) {
-    print('Notification tapped: ${message.messageId}');
-    print('Data: ${message.data}');
+    // Security: Only log in debug mode (notification data might contain sensitive info)
+    if (kDebugMode) {
+      print('Notification tapped: ${message.messageId}');
+      print('Data: ${message.data}');
+    }
 
     // TODO: Navigate based on notification data
     // Example navigation logic:
@@ -140,7 +154,10 @@ class FirebaseMessagingService {
 
   /// Handle local notification tap
   void _onLocalNotificationTap(NotificationResponse response) {
-    print('Local notification tapped: ${response.payload}');
+    // Security: Only log in debug mode (payload might contain sensitive data)
+    if (kDebugMode) {
+      print('Local notification tapped: ${response.payload}');
+    }
     // TODO: Navigate based on payload
   }
 
@@ -148,9 +165,14 @@ class FirebaseMessagingService {
   Future<void> _sendTokenToBackend(String token) async {
     try {
       await ApiService().updateFCMToken(token);
-      print('FCM token sent to backend successfully');
+      if (kDebugMode) {
+        print('FCM token sent to backend successfully');
+      }
     } catch (e) {
-      print('Failed to send FCM token to backend: $e');
+      // Security: Only log detailed errors in debug mode
+      if (kDebugMode) {
+        print('Failed to send FCM token to backend: $e');
+      }
       // Don't throw - this is not critical for app functionality
     }
   }
@@ -161,13 +183,17 @@ class FirebaseMessagingService {
   /// Example topics: 'breaking_news', 'events', 'government_officials'
   Future<void> subscribeToTopic(String topic) async {
     await _messaging.subscribeToTopic(topic);
-    print('Subscribed to topic: $topic');
+    if (kDebugMode) {
+      print('Subscribed to topic: $topic');
+    }
   }
 
   /// Unsubscribe from a topic
   Future<void> unsubscribeFromTopic(String topic) async {
     await _messaging.unsubscribeFromTopic(topic);
-    print('Unsubscribed from topic: $topic');
+    if (kDebugMode) {
+      print('Unsubscribed from topic: $topic');
+    }
   }
 
   /// Get the current FCM token
@@ -178,6 +204,8 @@ class FirebaseMessagingService {
   /// Delete the FCM token (useful when user logs out)
   Future<void> deleteToken() async {
     await _messaging.deleteToken();
-    print('FCM token deleted');
+    if (kDebugMode) {
+      print('FCM token deleted');
+    }
   }
 }

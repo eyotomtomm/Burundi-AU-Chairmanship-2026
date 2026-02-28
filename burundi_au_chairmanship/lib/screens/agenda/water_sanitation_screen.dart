@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../services/api_service.dart';
 
 class WaterSanitationScreen extends StatefulWidget {
@@ -138,7 +139,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
           children: [
             if (hasImage)
               CachedNetworkImage(
-                imageUrl: heroImage.toString().replaceAll('127.0.0.1', 'localhost'),
+                imageUrl: Environment.fixMediaUrl(heroImage.toString()),
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
                   decoration: const BoxDecoration(

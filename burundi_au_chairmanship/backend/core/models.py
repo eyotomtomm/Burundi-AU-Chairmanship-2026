@@ -392,6 +392,12 @@ class EmergencyContact(models.Model):
 
 
 class FeatureCard(models.Model):
+    ACTION_TYPE_CHOICES = [
+        ('none', 'No Action'),
+        ('url', 'External URL'),
+        ('route', 'App Route'),
+    ]
+
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField()
@@ -399,6 +405,9 @@ class FeatureCard(models.Model):
     image = models.ImageField(upload_to='feature_cards/', blank=True, validators=[validate_image_file])
     gradient_start = models.CharField(max_length=10, default='#1EB53A', help_text='Hex color e.g. #1EB53A')
     gradient_end = models.CharField(max_length=10, default='#4CAF50', help_text='Hex color e.g. #4CAF50')
+    icon_name = models.CharField(max_length=50, blank=True, help_text='Flutter IconData name, e.g. "stars", "travel_explore"')
+    action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES, default='none')
+    action_value = models.CharField(max_length=500, blank=True, help_text='URL for "url" type, route name for "route" type (e.g. "/news", "/magazine")')
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

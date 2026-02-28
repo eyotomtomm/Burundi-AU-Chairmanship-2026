@@ -206,7 +206,8 @@ class FeatureCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCard
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'image', 'gradient_start', 'gradient_end', 'order']
+                  'image', 'gradient_start', 'gradient_end', 'icon_name',
+                  'action_type', 'action_value', 'order']
 
 
 class AppSettingsSerializer(serializers.ModelSerializer):

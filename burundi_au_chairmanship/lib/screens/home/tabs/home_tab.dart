@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../../../config/app_colors.dart';
 import '../../../config/environment.dart';
@@ -131,12 +132,22 @@ class _HomeTabState extends State<HomeTab> {
         final j = entry.value as Map<String, dynamic>;
         final gradStart = _hexToColor(j['gradient_start'] ?? '#1EB53A');
         final gradEnd = _hexToColor(j['gradient_end'] ?? '#4CAF50');
+
+        // Parse icon from icon_name or use fallback
+        IconData icon = featureCardIcons[entry.key % featureCardIcons.length];
+        final iconName = j['icon_name'] as String?;
+        if (iconName != null && iconName.isNotEmpty) {
+          icon = _getIconFromName(iconName);
+        }
+
         return <String, dynamic>{
           'title': langCode == 'fr' ? (j['title_fr'] ?? j['title'] ?? '') : (j['title'] ?? ''),
           'description': langCode == 'fr' ? (j['description_fr'] ?? j['description'] ?? '') : (j['description'] ?? ''),
-          'icon': featureCardIcons[entry.key % featureCardIcons.length],
+          'icon': icon,
           'gradient': [gradStart, gradEnd],
           'imageUrl': j['image'] ?? '',
+          'actionType': j['action_type'] ?? 'none',
+          'actionValue': j['action_value'] ?? '',
         };
       }).toList();
 
@@ -604,11 +615,16 @@ class _HomeTabState extends State<HomeTab> {
               final card = _featureCards[index];
               final gradientColors = card['gradient'] as List<Color>;
               final imageUrl = card['imageUrl'] as String?;
+              final actionType = card['actionType'] as String?;
+              final actionValue = card['actionValue'] as String?;
+
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
+                child: GestureDetector(
+                  onTap: () => _handleFeatureCardTap(context, actionType, actionValue),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
@@ -726,6 +742,7 @@ class _HomeTabState extends State<HomeTab> {
                       ],
                     ),
                   ),
+                ),
                 ),
               );
             },
@@ -983,6 +1000,41 @@ class _HomeTabState extends State<HomeTab> {
         );
       }).toList(),
     );
+  }
+
+  void _handleFeatureCardTap(BuildContext context, String? actionType, String? actionValue) {
+    if (actionType == null || actionValue == null || actionValue.isEmpty || actionType == 'none') {
+      return; // No action defined
+    }
+
+    if (actionType == 'route') {
+      // Navigate to app route
+      Navigator.pushNamed(context, actionValue);
+    } else if (actionType == 'url') {
+      // Launch external URL
+      final uri = Uri.parse(actionValue);
+      launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  IconData _getIconFromName(String iconName) {
+    // Map common icon names to IconData
+    final iconMap = {
+      'stars': Icons.stars,
+      'travel_explore': Icons.travel_explore,
+      'gavel': Icons.gavel,
+      'security': Icons.security,
+      'public': Icons.public,
+      'handshake': Icons.handshake,
+      'groups': Icons.groups,
+      'policy': Icons.policy,
+      'auto_stories': Icons.auto_stories,
+      'campaign': Icons.campaign,
+      'flag': Icons.flag,
+      'workspace_premium': Icons.workspace_premium,
+    };
+
+    return iconMap[iconName] ?? Icons.stars;
   }
 
   Widget _buildSectionTitle(BuildContext context, String title, {bool showSeeAll = false}) {

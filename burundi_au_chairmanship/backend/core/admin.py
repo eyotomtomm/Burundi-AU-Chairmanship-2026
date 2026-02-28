@@ -439,6 +439,14 @@ class AppSettingsAdmin(admin.ModelAdmin):
     list_display = ['summit_year', 'summit_theme', 'social_links']
     save_on_top = True
 
+    def has_add_permission(self, request):
+        """Only allow one AppSettings instance."""
+        return not AppSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deletion of settings."""
+        return False
+
     def social_links(self, obj):
         links = []
         if obj.website_url:

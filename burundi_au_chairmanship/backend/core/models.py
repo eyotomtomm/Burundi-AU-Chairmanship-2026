@@ -7,6 +7,8 @@ from django.core.files.base import ContentFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from .validators import validate_image_file, validate_document_file, validate_fcm_token
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +24,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone_number = models.CharField(max_length=20, blank=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True)
-    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True, validators=[validate_image_file])
 
     # Firebase integration fields
     firebase_uid = models.CharField(
@@ -36,6 +38,7 @@ class UserProfile(models.Model):
     fcm_token = models.CharField(
         max_length=255,
         blank=True,
+        validators=[validate_fcm_token],
         help_text='Firebase Cloud Messaging token for push notifications'
     )
 
@@ -68,7 +71,7 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
 
 
 class HeroSlide(models.Model):
-    image = models.ImageField(upload_to='hero_slides/')
+    image = models.ImageField(upload_to='hero_slides/', validators=[validate_image_file])
     label = models.CharField(max_length=100)
     label_fr = models.CharField(max_length=100, blank=True)
     order = models.IntegerField(default=0)
@@ -87,8 +90,8 @@ class MagazineEdition(models.Model):
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField()
     description_fr = models.TextField(blank=True)
-    cover_image = models.ImageField(upload_to='magazines/')
-    pdf_file = models.FileField(upload_to='magazines/pdfs/', blank=True, help_text='Upload a PDF file')
+    cover_image = models.ImageField(upload_to='magazines/', validators=[validate_image_file])
+    pdf_file = models.FileField(upload_to='magazines/pdfs/', blank=True, validators=[validate_document_file], help_text='Upload a PDF file')
     external_url = models.URLField(blank=True, help_text='External link to PDF (used if no file uploaded)')
     publish_date = models.DateField()
     is_featured = models.BooleanField(default=False)
@@ -167,7 +170,7 @@ class MagazineLike(models.Model):
 class MagazineImage(models.Model):
     """Additional images for a magazine edition (shown in info bottom sheet)."""
     edition = models.ForeignKey(MagazineEdition, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='magazines/gallery/')
+    image = models.ImageField(upload_to='magazines/gallery/', validators=[validate_image_file])
     caption = models.CharField(max_length=300, blank=True)
     caption_fr = models.CharField(max_length=300, blank=True)
     order = models.IntegerField(default=0)
@@ -202,7 +205,7 @@ class Article(models.Model):
     title_fr = models.CharField(max_length=300, blank=True)
     content = models.TextField()
     content_fr = models.TextField(blank=True)
-    image = models.ImageField(upload_to='articles/', blank=True)
+    image = models.ImageField(upload_to='articles/', blank=True, validators=[validate_image_file])
     author = models.CharField(max_length=100)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, null=True, blank=True, related_name='articles')
     publish_date = models.DateTimeField()
@@ -250,7 +253,7 @@ class ArticleMedia(models.Model):
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='media')
     media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES, default='image')
-    image = models.ImageField(upload_to='article_media/', blank=True)
+    image = models.ImageField(upload_to='article_media/', blank=True, validators=[validate_image_file])
     video_url = models.URLField(blank=True)
     caption = models.CharField(max_length=300, blank=True)
     caption_fr = models.CharField(max_length=300, blank=True)
@@ -285,7 +288,7 @@ class EmbassyLocation(models.Model):
     website = models.URLField(blank=True)
     opening_hours = models.CharField(max_length=200, blank=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='embassy')
-    image = models.ImageField(upload_to='embassies/', blank=True)
+    image = models.ImageField(upload_to='embassies/', blank=True, validators=[validate_image_file])
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -305,7 +308,7 @@ class Event(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     event_date = models.DateTimeField()
-    image = models.ImageField(upload_to='events/', blank=True)
+    image = models.ImageField(upload_to='events/', blank=True, validators=[validate_image_file])
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -325,7 +328,7 @@ class LiveFeed(models.Model):
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     stream_url = models.URLField()
-    thumbnail = models.ImageField(upload_to='live_feeds/', blank=True)
+    thumbnail = models.ImageField(upload_to='live_feeds/', blank=True, validators=[validate_image_file])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
     viewer_count = models.IntegerField(default=0)
     duration = models.CharField(max_length=50, blank=True, help_text='e.g. 1h 30m')
@@ -354,7 +357,7 @@ class Resource(models.Model):
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
-    file = models.FileField(upload_to='resources/')
+    file = models.FileField(upload_to='resources/', validators=[validate_document_file])
     file_size = models.CharField(max_length=20, help_text='e.g. 2.4 MB')
     file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='pdf')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -393,7 +396,7 @@ class FeatureCard(models.Model):
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField()
     description_fr = models.TextField(blank=True)
-    image = models.ImageField(upload_to='feature_cards/', blank=True)
+    image = models.ImageField(upload_to='feature_cards/', blank=True, validators=[validate_image_file])
     gradient_start = models.CharField(max_length=10, default='#1EB53A', help_text='Hex color e.g. #1EB53A')
     gradient_end = models.CharField(max_length=10, default='#4CAF50', help_text='Hex color e.g. #4CAF50')
     order = models.IntegerField(default=0)
@@ -419,6 +422,23 @@ class AppSettings(models.Model):
     class Meta:
         verbose_name = 'App Settings'
         verbose_name_plural = 'App Settings'
+
+    def save(self, *args, **kwargs):
+        """Enforce singleton: delete all other instances before saving."""
+        self.pk = 1
+        super().save(*args, **kwargs)
+        # Delete any other instances (shouldn't exist, but just in case)
+        self.__class__.objects.exclude(pk=1).delete()
+
+    def delete(self, *args, **kwargs):
+        """Prevent deletion of settings."""
+        pass
+
+    @classmethod
+    def load(cls):
+        """Get or create the singleton instance."""
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
 
     def __str__(self):
         return f"App Settings ({self.summit_year})"
@@ -448,7 +468,7 @@ class PriorityAgenda(models.Model):
     is_active = models.BooleanField(default=True)
 
     # Media
-    hero_image = models.ImageField(upload_to='agendas/', blank=True, null=True, help_text='Main image for this agenda')
+    hero_image = models.ImageField(upload_to='agendas/', blank=True, null=True, validators=[validate_image_file], help_text='Main image for this agenda')
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
@@ -469,7 +489,7 @@ class GalleryAlbum(models.Model):
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     description_fr = models.TextField(blank=True)
-    cover_image = models.ImageField(upload_to='gallery/covers/')
+    cover_image = models.ImageField(upload_to='gallery/covers/', validators=[validate_image_file])
     photo_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     is_featured = models.BooleanField(default=False)
@@ -487,7 +507,7 @@ class GalleryAlbum(models.Model):
 class GalleryPhoto(models.Model):
     """Individual photos in gallery albums"""
     album = models.ForeignKey(GalleryAlbum, on_delete=models.CASCADE, related_name='photos')
-    image = models.ImageField(upload_to='gallery/photos/')
+    image = models.ImageField(upload_to='gallery/photos/', validators=[validate_image_file])
     caption = models.CharField(max_length=300, blank=True)
     caption_fr = models.CharField(max_length=300, blank=True)
     photographer = models.CharField(max_length=100, blank=True)
@@ -520,7 +540,7 @@ class Video(models.Model):
     description = models.TextField()
     description_fr = models.TextField(blank=True)
     video_url = models.URLField(help_text='YouTube or other video URL')
-    thumbnail = models.ImageField(upload_to='videos/thumbnails/', blank=True)
+    thumbnail = models.ImageField(upload_to='videos/thumbnails/', blank=True, validators=[validate_image_file])
     duration = models.CharField(max_length=20, help_text='e.g. 5:30')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='highlight')
     view_count = models.PositiveIntegerField(default=0)

@@ -7,8 +7,12 @@ JWT authentication for backward compatibility during migration.
 """
 
 from django.contrib.auth.models import AnonymousUser
+from django.http import JsonResponse
 from config.firebase import verify_firebase_token
 from core.models import UserProfile
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FirebaseAuthenticationMiddleware:
@@ -26,9 +30,17 @@ class FirebaseAuthenticationMiddleware:
         # Get Authorization header
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
 
-        # Check if it's a Bearer token
+        # Check if it's a Bearer token (could be Firebase or JWT)
         if auth_header.startswith('Bearer '):
             id_token = auth_header.split('Bearer ')[1].strip()
+
+            # Only try Firebase auth if token looks like Firebase token
+            # JWT tokens start with 'eyJ', Firebase tokens are longer (~900+ chars)
+            # Skip Firebase verification for short tokens (likely JWT)
+            if len(id_token) < 100:
+                # Likely a JWT token, let JWTAuthentication handle it
+                response = self.get_response(request)
+                return response
 
             # Try to verify Firebase token
             try:
@@ -49,13 +61,25 @@ class FirebaseAuthenticationMiddleware:
                         profile.save(update_fields=['is_email_verified'])
 
                 except UserProfile.DoesNotExist:
-                    # Firebase user exists but not in Django - set AnonymousUser
-                    request.user = AnonymousUser()
+                    # Firebase user exists but not registered in Django
+                    logger.warning(f'Firebase user {firebase_uid} not found in database')
+                    return JsonResponse({
+                        'detail': 'User not found. Please register first.'
+                    }, status=401)
 
-            except (ValueError, Exception):
-                # Invalid token or verification failed - set AnonymousUser
-                # This allows the request to proceed but as anonymous
-                request.user = AnonymousUser()
+            except ValueError as e:
+                # Invalid Firebase token (expired, malformed, wrong signature)
+                logger.warning(f'Invalid Firebase token: {str(e)}')
+                return JsonResponse({
+                    'detail': 'Invalid or expired authentication token.'
+                }, status=401)
+
+            except Exception as e:
+                # Unexpected error during Firebase auth
+                logger.error(f'Firebase authentication error: {str(e)}')
+                return JsonResponse({
+                    'detail': 'Authentication failed.'
+                }, status=401)
 
         response = self.get_response(request)
         return response

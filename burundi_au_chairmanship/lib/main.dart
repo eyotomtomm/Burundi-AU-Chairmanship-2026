@@ -18,7 +18,6 @@ import 'l10n/app_localizations.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/emergency/emergency_screen.dart';
 import 'screens/live_feeds/live_feeds_screen.dart';
 import 'screens/resources/resources_screen.dart';
 import 'screens/calendar/calendar_screen.dart';
@@ -131,7 +130,6 @@ class BurundiAUApp extends StatelessWidget {
               '/': (context) => const SplashScreen(),
               '/auth': (context) => const AuthScreen(),
               '/home': (context) => const HomeScreen(),
-              '/emergency': (context) => const EmergencyScreen(),
               '/live-feeds': (context) => const LiveFeedsScreen(),
               '/resources': (context) => const ResourcesScreen(),
               '/calendar': (context) => const CalendarScreen(),

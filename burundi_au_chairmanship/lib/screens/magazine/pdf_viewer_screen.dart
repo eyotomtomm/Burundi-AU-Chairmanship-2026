@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../services/api_service.dart';
 
 class PdfViewerScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final url = widget.pdfUrl.replaceAll('127.0.0.1', 'localhost');
+    final url = Environment.fixMediaUrl(widget.pdfUrl);
 
     return Scaffold(
       appBar: AppBar(

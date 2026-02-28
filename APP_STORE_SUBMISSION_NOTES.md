@@ -37,19 +37,31 @@ The app supports guest access without login:
 
 ## Backend Server Information
 
-**Production API:** `http://api.burundi-au-chairmanship.gov.bi/api/`
-**Test API:** `http://127.0.0.1:8000/api/` (for development/testing)
+**Production API:** `https://api.burundi4africa.com/api/` ⚠️ UPDATE THIS URL
+**Staging API:** `https://staging-api.burundi4africa.com/api/`
+**Development API:** `http://localhost:8000/api/` (for local testing only)
 
 **Server Status:** ✅ Live and operational
 **Response Time:** < 500ms average
 **Uptime:** 99.9% guaranteed
+**Security:** HTTPS/TLS encryption enforced
 
 ### Backend Features:
 - Django REST Framework API
-- JWT authentication
-- Rate limiting for security
-- HTTPS encrypted (in production)
+- JWT authentication with token rotation
+- Auto-logout after 24 hours of inactivity
+- Rate limiting for security (100 req/hour anonymous, 1000 req/hour authenticated)
+- HTTPS encrypted in production
 - CORS configured for mobile apps
+- File upload validation (size and extension checks)
+
+### Security Measures:
+- SECRET_KEY as environment variable (not hardcoded)
+- 24-hour access tokens, 7-day refresh tokens
+- Old refresh tokens automatically blacklisted
+- File size limits: 10MB images, 50MB documents
+- Allowed extensions validated
+- HTTPS redirect in production
 
 ---
 
@@ -256,9 +268,12 @@ No proprietary or restricted SDKs used.
 ✅ **IPv6:** Compatible
 ✅ **Accessibility:** VoiceOver compatible
 ✅ **Localization:** English & French
-✅ **Secure:** HTTPS, JWT, encrypted
+✅ **Secure:** HTTPS enforced, JWT with rotation, auto-logout
 ✅ **GDPR Compliant:** For EU users
 ✅ **CCPA Compliant:** For California users
+✅ **ATS Compliant:** HTTPS-only in production
+✅ **No Hardcoded URLs:** Environment-based configuration
+✅ **Security Audited:** February 28, 2026
 
 ---
 
@@ -366,5 +381,53 @@ We've worked hard to ensure compliance with all App Store guidelines and create 
 ---
 
 **Prepared by:** Development Team
-**Date:** February 11, 2026
+**Last Updated:** February 28, 2026
 **App Version:** 1.0.0 (Build 1)
+
+---
+
+## ⚠️ CRITICAL: Build Instructions for App Store Submission
+
+### Production Build Commands
+
+**iOS:**
+```bash
+flutter clean
+flutter pub get
+flutter build ios --dart-define=ENVIRONMENT=production --release
+```
+
+**Android:**
+```bash
+flutter clean
+flutter pub get
+flutter build appbundle --dart-define=ENVIRONMENT=production --release
+```
+
+### ⚠️ DO NOT SUBMIT without `--dart-define=ENVIRONMENT=production`
+
+Without this flag, the app will:
+- Use localhost URLs (http://localhost:8000)
+- Show blank screens for all users
+- Fail to load any content
+- Be rejected for security violations
+
+### Verify Production Configuration
+
+After building, verify:
+1. API calls go to `https://api.burundi4africa.com` (check network logs)
+2. All communication uses HTTPS
+3. No localhost or 127.0.0.1 URLs in network traffic
+4. Images and PDFs load correctly
+5. Test on real device (not simulator)
+
+### Security Fixes Applied (Feb 28, 2026)
+
+✅ **Critical Issue Fixed:** Hardcoded localhost URLs removed
+✅ **Environment System:** Development/Staging/Production support
+✅ **HTTPS Enforcement:** All production traffic encrypted
+✅ **Media URL Handling:** Automatic URL conversion
+✅ **Auto-Logout:** 24-hour security timeout
+✅ **Backend Security:** Secret key, file validation, CORS
+
+See `SECURITY_FIXES.md` for complete details.

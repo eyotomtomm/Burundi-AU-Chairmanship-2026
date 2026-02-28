@@ -1,11 +1,13 @@
 from django.contrib.auth.models import User
 from django.db.models import Count, Exists, OuterRef, F
 from rest_framework import viewsets, status
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
+from .throttling import ViewCountThrottle, LikeToggleThrottle
 from .models import (
     HeroSlide, MagazineEdition, MagazineLike, Article, EmbassyLocation,
     Event, LiveFeed, Resource, EmergencyContact, AppSettings,
@@ -287,12 +289,16 @@ def export_user_data(request):
 # ── Content ViewSets ──────────────────────────────────────
 
 class HeroSlideViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view hero slides"""
+    permission_classes = [AllowAny]
     queryset = HeroSlide.objects.filter(is_active=True)
     serializer_class = HeroSlideSerializer
     pagination_class = None
 
 
 class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view magazines, but authentication required to like"""
+    permission_classes = [AllowAny]
     queryset = MagazineEdition.objects.all()
     serializer_class = MagazineEditionSerializer
 
@@ -305,41 +311,61 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return qs
 
-    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
+        """
+        Record a view for this magazine edition.
+
+        Throttled to 1 view per content per minute per user/IP
+        to prevent view count manipulation.
+        """
         edition = self.get_object()
         MagazineEdition.objects.filter(pk=edition.pk).update(view_count=F('view_count') + 1)
         edition.refresh_from_db()
         return Response({'view_count': edition.view_count})
 
-    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
-        edition = self.get_object()
-        is_liked = False
-        if request.user.is_authenticated:
-            like, created = MagazineLike.objects.get_or_create(
-                user=request.user, edition=edition,
+        """
+        Toggle like on magazine. Requires authentication.
+
+        Throttled to 10 toggles per minute to prevent spam.
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'Authentication required to like content'},
+                status=status.HTTP_401_UNAUTHORIZED
             )
-            if not created:
-                like.delete()
-                MagazineEdition.objects.filter(pk=edition.pk).update(like_count=F('like_count') - 1)
-            else:
-                MagazineEdition.objects.filter(pk=edition.pk).update(like_count=F('like_count') + 1)
-                is_liked = True
+
+        edition = self.get_object()
+        like, created = MagazineLike.objects.get_or_create(
+            user=request.user, edition=edition,
+        )
+        if not created:
+            # Unlike: delete the like record
+            like.delete()
+            MagazineEdition.objects.filter(pk=edition.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
         else:
+            # Like: increment count
             MagazineEdition.objects.filter(pk=edition.pk).update(like_count=F('like_count') + 1)
             is_liked = True
+
         edition.refresh_from_db()
         return Response({'like_count': edition.like_count, 'is_liked': is_liked})
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view categories"""
+    permission_classes = [AllowAny]
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     pagination_class = None
 
 
 class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can read articles, but authentication required to like/comment"""
+    permission_classes = [AllowAny]
     serializer_class = ArticleSerializer
     filterset_fields = ['category', 'is_featured']
 
@@ -360,8 +386,14 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.annotate(is_liked=Value(False, output_field=BooleanField()))
         return qs
 
-    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny])
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
+        """
+        Record a view for this article.
+
+        Throttled to 1 view per content per minute per user/IP
+        to prevent view count manipulation.
+        """
         Article.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
         article = self.get_object()
         return Response({'view_count': article.view_count})
@@ -396,8 +428,13 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
+        """
+        Toggle like on article. Requires authentication.
+
+        Throttled to 10 toggles per minute to prevent spam.
+        """
         article = self.get_object()
         like, created = ArticleLike.objects.get_or_create(user=request.user, article=article)
         if not created:
@@ -409,71 +446,99 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class EmbassyLocationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view embassy locations"""
+    permission_classes = [AllowAny]
     queryset = EmbassyLocation.objects.all()
     serializer_class = EmbassyLocationSerializer
     filterset_fields = ['type', 'country']
 
 
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view events"""
+    permission_classes = [AllowAny]
     queryset = Event.objects.all()
     serializer_class = EventSerializer
 
 
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view live feeds"""
+    permission_classes = [AllowAny]
     queryset = LiveFeed.objects.all()
     serializer_class = LiveFeedSerializer
     filterset_fields = ['status']
 
 
 class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view resources"""
+    permission_classes = [AllowAny]
     queryset = Resource.objects.all()
     serializer_class = ResourceSerializer
     filterset_fields = ['category', 'file_type']
 
 
 class EmergencyContactViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view emergency contacts"""
+    permission_classes = [AllowAny]
     queryset = EmergencyContact.objects.all()
     serializer_class = EmergencyContactSerializer
     pagination_class = None
 
 
 class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view feature cards"""
+    permission_classes = [AllowAny]
     queryset = FeatureCard.objects.filter(is_active=True)
     serializer_class = FeatureCardSerializer
     pagination_class = None
 
 
 class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view priority agendas"""
+    permission_classes = [AllowAny]
     queryset = PriorityAgenda.objects.filter(is_active=True).order_by('display_order')
     serializer_class = PriorityAgendaSerializer
     pagination_class = None
 
 
 class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view gallery albums"""
+    permission_classes = [AllowAny]
     queryset = GalleryAlbum.objects.prefetch_related('photos').all()
     serializer_class = GalleryAlbumSerializer
 
 
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view videos"""
+    permission_classes = [AllowAny]
     queryset = Video.objects.all()
     serializer_class = VideoSerializer
     filterset_fields = ['category', 'is_featured']
 
-    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny])
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
+        """
+        Record a view for this video.
+
+        Throttled to 1 view per content per minute per user/IP
+        to prevent view count manipulation.
+        """
         Video.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
         video = self.get_object()
         return Response({'view_count': video.view_count})
 
 
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view social media links"""
+    permission_classes = [AllowAny]
     queryset = SocialMediaLink.objects.filter(is_active=True)
     serializer_class = SocialMediaLinkSerializer
     pagination_class = None
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def app_settings(request):
+    """Public endpoint: Anyone can view app settings"""
     settings = AppSettings.objects.first()
     if settings:
         serializer = AppSettingsSerializer(settings)
@@ -482,6 +547,7 @@ def app_settings(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def home_feed(request):
     """Combined endpoint for home screen — hero slides, featured articles, feature cards, categories, and settings."""
     hero_slides = HeroSlide.objects.filter(is_active=True)

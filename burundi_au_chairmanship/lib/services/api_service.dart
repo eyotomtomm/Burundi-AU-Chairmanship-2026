@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_constants.dart';
+import '../config/environment.dart';
 import '../models/api_models.dart';
 import '../models/magazine_model.dart';
 import '../models/location_model.dart';
@@ -12,7 +13,8 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  static const String _baseUrl = AppConstants.baseApiUrl;
+  // Use environment-specific API URL
+  static final String _baseUrl = Environment.apiBaseUrl;
 
   Future<Map<String, String>> _headers({bool auth = false}) async {
     final headers = <String, String>{

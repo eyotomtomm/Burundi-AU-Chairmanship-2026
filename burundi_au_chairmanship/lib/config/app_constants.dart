@@ -24,6 +24,9 @@ class AppConstants {
   static const String summitTheme = 'Africa We Want: Building a Resilient and Prosperous Continent';
 
   // API Endpoints
+  // DEPRECATED: Use Environment.apiBaseUrl instead
+  // This is kept for backward compatibility but should not be used
+  @Deprecated('Use Environment.apiBaseUrl instead')
   static const String baseApiUrl = 'http://localhost:8000/api';
 
   // Storage Keys

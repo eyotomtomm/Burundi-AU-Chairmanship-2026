@@ -248,7 +248,14 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                   SnackBar(
                     content: Text('Downloading: ${item.getTitle(langCode)}'),
                     backgroundColor: AppColors.burundiGreen,
-                    action: SnackBarAction(label: 'Cancel', textColor: Colors.white, onPressed: () {}),
+                    action: SnackBarAction(
+                      label: 'Cancel',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        // Dismiss the snackbar
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      },
+                    ),
                   ),
                 );
               },

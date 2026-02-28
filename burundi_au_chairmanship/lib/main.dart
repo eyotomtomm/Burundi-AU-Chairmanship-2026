@@ -33,6 +33,9 @@ import 'screens/gallery/gallery_screen.dart';
 import 'screens/videos/videos_screen.dart';
 import 'screens/social_media/social_media_screen.dart';
 
+// Global navigator key for navigation from services
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -72,7 +75,7 @@ void main() async {
   // Initialize Firebase Messaging (if Firebase was initialized)
   try {
     final messaging = FirebaseMessagingService();
-    await messaging.initialize();
+    await messaging.initialize(navigatorKey);
   } catch (e) {
     print('Firebase Messaging initialization failed: $e');
   }
@@ -103,6 +106,7 @@ class BurundiAUApp extends StatelessWidget {
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (context, themeProvider, languageProvider, _) {
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
 

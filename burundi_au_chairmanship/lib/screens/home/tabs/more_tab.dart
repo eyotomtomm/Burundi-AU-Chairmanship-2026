@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'dart:convert';
+import 'dart:io';
 import '../../../config/app_colors.dart';
 import '../../../config/app_constants.dart';
 import '../../../l10n/app_localizations.dart';
@@ -379,14 +383,14 @@ class MoreTab extends StatelessWidget {
                       iconBgColor: const Color(0xFF66BB6A),
                       title: l10n.translate('share_app'),
                       isDark: isDark,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Share link copied!'),
-                            backgroundColor: const Color(0xFF66BB6A),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
+                      onTap: () async {
+                        final appLink = Platform.isIOS
+                            ? 'https://apps.apple.com/app/burundi-au-chairmanship/id123456789'
+                            : 'https://play.google.com/store/apps/details?id=com.burundi.au.chairmanship';
+
+                        await Share.share(
+                          'Check out the Burundi AU Chairmanship 2026 app! 🇧🇮\n\n$appLink',
+                          subject: 'Burundi AU Chairmanship 2026 App',
                         );
                       },
                     ),
@@ -396,15 +400,33 @@ class MoreTab extends StatelessWidget {
                       iconBgColor: const Color(0xFFFFB74D),
                       title: l10n.translate('rate_app'),
                       isDark: isDark,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Thank you for your support!'),
-                            backgroundColor: const Color(0xFFFFB74D),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                      onTap: () async {
+                        final InAppReview inAppReview = InAppReview.instance;
+
+                        if (await inAppReview.isAvailable()) {
+                          // Request in-app review (iOS/Android native prompt)
+                          await inAppReview.requestReview();
+                        } else {
+                          // Fallback: Open store listing
+                          final appId = Platform.isIOS
+                              ? 'id123456789'
+                              : 'com.burundi.au.chairmanship';
+
+                          await inAppReview.openStoreListing(
+                            appStoreId: appId,
+                          );
+                        }
+
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Thank you for your support!'),
+                              backgroundColor: const Color(0xFFFFB74D),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
                       },
                     ),
                     _buildMenuItem(
@@ -476,15 +498,20 @@ class MoreTab extends StatelessWidget {
                                             child: const Text('Close'),
                                           ),
                                           TextButton(
-                                            onPressed: () {
-                                              // In a real app, this would save to file or share
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Data copied! You can paste it into a file.'),
-                                                  backgroundColor: AppColors.success,
-                                                ),
-                                              );
-                                              Navigator.pop(ctx);
+                                            onPressed: () async {
+                                              // Copy to clipboard
+                                              final jsonString = const JsonEncoder.withIndent('  ').convert(data);
+                                              await Clipboard.setData(ClipboardData(text: jsonString));
+
+                                              if (context.mounted) {
+                                                Navigator.pop(ctx);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Data copied! You can paste it into a file.'),
+                                                    backgroundColor: AppColors.success,
+                                                  ),
+                                                );
+                                              }
                                             },
                                             child: const Text('Copy'),
                                           ),

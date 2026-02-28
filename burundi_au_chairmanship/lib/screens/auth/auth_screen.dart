@@ -316,7 +316,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: () => _showForgotPasswordDialog(context),
               style: TextButton.styleFrom(padding: EdgeInsets.zero),
               child: Text(
                 l10n.forgotPassword,
@@ -796,5 +796,88 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void _skipAuth(BuildContext context) {
     context.read<AuthProvider>().skipAuth();
     Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  void _showForgotPasswordDialog(BuildContext context) {
+    final emailController = TextEditingController();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter your email address and we\'ll send you a link to reset your password.',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'Email',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter your email address'),
+                    backgroundColor: AppColors.burundiRed,
+                  ),
+                );
+                return;
+              }
+
+              Navigator.pop(ctx);
+
+              final authProvider = context.read<AuthProvider>();
+              final success = await authProvider.sendPasswordResetEmail(email);
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? 'Password reset link sent to $email'
+                          : 'Failed to send reset link. Please try again.',
+                    ),
+                    backgroundColor: success ? AppColors.burundiGreen : AppColors.burundiRed,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.burundiGreen,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
   }
 }

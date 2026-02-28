@@ -18,6 +18,7 @@ router.register('priority-agendas', views.PriorityAgendaViewSet)
 router.register('gallery', views.GalleryAlbumViewSet)
 router.register('videos', views.VideoViewSet)
 router.register('social-media', views.SocialMediaLinkViewSet)
+router.register('notifications', views.NotificationViewSet, basename='notification')
 
 urlpatterns = [
     path('', include(router.urls)),

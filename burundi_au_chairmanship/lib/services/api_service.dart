@@ -58,6 +58,10 @@ class ApiService {
     }
   }
 
+  /// Public GET method
+  Future<dynamic> get(String endpoint, {bool auth = false}) =>
+      _get(endpoint, auth: auth);
+
   /// Public POST for simple actions (e.g. record_view, toggle_like)
   Future<dynamic> post(String endpoint, Map<String, dynamic> body, {bool auth = false}) =>
       _post(endpoint, body, auth: auth);

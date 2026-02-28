@@ -481,18 +481,35 @@ class _HomeTabState extends State<HomeTab> {
                           const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate), title: Text('Translate'), dense: true, contentPadding: EdgeInsets.zero)),
                         ],
                       ),
-                      Consumer<ThemeProvider>(
-                        builder: (context, themeProvider, _) {
-                          return IconButton(
-                            icon: Icon(
-                              themeProvider.isDarkMode
-                                  ? Icons.light_mode_outlined
-                                  : Icons.dark_mode_outlined,
-                              color: Colors.white,
+                      Row(
+                        children: [
+                          // Notification bell
+                          IconButton(
+                            icon: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.notifications_outlined, color: Colors.white),
                             ),
-                            onPressed: () => themeProvider.toggleTheme(),
-                          );
-                        },
+                            onPressed: () => Navigator.pushNamed(context, '/notifications'),
+                          ),
+                          // Theme toggle
+                          Consumer<ThemeProvider>(
+                            builder: (context, themeProvider, _) {
+                              return IconButton(
+                                icon: Icon(
+                                  themeProvider.isDarkMode
+                                      ? Icons.light_mode_outlined
+                                      : Icons.dark_mode_outlined,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () => themeProvider.toggleTheme(),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),

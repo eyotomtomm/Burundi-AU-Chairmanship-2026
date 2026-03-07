@@ -202,61 +202,86 @@ SIMPLE_JWT = {
 # ─── Jazzmin Admin Theme ──────────────────────────────────────
 JAZZMIN_SETTINGS = {
     # Title
-    'site_title': 'Burundi AU Admin',
-    'site_header': 'Burundi AU Chairmanship',
-    'site_brand': 'AU Chairmanship 2026',
-    'welcome_sign': 'Welcome to the Burundi AU Chairmanship Admin',
-    'copyright': 'Republic of Burundi - African Union Chairmanship 2026',
+    'site_title': 'Burundi4africa',
+    'site_header': 'Burundi4africa',
+    'site_brand': 'Burundi4africa',
+    'welcome_sign': 'Burundi AU Chairmanship 2025-2026',
+    'copyright': 'Republic of Burundi — AU Chairmanship 2025-2026',
 
-    # Logo (text-based since we have no logo file uploaded yet)
+    # Logo
     'site_logo': None,
     'login_logo': None,
     'site_icon': None,
 
-    # Top menu links
+    # Top menu
     'topmenu_links': [
         {'name': 'Dashboard', 'url': 'admin:index', 'permissions': ['auth.view_user']},
-        {'name': 'API Root', 'url': '/api/', 'new_window': True},
-        {'name': 'Website', 'url': 'https://www.burundi.gov.bi', 'new_window': True},
-        {'model': 'auth.User'},
+        {'name': 'API', 'url': '/api/', 'new_window': True},
     ],
 
-    # Side menu
+    # Sidebar
     'show_sidebar': True,
-    'navigation_expanded': True,
+    'navigation_expanded': False,
+
+    # Hide technical/internal models from sidebar
     'hide_apps': [],
-    'hide_models': [],
+    'hide_models': [
+        'core.ArticleLike',
+        'core.ArticleComment',
+        'core.ArticleMedia',
+        'core.MagazineLike',
+        'core.MagazineImage',
+        'core.GalleryPhoto',
+        'core.UserProfile',
+        'auth.Group',
+    ],
 
     'order_with_respect_to': [
         'core',
         'core.HeroSlide',
+        'core.HeroTextContent',
         'core.FeatureCard',
+        'core.QuickAccessMenuItem',
+        'core.Category',
         'core.Article',
         'core.MagazineEdition',
-        'core.EmbassyLocation',
-        'core.Event',
+        'core.PriorityAgenda',
+        'core.GalleryAlbum',
+        'core.Video',
         'core.LiveFeed',
+        'core.Event',
+        'core.EmbassyLocation',
         'core.Resource',
         'core.EmergencyContact',
+        'core.SocialMediaLink',
+        'core.Notification',
         'core.AppSettings',
         'auth',
     ],
 
-    # Custom icons for models/apps
+    # Icons
     'icons': {
         'auth': 'fas fa-users-cog',
         'auth.user': 'fas fa-user',
         'auth.Group': 'fas fa-users',
         'core.HeroSlide': 'fas fa-images',
         'core.FeatureCard': 'fas fa-th-large',
+        'core.Category': 'fas fa-tags',
         'core.Article': 'fas fa-newspaper',
         'core.MagazineEdition': 'fas fa-book-open',
+        'core.PriorityAgenda': 'fas fa-flag',
+        'core.GalleryAlbum': 'fas fa-camera-retro',
+        'core.Video': 'fas fa-play-circle',
+        'core.LiveFeed': 'fas fa-broadcast-tower',
         'core.EmbassyLocation': 'fas fa-map-marker-alt',
         'core.Event': 'fas fa-calendar-alt',
-        'core.LiveFeed': 'fas fa-video',
         'core.Resource': 'fas fa-file-alt',
         'core.EmergencyContact': 'fas fa-phone-alt',
+        'core.SocialMediaLink': 'fas fa-share-alt',
+        'core.Notification': 'fas fa-bell',
         'core.AppSettings': 'fas fa-cogs',
+        'core.HeroTextContent': 'fas fa-heading',
+        'core.QuickAccessMenuItem': 'fas fa-grip-horizontal',
     },
 
     'default_icon_parents': 'fas fa-folder',

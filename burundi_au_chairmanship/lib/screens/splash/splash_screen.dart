@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'dart:math' as math;
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../widgets/african_pattern.dart';
+import '../../providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -61,7 +63,15 @@ class _SplashScreenState extends State<SplashScreen>
     _scaleController.forward();
 
     await Future.delayed(AppConstants.splashDuration);
-    if (mounted) {
+    if (!mounted) return;
+
+    // Check authentication status
+    final authProvider = context.read<AuthProvider>();
+    await Future.delayed(const Duration(milliseconds: 500)); // Let provider initialize
+
+    if (authProvider.isAuthenticated) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else {
       Navigator.of(context).pushReplacementNamed('/auth');
     }
   }

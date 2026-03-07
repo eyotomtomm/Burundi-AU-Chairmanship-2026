@@ -17,6 +17,7 @@ import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
 import '../widgets/news_card.dart';
 import '../widgets/feature_item.dart';
+import '../../../widgets/search_bar_widget.dart';
 
 class HomeTab extends StatefulWidget {
   final ValueChanged<int>? onSwitchTab;
@@ -40,6 +41,12 @@ class _HomeTabState extends State<HomeTab> {
   List<Article>? _apiArticles;
   List<Map<String, dynamic>>? _apiFeatureCards;
   List<Map<String, dynamic>>? _apiPriorityAgendas;
+  Map<String, String>? _heroTextContent;
+  List<Map<String, dynamic>>? _quickAccessItems;
+
+  // Search
+  List<Article>? _searchResults;
+  bool _isSearching = false;
 
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
@@ -91,6 +98,20 @@ class _HomeTabState extends State<HomeTab> {
   List<Article> get _articles {
     if (_apiArticles != null && _apiArticles!.isNotEmpty) return _apiArticles!;
     return [];
+  }
+
+  String _getHeroText(String key) {
+    if (_heroTextContent != null && _heroTextContent!.containsKey(key)) {
+      return _heroTextContent![key]!;
+    }
+    // Fallback values
+    const fallbacks = {
+      'badge': 'BURUNDI',
+      'title_line1': 'African Union',
+      'title_line2': 'Chairmanship',
+      'year': '2026',
+    };
+    return fallbacks[key] ?? '';
   }
 
   /// Parse hex color string like "#1EB53A" into a Color
@@ -154,11 +175,27 @@ class _HomeTabState extends State<HomeTab> {
       // Fetch priority agendas
       final priorityAgendas = await api.getPriorityAgendas();
 
+      // Fetch hero text content
+      final heroTextData = await api.getHeroTextContent();
+      final heroTextMap = <String, String>{};
+      for (final item in heroTextData) {
+        final key = item['key'] as String;
+        final text = langCode == 'fr' && item['text_fr'] != null && (item['text_fr'] as String).isNotEmpty
+            ? item['text_fr'] as String
+            : item['text_en'] as String;
+        heroTextMap[key] = text;
+      }
+
+      // Fetch quick access menu
+      final quickAccessMenu = await api.getQuickAccessMenu();
+
       setState(() {
         _apiHeroSlides = heroSlides;
         _apiArticles = articles;
         _apiFeatureCards = featureCards;
         _apiPriorityAgendas = priorityAgendas;
+        _heroTextContent = heroTextMap;
+        _quickAccessItems = quickAccessMenu;
       });
     } catch (_) {
       // Fallback data will be used via computed getters
@@ -198,6 +235,34 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
+  Future<void> _handleSearch(String query) async {
+    if (query.length < 2) {
+      setState(() {
+        _searchResults = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    try {
+      final api = ApiService();
+      final langCode = Localizations.localeOf(context).languageCode;
+      final results = await api.searchArticles(query, langCode);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -209,6 +274,21 @@ class _HomeTabState extends State<HomeTab> {
         SliverToBoxAdapter(
           child: _buildHeroSlideshow(context, l10n),
         ),
+
+        // TODO: Search Bar (temporarily disabled for build fix)
+        // SliverToBoxAdapter(
+        //   child: Padding(
+        //     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        //     child: SearchBarWidget(
+        //       hintText: 'Search articles...',
+        //       onSearch: _handleSearch,
+        //       onClear: () => setState(() {
+        //         _searchResults = null;
+        //         _isSearching = false;
+        //       }),
+        //     ),
+        //   ),
+        // ),
 
         // Feature Cards Slideshow
         SliverToBoxAdapter(
@@ -523,9 +603,9 @@ class _HomeTabState extends State<HomeTab> {
                       color: AppColors.auGold,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      'BURUNDI',
-                      style: TextStyle(
+                    child: Text(
+                      _getHeroText('badge'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -534,9 +614,9 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'African Union',
-                    style: TextStyle(
+                  Text(
+                    _getHeroText('title_line1'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -545,9 +625,9 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                   Row(
                     children: [
-                      const Text(
-                        'Chairmanship ',
-                        style: TextStyle(
+                      Text(
+                        '${_getHeroText('title_line2')} ',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
@@ -558,9 +638,9 @@ class _HomeTabState extends State<HomeTab> {
                         shaderCallback: (bounds) => const LinearGradient(
                           colors: [AppColors.auGold, Color(0xFFFFD700)],
                         ).createShader(bounds),
-                        child: const Text(
-                          '2026',
-                          style: TextStyle(
+                        child: Text(
+                          _getHeroText('year'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -789,6 +869,37 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildQuickAccessGrid(BuildContext context, AppLocalizations l10n) {
+    // Use API data if available
+    if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty) {
+      final langCode = Localizations.localeOf(context).languageCode;
+      final items = _quickAccessItems!.map((menuItem) {
+        final title = langCode == 'fr' && menuItem['title_fr'] != null && (menuItem['title_fr'] as String).isNotEmpty
+            ? menuItem['title_fr'] as String
+            : menuItem['title_en'] as String;
+        final iconName = menuItem['icon_name'] as String;
+        final icon = _getIconFromName(iconName);
+        final actionType = menuItem['action_type'] as String;
+        final actionValue = menuItem['action_value'] as String;
+        final hasLiveDot = menuItem['has_live_indicator'] as bool? ?? false;
+
+        return <String, dynamic>{
+          'title': title,
+          'icon': icon,
+          'hasLiveDot': hasLiveDot,
+          'onTap': () {
+            if (actionType == 'route') {
+              Navigator.pushNamed(context, actionValue);
+            } else if (actionType == 'url') {
+              launchUrl(Uri.parse(actionValue));
+            }
+          },
+        };
+      }).toList();
+
+      return QuickAccessGrid(items: items);
+    }
+
+    // Fallback to hardcoded items when API is unavailable
     final items = <Map<String, dynamic>>[
       {'title': l10n.translate('live'), 'icon': Icons.play_circle_filled_rounded, 'hasLiveDot': true,
         'onTap': () => Navigator.pushNamed(context, '/live-feeds')},

@@ -96,7 +96,7 @@ class FirebaseMessagingService {
     );
 
     await _localNotifications.initialize(
-      settings,
+      settings: settings,
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
   }
@@ -113,10 +113,10 @@ class FirebaseMessagingService {
     final notification = message.notification;
     if (notification != null) {
       _localNotifications.show(
-        message.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
+        id: message.hashCode,
+        title: notification.title,
+        body: notification.body,
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             'default_channel',
             'Default Notifications',

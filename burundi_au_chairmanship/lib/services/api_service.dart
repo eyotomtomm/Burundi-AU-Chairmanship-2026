@@ -378,6 +378,33 @@ class ApiService {
     final data = await _get('home-feed/');
     return data as Map<String, dynamic>;
   }
+
+  // ── Hero Text Content ────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getHeroTextContent() async {
+    final data = await _get('hero-text-content/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Quick Access Menu ────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getQuickAccessMenu() async {
+    final data = await _get('quick-access-menu/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Search ───────────────────────────────────────────────
+  Future<List<Article>> searchArticles(String query, String language) async {
+    final encodedQuery = Uri.encodeComponent(query);
+    final data = await _get('search/articles/?q=$encodedQuery&lang=$language');
+    final results = (data['results'] as List<dynamic>?) ?? [];
+    return results.map((j) => Article.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<MagazineEdition>> searchMagazines(String query, String language) async {
+    final encodedQuery = Uri.encodeComponent(query);
+    final data = await _get('search/magazines/?q=$encodedQuery&lang=$language');
+    final results = (data['results'] as List<dynamic>?) ?? [];
+    return results.map((j) => MagazineEdition.fromJson(j as Map<String, dynamic>)).toList();
+  }
 }
 
 class ApiException implements Exception {

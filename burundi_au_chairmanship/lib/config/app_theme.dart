@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 class AppTheme {
+  /// Returns a theme-aware BoxShadow for cards and elevated surfaces.
+  /// Shadow opacity adapts based on light/dark theme.
+  static BoxShadow cardShadow(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final shadowColor = Theme.of(context).shadowColor;
+    return BoxShadow(
+      color: shadowColor.withValues(alpha: isDark ? 0.4 : 0.1),
+      blurRadius: 12,
+      offset: const Offset(0, 4),
+    );
+  }
+
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,

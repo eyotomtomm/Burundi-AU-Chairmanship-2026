@@ -19,12 +19,18 @@ router.register('gallery', views.GalleryAlbumViewSet)
 router.register('videos', views.VideoViewSet)
 router.register('social-media', views.SocialMediaLinkViewSet)
 router.register('notifications', views.NotificationViewSet, basename='notification')
+router.register('hero-text-content', views.HeroTextContentViewSet)
+router.register('quick-access-menu', views.QuickAccessMenuViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
     path('health/', views.health_check, name='health-check'),  # For load balancers/monitoring
     path('settings/', views.app_settings, name='app-settings'),
     path('home-feed/', views.home_feed, name='home-feed'),
+
+    # Search endpoints
+    path('search/articles/', views.search_articles, name='search-articles'),
+    path('search/magazines/', views.search_magazines, name='search-magazines'),
 
     # Auth - Legacy JWT endpoints (for backward compatibility)
     path('auth/register/', views.register, name='auth-register'),

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 /// Environment configuration for the app
 ///
 /// Supports multiple environments: development, staging, production
@@ -45,9 +47,10 @@ class Environment {
       case EnvironmentType.staging:
         return 'https://staging-api.burundi4africa.com/api';
       case EnvironmentType.development:
-        // For development, default to localhost
-        // iOS simulator uses localhost, Android emulator uses 10.0.2.2
-        return 'http://localhost:8000/api';
+        // Android emulator uses 10.0.2.2 to reach the host machine;
+        // iOS simulator shares the host network so localhost works.
+        final host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+        return 'http://$host:8000/api';
     }
   }
 
@@ -98,9 +101,12 @@ class Environment {
   static String fixMediaUrl(String url) {
     if (url.isEmpty) return url;
 
-    // In development, convert 127.0.0.1 to localhost for iOS compatibility
+    // In development, rewrite host to match the platform
     if (isDevelopment) {
-      return url.replaceAll('127.0.0.1:8000', 'localhost:8000');
+      final host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+      return url
+          .replaceAll('127.0.0.1:8000', '$host:8000')
+          .replaceAll('localhost:8000', '$host:8000');
     }
 
     // In production/staging, ensure HTTPS is used

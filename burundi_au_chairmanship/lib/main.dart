@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -49,9 +50,11 @@ void main() async {
     // Initialize Crashlytics
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
   } catch (e) {
-    print('Firebase initialization failed: $e');
-    print('App will continue without Firebase features');
-    print('To enable Firebase: Follow steps in FIREBASE_SETUP_GUIDE.md');
+    if (kDebugMode) {
+      print('Firebase initialization failed: $e');
+      print('App will continue without Firebase features');
+      print('To enable Firebase: Follow steps in FIREBASE_SETUP_GUIDE.md');
+    }
   }
 
   // Set preferred orientations
@@ -78,7 +81,9 @@ void main() async {
     final messaging = FirebaseMessagingService();
     await messaging.initialize(navigatorKey);
   } catch (e) {
-    print('Firebase Messaging initialization failed: $e');
+    if (kDebugMode) {
+      print('Firebase Messaging initialization failed: $e');
+    }
   }
 
   // Initialize Remote Config (if Firebase was initialized)
@@ -86,7 +91,9 @@ void main() async {
     final remoteConfig = RemoteConfigService();
     await remoteConfig.initialize();
   } catch (e) {
-    print('Remote Config initialization failed: $e');
+    if (kDebugMode) {
+      print('Remote Config initialization failed: $e');
+    }
   }
 
   // Run the app — binding was initialized in this zone, so runApp must stay here

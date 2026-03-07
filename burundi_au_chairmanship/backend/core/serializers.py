@@ -6,7 +6,7 @@ from .models import (
     Event, LiveFeed, Resource, EmergencyContact, Notification, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
-    GalleryPhoto, Video, SocialMediaLink,
+    GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
 )
 
 
@@ -273,3 +273,16 @@ class SocialMediaLinkSerializer(serializers.ModelSerializer):
         fields = ['id', 'platform', 'display_name', 'display_name_fr', 'url',
                   'handle', 'follower_count', 'description', 'description_fr',
                   'icon_color', 'is_active', 'display_order']
+
+
+class HeroTextContentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HeroTextContent
+        fields = ['id', 'key', 'text_en', 'text_fr', 'is_active', 'order']
+
+
+class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuickAccessMenuItem
+        fields = ['id', 'title_en', 'title_fr', 'icon_name', 'action_type',
+                  'action_value', 'order', 'is_active', 'has_live_indicator']

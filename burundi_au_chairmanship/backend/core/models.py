@@ -654,3 +654,54 @@ class SocialMediaLink(models.Model):
 
     def __str__(self):
         return f"{self.get_platform_display()} - {self.handle}"
+
+
+class HeroTextContent(models.Model):
+    """Dynamic text for hero section"""
+    KEY_CHOICES = [
+        ('badge', 'Badge Text'),
+        ('title_line1', 'Title Line 1'),
+        ('title_line2', 'Title Line 2'),
+        ('year', 'Year'),
+    ]
+
+    key = models.CharField(max_length=50, unique=True, choices=KEY_CHOICES)
+    text_en = models.CharField(max_length=200)
+    text_fr = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Hero Text Content'
+        verbose_name_plural = 'Hero Text Contents'
+
+    def __str__(self):
+        return f"{self.key}: {self.text_en}"
+
+
+class QuickAccessMenuItem(models.Model):
+    """Dynamic quick access menu items"""
+    ACTION_TYPE_CHOICES = [
+        ('route', 'App Route'),
+        ('url', 'External URL'),
+    ]
+
+    title_en = models.CharField(max_length=100)
+    title_fr = models.CharField(max_length=100, blank=True)
+    icon_name = models.CharField(max_length=50, help_text='Flutter icon name (e.g. live_tv, menu_book, article)')
+    action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES)
+    action_value = models.CharField(max_length=200, help_text='Route name (e.g. /live-feeds) or URL')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    has_live_indicator = models.BooleanField(default=False, help_text='Show red "LIVE" badge')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Quick Access Menu Item'
+        verbose_name_plural = 'Quick Access Menu Items'
+
+    def __str__(self):
+        return self.title_en

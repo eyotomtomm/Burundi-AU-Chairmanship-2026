@@ -376,9 +376,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   label: 'Google',
                   iconPath: 'assets/icons/google_logo.png',
                   onPressed: () => _signInWithGoogle(context),
-                  backgroundColor: Colors.white,
-                  textColor: Colors.black87,
-                  borderColor: Colors.grey[300]!,
+                  backgroundColor: theme.colorScheme.surface,
+                  textColor: theme.colorScheme.onSurface,
+                  borderColor: theme.dividerColor,
                   isLoading: context.watch<AuthProvider>().isLoading,
                 ),
               ),
@@ -390,9 +390,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     label: 'Apple',
                     icon: Icons.apple,
                     onPressed: () => _signInWithApple(context),
-                    backgroundColor: Colors.black,
-                    textColor: Colors.white,
-                    borderColor: Colors.black,
+                    backgroundColor: isDark ? Colors.white : Colors.black,
+                    textColor: isDark ? Colors.black : Colors.white,
+                    borderColor: isDark ? Colors.white : Colors.black,
                     isLoading: context.watch<AuthProvider>().isLoading,
                   ),
                 ),
@@ -472,6 +472,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             isDark: isDark,
+            validator: (value) {
+              if (value?.isEmpty ?? true) return 'Email is required';
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
+                return 'Enter a valid email';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 14),
 
@@ -490,6 +497,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               ),
               onPressed: () => setState(() => _obscureSignUpPassword = !_obscureSignUpPassword),
             ),
+            validator: (value) {
+              if (value?.isEmpty ?? true) return 'Password is required';
+              if (value!.length < 6) return 'At least 6 characters';
+              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Need uppercase letter';
+              if (!RegExp(r'[0-9]').hasMatch(value)) return 'Need number';
+              return null;
+            },
           ),
           const SizedBox(height: 14),
 
@@ -508,6 +522,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               ),
               onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
             ),
+            validator: (value) {
+              if (value?.isEmpty ?? true) return 'Confirm password';
+              if (value != _signUpPasswordController.text) return 'Passwords don\'t match';
+              return null;
+            },
           ),
           const SizedBox(height: 24),
 
@@ -558,9 +577,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   label: 'Google',
                   iconPath: 'assets/icons/google_logo.png',
                   onPressed: () => _signInWithGoogle(context),
-                  backgroundColor: Colors.white,
-                  textColor: Colors.black87,
-                  borderColor: Colors.grey[300]!,
+                  backgroundColor: theme.colorScheme.surface,
+                  textColor: theme.colorScheme.onSurface,
+                  borderColor: theme.dividerColor,
                   isLoading: context.watch<AuthProvider>().isLoading,
                 ),
               ),
@@ -572,9 +591,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     label: 'Apple',
                     icon: Icons.apple,
                     onPressed: () => _signInWithApple(context),
-                    backgroundColor: Colors.black,
-                    textColor: Colors.white,
-                    borderColor: Colors.black,
+                    backgroundColor: isDark ? Colors.white : Colors.black,
+                    textColor: isDark ? Colors.black : Colors.white,
+                    borderColor: isDark ? Colors.white : Colors.black,
                     isLoading: context.watch<AuthProvider>().isLoading,
                   ),
                 ),
@@ -622,11 +641,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     TextInputType? keyboardType,
     bool obscureText = false,
     Widget? suffixIcon,
+    String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      validator: validator,
       style: TextStyle(fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
@@ -752,6 +773,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _signUp(BuildContext context) async {
+    // Validate form before proceeding
+    if (!_signUpFormKey.currentState!.validate()) return;
+
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signUp(
       _signUpNameController.text,
@@ -796,6 +820,22 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void _skipAuth(BuildContext context) {
     context.read<AuthProvider>().skipAuth();
     Navigator.of(context).pushReplacementNamed('/home');
+
+    // Show feedback to user
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.person_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            const Text('Continuing as guest'),
+          ],
+        ),
+        backgroundColor: AppColors.burundiGreen,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _showForgotPasswordDialog(BuildContext context) {

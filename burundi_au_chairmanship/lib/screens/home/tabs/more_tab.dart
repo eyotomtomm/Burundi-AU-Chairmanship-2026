@@ -24,7 +24,7 @@ class MoreTab extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      backgroundColor: theme.colorScheme.background,
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -41,7 +41,7 @@ class MoreTab extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                        color: theme.colorScheme.onBackground,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -50,7 +50,7 @@ class MoreTab extends StatelessWidget {
                       'Customize your experience',
                       style: TextStyle(
                         fontSize: 15,
-                        color: isDark ? Colors.white60 : Colors.black45,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -82,8 +82,8 @@ class MoreTab extends StatelessWidget {
                         boxShadow: [
                           BoxShadow(
                             color: isDark
-                                ? Colors.black.withValues(alpha: 0.4)
-                                : Colors.black.withValues(alpha: 0.04),
+                                ? theme.shadowColor.withValues(alpha: 0.4)
+                                : theme.shadowColor.withValues(alpha: 0.1),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),
@@ -128,14 +128,14 @@ class MoreTab extends StatelessWidget {
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 18,
-                                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                    color: theme.colorScheme.onBackground,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   isLoggedIn ? (authProvider.userEmail ?? '') : l10n.translate('tap_to_sign_in'),
                                   style: TextStyle(
-                                    color: isDark ? Colors.white60 : Colors.black54,
+                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                                     fontSize: 14,
                                   ),
                                 ),
@@ -145,7 +145,7 @@ class MoreTab extends StatelessWidget {
                           Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 18,
-                            color: isDark ? Colors.white30 : Colors.black26,
+                            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
                           ),
                         ],
                       ),
@@ -204,7 +204,7 @@ class MoreTab extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white70 : Colors.black54,
+                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -213,7 +213,7 @@ class MoreTab extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                    color: theme.colorScheme.onBackground,
                                   ),
                                 ),
                               ],
@@ -268,7 +268,7 @@ class MoreTab extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white70 : Colors.black54,
+                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -279,7 +279,7 @@ class MoreTab extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                                    color: theme.colorScheme.onBackground,
                                   ),
                                 ),
                               ],
@@ -307,8 +307,8 @@ class MoreTab extends StatelessWidget {
                   boxShadow: [
                     BoxShadow(
                       color: isDark
-                          ? Colors.black.withValues(alpha: 0.4)
-                          : Colors.black.withValues(alpha: 0.04),
+                          ? theme.shadowColor.withValues(alpha: 0.4)
+                          : theme.shadowColor.withValues(alpha: 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 4),
                     ),
@@ -678,7 +678,7 @@ class MoreTab extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white30 : Colors.black26,
+                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -687,7 +687,7 @@ class MoreTab extends StatelessWidget {
                     'v${AppConstants.appVersion}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.2),
+                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.2),
                     ),
                   ),
                 ],

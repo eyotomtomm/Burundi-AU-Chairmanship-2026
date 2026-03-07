@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import Count, Exists, OuterRef, F
+from django.db.models import Count, Exists, OuterRef, F, Q
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
@@ -14,7 +14,7 @@ from .models import (
     Event, LiveFeed, Resource, EmergencyContact, AppSettings,
     FeatureCard, ArticleComment, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
-    Notification,
+    Notification, HeroTextContent, QuickAccessMenuItem,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -23,7 +23,7 @@ from .serializers import (
     FeatureCardSerializer, RegisterSerializer, UserSerializer,
     ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
     GalleryAlbumSerializer, VideoSerializer, SocialMediaLinkSerializer,
-    NotificationSerializer,
+    NotificationSerializer, HeroTextContentSerializer, QuickAccessMenuItemSerializer,
 )
 
 
@@ -690,3 +690,97 @@ def home_feed(request):
         'settings': AppSettingsSerializer(settings).data if settings else {},
     }
     return Response(data)
+
+
+# ── Search Endpoints ────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def search_articles(request):
+    """
+    Search articles by query string in both English and French.
+    Query params:
+      - q: search query (required, min 2 characters)
+      - lang: language preference (en or fr) for display
+    """
+    query = request.GET.get('q', '').strip()
+    lang = request.GET.get('lang', 'en')
+
+    if not query or len(query) < 2:
+        return Response({'results': [], 'count': 0})
+
+    # Bilingual search in title and content
+    articles = Article.objects.filter(
+        Q(title__icontains=query) | Q(content__icontains=query) |
+        Q(title_fr__icontains=query) | Q(content_fr__icontains=query)
+    ).select_related('category').prefetch_related('media').annotate(
+        comment_count=Count('comments', distinct=True),
+        like_count=Count('likes', distinct=True),
+    )
+
+    # Add is_liked annotation if authenticated
+    if request.user.is_authenticated:
+        articles = articles.annotate(
+            is_liked=Exists(ArticleLike.objects.filter(article=OuterRef('pk'), user=request.user)),
+        )
+    else:
+        from django.db.models import Value, BooleanField
+        articles = articles.annotate(is_liked=Value(False, output_field=BooleanField()))
+
+    articles = articles[:20]  # Limit to 20 results
+
+    serializer = ArticleSerializer(articles, many=True, context={'request': request})
+    return Response({
+        'results': serializer.data,
+        'count': len(serializer.data)
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def search_magazines(request):
+    """
+    Search magazine editions by query string in both English and French.
+    Query params:
+      - q: search query (required, min 2 characters)
+      - lang: language preference (en or fr) for display
+    """
+    query = request.GET.get('q', '').strip()
+    lang = request.GET.get('lang', 'en')
+
+    if not query or len(query) < 2:
+        return Response({'results': [], 'count': 0})
+
+    # Bilingual search in title and description
+    magazines = MagazineEdition.objects.filter(
+        Q(title__icontains=query) | Q(description__icontains=query) |
+        Q(title_fr__icontains=query) | Q(description_fr__icontains=query)
+    ).prefetch_related('images')[:20]  # Limit to 20 results
+
+    serializer = MagazineEditionSerializer(magazines, many=True, context={'request': request})
+    return Response({
+        'results': serializer.data,
+        'count': len(serializer.data)
+    })
+
+
+# ── Hero Text and Menu ViewSets ────────────────────────────────────────────
+
+class HeroTextContentViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for hero text content.
+    Returns active hero text items ordered by order field.
+    """
+    queryset = HeroTextContent.objects.filter(is_active=True)
+    serializer_class = HeroTextContentSerializer
+    permission_classes = [AllowAny]
+
+
+class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for quick access menu items.
+    Returns active menu items ordered by order field.
+    """
+    queryset = QuickAccessMenuItem.objects.filter(is_active=True)
+    serializer_class = QuickAccessMenuItemSerializer
+    permission_classes = [AllowAny]

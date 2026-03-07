@@ -1,51 +1,66 @@
 /* ═══════════════════════════════════════════════════════════════
-   Burundi AU Chairmanship – Custom Admin Styles
+   Burundi4africa — Admin Theme
    Colors: Green #1EB53A · Red #CE1126 · Gold #D4AF37 · White
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Login page ──────────────────────────────────────────────── */
+/* ── Burundi flag stripe ───────────────────────────────────── */
+body::before {
+  content: '';
+  display: block;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    #CE1126 0%, #CE1126 33%,
+    #fff 33%, #fff 50%,
+    #1EB53A 50%, #1EB53A 100%
+  );
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
+.main-header {
+  margin-top: 4px;
+}
+
+/* ── Login page ────────────────────────────────────────────── */
+.login-page {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%) !important;
+}
 .login-page .card {
   border-top: 4px solid #1EB53A;
+  border-radius: 12px;
 }
 .login-page .btn-primary {
-  background-color: #1EB53A !important;
-  border-color: #1EB53A !important;
+  background: linear-gradient(135deg, #1EB53A 0%, #179a30 100%) !important;
+  border: none !important;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 .login-page .btn-primary:hover {
-  background-color: #179a30 !important;
-  border-color: #179a30 !important;
+  background: linear-gradient(135deg, #179a30 0%, #137a26 100%) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(30, 181, 58, 0.3);
+}
+.login-logo b {
+  font-weight: 700;
 }
 
-/* ── Dashboard stats cards ───────────────────────────────────── */
-.info-box {
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.info-box:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-}
-.small-box {
-  border-radius: 12px;
-  transition: transform 0.2s ease;
-}
-.small-box:hover {
-  transform: translateY(-3px);
-}
-
-/* ── Navbar brand accent ─────────────────────────────────────── */
+/* ── Navbar ────────────────────────────────────────────────── */
 .main-header .navbar-brand {
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
-/* ── Sidebar tweaks ──────────────────────────────────────────── */
+/* ── Sidebar ───────────────────────────────────────────────── */
 .sidebar .nav-sidebar .nav-link.active {
-  background-color: #1EB53A !important;
+  background: linear-gradient(135deg, #1EB53A 0%, #179a30 100%) !important;
   color: #fff !important;
   border-radius: 8px;
   margin: 2px 8px;
+  box-shadow: 0 2px 8px rgba(30, 181, 58, 0.25);
 }
 .sidebar .nav-sidebar .nav-link:hover {
   background-color: rgba(30, 181, 58, 0.15);
@@ -56,16 +71,23 @@
   border-bottom: 1px solid rgba(255,255,255,0.15);
   padding: 14px 8px;
 }
+.nav-sidebar .nav-header {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.4);
+  padding: 12px 16px 4px;
+}
 
-/* ── Content area ────────────────────────────────────────────── */
+/* ── Content area ──────────────────────────────────────────── */
 .content-wrapper {
-  background: #f4f6f9;
+  background: #f0f2f5;
 }
 .dark-mode .content-wrapper {
   background: #1a1a2e;
 }
 
-/* ── Cards & tables ──────────────────────────────────────────── */
+/* ── Cards ─────────────────────────────────────────────────── */
 .card {
   border-radius: 12px;
   box-shadow: 0 1px 6px rgba(0,0,0,0.06);
@@ -75,18 +97,28 @@
   border-radius: 12px 12px 0 0 !important;
   font-weight: 600;
 }
+
+/* ── Tables ────────────────────────────────────────────────── */
 .table th {
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.5px;
+  font-size: 0.75rem;
+  letter-spacing: 0.6px;
   color: #6c757d;
+  border-bottom: 2px solid #e9ecef;
 }
 .table td {
   vertical-align: middle;
 }
+/* Alternating row colors */
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(30, 181, 58, 0.03);
+}
+.table-hover tbody tr:hover {
+  background-color: rgba(30, 181, 58, 0.07);
+}
 
-/* ── Buttons ─────────────────────────────────────────────────── */
+/* ── Buttons ───────────────────────────────────────────────── */
 .btn-success,
 .bg-success {
   background-color: #1EB53A !important;
@@ -105,12 +137,12 @@
   color: #fff !important;
 }
 
-/* ── Breadcrumb ──────────────────────────────────────────────── */
+/* ── Breadcrumb ────────────────────────────────────────────── */
 .content-header .breadcrumb {
   background: transparent;
 }
 
-/* ── Model action buttons ────────────────────────────────────── */
+/* ── Object action buttons ─────────────────────────────────── */
 .object-tools a {
   border-radius: 6px !important;
   background-color: #1EB53A !important;
@@ -119,28 +151,42 @@
   background-color: #179a30 !important;
 }
 
-/* ── Fieldsets ────────────────────────────────────────────────── */
+/* ── Fieldsets in change form ──────────────────────────────── */
 fieldset {
   border-radius: 10px;
 }
 fieldset .card-header {
   background: linear-gradient(135deg, #1EB53A 0%, #179a30 100%) !important;
   color: #fff !important;
+  font-size: 0.9rem;
+  letter-spacing: 0.3px;
 }
 
-/* ── Image previews in list view ─────────────────────────────── */
+/* ── Inline forms ──────────────────────────────────────────── */
+.inline-related {
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.inline-related .card-header {
+  background: #f8f9fa !important;
+  color: #333 !important;
+  font-size: 0.85rem;
+}
+.tabular .module {
+  border-radius: 8px;
+}
+.add-row a {
+  color: #1EB53A !important;
+  font-weight: 600;
+}
+
+/* ── Image previews ────────────────────────────────────────── */
 td img {
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
-/* ── Footer ──────────────────────────────────────────────────── */
-.main-footer {
-  font-size: 0.85rem;
-  border-top: 2px solid #1EB53A;
-}
-
-/* ── Pagination ──────────────────────────────────────────────── */
+/* ── Pagination ────────────────────────────────────────────── */
 .page-item.active .page-link {
   background-color: #1EB53A;
   border-color: #1EB53A;
@@ -152,39 +198,42 @@ td img {
   color: #179a30;
 }
 
-/* ── Select2 / Dropdowns ─────────────────────────────────────── */
+/* ── Select2 ───────────────────────────────────────────────── */
 .select2-container--default .select2-results__option--highlighted[aria-selected] {
   background-color: #1EB53A !important;
 }
 
-/* ── Gold accent highlights ──────────────────────────────────── */
+/* ── Gold accent ───────────────────────────────────────────── */
 .badge-warning,
 .bg-warning {
   background-color: #D4AF37 !important;
 }
 
-/* ── Burundi flag stripe on the very top ─────────────────────── */
-body::before {
-  content: '';
-  display: block;
-  height: 3px;
-  background: linear-gradient(
-    90deg,
-    #CE1126 0%, #CE1126 33%,
-    #fff 33%, #fff 50%,
-    #1EB53A 50%, #1EB53A 100%
-  );
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 9999;
+/* ── Dashboard info boxes ──────────────────────────────────── */
+.info-box {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.main-header {
-  margin-top: 3px;
+.info-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.small-box {
+  border-radius: 12px;
+  transition: transform 0.2s ease;
+}
+.small-box:hover {
+  transform: translateY(-3px);
 }
 
-/* ── Smooth transitions everywhere ───────────────────────────── */
+/* ── Footer ────────────────────────────────────────────────── */
+.main-footer {
+  font-size: 0.85rem;
+  border-top: 2px solid #1EB53A;
+}
+
+/* ── Smooth transitions ────────────────────────────────────── */
 a, .btn, .nav-link, .card, .info-box, .small-box {
   transition: all 0.2s ease;
 }

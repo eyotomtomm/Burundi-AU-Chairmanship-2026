@@ -71,20 +71,6 @@ class AppLocalizations {
       'resources_desc': 'Access documents and resources',
       'quick_reference': 'Quick Reference',
       'quick_reference_desc': 'Important contacts and information',
-      'emergency_sos': 'Emergency SOS',
-      'emergency_sos_desc': 'Quick access to emergency services',
-
-      // Emergency
-      'call_embassy': 'Call Embassy',
-      'call_police': 'Call Police',
-      'call_ambulance': 'Call Ambulance',
-      'call_fire': 'Call Fire Service',
-      'emergency_contacts': 'Emergency Contacts',
-      'your_location': 'Your Location',
-      'share_location': 'Share Location',
-      'emergency_help': 'Emergency Help',
-      'tap_for_help': 'Tap for immediate assistance',
-
       // Magazine
       'latest_edition': 'Latest Edition',
       'featured_edition': 'Featured Edition',
@@ -101,12 +87,6 @@ class AppLocalizations {
       'get_directions': 'Get Directions',
       'call': 'Call',
       'view_on_map': 'View on Map',
-
-      // Emergency
-      'embassy': 'Embassy',
-      'police': 'Police',
-      'ambulance': 'Ambulance',
-      'fire_department': 'Fire Department',
 
       // Settings
       'settings': 'Settings',
@@ -250,20 +230,6 @@ class AppLocalizations {
       'resources_desc': 'Accédez aux documents et ressources',
       'quick_reference': 'Référence rapide',
       'quick_reference_desc': 'Contacts et informations importants',
-      'emergency_sos': 'SOS Urgence',
-      'emergency_sos_desc': "Accès rapide aux services d'urgence",
-
-      // Emergency
-      'call_embassy': "Appeler l'ambassade",
-      'call_police': 'Appeler la police',
-      'call_ambulance': "Appeler l'ambulance",
-      'call_fire': 'Appeler les pompiers',
-      'emergency_contacts': "Contacts d'urgence",
-      'your_location': 'Votre position',
-      'share_location': 'Partager la position',
-      'emergency_help': "Aide d'urgence",
-      'tap_for_help': 'Appuyez pour une assistance immédiate',
-
       // Magazine
       'latest_edition': 'Dernière édition',
       'featured_edition': 'Édition en vedette',
@@ -280,12 +246,6 @@ class AppLocalizations {
       'get_directions': 'Obtenir les directions',
       'call': 'Appeler',
       'view_on_map': 'Voir sur la carte',
-
-      // Emergency
-      'embassy': 'Ambassade',
-      'police': 'Police',
-      'ambulance': 'Ambulance',
-      'fire_department': 'Pompiers',
 
       // Settings
       'settings': 'Paramètres',
@@ -426,20 +386,6 @@ class AppLocalizations {
   String get resourcesDesc => translate('resources_desc');
   String get quickReference => translate('quick_reference');
   String get quickReferenceDesc => translate('quick_reference_desc');
-  String get emergencySos => translate('emergency_sos');
-  String get emergencySosDesc => translate('emergency_sos_desc');
-
-  // Emergency
-  String get callEmbassy => translate('call_embassy');
-  String get callPolice => translate('call_police');
-  String get callAmbulance => translate('call_ambulance');
-  String get callFire => translate('call_fire');
-  String get emergencyContacts => translate('emergency_contacts');
-  String get yourLocation => translate('your_location');
-  String get shareLocation => translate('share_location');
-  String get emergencyHelp => translate('emergency_help');
-  String get tapForHelp => translate('tap_for_help');
-
   // Settings
   String get settings => translate('settings');
   String get language => translate('language');

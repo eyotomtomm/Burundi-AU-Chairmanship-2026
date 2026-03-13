@@ -326,14 +326,6 @@ class ApiService {
         .toList();
   }
 
-  // ── Emergency Contacts ───────────────────────────────────
-  Future<List<ApiEmergencyContact>> getEmergencyContacts() async {
-    final data = await _get('emergency-contacts/');
-    return _extractResults(data)
-        .map((j) => ApiEmergencyContact.fromJson(j))
-        .toList();
-  }
-
   // ── Settings ─────────────────────────────────────────────
   Future<AppSettingsModel?> getSettings() async {
     final data = await _get('settings/');

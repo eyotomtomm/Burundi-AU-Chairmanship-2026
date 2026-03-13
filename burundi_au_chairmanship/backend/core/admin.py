@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from .models import (
     HeroSlide, MagazineEdition, MagazineImage, Article, EmbassyLocation,
-    Event, LiveFeed, Resource, EmergencyContact, AppSettings,
+    Event, LiveFeed, Resource, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, Notification, MagazineLike,
@@ -317,15 +317,6 @@ class ResourceAdmin(admin.ModelAdmin):
         if obj.file:
             return format_html('<a href="{}" target="_blank">Download</a>', obj.file.url)
         return '-'
-
-
-@admin.register(EmergencyContact)
-class EmergencyContactAdmin(admin.ModelAdmin):
-    list_display = ['name', 'phone_number', 'type', 'order']
-    list_editable = ['order']
-    list_filter = ['type']
-    search_fields = ['name', 'phone_number']
-    fields = ['name', 'name_fr', 'phone_number', 'type', 'order']
 
 
 # ═══════════════════════════════════════════════════════════════

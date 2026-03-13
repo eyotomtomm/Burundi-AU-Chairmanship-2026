@@ -369,28 +369,6 @@ class Resource(models.Model):
         return self.title
 
 
-class EmergencyContact(models.Model):
-    TYPE_CHOICES = [
-        ('embassy', 'Embassy'),
-        ('police', 'Police'),
-        ('ambulance', 'Ambulance'),
-        ('fire', 'Fire Department'),
-    ]
-
-    name = models.CharField(max_length=100)
-    name_fr = models.CharField(max_length=100, blank=True)
-    phone_number = models.CharField(max_length=50)
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-    order = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['order']
-
-    def __str__(self):
-        return f"{self.name}: {self.phone_number}"
-
-
 class FeatureCard(models.Model):
     ACTION_TYPE_CHOICES = [
         ('none', 'No Action'),

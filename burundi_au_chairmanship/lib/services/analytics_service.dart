@@ -182,7 +182,6 @@ class AnalyticsScreens {
   static const String locations = 'Locations';
   static const String more = 'More';
   static const String auth = 'Authentication';
-  static const String emergency = 'Emergency';
   static const String liveFeeds = 'Live Feeds';
   static const String resources = 'Resources';
   static const String calendar = 'Calendar';
@@ -204,7 +203,6 @@ class AnalyticsFeatures {
   static const String readArticle = 'read_article';
   static const String viewEmbassy = 'view_embassy';
   static const String getDirections = 'get_directions';
-  static const String callEmergency = 'call_emergency';
   static const String downloadResource = 'download_resource';
   static const String shareApp = 'share_app';
   static const String rateApp = 'rate_app';

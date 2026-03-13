@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from core.models import (
     Article, MagazineEdition, EmbassyLocation, Event,
-    LiveFeed, Resource, EmergencyContact, AppSettings,
+    LiveFeed, Resource, AppSettings,
     FeatureCard, HeroSlide, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, Category,
 )
@@ -351,17 +351,6 @@ class Command(BaseCommand):
         for res in resources:
             Resource.objects.get_or_create(title=res['title'], defaults=res)
         self.stdout.write(f'  {len(resources)} Resources created')
-
-        # Emergency Contacts
-        contacts = [
-            {'name': 'Embassy', 'name_fr': 'Ambassade', 'phone_number': '+257 22 22 34 54', 'type': 'embassy', 'order': 1},
-            {'name': 'Police', 'name_fr': 'Police', 'phone_number': '117', 'type': 'police', 'order': 2},
-            {'name': 'Ambulance', 'name_fr': 'Ambulance', 'phone_number': '118', 'type': 'ambulance', 'order': 3},
-            {'name': 'Fire Department', 'name_fr': 'Pompiers', 'phone_number': '118', 'type': 'fire', 'order': 4},
-        ]
-        for c in contacts:
-            EmergencyContact.objects.get_or_create(type=c['type'], defaults=c)
-        self.stdout.write(f'  {len(contacts)} Emergency Contacts created')
 
         # Priority Agendas
         priority_agendas = [

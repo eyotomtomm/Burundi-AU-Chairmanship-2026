@@ -35,14 +35,6 @@ class _TranslateScreenState extends State<TranslateScreen> {
       {'kirundi': 'Ahabanza', 'en': 'First / Here', 'fr': 'Ici / D\'abord'},
       {'kirundi': 'Aho', 'en': 'There', 'fr': 'Là-bas'},
     ],
-    'emergency': [
-      {'kirundi': 'Tabara!', 'en': 'Help!', 'fr': 'Au secours!'},
-      {'kirundi': 'Hamagara abapolisi', 'en': 'Call the police', 'fr': 'Appelez la police'},
-      {'kirundi': 'Ndakeneye muganga', 'en': 'I need a doctor', 'fr': 'J\'ai besoin d\'un médecin'},
-      {'kirundi': 'Ivyibitungwa', 'en': 'Hospital', 'fr': 'Hôpital'},
-      {'kirundi': 'Umuriro!', 'en': 'Fire!', 'fr': 'Au feu!'},
-      {'kirundi': 'Ni ibiki?', 'en': 'What happened?', 'fr': 'Que s\'est-il passé?'},
-    ],
     'diplomacy': [
       {'kirundi': 'Umunyamabanga', 'en': 'Secretary', 'fr': 'Secrétaire'},
       {'kirundi': 'Umukuru w\'igihugu', 'en': 'Head of State', 'fr': 'Chef d\'État'},
@@ -58,14 +50,12 @@ class _TranslateScreenState extends State<TranslateScreen> {
   static const Map<String, IconData> _categoryIcons = {
     'greetings': Icons.waving_hand_rounded,
     'directions': Icons.explore_rounded,
-    'emergency': Icons.emergency_rounded,
     'diplomacy': Icons.account_balance_rounded,
   };
 
   static const Map<String, String> _categoryLabelsEn = {
     'greetings': 'Greetings',
     'directions': 'Directions',
-    'emergency': 'Emergency',
     'diplomacy': 'Diplomacy',
   };
 

@@ -1,7 +1,6 @@
 /// App-wide constants
 ///
 /// IMPORTANT: This file should only contain build-time constants.
-/// - Emergency contacts are loaded from /emergency-contacts/ API
 /// - Social media URLs are loaded from /settings/ API
 /// - Summit theme is loaded from /settings/ API
 class AppConstants {

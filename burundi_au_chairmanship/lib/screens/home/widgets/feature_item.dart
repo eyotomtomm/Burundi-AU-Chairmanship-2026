@@ -7,7 +7,6 @@ class FeatureItem extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final bool isEmergency;
 
   const FeatureItem({
     super.key,
@@ -16,7 +15,6 @@ class FeatureItem extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.isEmergency = false,
   });
 
   @override
@@ -31,12 +29,9 @@ class FeatureItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: isEmergency
-              ? Border.all(color: color, width: 2)
-              : null,
           boxShadow: [
             BoxShadow(
-              color: (isEmergency ? color : Colors.black).withValues(alpha: 0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

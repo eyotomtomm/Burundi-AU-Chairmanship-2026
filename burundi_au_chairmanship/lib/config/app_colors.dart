@@ -36,7 +36,4 @@ class AppColors {
   static const Color error = Color(0xFFCE1126); // Burundi Red
   static const Color info = Color(0xFFD4AF37); // AU Gold instead of blue
 
-  // Emergency SOS
-  static const Color emergency = Color(0xFFDC143C);
-  static const Color emergencyLight = Color(0xFFFFCDD2);
 }

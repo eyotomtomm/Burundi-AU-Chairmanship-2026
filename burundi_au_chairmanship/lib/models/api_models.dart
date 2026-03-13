@@ -143,37 +143,6 @@ class ApiResource {
       langCode == 'fr' ? categoryDisplayNameFr : categoryDisplayName;
 }
 
-class ApiEmergencyContact {
-  final int id;
-  final String name;
-  final String nameFr;
-  final String phoneNumber;
-  final String type;
-  final int order;
-
-  ApiEmergencyContact({
-    required this.id,
-    required this.name,
-    required this.nameFr,
-    required this.phoneNumber,
-    required this.type,
-    required this.order,
-  });
-
-  factory ApiEmergencyContact.fromJson(Map<String, dynamic> json) {
-    return ApiEmergencyContact(
-      id: json['id'] ?? 0,
-      name: json['name'] ?? '',
-      nameFr: json['name_fr'] ?? '',
-      phoneNumber: json['phone_number'] ?? '',
-      type: json['type'] ?? '',
-      order: json['order'] ?? 0,
-    );
-  }
-
-  String getName(String langCode) => langCode == 'fr' ? nameFr : name;
-}
-
 class AppSettingsModel {
   final String summitYear;
   final String summitTheme;

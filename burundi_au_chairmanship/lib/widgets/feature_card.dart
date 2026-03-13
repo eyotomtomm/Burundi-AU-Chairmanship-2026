@@ -8,7 +8,6 @@ class FeatureCard extends StatelessWidget {
   final Color? iconColor;
   final Color? backgroundColor;
   final VoidCallback onTap;
-  final bool isEmergency;
 
   const FeatureCard({
     super.key,
@@ -18,7 +17,6 @@ class FeatureCard extends StatelessWidget {
     this.iconColor,
     this.backgroundColor,
     required this.onTap,
-    this.isEmergency = false,
   });
 
   @override
@@ -32,12 +30,9 @@ class FeatureCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor ?? (isDark ? AppColors.darkSurface : AppColors.lightSurface),
           borderRadius: BorderRadius.circular(16),
-          border: isEmergency
-              ? Border.all(color: AppColors.emergency, width: 2)
-              : null,
           boxShadow: [
             BoxShadow(
-              color: (isEmergency ? AppColors.emergency : Colors.black).withValues(alpha: 0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),

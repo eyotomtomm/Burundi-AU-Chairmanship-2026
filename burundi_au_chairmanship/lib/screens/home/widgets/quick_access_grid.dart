@@ -4,7 +4,7 @@ import '../../../config/app_colors.dart';
 /// Grid of quick access buttons for common actions
 ///
 /// Displays a responsive grid of action buttons with icons,
-/// supporting special styling for emergency (SOS) items and live indicators
+/// supporting live indicators
 class QuickAccessGrid extends StatelessWidget {
   /// List of items to display in the grid
   ///
@@ -12,7 +12,6 @@ class QuickAccessGrid extends StatelessWidget {
   /// - `title`: String - Display text
   /// - `icon`: IconData - Icon to show
   /// - `onTap`: VoidCallback - Action when tapped
-  /// - `isSos`: bool (optional) - Style as emergency button
   /// - `hasLiveDot`: bool (optional) - Show live indicator dot
   final List<Map<String, dynamic>> items;
 
@@ -27,7 +26,6 @@ class QuickAccessGrid extends StatelessWidget {
       spacing: 12,
       runSpacing: 16,
       children: items.map((item) {
-        final isSos = item['isSos'] == true;
         final hasLiveDot = item['hasLiveDot'] == true;
 
         return GestureDetector(
@@ -44,20 +42,16 @@ class QuickAccessGrid extends StatelessWidget {
                       width: 58,
                       height: 58,
                       decoration: BoxDecoration(
-                        color: isSos
-                            ? AppColors.emergency.withValues(alpha: 0.1)
-                            : AppColors.burundiGreen.withValues(alpha: 0.1),
+                        color: AppColors.burundiGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isSos
-                              ? AppColors.emergency.withValues(alpha: 0.25)
-                              : AppColors.burundiGreen.withValues(alpha: 0.2),
+                          color: AppColors.burundiGreen.withValues(alpha: 0.2),
                           width: 1.5,
                         ),
                       ),
                       child: Icon(
                         item['icon'] as IconData,
-                        color: isSos ? AppColors.emergency : AppColors.burundiGreen,
+                        color: AppColors.burundiGreen,
                         size: 26,
                       ),
                     ),
@@ -69,7 +63,7 @@ class QuickAccessGrid extends StatelessWidget {
                           width: 10,
                           height: 10,
                           decoration: BoxDecoration(
-                            color: AppColors.emergency,
+                            color: AppColors.burundiRed,
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: Theme.of(context).scaffoldBackgroundColor,

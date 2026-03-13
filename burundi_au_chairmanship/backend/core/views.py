@@ -11,7 +11,7 @@ from config.firebase import verify_firebase_token
 from .throttling import ViewCountThrottle, LikeToggleThrottle
 from .models import (
     HeroSlide, MagazineEdition, MagazineLike, Article, EmbassyLocation,
-    Event, LiveFeed, Resource, EmergencyContact, AppSettings,
+    Event, LiveFeed, Resource, AppSettings,
     FeatureCard, ArticleComment, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
     Notification, HeroTextContent, QuickAccessMenuItem,
@@ -19,7 +19,7 @@ from .models import (
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
     EmbassyLocationSerializer, EventSerializer, LiveFeedSerializer,
-    ResourceSerializer, EmergencyContactSerializer, AppSettingsSerializer,
+    ResourceSerializer, AppSettingsSerializer,
     FeatureCardSerializer, RegisterSerializer, UserSerializer,
     ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
     GalleryAlbumSerializer, VideoSerializer, SocialMediaLinkSerializer,
@@ -189,23 +189,33 @@ def firebase_login(request):
         # Verify Firebase token
         decoded_token = verify_firebase_token(id_token)
         firebase_uid = decoded_token['uid']
+        email = decoded_token.get('email', '')
+        name = decoded_token.get('name', email.split('@')[0] if email else 'User')
 
-        # Find user by Firebase UID
+        # Find or create user by Firebase UID
         try:
             profile = UserProfile.objects.select_related('user').get(firebase_uid=firebase_uid)
+            user = profile.user
+            is_new_user = False
         except UserProfile.DoesNotExist:
-            return Response(
-                {'detail': 'User not found. Please register first.'},
-                status=status.HTTP_404_NOT_FOUND
+            # Auto-create user if they don't exist (standard for social logins)
+            user = User.objects.create(
+                username=firebase_uid,
+                email=email,
+                first_name=name,
             )
+            profile = user.profile
+            profile.firebase_uid = firebase_uid
+            is_new_user = True
 
         # Update email verification status from Firebase
         profile.is_email_verified = decoded_token.get('email_verified', False)
         profile.save()
 
         return Response({
-            'user': UserSerializer(profile.user).data,
-            'message': 'Login successful'
+            'user': UserSerializer(user).data,
+            'message': 'Login successful',
+            'is_new_user': is_new_user
         })
 
     except ValueError as e:
@@ -498,14 +508,6 @@ class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Resource.objects.all()
     serializer_class = ResourceSerializer
     filterset_fields = ['category', 'file_type']
-
-
-class EmergencyContactViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view emergency contacts"""
-    permission_classes = [AllowAny]
-    queryset = EmergencyContact.objects.all()
-    serializer_class = EmergencyContactSerializer
-    pagination_class = None
 
 
 class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):

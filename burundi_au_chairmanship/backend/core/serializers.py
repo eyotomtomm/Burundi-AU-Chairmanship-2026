@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from .models import (
     HeroSlide, MagazineEdition, MagazineImage, Article, EmbassyLocation,
-    Event, LiveFeed, Resource, EmergencyContact, Notification, AppSettings,
+    Event, LiveFeed, Resource, Notification, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
@@ -194,12 +194,6 @@ class ResourceSerializer(serializers.ModelSerializer):
         model = Resource
         fields = ['id', 'title', 'title_fr', 'category', 'file',
                   'file_size', 'file_type']
-
-
-class EmergencyContactSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmergencyContact
-        fields = ['id', 'name', 'name_fr', 'phone_number', 'type', 'order']
 
 
 class FeatureCardSerializer(serializers.ModelSerializer):

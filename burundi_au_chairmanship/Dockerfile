@@ -15,10 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY backend/ .
 
-# Collect static files (fail on error so broken builds are caught)
-RUN python manage.py collectstatic --noinput
-
 EXPOSE 8080
 
-# Run migrations then start gunicorn
-CMD python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:8080 --log-file -
+# Collect static files, run migrations, then start gunicorn
+# collectstatic runs at startup because DJANGO_SECRET_KEY is not available at build time
+CMD python manage.py collectstatic --noinput && \
+    python manage.py migrate --noinput && \
+    gunicorn config.wsgi --bind 0.0.0.0:8080 --workers 3 --log-file -

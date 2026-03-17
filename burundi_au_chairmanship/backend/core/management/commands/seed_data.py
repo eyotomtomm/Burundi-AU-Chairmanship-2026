@@ -17,8 +17,15 @@ class Command(BaseCommand):
 
         # Admin user
         if not User.objects.filter(is_superuser=True).exists():
-            User.objects.create_superuser('admin', 'admin@burundi.gov.bi', 'admin2026')
-            self.stdout.write('  Admin user created (admin / admin2026)')
+            import os
+            admin_password = os.environ.get('DJANGO_ADMIN_PASSWORD', 'admin2026')
+            User.objects.create_superuser('admin', 'admin@burundi.gov.bi', admin_password)
+            if admin_password == 'admin2026':
+                self.stdout.write(self.style.WARNING(
+                    '  Admin user created with DEFAULT password — set DJANGO_ADMIN_PASSWORD env var in production!'
+                ))
+            else:
+                self.stdout.write('  Admin user created with password from DJANGO_ADMIN_PASSWORD')
 
         # App Settings
         AppSettings.objects.get_or_create(

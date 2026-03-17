@@ -376,6 +376,33 @@ class FeatureCard(models.Model):
         ('route', 'App Route'),
     ]
 
+    ICON_CHOICES = [
+        ('stars', 'Stars'),
+        ('travel_explore', 'Travel / Explore'),
+        ('public', 'Globe / Public'),
+        ('security', 'Security / Shield'),
+        ('groups', 'Groups / People'),
+        ('gavel', 'Gavel / Justice'),
+        ('handshake', 'Handshake'),
+        ('trending_up', 'Trending Up / Growth'),
+        ('auto_stories', 'Book / Stories'),
+        ('campaign', 'Campaign / Megaphone'),
+        ('flag', 'Flag'),
+        ('workspace_premium', 'Premium / Award'),
+        ('landscape', 'Landscape / Nature'),
+        ('music_note', 'Music Note'),
+        ('restaurant', 'Restaurant / Food'),
+        ('diversity_3', 'Diversity / Community'),
+        ('water_drop', 'Water Drop'),
+        ('health_and_safety', 'Health & Safety'),
+        ('school', 'School / Education'),
+        ('agriculture', 'Agriculture'),
+        ('business', 'Business / Trade'),
+        ('computer', 'Computer / Digital'),
+        ('factory', 'Factory / Industry'),
+        ('local_shipping', 'Shipping / Transport'),
+    ]
+
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField()
@@ -383,9 +410,27 @@ class FeatureCard(models.Model):
     image = models.ImageField(upload_to='feature_cards/', blank=True, validators=[validate_image_file])
     gradient_start = models.CharField(max_length=10, default='#1EB53A', help_text='Hex color e.g. #1EB53A')
     gradient_end = models.CharField(max_length=10, default='#4CAF50', help_text='Hex color e.g. #4CAF50')
-    icon_name = models.CharField(max_length=50, blank=True, help_text='Flutter IconData name, e.g. "stars", "travel_explore"')
+    icon_name = models.CharField(max_length=50, blank=True, choices=ICON_CHOICES, help_text='Fallback icon if no image is uploaded')
+    icon_image = models.ImageField(upload_to='feature_cards/icons/', blank=True, validators=[validate_image_file],
+                                   help_text='Upload a custom icon image (PNG/SVG recommended). Overrides icon_name.')
     action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES, default='none')
     action_value = models.CharField(max_length=500, blank=True, help_text='URL for "url" type, route name for "route" type (e.g. "/news", "/magazine")')
+
+    # Rich content fields for detail page
+    overview = models.TextField(blank=True, help_text='Extended description for the detail page')
+    overview_fr = models.TextField(blank=True)
+    key_points = models.JSONField(default=list, blank=True, help_text='List of bullet point strings, e.g. ["Point one", "Point two"]')
+    key_points_fr = models.JSONField(default=list, blank=True)
+    impact_areas = models.JSONField(
+        default=list, blank=True,
+        help_text='List of impact areas. Each item: {"icon": "icon_name", "title": "Title", "description": "Description"}. '
+                  'Available icons: stars, public, security, groups, trending_up, landscape, music_note, restaurant, '
+                  'diversity_3, health_and_safety, school, agriculture, business, computer, factory, local_shipping'
+    )
+    impact_areas_fr = models.JSONField(default=list, blank=True)
+    extra_content = models.TextField(blank=True, help_text='Additional text section for the detail page')
+    extra_content_fr = models.TextField(blank=True)
+
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -674,6 +719,10 @@ class QuickAccessMenuItem(models.Model):
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     has_live_indicator = models.BooleanField(default=False, help_text='Show red "LIVE" badge')
+    badge_text = models.CharField(max_length=10, blank=True, help_text='Manual badge text e.g. "HOT", "PROMO". Overrides auto badge if set.')
+    badge_color = models.CharField(max_length=10, blank=True, default='#E53935', help_text='Badge background color (hex). Default: red')
+    auto_badge = models.BooleanField(default=True, help_text='Automatically show "NEW" badge when fresh content exists for this route')
+    auto_badge_days = models.IntegerField(default=3, help_text='Number of days content is considered "new"')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

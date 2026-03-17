@@ -200,8 +200,10 @@ class FeatureCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = FeatureCard
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'image', 'gradient_start', 'gradient_end', 'icon_name',
-                  'action_type', 'action_value', 'order']
+                  'image', 'gradient_start', 'gradient_end', 'icon_name', 'icon_image',
+                  'action_type', 'action_value', 'order',
+                  'overview', 'overview_fr', 'key_points', 'key_points_fr',
+                  'impact_areas', 'impact_areas_fr', 'extra_content', 'extra_content_fr']
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -276,7 +278,54 @@ class HeroTextContentSerializer(serializers.ModelSerializer):
 
 
 class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
+    badge_text = serializers.SerializerMethodField()
+
     class Meta:
         model = QuickAccessMenuItem
         fields = ['id', 'title_en', 'title_fr', 'icon_name', 'action_type',
-                  'action_value', 'order', 'is_active', 'has_live_indicator']
+                  'action_value', 'order', 'is_active', 'has_live_indicator',
+                  'badge_text', 'badge_color']
+
+    def get_badge_text(self, obj):
+        # Manual badge always takes priority
+        if obj.badge_text:
+            return obj.badge_text
+
+        # Auto-detect new content if enabled
+        if obj.auto_badge:
+            from django.utils import timezone
+            from datetime import timedelta
+            cutoff = timezone.now() - timedelta(days=obj.auto_badge_days)
+
+            route = obj.action_value
+            has_new = False
+
+            if route == '/news':
+                from core.models import Article
+                has_new = Article.objects.filter(publish_date__gte=cutoff).exists()
+            elif route == '/magazine':
+                from core.models import MagazineEdition
+                has_new = MagazineEdition.objects.filter(publish_date__gte=cutoff).exists()
+            elif route == '/gallery':
+                from core.models import GalleryAlbum
+                has_new = GalleryAlbum.objects.filter(created_at__gte=cutoff).exists()
+            elif route == '/videos':
+                from core.models import Video
+                has_new = Video.objects.filter(created_at__gte=cutoff).exists()
+            elif route == '/resources':
+                from core.models import Resource
+                has_new = Resource.objects.filter(created_at__gte=cutoff).exists()
+            elif route == '/live-feeds':
+                from core.models import LiveFeed
+                has_new = LiveFeed.objects.filter(status='live').exists()
+            elif route == '/calendar':
+                from core.models import Event
+                has_new = Event.objects.filter(
+                    event_date__gte=timezone.now(),
+                    created_at__gte=cutoff,
+                ).exists()
+
+            if has_new:
+                return 'NEW'
+
+        return ''

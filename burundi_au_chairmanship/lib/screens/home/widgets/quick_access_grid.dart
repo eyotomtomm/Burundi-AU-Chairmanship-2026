@@ -17,6 +17,17 @@ class QuickAccessGrid extends StatelessWidget {
 
   const QuickAccessGrid({super.key, required this.items});
 
+  static Color _hexToColor(String hex, Color fallback) {
+    if (hex.isEmpty) return fallback;
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    try {
+      return Color(int.parse(hex, radix: 16));
+    } catch (_) {
+      return fallback;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -27,6 +38,8 @@ class QuickAccessGrid extends StatelessWidget {
       runSpacing: 16,
       children: items.map((item) {
         final hasLiveDot = item['hasLiveDot'] == true;
+        final badgeText = item['badgeText'] as String? ?? '';
+        final badgeColorHex = item['badgeColor'] as String? ?? '';
 
         return GestureDetector(
           onTap: item['onTap'] as VoidCallback,
@@ -55,7 +68,35 @@ class QuickAccessGrid extends StatelessWidget {
                         size: 26,
                       ),
                     ),
-                    if (hasLiveDot)
+                    // "NEW" / "HOT" / custom text badge
+                    if (badgeText.isNotEmpty)
+                      Positioned(
+                        top: -8,
+                        right: -12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _hexToColor(badgeColorHex, AppColors.burundiRed),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Text(
+                            badgeText.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      )
+                    // Fallback to red live dot
+                    else if (hasLiveDot)
                       Positioned(
                         top: -2,
                         right: -2,

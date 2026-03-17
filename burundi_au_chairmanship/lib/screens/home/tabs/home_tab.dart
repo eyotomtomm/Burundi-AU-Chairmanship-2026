@@ -12,6 +12,7 @@ import '../../../models/api_models.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/api_service.dart';
 import '../../news/article_detail_screen.dart';
+import '../../feature_card/feature_card_detail_screen.dart';
 import '../painters/zigzag_line_painter.dart';
 import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
@@ -28,12 +29,18 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  final PageController _heroPageController = PageController();
-  final PageController _featureCardPageController = PageController(viewportFraction: 0.85);
+  // Large offset so users can swipe left from the first slide too
+  static const int _kLoopOffset = 10000;
+
+  final PageController _heroPageController = PageController(initialPage: _kLoopOffset);
+  final PageController _featureCardPageController = PageController(
+    viewportFraction: 0.85,
+    initialPage: _kLoopOffset,
+  );
   Timer? _heroTimer;
   Timer? _featureTimer;
-  int _heroCurrentPage = 0;
-  int _featureCurrentPage = 0;
+  int _heroRawPage = _kLoopOffset;
+  int _featureRawPage = _kLoopOffset;
 
   // API data
   List<HeroSlide>? _apiHeroSlides;
@@ -164,10 +171,25 @@ class _HomeTabState extends State<HomeTab> {
           'title': langCode == 'fr' ? (j['title_fr'] ?? j['title'] ?? '') : (j['title'] ?? ''),
           'description': langCode == 'fr' ? (j['description_fr'] ?? j['description'] ?? '') : (j['description'] ?? ''),
           'icon': icon,
+          'iconImageUrl': j['icon_image'] ?? '',
           'gradient': [gradStart, gradEnd],
           'imageUrl': j['image'] ?? '',
           'actionType': j['action_type'] ?? 'none',
           'actionValue': j['action_value'] ?? '',
+          // Rich content fields for detail page
+          'gradient_start': j['gradient_start'] ?? '#1EB53A',
+          'gradient_end': j['gradient_end'] ?? '#4CAF50',
+          'overview': j['overview'] ?? '',
+          'overview_fr': j['overview_fr'] ?? '',
+          'key_points': j['key_points'] ?? [],
+          'key_points_fr': j['key_points_fr'] ?? [],
+          'impact_areas': j['impact_areas'] ?? [],
+          'impact_areas_fr': j['impact_areas_fr'] ?? [],
+          'extra_content': j['extra_content'] ?? '',
+          'extra_content_fr': j['extra_content_fr'] ?? '',
+          // Keep raw title fields for detail screen localization
+          'title_raw': j['title'] ?? '',
+          'title_fr': j['title_fr'] ?? '',
         };
       }).toList();
 
@@ -213,9 +235,8 @@ class _HomeTabState extends State<HomeTab> {
   void _startHeroAutoSlide() {
     _heroTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || _heroSlides.isEmpty) return;
-      final nextPage = (_heroCurrentPage + 1) % _heroSlides.length;
       _heroPageController.animateToPage(
-        nextPage,
+        _heroRawPage + 1,
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
       );
@@ -225,9 +246,8 @@ class _HomeTabState extends State<HomeTab> {
   void _startFeatureAutoSlide() {
     _featureTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || _featureCards.isEmpty) return;
-      final nextPage = (_featureCurrentPage + 1) % _featureCards.length;
       _featureCardPageController.animateToPage(
-        nextPage,
+        _featureRawPage + 1,
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
       );
@@ -417,11 +437,11 @@ class _HomeTabState extends State<HomeTab> {
           PageView.builder(
             controller: _heroPageController,
             onPageChanged: (index) {
-              setState(() => _heroCurrentPage = index);
+              setState(() => _heroRawPage = index);
             },
-            itemCount: _heroSlides.length,
             itemBuilder: (context, index) {
-              final slide = _heroSlides[index];
+              if (_heroSlides.isEmpty) return const SizedBox.shrink();
+              final slide = _heroSlides[index % _heroSlides.length];
               final imagePath = slide['image'] as String;
               final isNetwork = slide['isNetwork'] == true;
               return Stack(
@@ -652,7 +672,7 @@ class _HomeTabState extends State<HomeTab> {
                   const SizedBox(height: 8),
                   // Slide label
                   Text(
-                    _heroCurrentPage < _heroSlides.length ? (_heroSlides[_heroCurrentPage]['label'] ?? '') : '',
+                    _heroSlides.isNotEmpty ? (_heroSlides[_heroRawPage % _heroSlides.length]['label'] ?? '') : '',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 14,
@@ -670,20 +690,22 @@ class _HomeTabState extends State<HomeTab> {
                         painter: ZigzagLinePainter(),
                       ),
                       const SizedBox(width: 15),
-                      ...List.generate(_heroSlides.length, (index) {
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.only(right: 6),
-                          width: _heroCurrentPage == index ? 24 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: _heroCurrentPage == index
-                                ? AppColors.auGold
-                                : Colors.white.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        );
-                      }),
+                      if (_heroSlides.isNotEmpty)
+                        ...List.generate(_heroSlides.length, (index) {
+                          final activeIndex = _heroRawPage % _heroSlides.length;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            margin: const EdgeInsets.only(right: 6),
+                            width: activeIndex == index ? 24 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: activeIndex == index
+                                  ? AppColors.auGold
+                                  : Colors.white.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ],
@@ -704,20 +726,18 @@ class _HomeTabState extends State<HomeTab> {
           child: PageView.builder(
             controller: _featureCardPageController,
             onPageChanged: (index) {
-              setState(() => _featureCurrentPage = index);
+              setState(() => _featureRawPage = index);
             },
-            itemCount: _featureCards.length,
             itemBuilder: (context, index) {
-              final card = _featureCards[index];
+              if (_featureCards.isEmpty) return const SizedBox.shrink();
+              final card = _featureCards[index % _featureCards.length];
               final gradientColors = card['gradient'] as List<Color>;
               final imageUrl = card['imageUrl'] as String?;
-              final actionType = card['actionType'] as String?;
-              final actionValue = card['actionValue'] as String?;
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                 child: GestureDetector(
-                  onTap: () => _handleFeatureCardTap(context, actionType, actionValue),
+                  onTap: () => _handleFeatureCardTap(context, card),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
@@ -826,11 +846,7 @@ class _HomeTabState extends State<HomeTab> {
                                   color: Colors.white.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Icon(
-                                  card['icon'] as IconData,
-                                  color: Colors.white,
-                                  size: 40,
-                                ),
+                                child: _buildCardIcon(card, 40),
                               ),
                             ],
                           ),
@@ -846,23 +862,25 @@ class _HomeTabState extends State<HomeTab> {
         ),
         const SizedBox(height: 8),
         // Dot indicators
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_featureCards.length, (index) {
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              width: _featureCurrentPage == index ? 24 : 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: _featureCurrentPage == index
-                    ? AppColors.burundiGreen
-                    : AppColors.burundiGreen.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            );
-          }),
-        ),
+        if (_featureCards.isNotEmpty)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_featureCards.length, (index) {
+              final activeIndex = _featureRawPage % _featureCards.length;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: activeIndex == index ? 24 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: activeIndex == index
+                      ? AppColors.burundiGreen
+                      : AppColors.burundiGreen.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          ),
       ],
     );
   }
@@ -881,10 +899,15 @@ class _HomeTabState extends State<HomeTab> {
         final actionValue = menuItem['action_value'] as String;
         final hasLiveDot = menuItem['has_live_indicator'] as bool? ?? false;
 
+        final badgeText = menuItem['badge_text'] as String? ?? '';
+        final badgeColor = menuItem['badge_color'] as String? ?? '';
+
         return <String, dynamic>{
           'title': title,
           'icon': icon,
           'hasLiveDot': hasLiveDot,
+          'badgeText': badgeText,
+          'badgeColor': badgeColor,
           'onTap': () {
             if (actionType == 'route') {
               Navigator.pushNamed(context, actionValue);
@@ -1129,16 +1152,53 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  void _handleFeatureCardTap(BuildContext context, String? actionType, String? actionValue) {
-    if (actionType == null || actionValue == null || actionValue.isEmpty || actionType == 'none') {
+  /// Shows uploaded icon image if available, otherwise falls back to Material icon.
+  Widget _buildCardIcon(Map<String, dynamic> card, double size) {
+    final iconImageUrl = card['iconImageUrl'] as String? ?? '';
+    if (iconImageUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: Environment.fixMediaUrl(iconImageUrl),
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        placeholder: (_, _) => Icon(
+          card['icon'] as IconData? ?? Icons.stars,
+          color: Colors.white,
+          size: size,
+        ),
+        errorWidget: (_, _, _) => Icon(
+          card['icon'] as IconData? ?? Icons.stars,
+          color: Colors.white,
+          size: size,
+        ),
+      );
+    }
+    return Icon(
+      card['icon'] as IconData? ?? Icons.stars,
+      color: Colors.white,
+      size: size,
+    );
+  }
+
+  void _handleFeatureCardTap(BuildContext context, Map<String, dynamic> card) {
+    final actionType = card['actionType'] as String?;
+    final actionValue = card['actionValue'] as String?;
+
+    if (actionType == null || actionType == 'none') {
       return; // No action defined
     }
 
-    if (actionType == 'route') {
-      // Navigate to app route
+    if (actionType == 'route' && actionValue == '/feature-detail') {
+      // Navigate to the feature card detail screen with full card data
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FeatureCardDetailScreen(cardData: card),
+        ),
+      );
+    } else if (actionType == 'route' && actionValue != null && actionValue.isNotEmpty) {
       Navigator.pushNamed(context, actionValue);
-    } else if (actionType == 'url') {
-      // Launch external URL
+    } else if (actionType == 'url' && actionValue != null && actionValue.isNotEmpty) {
       final uri = Uri.parse(actionValue);
       launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -1159,6 +1219,15 @@ class _HomeTabState extends State<HomeTab> {
       'campaign': Icons.campaign,
       'flag': Icons.flag,
       'workspace_premium': Icons.workspace_premium,
+      // Quick access icons
+      'play_circle_filled': Icons.play_circle_filled_rounded,
+      'folder_copy': Icons.folder_copy_rounded,
+      'article': Icons.article_rounded,
+      'translate': Icons.translate_rounded,
+      'cloud': Icons.cloud_rounded,
+      'calendar_month': Icons.calendar_month_rounded,
+      'live_tv': Icons.live_tv,
+      'menu_book': Icons.menu_book,
     };
 
     return iconMap[iconName] ?? Icons.stars;

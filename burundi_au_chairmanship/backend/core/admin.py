@@ -71,13 +71,38 @@ class HeroSlideAdmin(admin.ModelAdmin):
 
 @admin.register(FeatureCard)
 class FeatureCardAdmin(admin.ModelAdmin):
-    list_display = ['title', 'color_preview', 'order', 'is_active']
+    list_display = ['title', 'color_preview', 'action_type', 'order', 'is_active']
     list_editable = ['order', 'is_active']
     search_fields = ['title', 'title_fr']
 
-    # Hide technical fields — only show what content managers need
-    fields = ['title', 'title_fr', 'description', 'description_fr',
-              'image', 'gradient_start', 'gradient_end', 'order', 'is_active']
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('title', 'title_fr', 'description', 'description_fr',
+                       'image', 'gradient_start', 'gradient_end', 'order', 'is_active'),
+        }),
+        ('Icon', {
+            'fields': ('icon_image', 'icon_name'),
+            'description': 'Upload a custom icon image (preferred), or pick a built-in icon as fallback.',
+        }),
+        ('Action', {
+            'fields': ('action_type', 'action_value'),
+            'description': 'Set action_type to "route" and action_value to "/feature-detail" to enable the detail page.',
+        }),
+        ('Detail Page Content', {
+            'fields': ('overview', 'overview_fr'),
+            'classes': ('collapse',),
+            'description': 'Rich content shown when the card is tapped.',
+        }),
+        ('Detail Page — Extra Content', {
+            'fields': ('extra_content', 'extra_content_fr'),
+            'classes': ('collapse',),
+        }),
+        ('Advanced (technical)', {
+            'fields': ('key_points', 'key_points_fr', 'impact_areas', 'impact_areas_fr'),
+            'classes': ('collapse',),
+            'description': 'JSON fields managed by the developer.',
+        }),
+    )
 
     @admin.display(description='Color')
     def color_preview(self, obj):
@@ -396,7 +421,25 @@ class HeroTextContentAdmin(admin.ModelAdmin):
 
 @admin.register(QuickAccessMenuItem)
 class QuickAccessMenuItemAdmin(admin.ModelAdmin):
-    list_display = ['title_en', 'is_active', 'order']
+    list_display = ['title_en', 'badge_preview', 'is_active', 'order']
     list_editable = ['order', 'is_active']
     list_filter = ['is_active']
-    fields = ['title_en', 'title_fr', 'order', 'is_active', 'has_live_indicator']
+    fieldsets = (
+        (None, {
+            'fields': ('title_en', 'title_fr', 'icon_name', 'action_type', 'action_value',
+                       'order', 'is_active', 'has_live_indicator'),
+        }),
+        ('Badge / Promotion', {
+            'fields': ('auto_badge', 'auto_badge_days', 'badge_text', 'badge_color'),
+            'description': 'Auto badge detects new content automatically. Manual badge_text overrides auto detection.',
+        }),
+    )
+
+    @admin.display(description='Badge')
+    def badge_preview(self, obj):
+        if obj.badge_text:
+            return format_html(
+                '<span style="background:{};color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold">{}</span>',
+                obj.badge_color or '#E53935', obj.badge_text
+            )
+        return '—'

@@ -91,5 +91,3 @@ try:
 except FileNotFoundError as e:
     logger.error(f"Firebase credentials missing: {e}")
     logger.error("Firebase Admin SDK will not be available until credentials are configured.")
-    if not settings.DEBUG:
-        raise

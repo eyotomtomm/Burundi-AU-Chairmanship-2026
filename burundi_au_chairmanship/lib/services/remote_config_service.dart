@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 /// Service for Firebase Remote Config
@@ -41,9 +42,9 @@ class RemoteConfigService {
 
       // Fetch and activate remote config
       await _remoteConfig.fetchAndActivate();
-      print('Remote Config initialized successfully');
+      if (kDebugMode) print('Remote Config initialized successfully');
     } catch (e) {
-      print('Failed to initialize Remote Config: $e');
+      if (kDebugMode) print('Failed to initialize Remote Config: $e');
       // Continue with default values if fetch fails
     }
   }
@@ -54,9 +55,9 @@ class RemoteConfigService {
   Future<void> forceFetch() async {
     try {
       await _remoteConfig.fetchAndActivate();
-      print('Remote Config force fetched');
+      if (kDebugMode) print('Remote Config force fetched');
     } catch (e) {
-      print('Failed to force fetch Remote Config: $e');
+      if (kDebugMode) print('Failed to force fetch Remote Config: $e');
     }
   }
 
@@ -111,7 +112,7 @@ class RemoteConfigService {
     try {
       return _remoteConfig.getBool(key);
     } catch (e) {
-      print('Error getting bool for key $key: $e');
+      if (kDebugMode) print('Error getting bool for key $key: $e');
       return false;
     }
   }
@@ -121,7 +122,7 @@ class RemoteConfigService {
     try {
       return _remoteConfig.getString(key);
     } catch (e) {
-      print('Error getting string for key $key: $e');
+      if (kDebugMode) print('Error getting string for key $key: $e');
       return '';
     }
   }
@@ -131,7 +132,7 @@ class RemoteConfigService {
     try {
       return _remoteConfig.getInt(key);
     } catch (e) {
-      print('Error getting int for key $key: $e');
+      if (kDebugMode) print('Error getting int for key $key: $e');
       return 0;
     }
   }
@@ -141,7 +142,7 @@ class RemoteConfigService {
     try {
       return _remoteConfig.getDouble(key);
     } catch (e) {
-      print('Error getting double for key $key: $e');
+      if (kDebugMode) print('Error getting double for key $key: $e');
       return 0.0;
     }
   }

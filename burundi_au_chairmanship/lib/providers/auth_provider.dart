@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_constants.dart';
@@ -93,7 +93,7 @@ class AuthProvider extends ChangeNotifier {
       _isAuthenticated = true;
       notifyListeners();
     } catch (e) {
-      print('Failed to sync with backend: $e');
+      if (kDebugMode) print('Failed to sync with backend: $e');
       // If sync fails, user is still authenticated with Firebase
       // but profile data may be incomplete
       _isAuthenticated = true;
@@ -338,7 +338,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Failed to reload user: $e');
+      if (kDebugMode) print('Failed to reload user: $e');
     }
   }
 

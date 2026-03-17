@@ -6,9 +6,12 @@ Firebase ID tokens sent from the Flutter mobile app.
 """
 
 import os
+import logging
 import firebase_admin
 from firebase_admin import credentials, auth
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 def initialize_firebase():
@@ -32,7 +35,7 @@ def initialize_firebase():
 
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
-        print(f"Firebase Admin SDK initialized with credentials from: {cred_path}")
+        logger.info(f"Firebase Admin SDK initialized with credentials from: {cred_path}")
 
 
 def verify_firebase_token(id_token):
@@ -86,5 +89,7 @@ def get_firebase_user(uid):
 try:
     initialize_firebase()
 except FileNotFoundError as e:
-    print(f"WARNING: {e}")
-    print("Firebase Admin SDK will not be available until credentials are configured.")
+    logger.error(f"Firebase credentials missing: {e}")
+    logger.error("Firebase Admin SDK will not be available until credentials are configured.")
+    if not settings.DEBUG:
+        raise

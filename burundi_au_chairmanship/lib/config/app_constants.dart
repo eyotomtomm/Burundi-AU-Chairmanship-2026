@@ -24,7 +24,4 @@ class AppConstants {
   static const String summitTheme = 'Africa We Want: Building a Resilient and Prosperous Continent';
   static const String websiteUrl = 'https://www.burundi.gov.bi';
 
-  // DEPRECATED: Use Environment.apiBaseUrl instead
-  @Deprecated('Use Environment.apiBaseUrl instead')
-  static const String baseApiUrl = 'http://localhost:8000/api';
 }

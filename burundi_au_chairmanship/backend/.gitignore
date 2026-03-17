@@ -67,3 +67,5 @@ htmlcov/
 *.key
 *.crt
 firebase-adminsdk*.json
+credentials/
+*.p8

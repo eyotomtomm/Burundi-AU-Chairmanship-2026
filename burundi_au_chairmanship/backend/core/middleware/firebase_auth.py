@@ -7,7 +7,6 @@ JWT authentication for backward compatibility during migration.
 """
 
 from django.contrib.auth.models import AnonymousUser
-from django.http import JsonResponse
 from config.firebase import verify_firebase_token
 from core.models import UserProfile
 import logging
@@ -62,24 +61,21 @@ class FirebaseAuthenticationMiddleware:
 
                 except UserProfile.DoesNotExist:
                     # Firebase user exists but not registered in Django
+                    # Let DRF's permission classes decide (AllowAny will pass)
                     logger.warning(f'Firebase user {firebase_uid} not found in database')
-                    return JsonResponse({
-                        'detail': 'User not found. Please register first.'
-                    }, status=401)
+                    request.user = AnonymousUser()
 
             except ValueError as e:
                 # Invalid Firebase token (expired, malformed, wrong signature)
+                # Let DRF's permission classes decide (AllowAny will pass)
                 logger.warning(f'Invalid Firebase token: {str(e)}')
-                return JsonResponse({
-                    'detail': 'Invalid or expired authentication token.'
-                }, status=401)
+                request.user = AnonymousUser()
 
             except Exception as e:
                 # Unexpected error during Firebase auth
+                # Let DRF's permission classes decide (AllowAny will pass)
                 logger.error(f'Firebase authentication error: {str(e)}')
-                return JsonResponse({
-                    'detail': 'Authentication failed.'
-                }, status=401)
+                request.user = AnonymousUser()
 
         response = self.get_response(request)
         return response

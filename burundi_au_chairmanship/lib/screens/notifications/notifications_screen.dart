@@ -105,7 +105,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc?.translate('notifications') ?? 'Notifications'),
+        title: Text(loc.translate('notifications') ?? 'Notifications'),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
       ),

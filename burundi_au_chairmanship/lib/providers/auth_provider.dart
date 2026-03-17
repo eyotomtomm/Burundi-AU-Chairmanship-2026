@@ -215,26 +215,9 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Failed to get Firebase ID token');
       }
 
-      // 3. Check if user exists in backend
-      bool isNewUser = credential.additionalUserInfo?.isNewUser ?? false;
-
-      if (isNewUser) {
-        // Register new user with backend
-        final name = credential.user?.displayName ?? '';
-        final email = credential.user?.email ?? '';
-
-        final data = await _api.firebaseRegister(
-          idToken: idToken,
-          name: name,
-          email: email,
-        );
-
-        await _storeUserData(data['user']);
-      } else {
-        // Login existing user
-        final data = await _api.firebaseLogin(idToken: idToken);
-        await _storeUserData(data['user']);
-      }
+      // 3. Login or register with backend (backend auto-creates if new)
+      final data = await _api.firebaseLogin(idToken: idToken);
+      await _storeUserData(data['user']);
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -274,26 +257,9 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Failed to get Firebase ID token');
       }
 
-      // 3. Check if user exists in backend
-      bool isNewUser = credential.additionalUserInfo?.isNewUser ?? false;
-
-      if (isNewUser) {
-        // Register new user with backend
-        final name = credential.user?.displayName ?? 'Apple User';
-        final email = credential.user?.email ?? '';
-
-        final data = await _api.firebaseRegister(
-          idToken: idToken,
-          name: name,
-          email: email,
-        );
-
-        await _storeUserData(data['user']);
-      } else {
-        // Login existing user
-        final data = await _api.firebaseLogin(idToken: idToken);
-        await _storeUserData(data['user']);
-      }
+      // 3. Login or register with backend (backend auto-creates if new)
+      final data = await _api.firebaseLogin(idToken: idToken);
+      await _storeUserData(data['user']);
 
       _isAuthenticated = true;
       _isLoading = false;

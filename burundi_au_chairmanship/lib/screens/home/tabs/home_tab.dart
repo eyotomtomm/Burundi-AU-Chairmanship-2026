@@ -17,7 +17,6 @@ import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
 import '../widgets/news_card.dart';
 import '../widgets/feature_item.dart';
-import '../../../widgets/search_bar_widget.dart';
 
 class HomeTab extends StatefulWidget {
   final ValueChanged<int>? onSwitchTab;

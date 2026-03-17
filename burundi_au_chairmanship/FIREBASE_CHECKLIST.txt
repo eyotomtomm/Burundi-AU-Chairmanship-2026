@@ -1,0 +1,105 @@
+═══════════════════════════════════════════════════════════════════
+        🔥 FIREBASE APPLE SIGN IN - QUICK CHECKLIST 🔥
+═══════════════════════════════════════════════════════════════════
+
+STEP 1: OPEN FIREBASE
+══════════════════════════════════════════════════════════════════
+[ ] Open: https://console.firebase.google.com
+[ ] Sign in with your Google account
+[ ] Find and click project: "b4africa" or "b4africa-700f7"
+
+
+STEP 2: NAVIGATE TO AUTHENTICATION
+══════════════════════════════════════════════════════════════════
+[ ] Click "Build" or "Authentication" in left sidebar
+[ ] Click "Sign-in method" tab at top
+[ ] See list of providers (Google, Apple, Email, etc.)
+
+
+STEP 3: ENABLE APPLE
+══════════════════════════════════════════════════════════════════
+[ ] Find "Apple" in the list
+[ ] Click on Apple row to expand
+[ ] Toggle "Enable" switch to ON (turns blue/green)
+
+
+STEP 4: CONFIGURE APPLE SETTINGS
+══════════════════════════════════════════════════════════════════
+[ ] Copy the OAuth redirect URI shown (auto-generated)
+    Example: https://b4africa-700f7.firebaseapp.com/__/auth/handler
+
+[ ] Enter Team ID: 5UL786DM5B
+
+[ ] (Optional) Enter Key ID: V78M5AW74C
+
+[ ] (Optional) Upload .p8 file: backend/credentials/AuthKey_V78M5AW74C.p8
+
+[ ] Click "Save" button
+
+
+STEP 5: UPDATE APPLE DEVELOPER
+══════════════════════════════════════════════════════════════════
+[ ] Open: https://developer.apple.com/account
+[ ] Click "Certificates, Identifiers & Profiles"
+[ ] Click "Identifiers" in left sidebar
+[ ] Find: com.burundi.au.burundiAuChairmanship
+[ ] Scroll to "Sign in with Apple"
+[ ] Click "Configure" or "Edit"
+[ ] Add Firebase redirect URI (copied from Step 4)
+[ ] Click "Save" → "Continue" → "Save"
+[ ] Wait 5-10 minutes for changes to propagate
+
+
+STEP 6: TEST YOUR APP
+══════════════════════════════════════════════════════════════════
+[ ] Run: flutter run --release
+[ ] App opens to auth screen
+[ ] Tap Apple Sign In button (black button)
+[ ] Authenticate with Face ID/Touch ID
+[ ] Choose to share/hide email
+[ ] Should be logged in! ✅
+
+
+STEP 7: VERIFY IN FIREBASE
+══════════════════════════════════════════════════════════════════
+[ ] Go to Firebase Console
+[ ] Click Authentication → Users
+[ ] See your account listed with "Apple" provider
+[ ] Success! 🎉
+
+
+═══════════════════════════════════════════════════════════════════
+
+YOUR CREDENTIALS (Copy these for reference):
+───────────────────────────────────────────────────────────────────
+Team ID:      5UL786DM5B
+Bundle ID:    com.burundi.au.burundiAuChairmanship
+Key ID:       V78M5AW74C
+.p8 File:     backend/credentials/AuthKey_V78M5AW74C.p8
+Firebase:     b4africa-700f7
+
+═══════════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING:
+───────────────────────────────────────────────────────────────────
+"Invalid configuration"
+  → Double-check Team ID: 5UL786DM5B
+
+"The operation couldn't be completed"
+  → Wait 10 minutes after Apple Developer changes
+  → Verify redirect URI added correctly
+
+"Sign in not available"
+  → Device must be iOS 13+ or macOS 10.15+
+
+═══════════════════════════════════════════════════════════════════
+
+NEED DETAILED HELP?
+───────────────────────────────────────────────────────────────────
+→ Read: FIREBASE_WALKTHROUGH.md (step-by-step guide)
+→ Read: APPLE_SIGNIN_COMPLETE_GUIDE.md (quick overview)
+→ Run: ./verify_apple_signin.sh (check setup status)
+
+═══════════════════════════════════════════════════════════════════
+                         ✨ YOU GOT THIS! ✨
+═══════════════════════════════════════════════════════════════════

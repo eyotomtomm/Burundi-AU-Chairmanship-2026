@@ -69,7 +69,7 @@ class _AgendaTabState extends State<AgendaTab> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final langCode = Localizations.localeOf(context).languageCode;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),

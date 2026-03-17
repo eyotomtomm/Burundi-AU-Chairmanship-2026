@@ -188,7 +188,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                         ? Image.network(
                             feed.thumbnail,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
+                            errorBuilder: (_, _, _) => Center(
                               child: Icon(
                                 Icons.play_circle_outline,
                                 size: 64,

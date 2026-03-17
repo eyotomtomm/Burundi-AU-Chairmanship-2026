@@ -149,7 +149,7 @@ class _VideosScreenState extends State<VideosScreen> {
                             end: Alignment.bottomRight,
                             colors: [
                               AppColors.burundiRed,
-                              AppColors.burundiRed.withOpacity(0.8),
+                              AppColors.burundiRed.withValues(alpha: 0.8),
                             ],
                           ),
                         ),
@@ -220,7 +220,7 @@ class _VideosScreenState extends State<VideosScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -271,7 +271,7 @@ class _VideosScreenState extends State<VideosScreen> {
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                     ),
                     child: const Center(
                       child: Icon(
@@ -290,7 +290,7 @@ class _VideosScreenState extends State<VideosScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.8),
+                      color: Colors.black.withValues(alpha: 0.8),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -366,7 +366,7 @@ class _VideosScreenState extends State<VideosScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _getCategoryColor(video['category'] ?? '').withOpacity(0.1),
+                          color: _getCategoryColor(video['category'] ?? '').withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

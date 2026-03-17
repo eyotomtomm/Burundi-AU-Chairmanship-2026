@@ -215,7 +215,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         child: Image.asset(
           'assets/images/Burundi Embassy in Addis Ababa.png',
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(
+          errorBuilder: (_, _, _) => const Icon(
             Icons.shield_rounded,
             size: 40,
             color: AppColors.burundiGreen,
@@ -767,7 +767,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _signInEmailController.text,
       _signInPasswordController.text,
     );
-    if (success && mounted) {
+    if (success && context.mounted) {
       Navigator.of(context).pushReplacementNamed('/home');
     }
   }
@@ -782,7 +782,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _signUpEmailController.text,
       _signUpPasswordController.text,
     );
-    if (success && mounted) {
+    if (success && context.mounted) {
       Navigator.of(context).pushReplacementNamed('/home');
     }
   }
@@ -790,9 +790,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Future<void> _signInWithGoogle(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signInWithGoogle();
-    if (success && mounted) {
+    if (success && context.mounted) {
       Navigator.of(context).pushReplacementNamed('/home');
-    } else if (mounted && authProvider.errorMessage != null) {
+    } else if (context.mounted && authProvider.errorMessage != null) {
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
@@ -800,9 +800,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Future<void> _signInWithApple(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signInWithApple();
-    if (success && mounted) {
+    if (success && context.mounted) {
       Navigator.of(context).pushReplacementNamed('/home');
-    } else if (mounted && authProvider.errorMessage != null) {
+    } else if (context.mounted && authProvider.errorMessage != null) {
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }

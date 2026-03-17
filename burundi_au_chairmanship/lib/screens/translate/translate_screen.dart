@@ -148,7 +148,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _phrases[_selectedCategory]!.length,
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
               ),

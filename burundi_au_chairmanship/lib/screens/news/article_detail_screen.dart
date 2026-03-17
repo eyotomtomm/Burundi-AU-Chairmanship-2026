@@ -211,8 +211,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   CachedNetworkImage(
                     imageUrl: _article.imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
-                    errorWidget: (_, __, ___) => Container(
+                    placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
+                    errorWidget: (_, _, _) => Container(
                       color: AppColors.auGold.withValues(alpha: 0.2),
                       child: const Icon(Icons.article_rounded, size: 48, color: Colors.white54),
                     ),
@@ -360,12 +360,12 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                   imageUrl: m.imageUrl,
                                   width: double.infinity,
                                   fit: BoxFit.cover,
-                                  placeholder: (_, __) => Container(
+                                  placeholder: (_, _) => Container(
                                     height: 200,
                                     color: AppColors.auGold.withValues(alpha: 0.1),
                                     child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                   ),
-                                  errorWidget: (_, __, ___) => Container(
+                                  errorWidget: (_, _, _) => Container(
                                     height: 200,
                                     color: AppColors.auGold.withValues(alpha: 0.1),
                                     child: const Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey),

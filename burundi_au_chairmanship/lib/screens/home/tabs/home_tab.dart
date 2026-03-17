@@ -50,10 +50,6 @@ class _HomeTabState extends State<HomeTab> {
   Map<String, String>? _heroTextContent;
   List<Map<String, dynamic>>? _quickAccessItems;
 
-  // Search
-  List<Article>? _searchResults;
-  bool _isSearching = false;
-
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
     if (_apiHeroSlides != null && _apiHeroSlides!.isNotEmpty) {
@@ -254,34 +250,6 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
-  Future<void> _handleSearch(String query) async {
-    if (query.length < 2) {
-      setState(() {
-        _searchResults = null;
-        _isSearching = false;
-      });
-      return;
-    }
-
-    setState(() => _isSearching = true);
-
-    try {
-      final api = ApiService();
-      final langCode = Localizations.localeOf(context).languageCode;
-      final results = await api.searchArticles(query, langCode);
-      if (mounted) {
-        setState(() {
-          _searchResults = results;
-          _isSearching = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isSearching = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -293,21 +261,6 @@ class _HomeTabState extends State<HomeTab> {
         SliverToBoxAdapter(
           child: _buildHeroSlideshow(context, l10n),
         ),
-
-        // TODO: Search Bar (temporarily disabled for build fix)
-        // SliverToBoxAdapter(
-        //   child: Padding(
-        //     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        //     child: SearchBarWidget(
-        //       hintText: 'Search articles...',
-        //       onSearch: _handleSearch,
-        //       onClear: () => setState(() {
-        //         _searchResults = null;
-        //         _isSearching = false;
-        //       }),
-        //     ),
-        //   ),
-        // ),
 
         // Feature Cards Slideshow
         SliverToBoxAdapter(

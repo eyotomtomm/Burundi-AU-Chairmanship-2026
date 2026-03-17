@@ -165,7 +165,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                             Icon(
                               Icons.share,
                               size: 48,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ],
                         ),
@@ -180,9 +180,9 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.info.withOpacity(0.1),
+                          color: AppColors.info.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
@@ -234,7 +234,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -285,7 +285,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
+                              color: color.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(

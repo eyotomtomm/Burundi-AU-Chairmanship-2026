@@ -103,7 +103,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             end: Alignment.bottomRight,
                             colors: [
                               AppColors.burundiGreen,
-                              AppColors.burundiGreen.withOpacity(0.8),
+                              AppColors.burundiGreen.withValues(alpha: 0.8),
                             ],
                           ),
                         ),
@@ -210,7 +210,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -242,7 +242,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.7),
+                          Colors.black.withValues(alpha: 0.7),
                         ],
                       ),
                     ),
@@ -342,7 +342,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.6),
+                      Colors.black.withValues(alpha: 0.6),
                     ],
                   ),
                 ),

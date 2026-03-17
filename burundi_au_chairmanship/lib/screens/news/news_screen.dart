@@ -234,8 +234,8 @@ class _NewsScreenState extends State<NewsScreen> {
             CachedNetworkImage(
               imageUrl: article.imageUrl,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(color: _accent.withValues(alpha: 0.2)),
-              errorWidget: (_, __, ___) => Container(
+              placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
+              errorWidget: (_, _, _) => Container(
                 color: _accent.withValues(alpha: 0.2),
                 child: const Icon(Icons.article_rounded, size: 48, color: Colors.white54),
               ),
@@ -404,11 +404,11 @@ class _NewsScreenState extends State<NewsScreen> {
                   CachedNetworkImage(
                     imageUrl: article.imageUrl,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
+                    placeholder: (_, _) => Container(
                       color: AppColors.burundiGreen.withValues(alpha: 0.1),
                       child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
-                    errorWidget: (_, __, ___) => Container(
+                    errorWidget: (_, _, _) => Container(
                       color: AppColors.burundiGreen.withValues(alpha: 0.1),
                       child: const Icon(Icons.article_rounded, size: 48, color: AppColors.burundiGreen),
                     ),

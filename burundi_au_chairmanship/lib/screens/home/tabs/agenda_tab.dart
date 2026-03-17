@@ -85,7 +85,7 @@ class _AgendaTabState extends State<AgendaTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n.translate('priority_agenda') ?? 'Priority Agenda',
+                      l10n.translate('priority_agenda'),
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w800,
@@ -116,7 +116,7 @@ class _AgendaTabState extends State<AgendaTab> {
               SliverFillRemaining(
                 child: Center(
                   child: Text(
-                    l10n.translate('no_data') ?? 'No agendas available',
+                    l10n.translate('no_data'),
                     style: TextStyle(
                       color: isDark ? Colors.white60 : Colors.black54,
                     ),

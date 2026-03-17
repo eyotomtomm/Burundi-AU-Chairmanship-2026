@@ -68,6 +68,7 @@ class _SplashScreenState extends State<SplashScreen>
     // Check authentication status
     final authProvider = context.read<AuthProvider>();
     await Future.delayed(const Duration(milliseconds: 500)); // Let provider initialize
+    if (!mounted) return;
 
     if (authProvider.isAuthenticated) {
       Navigator.of(context).pushReplacementNamed('/home');

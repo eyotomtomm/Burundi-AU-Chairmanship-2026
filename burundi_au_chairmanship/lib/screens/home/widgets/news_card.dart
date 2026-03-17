@@ -55,7 +55,7 @@ class NewsCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: article.imageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
@@ -67,7 +67,7 @@ class NewsCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        errorWidget: (_, __, ___) => Container(
+                        errorWidget: (_, _, _) => Container(
                           color: catColor.withValues(alpha: 0.2),
                           child: Icon(Icons.article_rounded, size: 40, color: Colors.white.withValues(alpha: 0.5)),
                         ),

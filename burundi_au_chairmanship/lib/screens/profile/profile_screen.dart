@@ -661,46 +661,36 @@ class ProfileScreen extends StatelessWidget {
         title: const Text('Select Gender'),
         content: StatefulBuilder(
           builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioListTile<String>(
-                  title: const Text('Male'),
-                  value: 'male',
-                  groupValue: selectedGender,
-                  activeColor: AppColors.success,
-                  onChanged: (value) {
-                    setState(() => selectedGender = value!);
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Female'),
-                  value: 'female',
-                  groupValue: selectedGender,
-                  activeColor: AppColors.success,
-                  onChanged: (value) {
-                    setState(() => selectedGender = value!);
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Other'),
-                  value: 'other',
-                  groupValue: selectedGender,
-                  activeColor: AppColors.success,
-                  onChanged: (value) {
-                    setState(() => selectedGender = value!);
-                  },
-                ),
-                RadioListTile<String>(
-                  title: const Text('Prefer not to say'),
-                  value: 'prefer_not_to_say',
-                  groupValue: selectedGender,
-                  activeColor: AppColors.success,
-                  onChanged: (value) {
-                    setState(() => selectedGender = value!);
-                  },
-                ),
-              ],
+            return RadioGroup<String>(
+              groupValue: selectedGender,
+              onChanged: (value) {
+                setState(() => selectedGender = value!);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  RadioListTile<String>(
+                    title: const Text('Male'),
+                    value: 'male',
+                    activeColor: AppColors.success,
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Female'),
+                    value: 'female',
+                    activeColor: AppColors.success,
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Other'),
+                    value: 'other',
+                    activeColor: AppColors.success,
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Prefer not to say'),
+                    value: 'prefer_not_to_say',
+                    activeColor: AppColors.success,
+                  ),
+                ],
+              ),
             );
           },
         ),

@@ -93,10 +93,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  int get _unreadCount {
-    return _notifications.where((n) => n['is_read'] != true).length;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
@@ -105,7 +101,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.translate('notifications') ?? 'Notifications'),
+        title: Text(loc.translate('notifications')),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
       ),
@@ -231,7 +227,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: iconColor, size: 24),

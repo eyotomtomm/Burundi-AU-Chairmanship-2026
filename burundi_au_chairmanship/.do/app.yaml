@@ -82,6 +82,9 @@ services:
       - key: SENTRY_DSN
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
+      - key: FIREBASE_CREDENTIALS_JSON
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
       - key: DO_SPACES_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"

@@ -6,6 +6,7 @@ Firebase ID tokens sent from the Flutter mobile app.
 """
 
 import os
+import json
 import logging
 import firebase_admin
 from firebase_admin import credentials, auth, messaging
@@ -17,25 +18,46 @@ logger = logging.getLogger(__name__)
 def initialize_firebase():
     """
     Initialize Firebase Admin SDK with service account credentials.
-    This should be called once when Django starts up.
+
+    Supports two methods (checked in order):
+    1. FIREBASE_CREDENTIALS_JSON env var — JSON string of the service account key
+       (ideal for DigitalOcean App Platform and other PaaS)
+    2. File path — FIREBASE_CREDENTIALS_PATH env var or default location
     """
     if not firebase_admin._apps:
-        # Get credentials path from environment variable or use default
-        cred_path = os.environ.get(
-            'FIREBASE_CREDENTIALS_PATH',
-            os.path.join(settings.BASE_DIR, 'config', 'firebase-adminsdk.json')
-        )
+        cred = None
 
-        if not os.path.exists(cred_path):
-            raise FileNotFoundError(
-                f"Firebase credentials file not found at: {cred_path}\n"
-                f"Please download the service account key from Firebase Console and place it at this location.\n"
-                f"See FIREBASE_SETUP_GUIDE.md for instructions."
+        # Method 1: JSON string from environment variable
+        cred_json = os.environ.get('FIREBASE_CREDENTIALS_JSON', '')
+        if cred_json:
+            try:
+                cred_dict = json.loads(cred_json)
+                cred = credentials.Certificate(cred_dict)
+                logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_JSON env var")
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(
+                    f"Invalid FIREBASE_CREDENTIALS_JSON: {e}\n"
+                    f"Ensure the env var contains valid JSON from your Firebase service account key."
+                )
+
+        # Method 2: File path
+        if cred is None:
+            cred_path = os.environ.get(
+                'FIREBASE_CREDENTIALS_PATH',
+                os.path.join(settings.BASE_DIR, 'config', 'firebase-adminsdk.json')
             )
 
-        cred = credentials.Certificate(cred_path)
+            if not os.path.exists(cred_path):
+                raise FileNotFoundError(
+                    f"Firebase credentials file not found at: {cred_path}\n"
+                    f"Either set FIREBASE_CREDENTIALS_JSON env var with the JSON content,\n"
+                    f"or download the service account key from Firebase Console and place it at this location."
+                )
+
+            cred = credentials.Certificate(cred_path)
+            logger.info(f"Firebase Admin SDK initialized from file: {cred_path}")
+
         firebase_admin.initialize_app(cred)
-        logger.info(f"Firebase Admin SDK initialized with credentials from: {cred_path}")
 
 
 def verify_firebase_token(id_token):

@@ -13,7 +13,7 @@ region: fra  # Frankfurt — closest to Africa
 services:
   - name: api
     github:
-      repo: your-github-org/burundi-au-chairmanship
+      repo: eyotomtomm/Burundi-AU-Chairmanship-2026
       branch: main
       deploy_on_push: true
     source_dir: /burundi_au_chairmanship/backend
@@ -37,7 +37,7 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com"
+        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
       - key: SITE_URL
         value: "https://api.burundi4africa.com"
       - key: EMAIL_BACKEND

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_constants.dart';
 import '../config/environment.dart';
@@ -9,14 +9,24 @@ import '../models/api_models.dart';
 import '../models/magazine_model.dart';
 import '../models/location_model.dart';
 import '../models/event_registration_model.dart';
+import 'pinned_http_client.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
+  /// HTTP client with certificate pinning (production) or standard (development)
+  final http.Client _client = PinnedHttpClient.create();
+
   // Use environment-specific API URL
   static final String _baseUrl = Environment.apiBaseUrl;
+
+  // Secure storage for JWT tokens (encrypted via Android Keystore / iOS Keychain)
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
 
   Future<Map<String, String>> _headers({bool auth = false}) async {
     final headers = <String, String>{
@@ -33,9 +43,8 @@ class ApiService {
         }
       }
 
-      // Fallback to JWT token (for backward compatibility)
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.userTokenKey);
+      // Fallback to JWT token from secure storage (for backward compatibility)
+      final token = await _secureStorage.read(key: AppConstants.userTokenKey);
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
@@ -45,7 +54,7 @@ class ApiService {
 
   Future<dynamic> _get(String endpoint, {bool auth = false}) async {
     try {
-      final response = await http
+      final response = await _client
           .get(
             Uri.parse('$_baseUrl/$endpoint'),
             headers: await _headers(auth: auth),
@@ -72,7 +81,7 @@ class ApiService {
 
   Future<dynamic> _post(String endpoint, Map<String, dynamic> body, {bool auth = false}) async {
     try {
-      final response = await http
+      final response = await _client
           .post(
             Uri.parse('$_baseUrl/$endpoint'),
             headers: await _headers(auth: auth),
@@ -111,7 +120,7 @@ class ApiService {
 
   Future<dynamic> _delete(String endpoint, {bool auth = false}) async {
     try {
-      final response = await http
+      final response = await _client
           .delete(
             Uri.parse('$_baseUrl/$endpoint'),
             headers: await _headers(auth: auth),
@@ -186,7 +195,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     try {
-      final response = await http
+      final response = await _client
           .put(
             Uri.parse('$_baseUrl/auth/profile/update/'),
             headers: await _headers(auth: true),
@@ -238,7 +247,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> deactivateAccount() async {
     try {
-      final response = await http
+      final response = await _client
           .post(
             Uri.parse('$_baseUrl/auth/deactivate-account/'),
             headers: await _headers(auth: true),
@@ -255,7 +264,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> deleteAccount() async {
     try {
-      final response = await http
+      final response = await _client
           .delete(
             Uri.parse('$_baseUrl/auth/delete-account/'),
             headers: await _headers(auth: true),
@@ -272,7 +281,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> exportUserData() async {
     try {
-      final response = await http
+      final response = await _client
           .get(
             Uri.parse('$_baseUrl/auth/export-data/'),
             headers: await _headers(auth: true),

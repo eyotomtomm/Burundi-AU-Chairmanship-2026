@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
-from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle
+from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, SupportTicketThrottle, SearchRateThrottle
 
 logger = logging.getLogger(__name__)
 from .models import (
@@ -898,6 +898,7 @@ def home_feed(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([SearchRateThrottle])
 def search_articles(request):
     """
     Search articles by query string in both English and French.
@@ -940,6 +941,7 @@ def search_articles(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([SearchRateThrottle])
 def search_magazines(request):
     """
     Search magazine editions by query string in both English and French.
@@ -1423,6 +1425,7 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     - POST /api/support/tickets/{id}/mark_read/ — mark all admin replies as read
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [SupportTicketThrottle]
     http_method_names = ['get', 'post']
 
     def get_serializer_class(self):

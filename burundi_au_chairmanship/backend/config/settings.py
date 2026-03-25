@@ -199,6 +199,8 @@ REST_FRAMEWORK = {
         'auth': '5/min',  # Strict limit on login/register to prevent brute-force
         'otp': '1/min',  # Strict: 1 OTP per minute to prevent abuse
         'otp_verify': '5/min',  # 5 verify attempts per minute before lockout
+        'support': '5/hour',  # 5 support tickets per hour per user
+        'search': '30/min',  # 30 search requests per minute per user/IP
     },
     # Use real client IP behind Cloudflare / reverse proxies
     'NUM_PROXIES': 1,

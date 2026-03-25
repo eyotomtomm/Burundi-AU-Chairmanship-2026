@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
@@ -15,6 +16,11 @@ import '../services/firebase_auth_service.dart';
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuthService _firebaseAuth = FirebaseAuthService();
   final ApiService _api = ApiService();
+  // Secure storage for sensitive data (JWT tokens) — encrypted via Android Keystore / iOS Keychain
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
 
   bool _isAuthenticated = false;
   int? _userId;
@@ -78,10 +84,11 @@ class AuthProvider extends ChangeNotifier {
       await _syncWithBackend();
     } else {
       // Check for legacy JWT auth (for backward compatibility)
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.userTokenKey);
+      // Tokens stored in encrypted secure storage (Android Keystore / iOS Keychain)
+      final token = await _secureStorage.read(key: AppConstants.userTokenKey);
       if (token != null && token.isNotEmpty) {
         _isAuthenticated = true;
+        final prefs = await SharedPreferences.getInstance();
         _userId = prefs.getInt('user_id');
         _userName = prefs.getString('user_name');
         _userEmail = prefs.getString('user_email');
@@ -94,6 +101,34 @@ class AuthProvider extends ChangeNotifier {
         _isVerified = prefs.getBool('user_is_verified') ?? false;
         _badgeType = prefs.getString('user_badge_type');
         _profilePictureUrl = prefs.getString('user_profile_picture');
+      } else {
+        // Migration: check if token exists in old SharedPreferences and migrate
+        final prefs = await SharedPreferences.getInstance();
+        final legacyToken = prefs.getString(AppConstants.userTokenKey);
+        if (legacyToken != null && legacyToken.isNotEmpty) {
+          // Migrate token to secure storage
+          await _secureStorage.write(key: AppConstants.userTokenKey, value: legacyToken);
+          final legacyRefresh = prefs.getString('refresh_token');
+          if (legacyRefresh != null) {
+            await _secureStorage.write(key: 'refresh_token', value: legacyRefresh);
+          }
+          // Remove from insecure storage
+          await prefs.remove(AppConstants.userTokenKey);
+          await prefs.remove('refresh_token');
+          _isAuthenticated = true;
+          _userId = prefs.getInt('user_id');
+          _userName = prefs.getString('user_name');
+          _userEmail = prefs.getString('user_email');
+          _phoneNumber = prefs.getString('user_phone');
+          _gender = prefs.getString('user_gender');
+          _nationality = prefs.getString('user_nationality');
+          _dateOfBirth = prefs.getString('user_date_of_birth');
+          _isEmailVerified = prefs.getBool('user_email_verified') ?? false;
+          _isGovernmentOfficial = prefs.getBool('user_is_official') ?? false;
+          _isVerified = prefs.getBool('user_is_verified') ?? false;
+          _badgeType = prefs.getString('user_badge_type');
+          _profilePictureUrl = prefs.getString('user_profile_picture');
+        }
       }
     }
     notifyListeners();
@@ -615,11 +650,15 @@ class AuthProvider extends ChangeNotifier {
     _profilePictureUrl = profilePic;
   }
 
-  /// Clear user data from SharedPreferences
+  /// Clear user data from SharedPreferences and secure storage
   Future<void> _clearUserData() async {
+    // Clear tokens from secure storage
+    await _secureStorage.delete(key: AppConstants.userTokenKey);
+    await _secureStorage.delete(key: 'refresh_token');
+    // Clear profile data from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(AppConstants.userTokenKey);
-    await prefs.remove('refresh_token');
+    await prefs.remove(AppConstants.userTokenKey); // Remove legacy if exists
+    await prefs.remove('refresh_token'); // Remove legacy if exists
     await prefs.remove('user_id');
     await prefs.remove('user_name');
     await prefs.remove('user_email');

@@ -98,3 +98,33 @@ class LikeToggleThrottle(SimpleRateThrottle):
             'scope': self.scope,
             'ident': ident
         }
+
+
+class SupportTicketThrottle(SimpleRateThrottle):
+    """
+    Throttle for support ticket creation to prevent spam.
+    Limits: 5 tickets per hour per user.
+    """
+    scope = 'support'
+
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            ident = str(request.user.pk)
+        else:
+            ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class SearchRateThrottle(SimpleRateThrottle):
+    """
+    Throttle for search endpoints to prevent enumeration and DoS.
+    Limits: 30 searches per minute per IP.
+    """
+    scope = 'search'
+
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            ident = str(request.user.pk)
+        else:
+            ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}

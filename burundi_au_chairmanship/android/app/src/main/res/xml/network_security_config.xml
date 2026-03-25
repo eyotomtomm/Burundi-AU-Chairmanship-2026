@@ -1,16 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Production: only allow HTTPS to our API domain -->
+    <!-- Production: HTTPS only + certificate pinning for API domain -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">burundi4africa.com</domain>
         <domain includeSubdomains="true">api.burundi4africa.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+        <!--
+            Certificate pinning: SHA-256 SPKI hashes of the certificate chain.
+            Pins the Google Trust Services intermediate and root CAs used by Cloudflare.
+            Expiration set to 2027-06-01 as safety net — after expiry, falls back to
+            normal certificate validation (app won't brick).
+            To refresh pins: openssl s_client -servername api.burundi4africa.com -connect api.burundi4africa.com:443 -showcerts
+        -->
+        <pin-set expiration="2027-06-01">
+            <!-- Google Trust Services WE1 (intermediate CA) -->
+            <pin digest="SHA-256">kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=</pin>
+            <!-- GTS Root R4 (root CA) -->
+            <pin digest="SHA-256">mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</pin>
+        </pin-set>
     </domain-config>
-    <!-- Development: allow HTTP to localhost/emulator for debug builds -->
+    <!-- Default: block cleartext everywhere -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- Development: allow user-installed certs for proxy debugging -->
     <debug-overrides>
         <trust-anchors>
             <certificates src="user" />

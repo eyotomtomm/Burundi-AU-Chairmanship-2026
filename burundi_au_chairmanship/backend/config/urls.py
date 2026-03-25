@@ -1,9 +1,11 @@
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, RedirectView
 
 urlpatterns = [
+    # Root redirects to admin panel
+    path('', RedirectView.as_view(url='/admin/', permanent=False)),
     path('admin/', include('custom_admin.urls')),
     path('api/', include('core.urls')),
     # Public legal pages (for Play Store / App Store listing)

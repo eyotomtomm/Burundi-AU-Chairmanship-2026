@@ -1471,6 +1471,14 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     def reply(self, request, pk=None):
         """User adds a message to an existing ticket."""
         ticket = self.get_object()
+
+        # Block replies on closed tickets
+        if ticket.status == 'closed':
+            return Response(
+                {'detail': 'This ticket is closed. Please create a new ticket.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         message_text = request.data.get('message', '').strip()
 
         if not message_text:
@@ -1487,10 +1495,40 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
             is_read=True,
         )
 
-        # Reopen ticket if it was resolved/closed
-        if ticket.status in ('resolved', 'closed'):
+        # Reopen ticket if it was resolved
+        if ticket.status == 'resolved':
             ticket.status = 'open'
             ticket.save(update_fields=['status'])
+
+        serializer = SupportTicketDetailSerializer(ticket)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def rate(self, request, pk=None):
+        """User submits a rating for a resolved/closed ticket."""
+        ticket = self.get_object()
+
+        if ticket.status not in ('resolved', 'closed'):
+            return Response(
+                {'detail': 'You can only rate resolved or closed tickets.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        rating = request.data.get('rating')
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 5:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'Rating must be between 1 and 5.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ticket.rating = rating
+        ticket.rating_comment = request.data.get('comment', '').strip()
+        ticket.status = 'closed'
+        ticket.save(update_fields=['rating', 'rating_comment', 'status'])
 
         serializer = SupportTicketDetailSerializer(ticket)
         return Response(serializer.data)

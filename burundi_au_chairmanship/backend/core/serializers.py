@@ -334,7 +334,8 @@ class AppSettingsSerializer(serializers.ModelSerializer):
         model = AppSettings
         fields = ['summit_year', 'summit_theme', 'summit_theme_fr',
                   'website_url', 'facebook_url', 'twitter_url', 'instagram_url',
-                  'sms_verification_enabled', 'whatsapp_verification_enabled']
+                  'sms_verification_enabled', 'whatsapp_verification_enabled',
+                  'live_agent_online']
 
 
 class PriorityAgendaSerializer(serializers.ModelSerializer):
@@ -689,8 +690,8 @@ class SupportTicketListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SupportTicket
-        fields = ['id', 'subject', 'status', 'priority', 'created_at',
-                  'updated_at', 'last_message', 'unread_count']
+        fields = ['id', 'subject', 'status', 'priority', 'is_live_chat',
+                  'created_at', 'updated_at', 'last_message', 'unread_count']
 
     def get_last_message(self, obj):
         msg = obj.messages.order_by('-created_at').first()
@@ -711,5 +712,6 @@ class SupportTicketDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SupportTicket
-        fields = ['id', 'subject', 'status', 'priority', 'created_at',
-                  'updated_at', 'resolved_at', 'messages']
+        fields = ['id', 'subject', 'status', 'priority', 'is_live_chat',
+                  'created_at', 'updated_at', 'resolved_at',
+                  'rating', 'rating_comment', 'messages']

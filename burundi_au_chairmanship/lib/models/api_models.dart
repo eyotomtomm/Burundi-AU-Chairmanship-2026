@@ -187,6 +187,7 @@ class AppSettingsModel {
   final String instagramUrl;
   final bool smsVerificationEnabled;
   final bool whatsappVerificationEnabled;
+  final bool liveAgentOnline;
 
   AppSettingsModel({
     required this.summitYear,
@@ -198,6 +199,7 @@ class AppSettingsModel {
     required this.instagramUrl,
     required this.smsVerificationEnabled,
     required this.whatsappVerificationEnabled,
+    required this.liveAgentOnline,
   });
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -211,6 +213,7 @@ class AppSettingsModel {
       instagramUrl: json['instagram_url'] ?? '',
       smsVerificationEnabled: json['sms_verification_enabled'] ?? false,
       whatsappVerificationEnabled: json['whatsapp_verification_enabled'] ?? false,
+      liveAgentOnline: json['live_agent_online'] ?? false,
     );
   }
 

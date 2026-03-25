@@ -160,6 +160,30 @@
                     </div>
                 </div>
 
+                <!-- Live Agent Support -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Live Agent Support</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">When ON, users see a "Live Agent" chat option in the app. Turn OFF when no agent is available.</p>
+
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            name="live_agent_online"
+                            {% if settings.live_agent_online %}checked{% endif %}
+                            class="w-5 h-5 rounded border-outline-variant text-blue-600 focus:ring-blue-600"
+                        />
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg text-blue-600">support_agent</span>
+                            <span class="font-body text-on-surface font-medium">Live Agent Online</span>
+                            {% if settings.live_agent_online %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ONLINE</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFFLINE</span>
+                            {% endif %}
+                        </span>
+                    </label>
+                </div>
+
                 <!-- Submit Button -->
                 <div class="pt-4">
                     <button

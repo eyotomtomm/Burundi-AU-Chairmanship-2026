@@ -579,6 +579,13 @@ class ApiService {
     return await _post('support/tickets/$ticketId/mark_read/', {}, auth: true);
   }
 
+  Future<Map<String, dynamic>> rateTicket(int ticketId, int rating, {String comment = ''}) async {
+    return await _post('support/tickets/$ticketId/rate/', {
+      'rating': rating,
+      'comment': comment,
+    }, auth: true);
+  }
+
   Future<int> getUnreadSupportCount() async {
     final data = await _get('support/unread-count/', auth: true);
     return data['unread_count'] ?? 0;

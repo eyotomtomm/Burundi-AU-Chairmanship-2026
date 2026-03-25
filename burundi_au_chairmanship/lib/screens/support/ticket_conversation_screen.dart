@@ -41,6 +41,13 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
     super.dispose();
   }
 
+  String get _status => _ticket?['status'] ?? 'open';
+  bool get _isClosed => _status == 'closed';
+  bool get _isResolved => _status == 'resolved';
+  bool get _canReply => !_isClosed;
+  bool get _canRate => (_isResolved || _isClosed) && (_ticket?['rating'] == null);
+  bool get _hasRated => _ticket?['rating'] != null;
+
   Future<void> _loadTicket() async {
     if (_ticketId == null) return;
 
@@ -57,10 +64,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
         _isLoading = false;
       });
 
-      // Mark messages as read
       await _apiService.markTicketRead(_ticketId!);
-
-      // Scroll to bottom after build
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     } catch (e) {
       if (kDebugMode) debugPrint('Ticket load error: $e');
@@ -83,7 +87,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _ticketId == null) return;
+    if (text.isEmpty || _ticketId == null || !_canReply) return;
 
     setState(() => _isSending = true);
 
@@ -100,13 +104,110 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
       setState(() => _isSending = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send: $e'),
-            backgroundColor: AppColors.error,
-          ),
+          SnackBar(content: Text('Failed to send: $e'), backgroundColor: AppColors.error),
         );
       }
     }
+  }
+
+  Future<void> _submitRating(int stars, String comment) async {
+    if (_ticketId == null) return;
+
+    try {
+      final data = await _apiService.rateTicket(_ticketId!, stars, comment: comment);
+      setState(() {
+        _ticket = data;
+        _messages = List<Map<String, dynamic>>.from(data['messages'] ?? []);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thank you for your feedback!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit rating: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  void _showRatingDialog() {
+    int selectedStars = 0;
+    final commentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Rate Your Experience', textAlign: TextAlign.center),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'How was your support experience?',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  final star = i + 1;
+                  return GestureDetector(
+                    onTap: () => setDialogState(() => selectedStars = star),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        star <= selectedStars ? Icons.star_rounded : Icons.star_border_rounded,
+                        color: star <= selectedStars ? Colors.amber : Colors.grey[400],
+                        size: 40,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                decoration: InputDecoration(
+                  hintText: 'Any additional feedback? (optional)',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                maxLines: 3,
+                minLines: 1,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Later'),
+            ),
+            ElevatedButton(
+              onPressed: selectedStars > 0
+                  ? () {
+                      Navigator.pop(ctx);
+                      _submitRating(selectedStars, commentController.text.trim());
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatTime(String? dateStr) {
@@ -137,7 +238,6 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final status = _ticket?['status'] ?? 'open';
 
     return Scaffold(
       appBar: AppBar(
@@ -148,12 +248,12 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         actions: [
-          if (status == 'resolved' || status == 'closed')
+          if (_isResolved || _isClosed)
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Chip(
                 label: Text(
-                  status == 'resolved' ? 'Resolved' : 'Closed',
+                  _isClosed ? 'Closed' : 'Resolved',
                   style: const TextStyle(fontSize: 11, color: Colors.white),
                 ),
                 backgroundColor: Colors.white24,
@@ -172,7 +272,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                     children: [
                       Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
                       const SizedBox(height: 16),
-                      Text('Failed to load conversation'),
+                      const Text('Failed to load conversation'),
                       TextButton(onPressed: _loadTicket, child: const Text('Retry')),
                     ],
                   ),
@@ -193,10 +293,143 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                             ),
                     ),
 
-                    // Input bar
-                    _buildInputBar(isDark),
+                    // Rating card when resolved
+                    if (_canRate) _buildRatingPrompt(isDark),
+
+                    // Already rated
+                    if (_hasRated) _buildRatedBanner(isDark),
+
+                    // Closed banner
+                    if (_isClosed && !_hasRated && !_canRate) _buildClosedBanner(isDark),
+
+                    // Input bar (hidden when closed)
+                    if (_canReply) _buildInputBar(isDark),
+
+                    // Closed message
+                    if (_isClosed) _buildClosedInputBar(isDark),
                   ],
                 ),
+    );
+  }
+
+  Widget _buildRatingPrompt(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.amber.withValues(alpha: 0.1) : Colors.amber[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.star_rounded, color: Colors.amber, size: 32),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ticket Resolved',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Please rate your experience',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _showRatingDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+              foregroundColor: Colors.black87,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: const Text('Rate', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRatedBanner(bool isDark) {
+    final rating = _ticket?['rating'] ?? 0;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.green.withValues(alpha: 0.1) : Colors.green[50],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+          const SizedBox(width: 8),
+          Text('You rated this ', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
+          ...List.generate(5, (i) => Icon(
+            i < rating ? Icons.star_rounded : Icons.star_border_rounded,
+            color: Colors.amber,
+            size: 18,
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClosedBanner(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[800] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.lock_outline, color: Colors.grey[500], size: 18),
+          const SizedBox(width: 8),
+          Text(
+            'This ticket is closed',
+            style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClosedInputBar(bool isDark) {
+    return Container(
+      padding: EdgeInsets.only(
+        left: 16, right: 16, top: 12,
+        bottom: MediaQuery.of(context).viewPadding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? Colors.white12 : Colors.black12)),
+      ),
+      child: ElevatedButton.icon(
+        onPressed: () => Navigator.pushReplacementNamed(context, '/contact-support'),
+        icon: const Icon(Icons.add),
+        label: const Text('Start New Ticket'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.burundiGreen,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
     );
   }
 
@@ -213,7 +446,6 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
       child: Column(
         crossAxisAlignment: alignment,
         children: [
-          // Sender label
           Padding(
             padding: EdgeInsets.only(
               left: isAdmin ? 4 : 0,
@@ -231,8 +463,6 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               ),
             ),
           ),
-
-          // Message bubble
           Container(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.75,
@@ -273,18 +503,12 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   Widget _buildInputBar(bool isDark) {
     return Container(
       padding: EdgeInsets.only(
-        left: 12,
-        right: 8,
-        top: 8,
+        left: 12, right: 8, top: 8,
         bottom: MediaQuery.of(context).viewPadding.bottom + 8,
       ),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[900] : Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: isDark ? Colors.white12 : Colors.black12,
-          ),
-        ),
+        border: Border(top: BorderSide(color: isDark ? Colors.white12 : Colors.black12)),
       ),
       child: Row(
         children: [
@@ -292,7 +516,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
             child: TextField(
               controller: _messageController,
               decoration: InputDecoration(
-                hintText: 'Type a message...',
+                hintText: _isResolved ? 'Reply to reopen ticket...' : 'Type a message...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -315,17 +539,13 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               ? const Padding(
                   padding: EdgeInsets.all(12),
                   child: SizedBox(
-                    width: 24,
-                    height: 24,
+                    width: 24, height: 24,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 )
               : IconButton(
                   onPressed: _sendMessage,
-                  icon: Icon(
-                    Icons.send_rounded,
-                    color: AppColors.burundiGreen,
-                  ),
+                  icon: Icon(Icons.send_rounded, color: AppColors.burundiGreen),
                   iconSize: 28,
                 ),
         ],

@@ -897,6 +897,9 @@ class SupportTicket(models.Model):
         User, null=True, blank=True, on_delete=models.SET_NULL,
         related_name='assigned_tickets'
     )
+    rating = models.PositiveSmallIntegerField(null=True, blank=True, help_text='User rating 1-5 stars')
+    rating_comment = models.TextField(blank=True, help_text='Optional feedback from user')
+    is_live_chat = models.BooleanField(default=False, help_text='Whether this was a live agent session')
 
     class Meta:
         ordering = ['-updated_at']
@@ -938,6 +941,9 @@ class AppSettings(models.Model):
     # Phone verification toggles (controlled from admin)
     sms_verification_enabled = models.BooleanField(default=False, help_text='Enable SMS OTP verification via Twilio')
     whatsapp_verification_enabled = models.BooleanField(default=False, help_text='Enable WhatsApp OTP verification via Twilio')
+
+    # Live agent support toggle
+    live_agent_online = models.BooleanField(default=False, help_text='When ON, users see Live Agent chat option in support')
 
     class Meta:
         verbose_name = 'App Settings'

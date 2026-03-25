@@ -1884,6 +1884,7 @@ def app_settings(request):
         settings.instagram_url = request.POST.get('instagram_url', '')
         settings.sms_verification_enabled = request.POST.get('sms_verification_enabled') == 'on'
         settings.whatsapp_verification_enabled = request.POST.get('whatsapp_verification_enabled') == 'on'
+        settings.live_agent_online = request.POST.get('live_agent_online') == 'on'
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')
@@ -2026,14 +2027,52 @@ def support_ticket_reply(request, pk):
 def support_ticket_update_status(request, pk):
     ticket = get_object_or_404(SupportTicket, pk=pk)
     new_status = request.POST.get('status')
-    if new_status in dict(SupportTicket.STATUS_CHOICES):
-        ticket.status = new_status
-        if new_status == 'resolved':
-            ticket.resolved_at = timezone.now()
-        ticket.save()
-        messages.success(request, f'Ticket status updated to {new_status}.')
-    else:
+    if new_status not in dict(SupportTicket.STATUS_CHOICES):
         messages.error(request, 'Invalid status.')
+        return redirect('custom_admin:support_ticket_detail', pk=pk)
+
+    ticket.status = new_status
+    if new_status == 'resolved':
+        ticket.resolved_at = timezone.now()
+
+        # Send closing template message asking for rating
+        closing_msg = (
+            'Your support ticket has been resolved. '
+            'We hope we were able to help!\n\n'
+            'Please rate your experience to help us improve our service. '
+            'Thank you for using Burundi AU Chairmanship support.'
+        )
+        TicketMessage.objects.create(
+            ticket=ticket,
+            sender=request.user,
+            message=closing_msg,
+            is_admin_reply=True,
+            is_read=False,
+        )
+
+        # Send email with closing template
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings as django_settings
+            send_mail(
+                subject=f'Ticket Resolved: {ticket.subject} - #{ticket.pk}',
+                message=(
+                    f'Hello {ticket.user.first_name or ticket.user.username},\n\n'
+                    f'Your support ticket "#{ticket.pk} - {ticket.subject}" has been resolved.\n\n'
+                    f'Please open the Burundi AU app to rate your experience.\n\n'
+                    f'If you need further help, you can always open a new ticket.\n\n'
+                    f'Best regards,\n'
+                    f'Burundi AU Support Team'
+                ),
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[ticket.user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+    ticket.save()
+    messages.success(request, f'Ticket status updated to {new_status}.')
     return redirect('custom_admin:support_ticket_detail', pk=pk)
 
 

@@ -98,6 +98,13 @@ class NewsCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: catColor,
                             borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Text(
                             catLabel,
@@ -105,6 +112,12 @@ class NewsCard extends StatelessWidget {
                               color: Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black26,
+                                  blurRadius: 2,
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -118,6 +131,13 @@ class NewsCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: AppColors.auGold,
                           borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Text(
                           date,
@@ -125,6 +145,12 @@ class NewsCard extends StatelessWidget {
                             color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                blurRadius: 2,
+                              ),
+                            ],
                           ),
                         ),
                       ),

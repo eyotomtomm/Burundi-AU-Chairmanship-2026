@@ -1,0 +1,80 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Hero Text - Burundi AU Chairmanship{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Page Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-primary">text_fields</span>
+      <span class="font-label text-xs uppercase tracking-wider text-on-surface-variant">Content Management</span>
+    </div>
+    <div class="flex items-center justify-between">
+      <h1 class="font-headline text-4xl font-bold text-on-surface">Hero Text</h1>
+      <a href="{% url 'custom_admin:hero_text_create' %}" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined">add</span>
+        Add Hero Text
+      </a>
+    </div>
+  </div>
+
+  <!-- Hero Text Table Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-outline-variant">
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-left pb-4">Key</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-left pb-4">English Text</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-left pb-4">French Text</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-center pb-4">Order</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-center pb-4">Status</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-right pb-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+          <td class="py-4 font-body text-on-surface">
+            <span class="bg-surface-container px-3 py-1 rounded font-mono text-sm">{{ item.key }}</span>
+          </td>
+          <td class="py-4 font-body text-on-surface max-w-xs truncate">{{ item.text_en }}</td>
+          <td class="py-4 font-body text-on-surface-variant max-w-xs truncate">{{ item.text_fr|default:"--" }}</td>
+          <td class="py-4 font-body text-on-surface text-center">{{ item.order }}</td>
+          <td class="py-4 text-center">
+            {% if item.is_active %}
+              <span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-xs font-bold">ACTIVE</span>
+            {% else %}
+              <span class="bg-slate-100 text-slate-500 px-2 py-1 rounded text-xs font-bold">INACTIVE</span>
+            {% endif %}
+          </td>
+          <td class="py-4 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <a href="{% url 'custom_admin:hero_text_edit' item.pk %}" class="text-primary hover:text-secondary transition-colors flex items-center gap-1">
+                <span class="material-symbols-outlined text-xl">edit</span>
+                <span class="font-label text-sm">Edit</span>
+              </a>
+              <form method="POST" action="{% url 'custom_admin:hero_text_delete' item.pk %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this hero text?');">
+                {% csrf_token %}
+                <button type="submit" class="text-red-600 hover:text-red-800 transition-colors flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xl">delete</span>
+                  <span class="font-label text-sm">Delete</span>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="py-12 text-center">
+            <span class="material-symbols-outlined text-6xl text-on-surface-variant opacity-30">text_fields</span>
+            <p class="font-body text-on-surface-variant mt-4">No hero text entries found.</p>
+            <a href="{% url 'custom_admin:hero_text_create' %}" class="inline-block mt-4 text-primary hover:text-secondary font-label">Add your first entry</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

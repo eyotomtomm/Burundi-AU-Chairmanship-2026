@@ -1,0 +1,63 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Photo Albums - Burundi AU Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-4xl text-primary">photo_library</span>
+            <h1 class="font-headline text-3xl font-bold text-on-surface">Photo Albums</h1>
+        </div>
+        <a href="{% url 'custom_admin:gallery_create' %}" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined">add</span>
+            New Album
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for album in albums %}
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div class="aspect-video relative bg-surface-container">
+                {% if album.cover_image %}
+                <img src="{{ album.cover_image.url }}" alt="{{ album.title }}" class="w-full h-full object-cover">
+                {% else %}
+                <div class="w-full h-full flex items-center justify-center">
+                    <span class="material-symbols-outlined text-6xl text-outline-variant">photo_library</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="p-6">
+                <h3 class="font-headline text-xl font-bold text-on-surface mb-2">{{ album.title }}</h3>
+                <div class="flex items-center gap-4 text-sm text-on-surface-variant mb-4">
+                    <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">photo</span>
+                        <span>{{ album.actual_photo_count }} photo{{ album.actual_photo_count|pluralize }}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">calendar_today</span>
+                        <span>{{ album.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <a href="{% url 'custom_admin:gallery_edit' album.pk %}" class="text-secondary hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined">edit</span>
+                    </a>
+                    <form method="post" action="{% url 'custom_admin:gallery_delete' album.pk %}" onsubmit="return confirm('Are you sure you want to delete this album and all its photos?')" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="text-red-500 hover:text-red-700 transition-colors">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full bg-surface-container-lowest rounded-xl shadow-sm p-12 text-center">
+            <span class="material-symbols-outlined text-6xl text-outline-variant mb-4">photo_library</span>
+            <p class="text-on-surface-variant font-body">No albums yet. Create your first album to get started.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

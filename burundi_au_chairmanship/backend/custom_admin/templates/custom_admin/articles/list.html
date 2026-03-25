@@ -1,0 +1,150 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Articles - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8 flex items-center justify-between">
+    <div>
+      <h1 class="font-headline font-extrabold text-4xl text-on-surface mb-2">Articles</h1>
+      <p class="text-on-surface-variant">Manage news articles and press releases</p>
+    </div>
+    <a href="{% url 'custom_admin:article_create' %}" class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium inline-flex items-center gap-2 transition-colors">
+      <span class="material-symbols-outlined text-xl">add</span>
+      New Article
+    </a>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="flex gap-4">
+      <div class="flex-1 relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+        <input
+          type="text"
+          name="search"
+          value="{{ request.GET.search|default:'' }}"
+          placeholder="Search articles by title, author, or category..."
+          class="w-full bg-surface-container-low border-0 rounded-lg py-3 pl-12 pr-4 focus:ring-2 focus:ring-secondary"
+        />
+      </div>
+      <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium transition-colors">
+        Search
+      </button>
+      {% if request.GET.search %}
+      <a href="{% url 'custom_admin:articles_list' %}" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-3 px-6 font-medium transition-colors">
+        Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Articles List -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if articles %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Image</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Title</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Category</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Author</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Status</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Created</th>
+            <th class="text-right py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for article in articles %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-4 px-6">
+              {% if article.image %}
+              <img src="{{ article.image.url }}" alt="{{ article.title }}" class="w-16 h-16 object-cover rounded-lg shadow-sm" />
+              {% else %}
+              <div class="w-16 h-16 bg-surface-container rounded-lg flex items-center justify-center">
+                <span class="material-symbols-outlined text-on-surface-variant">image</span>
+              </div>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6">
+              <div class="font-medium text-on-surface">{{ article.title }}</div>
+              {% if article.title_fr %}
+              <div class="text-sm text-on-surface-variant mt-1">{{ article.title_fr }}</div>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-secondary-container text-on-secondary-container">
+                <span class="material-symbols-outlined text-sm">category</span>
+                {{ article.category.name }}
+              </span>
+            </td>
+            <td class="py-4 px-6 text-on-surface-variant">{{ article.author }}</td>
+            <td class="py-4 px-6">
+              {% if article.is_featured %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-tertiary-container text-on-tertiary-container">
+                <span class="material-symbols-outlined text-sm">star</span>
+                Featured
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-surface-container text-on-surface-variant">
+                <span class="material-symbols-outlined text-sm">article</span>
+                Regular
+              </span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6 text-on-surface-variant text-sm">
+              {{ article.created_at|date:"M d, Y" }}
+            </td>
+            <td class="py-4 px-6">
+              <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'custom_admin:article_edit' article.pk %}" class="p-2 hover:bg-surface-container rounded-lg transition-colors" title="Edit">
+                  <span class="material-symbols-outlined text-primary">edit</span>
+                </a>
+                <form method="post" action="{% url 'custom_admin:article_delete' article.pk %}" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this article?');">
+                  {% csrf_token %}
+                  <button type="submit" class="p-2 hover:bg-surface-container rounded-lg transition-colors" title="Delete">
+                    <span class="material-symbols-outlined text-error">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+      <span class="material-symbols-outlined text-6xl text-on-surface-variant mb-4">article</span>
+      <p class="text-on-surface-variant text-lg">
+        {% if request.GET.search %}
+        No articles found matching "{{ request.GET.search }}"
+        {% else %}
+        No articles yet. Create your first article to get started.
+        {% endif %}
+      </p>
+      {% if not request.GET.search %}
+      <a href="{% url 'custom_admin:article_create' %}" class="inline-block mt-6 bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium transition-colors">
+        Create Article
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Pagination -->
+  {% if articles.has_other_pages %}
+  <div class="flex items-center justify-center gap-2 mt-8">
+    {% if articles.has_previous %}
+    <a href="?page={{ articles.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Previous</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm font-bold text-on-surface-variant">Page {{ articles.number }} of {{ articles.paginator.num_pages }}</span>
+    {% if articles.has_next %}
+    <a href="?page={{ articles.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

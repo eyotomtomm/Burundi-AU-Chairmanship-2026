@@ -13,6 +13,8 @@ import '../../../providers/theme_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
+import '../../support/contact_support_screen.dart';
+import '../../../widgets/verified_badge.dart';
 
 class MoreTab extends StatelessWidget {
   const MoreTab({super.key});
@@ -123,13 +125,24 @@ class MoreTab extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  isLoggedIn ? (authProvider.userName ?? 'User') : 'Guest User',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 18,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        isLoggedIn ? (authProvider.userName ?? 'User') : 'Guest User',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 18,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isLoggedIn && authProvider.isVerified) ...[
+                                      const SizedBox(width: 6),
+                                      VerifiedBadge(badgeType: authProvider.badgeType, size: 18),
+                                    ],
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -434,18 +447,15 @@ class MoreTab extends StatelessWidget {
                       icon: Icons.headset_mic_rounded,
                       iconBgColor: const Color(0xFFEF5350),
                       title: l10n.translate('contact_support'),
-                      subtitle: 'support@burundi.gov.bi',
+                      subtitle: 'Get help and support',
                       isDark: isDark,
                       onTap: () {
-                        final uri = Uri(
-                          scheme: 'mailto',
-                          path: 'support@burundi.gov.bi',
-                          queryParameters: {
-                            'subject': 'Burundi AU Chairmanship App Support',
-                            'body': 'Hello,\n\nI need assistance with:\n\n',
-                          },
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ContactSupportScreen(),
+                          ),
                         );
-                        launchUrl(uri);
                       },
                     ),
                     // Export Data & Delete Account - Only show if logged in

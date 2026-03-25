@@ -1,0 +1,140 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Verification Requests{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-rounded text-5xl text-primary">verified</span>
+      <div>
+        <h1 class="font-headline text-4xl font-bold text-on-surface">Verification Requests</h1>
+        <p class="font-body text-on-surface-variant mt-1">Review and manage user verification applications</p>
+      </div>
+    </div>
+    {% if pending_count > 0 %}
+    <div class="bg-amber-50 text-amber-700 font-headline font-bold rounded-lg py-3 px-6 flex items-center gap-2">
+      <span class="material-symbols-rounded">notifications_active</span>
+      <span>{{ pending_count }} Pending</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-2 mb-6 flex gap-2">
+    <a href="{% url 'custom_admin:verification_requests_list' %}"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if not current_filter %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      All Requests
+    </a>
+    <a href="{% url 'custom_admin:verification_requests_list' %}?status=pending"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'pending' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Pending
+    </a>
+    <a href="{% url 'custom_admin:verification_requests_list' %}?status=approved"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'approved' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Approved
+    </a>
+    <a href="{% url 'custom_admin:verification_requests_list' %}?status=rejected"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'rejected' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Rejected
+    </a>
+  </div>
+
+  <!-- Requests List -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if requests %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container">
+          <tr>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">User</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Full Name</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Badge Type</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Status</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Submitted</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for ver in requests %}
+          <tr class="hover:bg-surface-container transition-colors">
+            <td class="px-6 py-4">
+              <div class="font-body text-on-surface font-semibold">{{ ver.user.username }}</div>
+              <div class="font-body text-sm text-on-surface-variant">{{ ver.user.email }}</div>
+            </td>
+            <td class="px-6 py-4 font-body text-on-surface">{{ ver.full_name }}</td>
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold
+                {% if ver.badge_type == 'BLUE' %}bg-blue-100 text-blue-700
+                {% elif ver.badge_type == 'GOLD' %}bg-yellow-100 text-yellow-700
+                {% elif ver.badge_type == 'GOVERNMENT' %}bg-purple-100 text-purple-700
+                {% endif %}">
+                {{ ver.get_badge_type_display }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold
+                {% if ver.status == 'pending' %}bg-amber-100 text-amber-700
+                {% elif ver.status == 'approved' %}bg-emerald-100 text-emerald-700
+                {% elif ver.status == 'rejected' %}bg-red-100 text-red-700
+                {% endif %}">
+                <span class="material-symbols-rounded text-sm">
+                  {% if ver.status == 'pending' %}schedule
+                  {% elif ver.status == 'approved' %}check_circle
+                  {% elif ver.status == 'rejected' %}cancel
+                  {% endif %}
+                </span>
+                {{ ver.get_status_display }}
+              </span>
+            </td>
+            <td class="px-6 py-4 font-body text-sm text-on-surface-variant">{{ ver.created_at|date:"M d, Y" }}</td>
+            <td class="px-6 py-4 text-right">
+              <a href="{% url 'custom_admin:verification_request_review' ver.pk %}"
+                 class="inline-flex items-center gap-1 bg-primary-container text-white font-headline font-bold rounded-lg py-2 px-4 hover:bg-primary transition-all">
+                <span class="material-symbols-rounded text-sm">visibility</span>
+                Review
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if requests.has_other_pages %}
+    <div class="bg-surface-container px-6 py-4 flex items-center justify-between border-t border-outline-variant">
+      <div class="font-body text-sm text-on-surface-variant">
+        Page {{ requests.number }} of {{ requests.paginator.num_pages }}
+      </div>
+      <div class="flex gap-2">
+        {% if requests.has_previous %}
+        <a href="?page={{ requests.previous_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}"
+           class="inline-flex items-center gap-1 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container-high transition-all">
+          <span class="material-symbols-rounded text-sm">chevron_left</span>
+          Previous
+        </a>
+        {% endif %}
+        {% if requests.has_next %}
+        <a href="?page={{ requests.next_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}"
+           class="inline-flex items-center gap-1 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container-high transition-all">
+          Next
+          <span class="material-symbols-rounded text-sm">chevron_right</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="p-12 text-center">
+      <span class="material-symbols-rounded text-6xl text-on-surface-variant opacity-50 mb-4 block">verified</span>
+      <p class="font-headline text-xl text-on-surface-variant">No verification requests found</p>
+      <p class="font-body text-sm text-on-surface-variant mt-2">
+        {% if current_filter %}Try changing the filter{% else %}Requests will appear here when users apply for verification{% endif %}
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if item %}Edit{% else %}Create{% endif %} Hero Text - Burundi AU Chairmanship{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Page Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-primary">text_fields</span>
+      <span class="font-label text-xs uppercase tracking-wider text-on-surface-variant">Content Management</span>
+    </div>
+    <h1 class="font-headline text-4xl font-bold text-on-surface">
+      {% if item %}Edit Hero Text{% else %}Create Hero Text{% endif %}
+    </h1>
+  </div>
+
+  <!-- Form Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <form method="POST" action="{{ action }}" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- Key Field -->
+      <div class="mb-6">
+        <label for="key" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Key *
+        </label>
+        <select
+          id="key"
+          name="key"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+        >
+          <option value="">Select a key...</option>
+          <option value="badge" {% if item.key == 'badge' %}selected{% endif %}>badge</option>
+          <option value="title_line1" {% if item.key == 'title_line1' %}selected{% endif %}>title_line1</option>
+          <option value="title_line2" {% if item.key == 'title_line2' %}selected{% endif %}>title_line2</option>
+          <option value="year" {% if item.key == 'year' %}selected{% endif %}>year</option>
+        </select>
+      </div>
+
+      <!-- English Text Field -->
+      <div class="mb-6">
+        <label for="text_en" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          English Text *
+        </label>
+        <input
+          type="text"
+          id="text_en"
+          name="text_en"
+          value="{{ item.text_en }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Enter English text"
+        />
+      </div>
+
+      <!-- French Text Field -->
+      <div class="mb-6">
+        <label for="text_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          French Text
+        </label>
+        <input
+          type="text"
+          id="text_fr"
+          name="text_fr"
+          value="{{ item.text_fr }}"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Enter French text (optional)"
+        />
+      </div>
+
+      <!-- Order Field -->
+      <div class="mb-6">
+        <label for="order" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Order
+        </label>
+        <input
+          type="number"
+          id="order"
+          name="order"
+          value="{{ item.order|default:'0' }}"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="0"
+        />
+        <p class="text-xs text-on-surface-variant mt-1 font-body">Lower numbers appear first</p>
+      </div>
+
+      <!-- Active Checkbox -->
+      <div class="mb-8">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            id="is_active"
+            name="is_active"
+            {% if item.is_active or not item %}checked{% endif %}
+            class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-2 focus:ring-secondary"
+          />
+          <span class="font-body text-on-surface">Active (visible on app)</span>
+        </label>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="flex items-center gap-4 pt-6 border-t border-outline-variant">
+        <button
+          type="submit"
+          class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined">save</span>
+          {% if item %}Update Hero Text{% else %}Create Hero Text{% endif %}
+        </button>
+        <a
+          href="{% url 'custom_admin:hero_text_list' %}"
+          class="font-label text-on-surface-variant hover:text-on-surface transition-colors py-3 px-8"
+        >
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Magazines - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Content</span>
+        <h1 class="text-3xl font-extrabold text-on-surface font-headline">Magazines</h1>
+    </div>
+    <a href="{% url 'custom_admin:magazine_create' %}" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all inline-flex items-center gap-2">
+        <span class="material-symbols-outlined text-xl">add</span>
+        New Magazine
+    </a>
+</div>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    {% if magazines %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for mag in magazines %}
+                <div class="bg-surface-container-low rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    {% if mag.cover_image %}
+                        <img src="{{ mag.cover_image.url }}" alt="{{ mag.title }}" class="w-full h-64 object-cover">
+                    {% else %}
+                        <div class="w-full h-64 bg-surface-container flex items-center justify-center">
+                            <span class="material-symbols-outlined text-6xl text-outline-variant">book</span>
+                        </div>
+                    {% endif %}
+
+                    <div class="p-6">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <h3 class="font-headline font-bold text-lg text-on-surface mb-1">{{ mag.title }}</h3>
+                                {% if mag.title_fr %}
+                                    <p class="text-sm text-on-surface-variant italic">{{ mag.title_fr }}</p>
+                                {% endif %}
+                            </div>
+                            {% if mag.is_featured %}
+                                <span class="ml-2 inline-flex items-center gap-1 bg-secondary text-white text-xs font-bold px-2 py-1 rounded-full">
+                                    <span class="material-symbols-outlined" style="font-size: 14px;">star</span>
+                                    Featured
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="space-y-2 mb-4 text-sm text-on-surface-variant">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm">calendar_today</span>
+                                <span>{{ mag.publish_date|date:"M d, Y" }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm">description</span>
+                                <span>{{ mag.page_count }} pages</span>
+                            </div>
+                            {% if mag.file_size %}
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-sm">storage</span>
+                                    <span>{{ mag.file_size }}</span>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="flex items-center justify-between pt-4 border-t border-outline-variant">
+                            <a href="{% url 'custom_admin:magazine_edit' mag.pk %}" class="inline-flex items-center gap-1 text-secondary hover:text-primary font-medium transition-colors">
+                                <span class="material-symbols-outlined text-sm">edit</span>
+                                Edit
+                            </a>
+                            <form method="post" action="{% url 'custom_admin:magazine_delete' mag.pk %}" onsubmit="return confirm('Delete this magazine?')">
+                                {% csrf_token %}
+                                <button type="submit" class="text-red-500 hover:text-red-700 transition-colors">
+                                    <span class="material-symbols-outlined text-sm">delete</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% if magazines.has_other_pages %}
+            <div class="flex items-center justify-center gap-2 mt-8 pt-6 border-t border-outline-variant">
+                {% if magazines.has_previous %}
+                    <a href="?page=1" class="px-3 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-sm">first_page</span>
+                    </a>
+                    <a href="?page={{ magazines.previous_page_number }}" class="px-3 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-sm">chevron_left</span>
+                    </a>
+                {% endif %}
+
+                <span class="px-4 py-2 font-medium text-on-surface">
+                    Page {{ magazines.number }} of {{ magazines.paginator.num_pages }}
+                </span>
+
+                {% if magazines.has_next %}
+                    <a href="?page={{ magazines.next_page_number }}" class="px-3 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-sm">chevron_right</span>
+                    </a>
+                    <a href="?page={{ magazines.paginator.num_pages }}" class="px-3 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-colors">
+                        <span class="material-symbols-outlined text-sm">last_page</span>
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-16">
+            <span class="material-symbols-outlined text-8xl text-outline-variant mb-4 block">book</span>
+            <h3 class="text-xl font-headline font-bold text-on-surface-variant mb-2">No magazines yet</h3>
+            <p class="text-on-surface-variant mb-6">Get started by creating your first magazine.</p>
+            <a href="{% url 'custom_admin:magazine_create' %}" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all inline-flex items-center gap-2">
+                <span class="material-symbols-outlined text-xl">add</span>
+                Create Magazine
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -12,6 +12,7 @@ import 'config/app_constants.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/verification_provider.dart';
 import 'services/analytics_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/remote_config_service.dart';
@@ -27,6 +28,7 @@ import 'screens/magazine/magazine_screen.dart';
 import 'screens/translate/translate_screen.dart';
 import 'screens/weather/weather_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/profile/profile_completion_screen.dart';
 import 'screens/agenda/water_sanitation_screen.dart';
 import 'screens/agenda/arise_initiative_screen.dart';
 import 'screens/agenda/peace_security_screen.dart';
@@ -110,6 +112,7 @@ class BurundiAUApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => VerificationProvider()),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (context, themeProvider, languageProvider, _) {
@@ -150,6 +153,7 @@ class BurundiAUApp extends StatelessWidget {
               '/translate': (context) => const TranslateScreen(),
               '/weather': (context) => const WeatherScreen(),
               '/profile': (context) => const ProfileScreen(),
+              '/profile-completion': (context) => const ProfileCompletionScreen(),
               '/water-sanitation': (context) => const WaterSanitationScreen(),
               '/arise-initiative': (context) => const AriseInitiativeScreen(),
               '/peace-security': (context) => const PeaceSecurityScreen(),

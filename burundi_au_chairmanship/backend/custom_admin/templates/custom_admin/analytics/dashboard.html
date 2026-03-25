@@ -1,0 +1,119 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Analytics - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+  <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Data Intelligence</span>
+  <h1 class="text-3xl font-extrabold text-on-surface font-headline">Analytics &amp; Reports</h1>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-primary-container/10 p-2 rounded-lg"><span class="material-symbols-outlined text-primary-container">group</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Users</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ total_users }}</h3>
+    <p class="text-xs text-emerald-600 font-medium mt-1">+{{ new_users_7d }} this week</p>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-secondary/10 p-2 rounded-lg"><span class="material-symbols-outlined text-secondary">article</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Articles</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ total_articles }}</h3>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-primary-container/10 p-2 rounded-lg"><span class="material-symbols-outlined text-primary-container">event</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Events</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ total_events }}</h3>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-primary-container/10 p-2 rounded-lg"><span class="material-symbols-outlined text-primary-container">people</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Active (30d)</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ active_users }}</h3>
+  </div>
+</div>
+
+<div class="grid grid-cols-12 gap-8">
+  <!-- User Growth Chart -->
+  <div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-2">User Growth</h4>
+    <p class="text-sm text-on-surface-variant mb-6">New registrations over the last 6 months</p>
+    <canvas id="userGrowthChart" height="200"></canvas>
+  </div>
+
+  <!-- Content Distribution -->
+  <div class="col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Content Distribution</h4>
+    <canvas id="contentPieChart" height="200"></canvas>
+    <div class="mt-6 space-y-3">
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-black rounded-full"></span><span class="text-xs font-medium">Articles</span></div><span class="text-xs font-bold">{{ total_articles }}</span></div>
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-secondary rounded-full"></span><span class="text-xs font-medium">Events</span></div><span class="text-xs font-bold">{{ total_events }}</span></div>
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-slate-300 rounded-full"></span><span class="text-xs font-medium">Magazines</span></div><span class="text-xs font-bold">{{ total_magazines }}</span></div>
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-amber-400 rounded-full"></span><span class="text-xs font-medium">Resources</span></div><span class="text-xs font-bold">{{ total_resources }}</span></div>
+    </div>
+  </div>
+
+  <!-- Top Articles -->
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Top Articles</h4>
+    <div class="space-y-4">
+      {% for article in top_articles %}
+      <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+        <span class="text-lg font-black text-slate-300 w-8">{{ forloop.counter }}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">{{ article.title }}</p>
+          <p class="text-xs text-on-surface-variant">{{ article.author|default:"Admin" }} &bull; {{ article.created_at|date:"M d, Y" }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Top Events -->
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Upcoming Events</h4>
+    <div class="space-y-4">
+      {% for event in top_events %}
+      <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+        <div class="bg-primary-container text-white rounded-lg p-2 text-center min-w-[50px]">
+          <p class="text-[10px] uppercase font-bold">{{ event.event_date|date:"M" }}</p>
+          <p class="text-lg font-black leading-none">{{ event.event_date|date:"d" }}</p>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">{{ event.name }}</p>
+          <p class="text-xs text-on-surface-variant">{{ event.address|truncatewords:5 }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+const months = {{ months_json|safe }};
+const counts = {{ month_counts_json|safe }};
+
+new Chart(document.getElementById('userGrowthChart'), {
+  type: 'line',
+  data: { labels: months, datasets: [{ label: 'New Users', data: counts, borderColor: '#000', backgroundColor: 'rgba(0,0,0,0.05)', tension: 0.4, fill: true, pointBackgroundColor: '#745b17' }] },
+  options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+});
+
+new Chart(document.getElementById('contentPieChart'), {
+  type: 'doughnut',
+  data: { labels: ['Articles', 'Events', 'Magazines', 'Resources'], datasets: [{ data: [{{ total_articles }}, {{ total_events }}, {{ total_magazines }}, {{ total_resources }}], backgroundColor: ['#000', '#745b17', '#c5c6cd', '#e5c374'] }] },
+  options: { responsive: true, plugins: { legend: { display: false } }, cutout: '70%' }
+});
+</script>
+{% endblock %}

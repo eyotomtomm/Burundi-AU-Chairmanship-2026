@@ -1,0 +1,622 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{% if card.pk %}Edit{% else %}Create{% endif %} Feature Card - Burundi AU Chairmanship{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-surface py-8">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-4">
+                <span class="material-symbols-outlined text-primary text-4xl">auto_awesome</span>
+                <h1 class="font-headline text-4xl font-bold text-on-surface">
+                    {% if card.pk %}Edit{% else %}Create{% endif %} Feature Card
+                </h1>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <form method="post" action="{{ action }}" enctype="multipart/form-data" class="space-y-8">
+            {% csrf_token %}
+
+            <!-- Basic Information -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">info</span>
+                    Basic Information
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Title EN -->
+                    <div>
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Title (English) *
+                        </label>
+                        <input type="text"
+                               name="title"
+                               value="{{ card.title }}"
+                               required
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    </div>
+
+                    <!-- Title FR -->
+                    <div>
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Title (French) *
+                        </label>
+                        <input type="text"
+                               name="title_fr"
+                               value="{{ card.title_fr }}"
+                               required
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    </div>
+                </div>
+
+                <!-- Description EN -->
+                <div class="mt-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Description (English)
+                    </label>
+                    <textarea name="description"
+                              rows="3"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ card.description }}</textarea>
+                </div>
+
+                <!-- Description FR -->
+                <div class="mt-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Description (French)
+                    </label>
+                    <textarea name="description_fr"
+                              rows="3"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ card.description_fr }}</textarea>
+                </div>
+            </div>
+
+            <!-- Visual Settings -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">palette</span>
+                    Visual Settings
+                </h2>
+
+                <!-- Main Image -->
+                <div class="mb-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Main Image
+                    </label>
+                    {% if card.image %}
+                    <div class="mb-3">
+                        <img src="{{ card.image.url }}" alt="Current image" class="w-48 h-48 object-cover rounded-lg">
+                    </div>
+                    {% endif %}
+                    <input type="file"
+                           name="image"
+                           accept="image/*"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+
+                <!-- Icon Image -->
+                <div class="mb-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Icon Image (Optional - overrides Material Symbol)
+                    </label>
+                    {% if card.icon_image %}
+                    <div class="mb-3">
+                        <img src="{{ card.icon_image.url }}" alt="Current icon" class="w-16 h-16 object-cover rounded-lg">
+                    </div>
+                    {% endif %}
+                    <input type="file"
+                           name="icon_image"
+                           accept="image/*"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+
+                <!-- Icon Name (Material Symbol) -->
+                <div class="mb-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Icon Name (Material Symbol)
+                    </label>
+                    <select name="icon_name"
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        <option value="">-- Select Icon --</option>
+                        {% for value, label in icon_choices %}
+                        <option value="{{ value }}" {% if card.icon_name == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Gradient Colors -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Gradient Start Color
+                        </label>
+                        <input type="color"
+                               name="gradient_start"
+                               value="{{ card.gradient_start|default:'#1EB53A' }}"
+                               class="w-full h-12 bg-surface-container-low border-0 border-b-2 border-outline-variant focus:ring-0 focus:border-secondary">
+                    </div>
+
+                    <div>
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Gradient End Color
+                        </label>
+                        <input type="color"
+                               name="gradient_end"
+                               value="{{ card.gradient_end|default:'#4CAF50' }}"
+                               class="w-full h-12 bg-surface-container-low border-0 border-b-2 border-outline-variant focus:ring-0 focus:border-secondary">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overview Content -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">article</span>
+                    Overview Content
+                </h2>
+
+                <!-- Overview EN -->
+                <div class="mb-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Overview (English)
+                    </label>
+                    <textarea name="overview"
+                              rows="6"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ card.overview }}</textarea>
+                </div>
+
+                <!-- Overview FR -->
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Overview (French)
+                    </label>
+                    <textarea name="overview_fr"
+                              rows="6"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ card.overview_fr }}</textarea>
+                </div>
+            </div>
+
+            <!-- Extra Content -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">description</span>
+                    Extra Content
+                </h2>
+
+                <!-- Extra Content EN -->
+                <div class="mb-6">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Extra Content (English)
+                    </label>
+                    <textarea name="extra_content"
+                              rows="6"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ card.extra_content }}</textarea>
+                </div>
+
+                <!-- Extra Content FR -->
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Extra Content (French)
+                    </label>
+                    <textarea name="extra_content_fr"
+                              rows="6"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ card.extra_content_fr }}</textarea>
+                </div>
+            </div>
+
+            <!-- Key Points -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-headline text-2xl font-bold text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined">format_list_bulleted</span>
+                        Key Points
+                    </h2>
+                    <button type="button"
+                            onclick="addKeyPointRow()"
+                            class="bg-secondary-container text-white font-headline font-bold rounded-lg py-2 px-6 hover:bg-secondary transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined">add</span>
+                        Add Key Point
+                    </button>
+                </div>
+
+                <div id="keyPointsContainer" class="space-y-4">
+                    {% for kp in key_points %}
+                    <div class="dynamic-row grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-surface-container rounded-lg relative">
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Key Point (English)
+                            </label>
+                            <input type="text"
+                                   name="kp_text[]"
+                                   value="{{ kp.text }}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Key Point (French)
+                            </label>
+                            <input type="text"
+                                   name="kp_text_fr[]"
+                                   value="{{ kp.text_fr }}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                        <button type="button"
+                                onclick="removeRow(this)"
+                                class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+                            <span class="material-symbols-outlined text-sm">close</span>
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Impact Areas -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-headline text-2xl font-bold text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined">analytics</span>
+                        Impact Areas
+                    </h2>
+                    <button type="button"
+                            onclick="addImpactAreaRow()"
+                            class="bg-secondary-container text-white font-headline font-bold rounded-lg py-2 px-6 hover:bg-secondary transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined">add</span>
+                        Add Impact Area
+                    </button>
+                </div>
+
+                <div id="impactAreasContainer" class="space-y-6">
+                    {% for ia in impact_areas %}
+                    <div class="dynamic-row p-4 bg-surface-container rounded-lg relative space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Icon Name
+                                </label>
+                                <input type="text"
+                                       name="ia_icon[]"
+                                       value="{{ ia.icon_name }}"
+                                       placeholder="e.g., trending_up"
+                                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            </div>
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Title (English)
+                                </label>
+                                <input type="text"
+                                       name="ia_title[]"
+                                       value="{{ ia.title }}"
+                                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            </div>
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Title (French)
+                                </label>
+                                <input type="text"
+                                       name="ia_title_fr[]"
+                                       value="{{ ia.title_fr }}"
+                                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Description (English)
+                                </label>
+                                <textarea name="ia_desc[]"
+                                          rows="2"
+                                          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ ia.description }}</textarea>
+                            </div>
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Description (French)
+                                </label>
+                                <textarea name="ia_desc_fr[]"
+                                          rows="2"
+                                          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ ia.description_fr }}</textarea>
+                            </div>
+                        </div>
+                        <button type="button"
+                                onclick="removeRow(this)"
+                                class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+                            <span class="material-symbols-outlined text-sm">close</span>
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Media Items -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="font-headline text-2xl font-bold text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined">perm_media</span>
+                        Media Items
+                    </h2>
+                    <button type="button"
+                            onclick="addMediaRow()"
+                            class="bg-secondary-container text-white font-headline font-bold rounded-lg py-2 px-6 hover:bg-secondary transition-all flex items-center gap-2">
+                        <span class="material-symbols-outlined">add</span>
+                        Add Media
+                    </button>
+                </div>
+
+                <div id="mediaContainer" class="space-y-6">
+                    {% for m in media_items %}
+                    <div class="dynamic-row p-4 bg-surface-container rounded-lg relative space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Media Type
+                                </label>
+                                <select name="media_type[]"
+                                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                                    <option value="image" {% if m.media_type == 'image' %}selected{% endif %}>Image</option>
+                                    <option value="video" {% if m.media_type == 'video' %}selected{% endif %}>Video</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Media URL (Optional)
+                                </label>
+                                <input type="url"
+                                       name="media_url[]"
+                                       value="{{ m.effective_url }}"
+                                       placeholder="https://..."
+                                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Upload File (Optional - overrides URL)
+                            </label>
+                            <input type="file"
+                                   name="media_file_{{ forloop.counter0 }}"
+                                   accept="image/*,video/*"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Caption (English)
+                                </label>
+                                <input type="text"
+                                       name="media_caption[]"
+                                       value="{{ m.caption }}"
+                                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            </div>
+                            <div>
+                                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                    Caption (French)
+                                </label>
+                                <input type="text"
+                                       name="media_caption_fr[]"
+                                       value="{{ m.caption_fr }}"
+                                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            </div>
+                        </div>
+                        <button type="button"
+                                onclick="removeRow(this)"
+                                class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+                            <span class="material-symbols-outlined text-sm">close</span>
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">settings</span>
+                    Settings
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Order -->
+                    <div>
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Display Order
+                        </label>
+                        <input type="number"
+                               name="order"
+                               value="{{ card.order|default:'0' }}"
+                               min="0"
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    </div>
+
+                    <!-- Is Active -->
+                    <div class="flex items-center pt-6">
+                        <input type="checkbox"
+                               name="is_active"
+                               id="is_active"
+                               {% if card.is_active or not card.pk %}checked{% endif %}
+                               class="w-6 h-6 text-primary-container focus:ring-primary-container border-outline-variant rounded">
+                        <label for="is_active" class="ml-3 font-label text-sm font-bold text-on-surface">
+                            Active (visible in app)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-4 justify-end">
+                <a href="{% url 'custom_admin:feature_cards_list' %}"
+                   class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined">save</span>
+                    Save Feature Card
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let mediaRowCounter = {{ media_items|length|default:"0" }};
+
+function addKeyPointRow() {
+    const container = document.getElementById('keyPointsContainer');
+    const row = document.createElement('div');
+    row.className = 'dynamic-row grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-surface-container rounded-lg relative';
+    row.innerHTML = `
+        <div>
+            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                Key Point (English)
+            </label>
+            <input type="text"
+                   name="kp_text[]"
+                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+        </div>
+        <div>
+            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                Key Point (French)
+            </label>
+            <input type="text"
+                   name="kp_text_fr[]"
+                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+        </div>
+        <button type="button"
+                onclick="removeRow(this)"
+                class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+            <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+function addImpactAreaRow() {
+    const container = document.getElementById('impactAreasContainer');
+    const row = document.createElement('div');
+    row.className = 'dynamic-row p-4 bg-surface-container rounded-lg relative space-y-4';
+    row.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Icon Name
+                </label>
+                <input type="text"
+                       name="ia_icon[]"
+                       placeholder="e.g., trending_up"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Title (English)
+                </label>
+                <input type="text"
+                       name="ia_title[]"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Title (French)
+                </label>
+                <input type="text"
+                       name="ia_title_fr[]"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Description (English)
+                </label>
+                <textarea name="ia_desc[]"
+                          rows="2"
+                          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"></textarea>
+            </div>
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Description (French)
+                </label>
+                <textarea name="ia_desc_fr[]"
+                          rows="2"
+                          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"></textarea>
+            </div>
+        </div>
+        <button type="button"
+                onclick="removeRow(this)"
+                class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+            <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+function addMediaRow() {
+    const container = document.getElementById('mediaContainer');
+    const row = document.createElement('div');
+    row.className = 'dynamic-row p-4 bg-surface-container rounded-lg relative space-y-4';
+    row.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Media Type
+                </label>
+                <select name="media_type[]"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                </select>
+            </div>
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Media URL (Optional)
+                </label>
+                <input type="url"
+                       name="media_url[]"
+                       placeholder="https://..."
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+        </div>
+        <div>
+            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                Upload File (Optional - overrides URL)
+            </label>
+            <input type="file"
+                   name="media_file_${mediaRowCounter}"
+                   accept="image/*,video/*"
+                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Caption (English)
+                </label>
+                <input type="text"
+                       name="media_caption[]"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+            <div>
+                <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Caption (French)
+                </label>
+                <input type="text"
+                       name="media_caption_fr[]"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+        </div>
+        <button type="button"
+                onclick="removeRow(this)"
+                class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+            <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+    `;
+    container.appendChild(row);
+    mediaRowCounter++;
+}
+
+function removeRow(btn) {
+    btn.closest('.dynamic-row').remove();
+}
+</script>
+{% endblock %}

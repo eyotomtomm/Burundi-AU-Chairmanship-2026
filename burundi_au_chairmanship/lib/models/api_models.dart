@@ -30,6 +30,8 @@ class ApiLiveFeed {
   final int id;
   final String title;
   final String titleFr;
+  final String description;
+  final String descriptionFr;
   final String streamUrl;
   final String thumbnail;
   final String status;
@@ -41,6 +43,8 @@ class ApiLiveFeed {
     required this.id,
     required this.title,
     required this.titleFr,
+    required this.description,
+    required this.descriptionFr,
     required this.streamUrl,
     required this.thumbnail,
     required this.status,
@@ -54,6 +58,8 @@ class ApiLiveFeed {
       id: json['id'] ?? 0,
       title: json['title'] ?? '',
       titleFr: json['title_fr'] ?? '',
+      description: json['description'] ?? '',
+      descriptionFr: json['description_fr'] ?? '',
       streamUrl: json['stream_url'] ?? '',
       thumbnail: json['thumbnail'] ?? '',
       status: json['status'] ?? 'upcoming',
@@ -66,6 +72,7 @@ class ApiLiveFeed {
   }
 
   String getTitle(String langCode) => langCode == 'fr' ? titleFr : title;
+  String getDescription(String langCode) => langCode == 'fr' ? descriptionFr : description;
 
   bool get isLive => status == 'live';
   bool get isUpcoming => status == 'upcoming';
@@ -175,4 +182,36 @@ class AppSettingsModel {
   }
 
   String getTheme(String langCode) => langCode == 'fr' ? summitThemeFr : summitTheme;
+}
+
+class WeatherCity {
+  final int id;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final String? backgroundImage;
+  final int order;
+  final bool isDefault;
+
+  WeatherCity({
+    required this.id,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    this.backgroundImage,
+    required this.order,
+    required this.isDefault,
+  });
+
+  factory WeatherCity.fromJson(Map<String, dynamic> json) {
+    return WeatherCity(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      backgroundImage: json['background_image'],
+      order: json['order'] ?? 0,
+      isDefault: json['is_default'] ?? false,
+    );
+  }
 }

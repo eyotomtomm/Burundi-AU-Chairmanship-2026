@@ -37,6 +37,11 @@ class Environment {
   static String get apiBaseUrl {
     // If URL is explicitly configured via --dart-define, use it
     if (_configuredApiUrl.isNotEmpty) {
+      // Security: enforce HTTPS in production even for custom URLs
+      if (isProduction && _configuredApiUrl.startsWith('http://')) {
+        assert(false, 'SECURITY: Production API URL must use HTTPS');
+        return _configuredApiUrl.replaceFirst('http://', 'https://');
+      }
       return _configuredApiUrl;
     }
 

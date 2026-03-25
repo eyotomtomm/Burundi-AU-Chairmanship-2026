@@ -5,6 +5,10 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env')
+
 # Security: DEBUG should default to False (fail-secure)
 # Explicitly set DJANGO_DEBUG=True for development
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
@@ -43,8 +47,6 @@ else:
     )
 
 INSTALLED_APPS = [
-    'jazzmin',
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -58,6 +60,7 @@ INSTALLED_APPS = [
     'storages',
     # Local
     'core',
+    'custom_admin',
 ]
 
 MIDDLEWARE = [
@@ -130,6 +133,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Absolute base URL for building full media URLs (e.g. push notification images)
+SITE_URL = os.environ.get('SITE_URL', 'http://127.0.0.1:8000' if DEBUG else '')
+
 # DigitalOcean Spaces for media files (production only)
 if not DEBUG:
     AWS_ACCESS_KEY_ID = os.environ.get('DO_SPACES_KEY')
@@ -156,11 +162,15 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
 
 # ─── CORS — allow Flutter app to connect ──────────────────────
-CORS_ALLOW_ALL_ORIGINS = DEBUG
-if not DEBUG:
-    CORS_ALLOWED_ORIGINS = [
-        'https://burundi4africa.com',
-        'https://www.burundi4africa.com',
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    'https://burundi4africa.com',
+    'https://www.burundi4africa.com',
+]
+if DEBUG:
+    CORS_ALLOWED_ORIGINS += [
+        'http://localhost:3000',
+        'http://127.0.0.1:8000',
     ]
 # ─── DRF settings ─────────────────────────────────────────────
 REST_FRAMEWORK = {
@@ -170,7 +180,8 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'core.authentication.FirebaseAuthentication',  # Try Firebase first
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # Fallback to JWT
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -183,6 +194,8 @@ REST_FRAMEWORK = {
         'user': '1000/hour',
         'view_count': '1/min',  # 1 view per content item per minute (prevents manipulation)
         'like_toggle': '10/min',  # 10 like toggles per minute (prevents spam)
+        'auth': '5/min',  # Strict limit on login/register to prevent brute-force
+        'otp': '3/min',  # Strict limit on OTP send/verify
     },
 }
 
@@ -199,142 +212,14 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-# ─── Jazzmin Admin Theme ──────────────────────────────────────
-JAZZMIN_SETTINGS = {
-    # Title
-    'site_title': 'Burundi4africa',
-    'site_header': 'Burundi4africa',
-    'site_brand': 'Burundi4africa',
-    'welcome_sign': 'Burundi AU Chairmanship 2025-2026',
-    'copyright': 'Republic of Burundi — AU Chairmanship 2025-2026',
+# ─── Custom Admin Settings ────────────────────────────────────
+CUSTOM_ADMIN_SITE_TITLE = 'Burundi AU Chairmanship 2026'
+CUSTOM_ADMIN_SITE_HEADER = 'Content Management System'
 
-    # Logo
-    'site_logo': None,
-    'login_logo': None,
-    'site_icon': None,
-
-    # Top menu
-    'topmenu_links': [
-        {'name': 'Dashboard', 'url': 'admin:index', 'permissions': ['auth.view_user']},
-        {'name': 'API', 'url': '/api/', 'new_window': True},
-    ],
-
-    # Sidebar
-    'show_sidebar': True,
-    'navigation_expanded': False,
-
-    # Hide technical/internal models from sidebar
-    'hide_apps': [],
-    'hide_models': [
-        'core.ArticleLike',
-        'core.ArticleComment',
-        'core.ArticleMedia',
-        'core.MagazineLike',
-        'core.MagazineImage',
-        'core.GalleryPhoto',
-        'core.UserProfile',
-        'auth.Group',
-    ],
-
-    'order_with_respect_to': [
-        'core',
-        'core.HeroSlide',
-        'core.HeroTextContent',
-        'core.FeatureCard',
-        'core.QuickAccessMenuItem',
-        'core.Category',
-        'core.Article',
-        'core.MagazineEdition',
-        'core.PriorityAgenda',
-        'core.GalleryAlbum',
-        'core.Video',
-        'core.LiveFeed',
-        'core.Event',
-        'core.EmbassyLocation',
-        'core.Resource',
-        'core.SocialMediaLink',
-        'core.Notification',
-        'core.AppSettings',
-        'auth',
-    ],
-
-    # Icons
-    'icons': {
-        'auth': 'fas fa-users-cog',
-        'auth.user': 'fas fa-user',
-        'auth.Group': 'fas fa-users',
-        'core.HeroSlide': 'fas fa-images',
-        'core.FeatureCard': 'fas fa-th-large',
-        'core.Category': 'fas fa-tags',
-        'core.Article': 'fas fa-newspaper',
-        'core.MagazineEdition': 'fas fa-book-open',
-        'core.PriorityAgenda': 'fas fa-flag',
-        'core.GalleryAlbum': 'fas fa-camera-retro',
-        'core.Video': 'fas fa-play-circle',
-        'core.LiveFeed': 'fas fa-broadcast-tower',
-        'core.EmbassyLocation': 'fas fa-map-marker-alt',
-        'core.Event': 'fas fa-calendar-alt',
-        'core.Resource': 'fas fa-file-alt',
-        'core.SocialMediaLink': 'fas fa-share-alt',
-        'core.Notification': 'fas fa-bell',
-        'core.AppSettings': 'fas fa-cogs',
-        'core.HeroTextContent': 'fas fa-heading',
-        'core.QuickAccessMenuItem': 'fas fa-grip-horizontal',
-    },
-
-    'default_icon_parents': 'fas fa-folder',
-    'default_icon_children': 'fas fa-circle',
-
-    # Related modal
-    'related_modal_active': True,
-
-    # UI Tweaks
-    'custom_css': 'css/admin_custom.css',
-    'custom_js': None,
-    'use_google_fonts_cdn': True,
-    'show_ui_builder': False,
-
-    # Change view
-    'changeform_format': 'horizontal_tabs',
-    'changeform_format_overrides': {
-        'auth.user': 'collapsible',
-    },
-
-    'language_chooser': False,
-}
-
-JAZZMIN_UI_TWEAKS = {
-    'navbar_small_text': False,
-    'footer_small_text': False,
-    'body_small_text': False,
-    'brand_small_text': False,
-    'brand_colour': 'navbar-success',
-    'accent': 'accent-olive',
-    'navbar': 'navbar-dark navbar-success',
-    'no_navbar_border': False,
-    'navbar_fixed': True,
-    'layout_boxed': False,
-    'footer_fixed': False,
-    'sidebar_fixed': True,
-    'sidebar': 'sidebar-dark-success',
-    'sidebar_nav_small_text': False,
-    'sidebar_disable_expand': False,
-    'sidebar_nav_child_indent': True,
-    'sidebar_nav_compact_style': False,
-    'sidebar_nav_legacy_style': False,
-    'sidebar_nav_flat_style': False,
-    'theme': 'default',
-    'dark_mode_theme': None,
-    'button_classes': {
-        'primary': 'btn-primary',
-        'secondary': 'btn-secondary',
-        'info': 'btn-info',
-        'warning': 'btn-warning',
-        'danger': 'btn-danger',
-        'success': 'btn-success',
-    },
-    'actions_sticky_top': True,
-}
+# ─── Security Headers (always active) ────────────────────────
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+CSRF_COOKIE_HTTPONLY = True
 
 # ─── Production Security ──────────────────────────────────────
 if not DEBUG:
@@ -342,8 +227,25 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+# ─── Twilio SMS Configuration ─────────────────────────────────
+# For OTP verification via SMS
+# SECURITY: All Twilio credentials MUST be set via environment variables
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_VERIFY_SERVICE_SID = os.environ.get('TWILIO_VERIFY_SERVICE_SID', '')
+TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
+TWILIO_SENDER_ID = os.environ.get('TWILIO_SENDER_ID', 'B4africa')
+
+# ─── Email Configuration ──────────────────────────────────────
+# For email OTP verification
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Console for testing
+DEFAULT_FROM_EMAIL = 'Burundi AU Chairmanship <noreply@burundi4africa.com>'
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Uncomment for real emails
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password'

@@ -1,0 +1,305 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}User Management - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                        <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">group</span>
+                        User Management
+                    </h1>
+                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Manage user accounts and permissions</p>
+                </div>
+                <a href="{% url 'custom_admin:user_create' %}"
+                   class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl">
+                    <span class="material-symbols-outlined">person_add</span>
+                    Create New User
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <!-- Total Users -->
+            <a href="?" class="block">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-l-4 border-blue-500 hover:shadow-lg transition-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Total Users</p>
+                            <p class="text-3xl font-bold text-slate-900 dark:text-white mt-2">{{ total_count }}</p>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl text-blue-500">group</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Active Users -->
+            <a href="?status=active" class="block">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-l-4 border-green-500 hover:shadow-lg transition-shadow {% if current_filter == 'active' %}ring-2 ring-green-500{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Active</p>
+                            <p class="text-3xl font-bold text-slate-900 dark:text-white mt-2">{{ active_count }}</p>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl text-green-500">check_circle</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Blocked Users -->
+            <a href="?status=blocked" class="block">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-l-4 border-red-500 hover:shadow-lg transition-shadow {% if current_filter == 'blocked' %}ring-2 ring-red-500{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Blocked</p>
+                            <p class="text-3xl font-bold text-slate-900 dark:text-white mt-2">{{ blocked_count }}</p>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl text-red-500">block</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Staff Users -->
+            <a href="?status=staff" class="block">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-l-4 border-purple-500 hover:shadow-lg transition-shadow {% if current_filter == 'staff' %}ring-2 ring-purple-500{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Staff</p>
+                            <p class="text-3xl font-bold text-slate-900 dark:text-white mt-2">{{ staff_count }}</p>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl text-purple-500">admin_panel_settings</span>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Verified Users -->
+            <a href="?status=verified" class="block">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 border-l-4 border-amber-500 hover:shadow-lg transition-shadow {% if current_filter == 'verified' %}ring-2 ring-amber-500{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Verified</p>
+                            <p class="text-3xl font-bold text-slate-900 dark:text-white mt-2">{{ verified_count }}</p>
+                        </div>
+                        <span class="material-symbols-outlined text-4xl text-amber-500">verified</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Pending Verifications Alert -->
+        {% if pending_verifications > 0 %}
+        <div class="mb-6 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-500 p-4 rounded-lg">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-amber-600 dark:text-amber-400">warning</span>
+                <p class="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>{{ pending_verifications }}</strong> verification request{{ pending_verifications|pluralize }} pending review
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Search and Filters -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 mb-6">
+            <div class="flex flex-col lg:flex-row gap-4">
+                <!-- Search -->
+                <div class="flex-1">
+                    <form method="get" class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                        <input type="text"
+                               name="search"
+                               value="{{ request.GET.search }}"
+                               placeholder="Search by username, email, or name..."
+                               class="w-full pl-12 pr-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white">
+                    </form>
+                </div>
+
+                <!-- Filter Buttons -->
+                <div class="flex flex-wrap gap-2">
+                    <a href="{% url 'custom_admin:users_list' %}"
+                       class="px-4 py-2 rounded-lg font-medium transition-colors {% if not current_filter or current_filter == 'all' %}bg-blue-600 text-white{% else %}bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600{% endif %}">
+                        All
+                    </a>
+                    <a href="?status=active"
+                       class="px-4 py-2 rounded-lg font-medium transition-colors {% if current_filter == 'active' %}bg-green-600 text-white{% else %}bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600{% endif %}">
+                        Active
+                    </a>
+                    <a href="?status=blocked"
+                       class="px-4 py-2 rounded-lg font-medium transition-colors {% if current_filter == 'blocked' %}bg-red-600 text-white{% else %}bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600{% endif %}">
+                        Blocked
+                    </a>
+                    <a href="?status=staff"
+                       class="px-4 py-2 rounded-lg font-medium transition-colors {% if current_filter == 'staff' %}bg-purple-600 text-white{% else %}bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600{% endif %}">
+                        Staff
+                    </a>
+                    <a href="?status=verified"
+                       class="px-4 py-2 rounded-lg font-medium transition-colors {% if current_filter == 'verified' %}bg-amber-600 text-white{% else %}bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600{% endif %}">
+                        Verified
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Table -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">User</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Joined</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Last Login</th>
+                            <th class="px-6 py-4 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                        {% for user in users %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                            <!-- User Info -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center gap-3">
+                                    <!-- Avatar -->
+                                    <div class="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                                        {{ user.username|first|upper }}
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <p class="font-semibold text-slate-900 dark:text-white">{{ user.username }}</p>
+                                            {% if user.is_superuser %}
+                                            <span class="px-2 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full">ADMIN</span>
+                                            {% elif user.is_staff %}
+                                            <span class="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full">STAFF</span>
+                                            {% endif %}
+                                            {% if user.profile.is_verified %}
+                                            <span class="material-symbols-outlined text-amber-500 text-lg" title="Verified">verified</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-sm text-slate-600 dark:text-slate-400">
+                                            {% if user.first_name or user.last_name %}
+                                                {{ user.first_name }} {{ user.last_name }}
+                                            {% else %}
+                                                <span class="italic">No name provided</span>
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Contact -->
+                            <td class="px-6 py-4">
+                                <p class="text-sm text-slate-900 dark:text-white">{{ user.email }}</p>
+                            </td>
+
+                            <!-- Status -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.is_active %}
+                                <span class="inline-flex items-center gap-1 px-3 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full">
+                                    <span class="material-symbols-outlined text-sm">check_circle</span>
+                                    Active
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 px-3 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 text-xs font-semibold rounded-full">
+                                    <span class="material-symbols-outlined text-sm">block</span>
+                                    Blocked
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Joined Date -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <p class="text-sm text-slate-900 dark:text-white">{{ user.date_joined|date:"M d, Y" }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ user.date_joined|date:"g:i A" }}</p>
+                            </td>
+
+                            <!-- Last Login -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.last_login %}
+                                <p class="text-sm text-slate-900 dark:text-white">{{ user.last_login|date:"M d, Y" }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ user.last_login|date:"g:i A" }}</p>
+                                {% else %}
+                                <p class="text-sm text-slate-500 dark:text-slate-400 italic">Never</p>
+                                {% endif %}
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <!-- Edit Button -->
+                                    <a href="{% url 'custom_admin:user_edit' user.pk %}"
+                                       class="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                       title="Edit user">
+                                        <span class="material-symbols-outlined text-xl">edit</span>
+                                    </a>
+
+                                    <!-- Toggle Active -->
+                                    <form method="post" action="{% url 'custom_admin:user_toggle_active' user.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                class="p-2 {% if user.is_active %}text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20{% else %}text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20{% endif %} rounded-lg transition-colors"
+                                                title="{% if user.is_active %}Block user{% else %}Activate user{% endif %}">
+                                            <span class="material-symbols-outlined text-xl">{% if user.is_active %}block{% else %}check_circle{% endif %}</span>
+                                        </button>
+                                    </form>
+
+                                    <!-- Toggle Staff -->
+                                    {% if request.user.is_superuser %}
+                                    <form method="post" action="{% url 'custom_admin:user_toggle_staff' user.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                class="p-2 {% if user.is_staff %}text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20{% else %}text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %} rounded-lg transition-colors"
+                                                title="{% if user.is_staff %}Remove staff status{% else %}Grant staff status{% endif %}">
+                                            <span class="material-symbols-outlined text-xl">admin_panel_settings</span>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center">
+                                <span class="material-symbols-outlined text-6xl text-slate-300 dark:text-slate-600 mb-4 block">group_off</span>
+                                <p class="text-slate-500 dark:text-slate-400 text-lg">No users found</p>
+                                <p class="text-sm text-slate-400 dark:text-slate-500 mt-2">Try adjusting your search or filters</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if users.has_other_pages %}
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
+                <div class="flex items-center justify-between">
+                    <p class="text-sm text-slate-600 dark:text-slate-400">
+                        Showing page {{ users.number }} of {{ users.paginator.num_pages }}
+                    </p>
+                    <div class="flex gap-2">
+                        {% if users.has_previous %}
+                        <a href="?page={{ users.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
+                           class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                            Previous
+                        </a>
+                        {% endif %}
+                        {% if users.has_next %}
+                        <a href="?page={{ users.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}"
+                           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            Next
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

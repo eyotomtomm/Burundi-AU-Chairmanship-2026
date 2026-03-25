@@ -1,0 +1,922 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:async';
+import '../../config/app_colors.dart';
+import '../../services/api_service.dart';
+
+class EnhancedVerificationScreen extends StatefulWidget {
+  const EnhancedVerificationScreen({super.key});
+
+  @override
+  State<EnhancedVerificationScreen> createState() => _EnhancedVerificationScreenState();
+}
+
+class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen> {
+  int _currentStep = 0;
+  bool _isLoading = false;
+
+  // Controllers
+  final _emailController = TextEditingController();
+  final _emailOtpController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _phoneOtpController = TextEditingController();
+  final _reasoningController = TextEditingController();
+
+  // State
+  String _selectedCountryCode = '+257'; // Burundi default
+  bool _emailVerified = false;
+  bool _phoneVerified = false;
+  Timer? _emailTimer;
+  Timer? _phoneTimer;
+  int _emailCountdown = 0;
+  int _phoneCountdown = 0;
+
+  // Country codes with flags
+  final List<Map<String, String>> _countryCodes = [
+    {'name': 'Burundi', 'code': '+257', 'flag': '🇧🇮'},
+    {'name': 'USA', 'code': '+1', 'flag': '🇺🇸'},
+    {'name': 'UK', 'code': '+44', 'flag': '🇬🇧'},
+    {'name': 'Kenya', 'code': '+254', 'flag': '🇰🇪'},
+    {'name': 'Rwanda', 'code': '+250', 'flag': '🇷🇼'},
+    {'name': 'Tanzania', 'code': '+255', 'flag': '🇹🇿'},
+    {'name': 'Uganda', 'code': '+256', 'flag': '🇺🇬'},
+    {'name': 'South Africa', 'code': '+27', 'flag': '🇿🇦'},
+    {'name': 'Nigeria', 'code': '+234', 'flag': '🇳🇬'},
+    {'name': 'France', 'code': '+33', 'flag': '🇫🇷'},
+    {'name': 'Germany', 'code': '+49', 'flag': '🇩🇪'},
+    {'name': 'Belgium', 'code': '+32', 'flag': '🇧🇪'},
+    {'name': 'Canada', 'code': '+1', 'flag': '🇨🇦'},
+    {'name': 'China', 'code': '+86', 'flag': '🇨🇳'},
+    {'name': 'India', 'code': '+91', 'flag': '🇮🇳'},
+    {'name': 'UAE', 'code': '+971', 'flag': '🇦🇪'},
+  ];
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _emailOtpController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneController.dispose();
+    _phoneOtpController.dispose();
+    _reasoningController.dispose();
+    _emailTimer?.cancel();
+    _phoneTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startEmailCountdown() {
+    _emailCountdown = 60;
+    _emailTimer?.cancel();
+    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_emailCountdown > 0) {
+        setState(() => _emailCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _startPhoneCountdown() {
+    _phoneCountdown = 60;
+    _phoneTimer?.cancel();
+    _phoneTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_phoneCountdown > 0) {
+        setState(() => _phoneCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _sendEmailOtp() async {
+    if (_emailController.text.isEmpty) {
+      _showError('Please enter your email address');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService().post('otp/send-email/', {
+        'email': _emailController.text,
+      }, auth: true);
+
+      if (mounted) {
+        _showSuccess('OTP sent to your email!');
+        _startEmailCountdown();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to send OTP: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _verifyEmailOtp() async {
+    if (_emailOtpController.text.isEmpty) {
+      _showError('Please enter the OTP code');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService().post('otp/verify-email/', {
+        'email': _emailController.text,
+        'otp_code': _emailOtpController.text,
+      }, auth: true);
+
+      if (mounted) {
+        setState(() => _emailVerified = true);
+        _showSuccess('Email verified successfully!');
+
+        // Move to next step after a short delay
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() => _currentStep++);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Invalid OTP code');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _sendPhoneOtp() async {
+    if (_phoneController.text.isEmpty) {
+      _showError('Please enter your phone number');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService().post('otp/send-phone/', {
+        'country_code': _selectedCountryCode,
+        'phone_number': _phoneController.text,
+      }, auth: true);
+
+      if (mounted) {
+        _showSuccess('OTP sent to your phone!');
+        _startPhoneCountdown();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to send OTP: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _verifyPhoneOtp() async {
+    if (_phoneOtpController.text.isEmpty) {
+      _showError('Please enter the OTP code');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService().post('otp/verify-phone/', {
+        'country_code': _selectedCountryCode,
+        'phone_number': _phoneController.text,
+        'otp_code': _phoneOtpController.text,
+      }, auth: true);
+
+      if (mounted) {
+        setState(() => _phoneVerified = true);
+        _showSuccess('Phone verified successfully!');
+
+        // Move to next step
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() => _currentStep++);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Invalid OTP code');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _submitVerificationRequest() async {
+    // Validate all fields
+    if (_firstNameController.text.isEmpty || _lastNameController.text.isEmpty) {
+      _showError('Please enter your first and last name');
+      return;
+    }
+
+    if (_reasoningController.text.isEmpty) {
+      _showError('Please explain why you deserve the verification badge');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ApiService().post('verification/request/', {
+        'first_name': _firstNameController.text,
+        'last_name': _lastNameController.text,
+        'email': _emailController.text,
+        'country_code': _selectedCountryCode,
+        'phone_number': _phoneController.text,
+        'reasoning_message': _reasoningController.text,
+      }, auth: true);
+
+      if (mounted) {
+        _showSuccess('Verification request submitted successfully!');
+
+        // Navigate back after delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to submit request: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Request Verification'),
+        backgroundColor: AppColors.burundiGreen,
+        foregroundColor: Colors.white,
+      ),
+      body: Column(
+        children: [
+          // Progress Indicator
+          _buildProgressIndicator(),
+
+          // Content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: _buildStepContent(),
+            ),
+          ),
+
+          // Navigation Buttons
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[900] : Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  if (_currentStep > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isLoading ? null : () {
+                          setState(() => _currentStep--);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: const BorderSide(color: AppColors.burundiGreen),
+                        ),
+                        child: const Text('Back'),
+                      ),
+                    ),
+                  if (_currentStep > 0) const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleNext,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: AppColors.burundiGreen,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(_getNextButtonText()),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Row(
+        children: List.generate(4, (index) {
+          final isActive = index == _currentStep;
+          final isCompleted = index < _currentStep;
+
+          return Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isCompleted || isActive
+                          ? AppColors.burundiGreen
+                          : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                if (index < 3) const SizedBox(width: 8),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildStepContent() {
+    switch (_currentStep) {
+      case 0:
+        return _buildEmailVerificationStep();
+      case 1:
+        return _buildPersonalInfoStep();
+      case 2:
+        return _buildPhoneVerificationStep();
+      case 3:
+        return _buildReasoningStep();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  Widget _buildEmailVerificationStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepHeader(
+          icon: Icons.email,
+          title: 'Verify Your Email',
+          subtitle: 'We\'ll send a verification code to your email',
+        ),
+        const SizedBox(height: 32),
+
+        // Email Input
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: 'Email Address',
+            hintText: 'your.email@example.com',
+            prefixIcon: const Icon(Icons.email_outlined),
+            suffixIcon: _emailVerified
+                ? const Icon(Icons.check_circle, color: AppColors.success)
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+          ),
+          enabled: !_emailVerified,
+        ),
+        const SizedBox(height: 16),
+
+        // Send OTP Button
+        if (!_emailVerified)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _emailCountdown > 0 ? null : _sendEmailOtp,
+              icon: const Icon(Icons.send),
+              label: Text(
+                _emailCountdown > 0
+                    ? 'Resend in $_emailCountdown seconds'
+                    : 'Send Verification Code',
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+
+        if (_emailCountdown > 0) ...[
+          const SizedBox(height: 24),
+          TextField(
+            controller: _emailOtpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: InputDecoration(
+              labelText: 'Enter 6-Digit Code',
+              hintText: '123456',
+              prefixIcon: const Icon(Icons.pin),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.grey[100],
+              counterText: '',
+            ),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _verifyEmailOtp,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppColors.success,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Verify Code'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPersonalInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepHeader(
+          icon: Icons.person,
+          title: 'Personal Information',
+          subtitle: 'Enter your name for identity verification',
+        ),
+        const SizedBox(height: 32),
+
+        // First Name
+        TextField(
+          controller: _firstNameController,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: 'First Name',
+            hintText: 'John',
+            prefixIcon: const Icon(Icons.person_outline),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Last Name
+        TextField(
+          controller: _lastNameController,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: 'Last Name',
+            hintText: 'Doe',
+            prefixIcon: const Icon(Icons.person_outline),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneVerificationStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepHeader(
+          icon: Icons.phone_android,
+          title: 'Verify Your Phone',
+          subtitle: 'We\'ll send an SMS code to your phone number',
+        ),
+        const SizedBox(height: 32),
+
+        // Country Code + Phone Number Row
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Country Code Selector
+            InkWell(
+              onTap: _phoneVerified ? null : _showCountryCodePicker,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _countryCodes.firstWhere(
+                        (c) => c['code'] == _selectedCountryCode,
+                        orElse: () => _countryCodes[0],
+                      )['flag']!,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _selectedCountryCode,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Phone Number
+            Expanded(
+              child: TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Phone Number',
+                  hintText: '123456789',
+                  prefixIcon: const Icon(Icons.phone),
+                  suffixIcon: _phoneVerified
+                      ? const Icon(Icons.check_circle, color: AppColors.success)
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
+                enabled: !_phoneVerified,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Send OTP Button
+        if (!_phoneVerified)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _phoneCountdown > 0 ? null : _sendPhoneOtp,
+              icon: const Icon(Icons.sms),
+              label: Text(
+                _phoneCountdown > 0
+                    ? 'Resend in $_phoneCountdown seconds'
+                    : 'Send SMS Code',
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+
+        if (_phoneCountdown > 0) ...[
+          const SizedBox(height: 24),
+          TextField(
+            controller: _phoneOtpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: InputDecoration(
+              labelText: 'Enter 6-Digit Code',
+              hintText: '123456',
+              prefixIcon: const Icon(Icons.pin),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: Colors.grey[100],
+              counterText: '',
+            ),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _verifyPhoneOtp,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppColors.success,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Verify Code'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReasoningStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepHeader(
+          icon: Icons.message,
+          title: 'Tell Us Why',
+          subtitle: 'Explain why you deserve the verification badge',
+        ),
+        const SizedBox(height: 32),
+
+        TextField(
+          controller: _reasoningController,
+          maxLines: 8,
+          maxLength: 500,
+          decoration: InputDecoration(
+            labelText: 'Your Message',
+            hintText: 'I am a government official working on...',
+            alignLabelWithHint: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Info card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.info.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, color: AppColors.info, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Review Process',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.info,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Our team will review your request and verify your credentials. This usually takes 2-3 business days.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.info,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.burundiGreen.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 48,
+            color: AppColors.burundiGreen,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  void _showCountryCodePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Select Country',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _countryCodes.length,
+                  itemBuilder: (context, index) {
+                    final country = _countryCodes[index];
+                    final isSelected = country['code'] == _selectedCountryCode;
+
+                    return ListTile(
+                      leading: Text(
+                        country['flag']!,
+                        style: const TextStyle(fontSize: 32),
+                      ),
+                      title: Text(country['name']!),
+                      trailing: Text(
+                        country['code']!,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AppColors.burundiGreen : null,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedTileColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+                      onTap: () {
+                        setState(() {
+                          _selectedCountryCode = country['code']!;
+                        });
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _getNextButtonText() {
+    switch (_currentStep) {
+      case 0:
+        return _emailVerified ? 'Continue' : 'Verify Email First';
+      case 1:
+        return 'Continue';
+      case 2:
+        return _phoneVerified ? 'Continue' : 'Verify Phone First';
+      case 3:
+        return 'Submit Request';
+      default:
+        return 'Next';
+    }
+  }
+
+  void _handleNext() {
+    switch (_currentStep) {
+      case 0:
+        if (!_emailVerified) {
+          _showError('Please verify your email first');
+          return;
+        }
+        setState(() => _currentStep++);
+        break;
+      case 1:
+        if (_firstNameController.text.isEmpty || _lastNameController.text.isEmpty) {
+          _showError('Please enter your first and last name');
+          return;
+        }
+        setState(() => _currentStep++);
+        break;
+      case 2:
+        if (!_phoneVerified) {
+          _showError('Please verify your phone number first');
+          return;
+        }
+        setState(() => _currentStep++);
+        break;
+      case 3:
+        _submitVerificationRequest();
+        break;
+    }
+  }
+}

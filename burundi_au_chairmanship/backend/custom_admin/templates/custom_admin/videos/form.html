@@ -1,0 +1,122 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if video.pk %}Edit{% else %}New{% endif %} Video - Burundi AU Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <span class="material-symbols-outlined text-4xl text-primary">videocam</span>
+        <h1 class="font-headline text-3xl font-bold text-on-surface">
+            {% if video.pk %}Edit{% else %}New{% endif %} Video
+        </h1>
+    </div>
+
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <form method="post" action="{{ action }}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="title" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Title (English)
+                    </label>
+                    <input type="text" id="title" name="title" value="{{ video.title|default:'' }}"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+                </div>
+
+                <div>
+                    <label for="title_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Title (French)
+                    </label>
+                    <input type="text" id="title_fr" name="title_fr" value="{{ video.title_fr|default:'' }}"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="description" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Description (English)
+                    </label>
+                    <textarea id="description" name="description" rows="4"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ video.description|default:'' }}</textarea>
+                </div>
+
+                <div>
+                    <label for="description_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Description (French)
+                    </label>
+                    <textarea id="description_fr" name="description_fr" rows="4"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ video.description_fr|default:'' }}</textarea>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label for="video_url" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Video URL
+                </label>
+                <input type="url" id="video_url" name="video_url" value="{{ video.video_url|default:'' }}"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                <p class="text-xs text-on-surface-variant mt-2">YouTube, Vimeo, or direct video URL</p>
+            </div>
+
+            <div class="mb-6">
+                <label for="thumbnail" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Thumbnail Image
+                </label>
+                {% if video.thumbnail %}
+                <div class="mb-3">
+                    <img src="{{ video.thumbnail.url }}" alt="Current thumbnail" class="w-48 h-32 object-cover rounded-lg shadow-sm">
+                </div>
+                {% endif %}
+                <input type="file" id="thumbnail" name="thumbnail" accept="image/*"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                    <label for="duration" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Duration
+                    </label>
+                    <input type="text" id="duration" name="duration" value="{{ video.duration|default:'' }}"
+                           placeholder="e.g., 5:30"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+
+                <div>
+                    <label for="category" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Category
+                    </label>
+                    <select id="category" name="category"
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+                        <option value="">Select category</option>
+                        {% for value, label in category_choices %}
+                        <option value="{{ value }}" {% if video.category == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Options
+                    </label>
+                    <label class="flex items-center gap-3 cursor-pointer mt-3">
+                        <input type="checkbox" id="is_featured" name="is_featured" {% if video.is_featured %}checked{% endif %}
+                               class="w-5 h-5 text-secondary border-outline-variant rounded focus:ring-2 focus:ring-secondary">
+                        <span class="font-label text-sm text-on-surface font-bold">Featured</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-4">
+                <a href="{% url 'custom_admin:videos_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
+                    {% if video.pk %}Update{% else %}Create{% endif %} Video
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

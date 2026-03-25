@@ -1,0 +1,193 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ reg.event_title }} - Submissions{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-rounded text-5xl text-primary">assignment</span>
+      <div>
+        <h1 class="font-headline text-4xl font-bold text-on-surface">{{ reg.event_title }}</h1>
+        <p class="font-body text-on-surface-variant mt-1">Review and manage event registration submissions</p>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <a href="{% url 'custom_admin:event_registration_submissions' reg.pk %}?export=csv"
+         class="inline-flex items-center gap-2 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container transition-all">
+        <span class="material-symbols-rounded">download</span>
+        Export CSV
+      </a>
+      <a href="{% url 'custom_admin:event_registration_edit' reg.pk %}"
+         class="inline-flex items-center gap-2 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container transition-all">
+        <span class="material-symbols-rounded">edit</span>
+        Edit Form
+      </a>
+      <a href="{% url 'custom_admin:event_registrations_list' %}"
+         class="inline-flex items-center gap-2 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container transition-all">
+        <span class="material-symbols-rounded">arrow_back</span>
+        Back to List
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-4 gap-6 mb-8">
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">Total</p>
+          <p class="font-headline text-3xl font-bold text-on-surface mt-2">{{ total_count }}</p>
+        </div>
+        <span class="material-symbols-rounded text-4xl text-primary">people</span>
+      </div>
+    </div>
+    <div class="bg-amber-50 rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-label text-xs uppercase tracking-wider text-amber-700 font-bold">Pending</p>
+          <p class="font-headline text-3xl font-bold text-amber-700 mt-2">{{ pending_count }}</p>
+        </div>
+        <span class="material-symbols-rounded text-4xl text-amber-700">schedule</span>
+      </div>
+    </div>
+    <div class="bg-emerald-50 rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-label text-xs uppercase tracking-wider text-emerald-700 font-bold">Approved</p>
+          <p class="font-headline text-3xl font-bold text-emerald-700 mt-2">{{ approved_count }}</p>
+        </div>
+        <span class="material-symbols-rounded text-4xl text-emerald-700">check_circle</span>
+      </div>
+    </div>
+    <div class="bg-red-50 rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-label text-xs uppercase tracking-wider text-red-700 font-bold">Rejected</p>
+          <p class="font-headline text-3xl font-bold text-red-700 mt-2">{{ rejected_count }}</p>
+        </div>
+        <span class="material-symbols-rounded text-4xl text-red-700">cancel</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-2 mb-6 flex gap-2">
+    <a href="{% url 'custom_admin:event_registration_submissions' reg.pk %}"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if not current_filter %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      All Submissions
+    </a>
+    <a href="{% url 'custom_admin:event_registration_submissions' reg.pk %}?status=pending"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'pending' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Pending
+    </a>
+    <a href="{% url 'custom_admin:event_registration_submissions' reg.pk %}?status=approved"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'approved' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Approved
+    </a>
+    <a href="{% url 'custom_admin:event_registration_submissions' reg.pk %}?status=rejected"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'rejected' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Rejected
+    </a>
+  </div>
+
+  <!-- Submissions List -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if submissions %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container">
+          <tr>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">User</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Status</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Type</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-left">Submitted</th>
+            <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for sub in submissions %}
+          <tr class="hover:bg-surface-container transition-colors">
+            <td class="px-6 py-4">
+              <div class="font-body text-on-surface font-semibold">{{ sub.user.username }}</div>
+              <div class="font-body text-sm text-on-surface-variant">{{ sub.user.email }}</div>
+            </td>
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold
+                {% if sub.status == 'pending' %}bg-amber-100 text-amber-700
+                {% elif sub.status == 'approved' %}bg-emerald-100 text-emerald-700
+                {% elif sub.status == 'rejected' %}bg-red-100 text-red-700
+                {% endif %}">
+                <span class="material-symbols-rounded text-sm">
+                  {% if sub.status == 'pending' %}schedule
+                  {% elif sub.status == 'approved' %}check_circle
+                  {% elif sub.status == 'rejected' %}cancel
+                  {% endif %}
+                </span>
+                {{ sub.get_status_display }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              {% if sub.is_proxy %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold bg-purple-100 text-purple-700">
+                <span class="material-symbols-rounded text-sm">people</span>
+                Proxy
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold bg-blue-100 text-blue-700">
+                <span class="material-symbols-rounded text-sm">person</span>
+                Direct
+              </span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 font-body text-sm text-on-surface-variant">{{ sub.submitted_at|date:"M d, Y H:i" }}</td>
+            <td class="px-6 py-4 text-right">
+              <a href="{% url 'custom_admin:event_submission_review' sub.pk %}"
+                 class="inline-flex items-center gap-1 bg-primary-container text-white font-headline font-bold rounded-lg py-2 px-4 hover:bg-primary transition-all">
+                <span class="material-symbols-rounded text-sm">visibility</span>
+                Review
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if submissions.has_other_pages %}
+    <div class="bg-surface-container px-6 py-4 flex items-center justify-between border-t border-outline-variant">
+      <div class="font-body text-sm text-on-surface-variant">
+        Page {{ submissions.number }} of {{ submissions.paginator.num_pages }}
+      </div>
+      <div class="flex gap-2">
+        {% if submissions.has_previous %}
+        <a href="?page={{ submissions.previous_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}"
+           class="inline-flex items-center gap-1 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container-high transition-all">
+          <span class="material-symbols-rounded text-sm">chevron_left</span>
+          Previous
+        </a>
+        {% endif %}
+        {% if submissions.has_next %}
+        <a href="?page={{ submissions.next_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}"
+           class="inline-flex items-center gap-1 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container-high transition-all">
+          Next
+          <span class="material-symbols-rounded text-sm">chevron_right</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="p-12 text-center">
+      <span class="material-symbols-rounded text-6xl text-on-surface-variant opacity-50 mb-4 block">assignment</span>
+      <p class="font-headline text-xl text-on-surface-variant">No submissions found</p>
+      <p class="font-body text-sm text-on-surface-variant mt-2">
+        {% if current_filter %}Try changing the filter{% else %}Submissions will appear here when users register for this event{% endif %}
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

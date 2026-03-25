@@ -6,7 +6,9 @@ from core.models import (
     LiveFeed, Resource, AppSettings,
     FeatureCard, HeroSlide, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, Category,
-    QuickAccessMenuItem,
+    QuickAccessMenuItem, WeatherCity, HeroTextContent, Notification,
+    FeatureCardKeyPoint, FeatureCardImpactArea,
+    EventRegistration, RegistrationFormField,
 )
 
 
@@ -52,6 +54,17 @@ class Command(BaseCommand):
         for slide in hero_slides:
             HeroSlide.objects.get_or_create(label=slide['label'], defaults=slide)
         self.stdout.write(f'  {len(hero_slides)} Hero Slides created')
+
+        # Hero Text Content
+        hero_texts = [
+            {'key': 'badge', 'text_en': 'BURUNDI', 'text_fr': 'BURUNDI'},
+            {'key': 'title_line1', 'text_en': 'African Union', 'text_fr': 'Union Africaine'},
+            {'key': 'title_line2', 'text_en': 'Chairmanship', 'text_fr': 'Présidence'},
+            {'key': 'year', 'text_en': '2026', 'text_fr': '2026'},
+        ]
+        for hero_text in hero_texts:
+            HeroTextContent.objects.get_or_create(key=hero_text['key'], defaults=hero_text)
+        self.stdout.write(f'  {len(hero_texts)} Hero Text Content items created')
 
         # Feature Cards
         feature_cards = [
@@ -145,8 +158,35 @@ class Command(BaseCommand):
             },
         ]
         for fc in feature_cards:
-            FeatureCard.objects.update_or_create(title=fc['title'], defaults=fc)
-        self.stdout.write(f'  {len(feature_cards)} Feature Cards created/updated')
+            kp_en = fc.pop('key_points', [])
+            kp_fr = fc.pop('key_points_fr', [])
+            ia_en = fc.pop('impact_areas', [])
+            ia_fr = fc.pop('impact_areas_fr', [])
+            card, created = FeatureCard.objects.update_or_create(title=fc['title'], defaults=fc)
+            # Rebuild child rows on every seed (idempotent)
+            card.key_point_items.all().delete()
+            for i, text in enumerate(kp_en):
+                FeatureCardKeyPoint.objects.create(
+                    feature_card=card,
+                    text=str(text),
+                    text_fr=str(kp_fr[i]) if i < len(kp_fr) else '',
+                    order=i,
+                )
+            card.impact_area_items.all().delete()
+            for i, area in enumerate(ia_en):
+                if not isinstance(area, dict):
+                    continue
+                fr_area = ia_fr[i] if i < len(ia_fr) and isinstance(ia_fr[i], dict) else {}
+                FeatureCardImpactArea.objects.create(
+                    feature_card=card,
+                    icon_name=area.get('icon', 'stars'),
+                    title=area.get('title', ''),
+                    title_fr=fr_area.get('title', ''),
+                    description=area.get('description', ''),
+                    description_fr=fr_area.get('description', ''),
+                    order=i,
+                )
+        self.stdout.write(f'  {len(feature_cards)} Feature Cards created/updated (with key points & impact areas)')
 
         # ── Quick Access Menu ─────────────────────────────────────
         quick_access_items = [
@@ -867,5 +907,144 @@ class Command(BaseCommand):
         for sm in social_media:
             SocialMediaLink.objects.get_or_create(platform=sm['platform'], defaults=sm)
         self.stdout.write(f'  {len(social_media)} Social Media Links created')
+
+        # Weather Cities
+        weather_cities = [
+            {
+                'name': 'Bujumbura',
+                'latitude': -3.3731,
+                'longitude': 29.3644,
+                'order': 1,
+                'is_default': True,
+                'is_active': True,
+            },
+            {
+                'name': 'Addis Ababa',
+                'latitude': 9.0192,
+                'longitude': 38.7525,
+                'order': 2,
+                'is_default': True,
+                'is_active': True,
+            },
+        ]
+        for city in weather_cities:
+            WeatherCity.objects.get_or_create(name=city['name'], defaults=city)
+        self.stdout.write(f'  {len(weather_cities)} Weather Cities created')
+
+        # Notifications
+        notifications = [
+            {
+                'title': 'Welcome to Burundi AU Chairmanship 2026',
+                'title_fr': 'Bienvenue à la Présidence de l\'UA du Burundi 2026',
+                'message': 'Stay updated with the latest news, events, and announcements from the African Union Summit.',
+                'message_fr': 'Restez informé des dernières nouvelles, événements et annonces du Sommet de l\'Union Africaine.',
+                'notification_type': 'system',
+                'action_type': 'none',
+                'is_active': True,
+            },
+            {
+                'title': 'AU Summit 2026 - Opening Ceremony',
+                'title_fr': 'Sommet UA 2026 - Cérémonie d\'ouverture',
+                'message': 'The AU Summit will officially open on February 15, 2026. Don\'t miss the historic event!',
+                'message_fr': 'Le Sommet de l\'UA s\'ouvrira officiellement le 15 février 2026. Ne manquez pas cet événement historique !',
+                'notification_type': 'event',
+                'action_type': 'route',
+                'action_value': '/calendar',
+                'is_active': True,
+            },
+            {
+                'title': 'New Magazine Edition Available',
+                'title_fr': 'Nouvelle édition du magazine disponible',
+                'message': 'Read the latest edition featuring insights on Africa\'s development agenda and regional integration.',
+                'message_fr': 'Lisez la dernière édition avec des perspectives sur l\'agenda de développement de l\'Afrique et l\'intégration régionale.',
+                'notification_type': 'magazine',
+                'action_type': 'route',
+                'action_value': '/magazine',
+                'is_active': True,
+            },
+            {
+                'title': 'Live Stream: Presidential Address',
+                'title_fr': 'Diffusion en direct : Discours présidentiel',
+                'message': 'Watch live as President Ndayishimiye addresses the Continental Summit. Starting soon!',
+                'message_fr': 'Regardez en direct le Président Ndayishimiye s\'adresser au Sommet Continental. Commence bientôt !',
+                'notification_type': 'article',
+                'action_type': 'route',
+                'action_value': '/live-feeds',
+                'is_active': True,
+            },
+        ]
+        for notif in notifications:
+            Notification.objects.get_or_create(
+                title=notif['title'],
+                defaults=notif
+            )
+        self.stdout.write(f'  {len(notifications)} Notifications created')
+
+        # ── Standalone Event Registrations ────────────────────────
+        event_registrations = [
+            {
+                'event_title': 'AU Summit Gala Dinner',
+                'event_title_fr': "Dîner de gala du Sommet de l'UA",
+                'event_description': 'Join world leaders and delegates for an exclusive gala dinner celebrating African unity and the Burundi AU Chairmanship. Formal attire required.',
+                'event_description_fr': "Rejoignez les dirigeants du monde et les délégués pour un dîner de gala exclusif célébrant l'unité africaine et la présidence burundaise de l'UA. Tenue formelle requise.",
+                'card_type': 'event',
+                'event_date': '2026-02-14T19:00:00Z',
+                'event_end_date': '2026-02-14T23:00:00Z',
+                'venue': 'Bujumbura Convention Center',
+                'venue_fr': 'Centre de Conventions de Bujumbura',
+                'venue_address': 'Boulevard de l\'Uprona, Bujumbura, Burundi',
+                'contact_email': 'events@burundi.gov.bi',
+                'contact_phone': '+257 22 22 34 56',
+                'is_registration_enabled': True,
+                'max_registrations': 500,
+                'allow_proxy_registration': True,
+                'confirmation_message': 'Thank you for registering! You will receive your invitation card by email within 48 hours.',
+                'confirmation_message_fr': "Merci pour votre inscription ! Vous recevrez votre carte d'invitation par email dans les 48 heures.",
+                'order': 1,
+                'form_fields': [
+                    {'field_type': 'text', 'field_label': 'Full Name', 'field_label_fr': 'Nom complet', 'field_name': 'full_name', 'is_required': True, 'order': 1},
+                    {'field_type': 'email', 'field_label': 'Email Address', 'field_label_fr': 'Adresse email', 'field_name': 'email', 'is_required': True, 'order': 2},
+                    {'field_type': 'nationality', 'field_label': 'Nationality', 'field_label_fr': 'Nationalité', 'field_name': 'nationality', 'is_required': True, 'order': 3},
+                    {'field_type': 'text', 'field_label': 'Organization', 'field_label_fr': 'Organisation', 'field_name': 'organization', 'is_required': False, 'order': 4},
+                    {'field_type': 'select', 'field_label': 'Dietary Preference', 'field_label_fr': 'Préférence alimentaire', 'field_name': 'dietary', 'is_required': False, 'order': 5, 'options': ['No restrictions', 'Vegetarian', 'Vegan', 'Halal', 'Other']},
+                ],
+            },
+            {
+                'event_title': 'Youth Innovation Forum',
+                'event_title_fr': "Forum d'Innovation des Jeunes",
+                'event_description': 'A two-day forum bringing together young innovators, entrepreneurs, and change-makers from across Africa. Pitch your ideas, network with industry leaders, and compete for seed funding.',
+                'event_description_fr': "Un forum de deux jours réunissant de jeunes innovateurs, entrepreneurs et acteurs du changement de toute l'Afrique. Présentez vos idées, réseautez et concourez pour un financement de démarrage.",
+                'card_type': 'event',
+                'event_date': '2026-02-16T08:00:00Z',
+                'event_end_date': '2026-02-17T17:00:00Z',
+                'venue': 'University of Burundi Auditorium',
+                'venue_fr': "Auditorium de l'Université du Burundi",
+                'venue_address': 'Avenue de l\'UNESCO, Bujumbura, Burundi',
+                'contact_email': 'youth@burundi.gov.bi',
+                'contact_phone': '+257 22 22 78 90',
+                'is_registration_enabled': True,
+                'max_registrations': 200,
+                'allow_proxy_registration': False,
+                'confirmation_message': 'Welcome to the Youth Innovation Forum! Please bring a valid ID on the day of the event.',
+                'confirmation_message_fr': "Bienvenue au Forum d'Innovation des Jeunes ! Veuillez apporter une pièce d'identité valide le jour de l'événement.",
+                'order': 2,
+                'form_fields': [
+                    {'field_type': 'text', 'field_label': 'Full Name', 'field_label_fr': 'Nom complet', 'field_name': 'full_name', 'is_required': True, 'order': 1},
+                    {'field_type': 'email', 'field_label': 'Email', 'field_label_fr': 'Email', 'field_name': 'email', 'is_required': True, 'order': 2},
+                    {'field_type': 'phone', 'field_label': 'Phone Number', 'field_label_fr': 'Numéro de téléphone', 'field_name': 'phone', 'is_required': True, 'order': 3},
+                    {'field_type': 'number', 'field_label': 'Age', 'field_label_fr': 'Âge', 'field_name': 'age', 'is_required': True, 'order': 4},
+                    {'field_type': 'textarea', 'field_label': 'Tell us about your innovation project', 'field_label_fr': "Parlez-nous de votre projet d'innovation", 'field_name': 'project_description', 'is_required': True, 'order': 5},
+                ],
+            },
+        ]
+        for er_data in event_registrations:
+            form_fields_data = er_data.pop('form_fields')
+            er, created = EventRegistration.objects.get_or_create(
+                event_title=er_data['event_title'], defaults=er_data
+            )
+            if created:
+                for ff in form_fields_data:
+                    RegistrationFormField.objects.create(event_registration=er, **ff)
+        self.stdout.write(f'  {len(event_registrations)} Event Registrations created (with form fields)')
 
         self.stdout.write(self.style.SUCCESS('\nAll data seeded successfully!'))

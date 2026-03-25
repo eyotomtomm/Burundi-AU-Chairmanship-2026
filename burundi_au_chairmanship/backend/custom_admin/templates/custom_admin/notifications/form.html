@@ -1,0 +1,517 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{% if notification %}Edit Notification{% else %}Create Notification{% endif %} - Burundi AU Chairmanship{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">
+                    {% if notification %}edit_notifications{% else %}add_circle{% endif %}
+                </span>
+                <h1 class="text-3xl font-bold text-slate-900 dark:text-white">
+                    {% if notification %}Edit Notification{% else %}Create New Notification{% endif %}
+                </h1>
+            </div>
+            <p class="text-slate-600 dark:text-slate-400">
+                {% if notification %}Update notification details and settings{% else %}Compose a new push notification for app users{% endif %}
+            </p>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <form method="POST" enctype="multipart/form-data" class="divide-y divide-slate-200 dark:divide-slate-700">
+                {% csrf_token %}
+
+                <!-- Bilingual Titles Section -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">title</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Notification Title</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- English Title -->
+                        <div>
+                            <label for="title" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Title (English) <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <input type="text"
+                                       id="title"
+                                       name="title"
+                                       value="{{ notification.title|default:'' }}"
+                                       required
+                                       maxlength="200"
+                                       class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150"
+                                       placeholder="Enter notification title in English">
+                                <span class="absolute right-3 top-3 text-xs text-slate-400 dark:text-slate-500">EN</span>
+                            </div>
+                        </div>
+
+                        <!-- French Title -->
+                        <div>
+                            <label for="title_fr" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Titre (Français) <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <input type="text"
+                                       id="title_fr"
+                                       name="title_fr"
+                                       value="{{ notification.title_fr|default:'' }}"
+                                       required
+                                       maxlength="200"
+                                       class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150"
+                                       placeholder="Entrez le titre de la notification en français">
+                                <span class="absolute right-3 top-3 text-xs text-slate-400 dark:text-slate-500">FR</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bilingual Messages Section -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">description</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Message Content</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- English Message -->
+                        <div>
+                            <label for="message" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Message (English) <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <textarea id="message"
+                                          name="message"
+                                          required
+                                          rows="6"
+                                          maxlength="1000"
+                                          class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 resize-none"
+                                          placeholder="Enter the notification message in English">{{ notification.message|default:'' }}</textarea>
+                                <span class="absolute right-3 top-3 text-xs text-slate-400 dark:text-slate-500">EN</span>
+                            </div>
+                        </div>
+
+                        <!-- French Message -->
+                        <div>
+                            <label for="message_fr" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Message (Français) <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <textarea id="message_fr"
+                                          name="message_fr"
+                                          required
+                                          rows="6"
+                                          maxlength="1000"
+                                          class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 resize-none"
+                                          placeholder="Entrez le message de notification en français">{{ notification.message_fr|default:'' }}</textarea>
+                                <span class="absolute right-3 top-3 text-xs text-slate-400 dark:text-slate-500">FR</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Upload Section -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">image</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Notification Image</h2>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 ml-2">(optional)</span>
+                    </div>
+                    <div class="space-y-4">
+                        {% if notification and notification.image %}
+                        <div class="flex items-start gap-4">
+                            <div class="relative group">
+                                <img src="{{ notification.image.url }}" alt="Current image"
+                                     class="w-40 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
+                                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center transition-opacity">
+                                    <span class="text-white text-xs font-medium">Current Image</span>
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">Current image attached. Upload a new one to replace it.</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <label for="image" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Upload Image
+                            </label>
+                            <input type="file"
+                                   id="image"
+                                   name="image"
+                                   accept="image/jpeg,image/png,image/gif,image/webp"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/30 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50 transition-all duration-150"
+                                   onchange="previewImage(this)">
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">JPG, PNG, GIF, or WebP. Shows in push notification and in-app list.</p>
+                        </div>
+                        <div id="imagePreview" class="hidden">
+                            <img id="imagePreviewImg" src="" alt="Preview"
+                                 class="w-40 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Settings Section -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">settings</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Settings</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Notification Type -->
+                        <div>
+                            <label for="notification_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Notification Type <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select id="notification_type"
+                                        name="notification_type"
+                                        required
+                                        class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 appearance-none">
+                                    <option value="general" {% if notification.notification_type == 'general' %}selected{% endif %}>General</option>
+                                    <option value="event" {% if notification.notification_type == 'event' %}selected{% endif %}>Event</option>
+                                    <option value="article" {% if notification.notification_type == 'article' %}selected{% endif %}>Article</option>
+                                    <option value="magazine" {% if notification.notification_type == 'magazine' %}selected{% endif %}>Magazine</option>
+                                    <option value="system" {% if notification.notification_type == 'system' %}selected{% endif %}>System</option>
+                                </select>
+                                <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">
+                                    expand_more
+                                </span>
+                            </div>
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Select the category that best describes this notification</p>
+                        </div>
+
+                        <!-- Action Type + Value -->
+                        <div class="space-y-4">
+                            <div>
+                                <label for="action_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Tap Action
+                                </label>
+                                <div class="relative">
+                                    <select id="action_type"
+                                            name="action_type"
+                                            class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 appearance-none">
+                                        <option value="none" {% if notification.action_type == 'none' %}selected{% endif %}>No Action</option>
+                                        <option value="url" {% if notification.action_type == 'url' %}selected{% endif %}>External URL</option>
+                                        <option value="route" {% if notification.action_type == 'route' %}selected{% endif %}>App Route</option>
+                                    </select>
+                                    <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="action_value" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Action Value
+                                </label>
+                                <input type="text"
+                                       id="action_value"
+                                       name="action_value"
+                                       value="{{ notification.action_value|default:'' }}"
+                                       maxlength="500"
+                                       class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150"
+                                       placeholder="URL or app route (e.g., /news, /magazine)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Checkboxes Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                        <!-- Is Global -->
+                        <div class="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-750 rounded-lg border border-slate-200 dark:border-slate-600">
+                            <input type="checkbox"
+                                   id="is_global"
+                                   name="is_global"
+                                   value="on"
+                                   {% if notification.is_global or not notification %}checked{% endif %}
+                                   class="w-5 h-5 mt-0.5 text-blue-600 bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-blue-500 transition-all duration-150">
+                            <label for="is_global" class="flex-1 cursor-pointer">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="material-symbols-outlined text-sm text-blue-600 dark:text-blue-400">public</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">Global</span>
+                                </div>
+                                <p class="text-xs text-slate-600 dark:text-slate-400">Send to all app users</p>
+                            </label>
+                        </div>
+
+                        <!-- Is Active -->
+                        <div class="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-750 rounded-lg border border-slate-200 dark:border-slate-600">
+                            <input type="checkbox"
+                                   id="is_active"
+                                   name="is_active"
+                                   value="on"
+                                   {% if notification.is_active or not notification %}checked{% endif %}
+                                   class="w-5 h-5 mt-0.5 text-emerald-600 bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-emerald-500 transition-all duration-150">
+                            <label for="is_active" class="flex-1 cursor-pointer">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="material-symbols-outlined text-sm text-emerald-600 dark:text-emerald-400">check_circle</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">Active</span>
+                                </div>
+                                <p class="text-xs text-slate-600 dark:text-slate-400">Visible in app</p>
+                            </label>
+                        </div>
+
+                        <!-- Send Push Notification -->
+                        <div class="flex items-start gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                            <input type="checkbox"
+                                   id="send_push"
+                                   name="send_push"
+                                   value="on"
+                                   {% if not notification %}checked{% endif %}
+                                   class="w-5 h-5 mt-0.5 text-orange-600 bg-white dark:bg-slate-700 border-orange-300 dark:border-orange-600 rounded focus:ring-2 focus:ring-orange-500 transition-all duration-150">
+                            <label for="send_push" class="flex-1 cursor-pointer">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="material-symbols-outlined text-sm text-orange-600 dark:text-orange-400">send</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">Send Push</span>
+                                </div>
+                                <p class="text-xs text-slate-600 dark:text-slate-400">Dispatch FCM push notification</p>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audience Targeting Section -->
+                <div class="p-6" id="targetingSection">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">group</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Audience Targeting</h2>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 ml-2">(when Global is unchecked)</span>
+                    </div>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        These filters only apply when "Global" is unchecked. Leave fields blank to skip that filter.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Gender Filter -->
+                        <div>
+                            <label for="target_gender" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Gender
+                            </label>
+                            <div class="relative">
+                                <select id="target_gender"
+                                        name="target_gender"
+                                        class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 appearance-none">
+                                    <option value="">All Genders</option>
+                                    <option value="male" {% if notification.target_gender == 'male' %}selected{% endif %}>Male</option>
+                                    <option value="female" {% if notification.target_gender == 'female' %}selected{% endif %}>Female</option>
+                                    <option value="other" {% if notification.target_gender == 'other' %}selected{% endif %}>Other</option>
+                                </select>
+                                <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                            </div>
+                        </div>
+
+                        <!-- Nationality Filter (multi-select) -->
+                        <div>
+                            <label for="target_nationalities" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Nationalities
+                            </label>
+                            <select id="target_nationalities"
+                                    name="target_nationalities"
+                                    multiple
+                                    size="6"
+                                    class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150">
+                                {% for code, label in nationality_choices %}
+                                <option value="{{ code }}" {% if notification.target_nationalities and code in notification.target_nationalities %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Hold Ctrl/Cmd to select multiple. Leave empty for all.</p>
+                        </div>
+
+                        <!-- Age Range -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Age Range
+                            </label>
+                            <div class="flex items-center gap-3">
+                                <input type="number"
+                                       id="target_age_min"
+                                       name="target_age_min"
+                                       value="{{ notification.target_age_min|default:'' }}"
+                                       min="0" max="120"
+                                       class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150"
+                                       placeholder="Min age">
+                                <span class="text-slate-400">to</span>
+                                <input type="number"
+                                       id="target_age_max"
+                                       name="target_age_max"
+                                       value="{{ notification.target_age_max|default:'' }}"
+                                       min="0" max="120"
+                                       class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150"
+                                       placeholder="Max age">
+                            </div>
+                        </div>
+
+                        <!-- Verification Status -->
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-750 rounded-lg border border-slate-200 dark:border-slate-600">
+                                <input type="checkbox"
+                                       id="target_verified_only"
+                                       name="target_verified_only"
+                                       value="on"
+                                       {% if notification.target_verified_only %}checked{% endif %}
+                                       class="w-5 h-5 mt-0.5 text-blue-600 bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-blue-500 transition-all duration-150"
+                                       onchange="toggleBadgeType()">
+                                <label for="target_verified_only" class="flex-1 cursor-pointer">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <span class="material-symbols-outlined text-sm text-blue-600 dark:text-blue-400">verified</span>
+                                        <span class="font-medium text-slate-900 dark:text-white">Verified Users Only</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400">Only send to users with a verified badge</p>
+                                </label>
+                            </div>
+                            <div id="badgeTypeWrapper" class="{% if not notification.target_verified_only %}hidden{% endif %}">
+                                <label for="target_badge_type" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    Badge Type
+                                </label>
+                                <div class="relative">
+                                    <select id="target_badge_type"
+                                            name="target_badge_type"
+                                            class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 appearance-none">
+                                        <option value="">Any Badge</option>
+                                        <option value="BLUE" {% if notification.target_badge_type == 'BLUE' %}selected{% endif %}>Blue Badge</option>
+                                        <option value="GOLD" {% if notification.target_badge_type == 'GOLD' %}selected{% endif %}>Gold Badge (VIPs)</option>
+                                    </select>
+                                    <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Push Status (edit mode only) -->
+                {% if notification %}
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">monitoring</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Push Status</h2>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        {% if notification.push_sent %}
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium rounded-full">
+                                <span class="material-symbols-outlined text-sm">check_circle</span>
+                                Sent
+                            </span>
+                            <span class="text-sm text-slate-600 dark:text-slate-400">
+                                to {{ notification.push_recipient_count }} device{{ notification.push_recipient_count|pluralize }}
+                                {% if notification.push_sent_at %}
+                                    on {{ notification.push_sent_at|date:"M d, Y" }} at {{ notification.push_sent_at|time:"H:i" }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% else %}
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-sm font-medium rounded-full">
+                                <span class="material-symbols-outlined text-sm">schedule</span>
+                                Not sent
+                            </span>
+                            <span class="text-sm text-slate-500 dark:text-slate-400">Check "Send Push" above and save to dispatch</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Form Actions -->
+                <div class="px-6 py-4 bg-slate-50 dark:bg-slate-750">
+                    <div class="flex items-center justify-between gap-4">
+                        <a href="{% url 'custom_admin:notifications_list' %}"
+                           class="inline-flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all duration-150">
+                            <span class="material-symbols-outlined">close</span>
+                            <span>Cancel</span>
+                        </a>
+                        <div class="flex items-center gap-3">
+                            <button type="submit"
+                                    class="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                                <span class="material-symbols-outlined">{% if notification %}save{% else %}send{% endif %}</span>
+                                <span>{% if notification %}Save Changes{% else %}Create Notification{% endif %}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Help Info Card -->
+        <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+            <div class="flex gap-4">
+                <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">info</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-blue-900 dark:text-blue-300 mb-2">Notification Guidelines</h3>
+                    <ul class="space-y-1 text-sm text-blue-800 dark:text-blue-200">
+                        <li class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-xs mt-0.5">chevron_right</span>
+                            <span><strong>Bilingual Content:</strong> Always provide both English and French versions for all titles and messages</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-xs mt-0.5">chevron_right</span>
+                            <span><strong>Global Notifications:</strong> Check "Global" to send to all users, or leave unchecked for targeted delivery</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-xs mt-0.5">chevron_right</span>
+                            <span><strong>Active Status:</strong> Only active notifications will be sent to users</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-xs mt-0.5">chevron_right</span>
+                            <span><strong>Alert Type:</strong> Use "Alert" type for urgent or important announcements</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewImage(input) {
+    const preview = document.getElementById('imagePreview');
+    const img = document.getElementById('imagePreviewImg');
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            img.src = e.target.result;
+            preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.classList.add('hidden');
+    }
+}
+
+function toggleBadgeType() {
+    const verified = document.getElementById('target_verified_only').checked;
+    const wrapper = document.getElementById('badgeTypeWrapper');
+    if (verified) {
+        wrapper.classList.remove('hidden');
+    } else {
+        wrapper.classList.add('hidden');
+        document.getElementById('target_badge_type').value = '';
+    }
+}
+
+// Toggle targeting section visibility based on Global checkbox
+function toggleTargeting() {
+    const isGlobal = document.getElementById('is_global').checked;
+    const section = document.getElementById('targetingSection');
+    if (isGlobal) {
+        section.style.opacity = '0.4';
+        section.style.pointerEvents = 'none';
+    } else {
+        section.style.opacity = '1';
+        section.style.pointerEvents = 'auto';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const globalCheckbox = document.getElementById('is_global');
+    if (globalCheckbox) {
+        globalCheckbox.addEventListener('change', toggleTargeting);
+        toggleTargeting();
+    }
+});
+</script>
+{% endblock %}

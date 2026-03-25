@@ -28,6 +28,16 @@ dependencies:
   share_plus: ^10.1.2
   in_app_review: ^2.0.9
 
+  # Image Picker
+  image_picker: ^1.0.7
+
+  # Screenshot & Screen Recording Prevention
+  screen_protector: ^1.4.2
+
+  # File Download & Storage
+  path_provider: ^2.1.1
+  dio: ^5.4.0
+
   # Storage
   shared_preferences: ^2.3.3
 
@@ -38,6 +48,10 @@ dependencies:
   # Video Player for Live Feeds
   video_player: ^2.9.2
   chewie: ^1.8.5
+  youtube_player_flutter: ^9.0.3
+
+  # Calendar Integration
+  add_2_calendar: ^3.0.1
 
   # PDF Viewer
   syncfusion_flutter_pdfviewer: ^28.2.7

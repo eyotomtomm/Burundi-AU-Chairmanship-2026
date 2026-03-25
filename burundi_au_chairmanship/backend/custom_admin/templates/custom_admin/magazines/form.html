@@ -1,0 +1,201 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if magazine %}Edit Magazine{% else %}Create Magazine{% endif %} - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Content</span>
+    <h1 class="text-3xl font-extrabold text-on-surface font-headline">
+        {% if magazine %}Edit Magazine{% else %}Create Magazine{% endif %}
+    </h1>
+</div>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <form method="post" action="{{ action }}" enctype="multipart/form-data" class="space-y-8">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- English Title -->
+            <div>
+                <label for="title" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Title (English) *
+                </label>
+                <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    value="{% if magazine %}{{ magazine.title }}{% endif %}"
+                    required
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                >
+            </div>
+
+            <!-- French Title -->
+            <div>
+                <label for="title_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Title (French)
+                </label>
+                <input
+                    type="text"
+                    id="title_fr"
+                    name="title_fr"
+                    value="{% if magazine %}{{ magazine.title_fr }}{% endif %}"
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                >
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- English Description -->
+            <div>
+                <label for="description" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Description (English)
+                </label>
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="5"
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface resize-none"
+                >{% if magazine %}{{ magazine.description }}{% endif %}</textarea>
+            </div>
+
+            <!-- French Description -->
+            <div>
+                <label for="description_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Description (French)
+                </label>
+                <textarea
+                    id="description_fr"
+                    name="description_fr"
+                    rows="5"
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface resize-none"
+                >{% if magazine %}{{ magazine.description_fr }}{% endif %}</textarea>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Cover Image -->
+            <div>
+                <label for="cover_image" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Cover Image
+                </label>
+                {% if magazine and magazine.cover_image %}
+                    <div class="mb-4">
+                        <img src="{{ magazine.cover_image.url }}" alt="{{ magazine.title }}" class="w-48 h-64 object-cover rounded-lg shadow-sm">
+                        <p class="text-xs text-on-surface-variant mt-2">Current cover image</p>
+                    </div>
+                {% endif %}
+                <input
+                    type="file"
+                    id="cover_image"
+                    name="cover_image"
+                    accept="image/*"
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary"
+                >
+            </div>
+
+            <!-- PDF File -->
+            <div>
+                <label for="pdf_file" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    PDF File *
+                </label>
+                {% if magazine and magazine.pdf_file %}
+                    <div class="mb-4 p-4 bg-surface-container rounded-lg">
+                        <div class="flex items-center gap-2 text-on-surface">
+                            <span class="material-symbols-outlined">picture_as_pdf</span>
+                            <span class="text-sm">Current PDF uploaded</span>
+                        </div>
+                    </div>
+                {% endif %}
+                <input
+                    type="file"
+                    id="pdf_file"
+                    name="pdf_file"
+                    accept="application/pdf"
+                    {% if not magazine %}required{% endif %}
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary"
+                >
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Page Count -->
+            <div>
+                <label for="page_count" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Page Count *
+                </label>
+                <input
+                    type="number"
+                    id="page_count"
+                    name="page_count"
+                    value="{% if magazine %}{{ magazine.page_count }}{% endif %}"
+                    min="1"
+                    required
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                >
+            </div>
+
+            <!-- File Size -->
+            <div>
+                <label for="file_size" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    File Size (e.g., 2.5 MB)
+                </label>
+                <input
+                    type="text"
+                    id="file_size"
+                    name="file_size"
+                    value="{% if magazine %}{{ magazine.file_size }}{% endif %}"
+                    placeholder="2.5 MB"
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                >
+            </div>
+
+            <!-- Publish Date -->
+            <div>
+                <label for="publish_date" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-3">
+                    Publish Date *
+                </label>
+                <input
+                    type="date"
+                    id="publish_date"
+                    name="publish_date"
+                    value="{% if magazine %}{{ magazine.publish_date|date:'Y-m-d' }}{% endif %}"
+                    required
+                    class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                >
+            </div>
+        </div>
+
+        <!-- Featured Checkbox -->
+        <div class="flex items-start gap-3">
+            <input
+                type="checkbox"
+                id="is_featured"
+                name="is_featured"
+                {% if magazine and magazine.is_featured %}checked{% endif %}
+                class="mt-1 w-5 h-5 rounded border-outline-variant bg-surface-container-low text-secondary focus:ring-2 focus:ring-secondary focus:ring-offset-0"
+            >
+            <div>
+                <label for="is_featured" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-1 cursor-pointer">
+                    Featured Magazine
+                </label>
+                <p class="text-sm text-on-surface-variant">Display this magazine prominently on the home screen</p>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex items-center justify-between pt-6 border-t border-outline-variant">
+            <a href="{% url 'custom_admin:magazines_list' %}" class="text-on-surface-variant hover:text-on-surface font-medium transition-colors">
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all inline-flex items-center gap-2"
+            >
+                <span class="material-symbols-outlined text-xl">save</span>
+                {% if magazine %}Update Magazine{% else %}Create Magazine{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

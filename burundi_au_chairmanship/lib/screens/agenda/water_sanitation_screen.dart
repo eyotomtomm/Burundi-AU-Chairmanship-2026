@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
@@ -30,7 +31,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
         orElse: () => <String, dynamic>{},
       );
     } catch (e) {
-      debugPrint('Error loading agenda: $e');
+      if (kDebugMode) debugPrint('Error loading agenda: $e');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }

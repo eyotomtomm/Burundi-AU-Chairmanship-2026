@@ -69,3 +69,6 @@ htmlcov/
 firebase-adminsdk*.json
 credentials/
 *.p8
+
+#markdown
+*.md/

@@ -7,6 +7,33 @@ Provides rate limiting to prevent abuse and manipulation of analytics.
 from rest_framework.throttling import SimpleRateThrottle
 
 
+class AuthRateThrottle(SimpleRateThrottle):
+    """
+    Strict throttle for authentication endpoints (login, register).
+    Limits: 5 attempts per minute per IP to prevent brute-force attacks.
+    """
+    scope = 'auth'
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class OTPRateThrottle(SimpleRateThrottle):
+    """
+    Strict throttle for OTP send/verify endpoints.
+    Limits: 3 attempts per minute per user to prevent OTP flooding.
+    """
+    scope = 'otp'
+
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            ident = str(request.user.pk)
+        else:
+            ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
 class ViewCountThrottle(SimpleRateThrottle):
     """
     Throttle for view count endpoints to prevent manipulation.

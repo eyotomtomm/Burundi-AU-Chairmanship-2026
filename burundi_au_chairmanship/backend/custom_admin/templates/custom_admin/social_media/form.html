@@ -1,0 +1,108 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if link.pk %}Edit{% else %}New{% endif %} Social Media Link - Burundi AU Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <span class="material-symbols-outlined text-4xl text-primary">share</span>
+        <h1 class="font-headline text-3xl font-bold text-on-surface">
+            {% if link.pk %}Edit{% else %}New{% endif %} Social Media Link
+        </h1>
+    </div>
+
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <form method="post" action="{{ action }}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="platform" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Platform
+                    </label>
+                    <select id="platform" name="platform"
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+                        <option value="">Select platform</option>
+                        {% for value, label in platform_choices %}
+                        <option value="{{ value }}" {% if link.platform == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="handle" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Handle / Username
+                    </label>
+                    <input type="text" id="handle" name="handle" value="{{ link.handle|default:'' }}"
+                           placeholder="@username"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="display_name" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Display Name (English)
+                    </label>
+                    <input type="text" id="display_name" name="display_name" value="{{ link.display_name|default:'' }}"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+                </div>
+
+                <div>
+                    <label for="display_name_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Display Name (French)
+                    </label>
+                    <input type="text" id="display_name_fr" name="display_name_fr" value="{{ link.display_name_fr|default:'' }}"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label for="url" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    URL
+                </label>
+                <input type="url" id="url" name="url" value="{{ link.url|default:'' }}"
+                       placeholder="https://..."
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="follower_count" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Follower Count
+                    </label>
+                    <input type="number" id="follower_count" name="follower_count" value="{{ link.follower_count|default:'' }}"
+                           min="0"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+
+                <div>
+                    <label for="display_order" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Display Order
+                    </label>
+                    <input type="number" id="display_order" name="display_order" value="{{ link.display_order|default:'0' }}"
+                           min="0"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="is_active" name="is_active" {% if link.is_active %}checked{% endif %}
+                           class="w-5 h-5 text-secondary border-outline-variant rounded focus:ring-2 focus:ring-secondary">
+                    <span class="font-label text-sm text-on-surface font-bold">Active</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end gap-4">
+                <a href="{% url 'custom_admin:social_media_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
+                    {% if link.pk %}Update{% else %}Create{% endif %} Link
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

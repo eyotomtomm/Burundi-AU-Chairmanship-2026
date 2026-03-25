@@ -1,0 +1,216 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}Settings - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-surface py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-4xl text-primary">
+                    settings
+                </span>
+                <h1 class="font-headline text-4xl font-bold text-on-surface">Settings</h1>
+            </div>
+            <p class="mt-2 text-on-surface-variant font-body">Configure application settings and view audit logs</p>
+        </div>
+
+        <!-- Application Configuration Section -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mb-8">
+            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6">Application Configuration</h2>
+
+            <form method="POST" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Summit Year -->
+                <div>
+                    <label for="summit_year" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Summit Year
+                    </label>
+                    <input
+                        type="text"
+                        id="summit_year"
+                        name="summit_year"
+                        value="{{ settings.summit_year }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                    />
+                </div>
+
+                <!-- Summit Theme (English) -->
+                <div>
+                    <label for="summit_theme" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Summit Theme (English)
+                    </label>
+                    <input
+                        type="text"
+                        id="summit_theme"
+                        name="summit_theme"
+                        value="{{ settings.summit_theme }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                    />
+                </div>
+
+                <!-- Summit Theme (French) -->
+                <div>
+                    <label for="summit_theme_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Summit Theme (French)
+                    </label>
+                    <input
+                        type="text"
+                        id="summit_theme_fr"
+                        name="summit_theme_fr"
+                        value="{{ settings.summit_theme_fr }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                    />
+                </div>
+
+                <!-- Website URL -->
+                <div>
+                    <label for="website_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Website URL
+                    </label>
+                    <input
+                        type="url"
+                        id="website_url"
+                        name="website_url"
+                        value="{{ settings.website_url }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                        placeholder="https://example.com"
+                    />
+                </div>
+
+                <!-- Facebook URL -->
+                <div>
+                    <label for="facebook_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Facebook URL
+                    </label>
+                    <input
+                        type="url"
+                        id="facebook_url"
+                        name="facebook_url"
+                        value="{{ settings.facebook_url }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                        placeholder="https://facebook.com/..."
+                    />
+                </div>
+
+                <!-- Twitter URL -->
+                <div>
+                    <label for="twitter_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Twitter URL
+                    </label>
+                    <input
+                        type="url"
+                        id="twitter_url"
+                        name="twitter_url"
+                        value="{{ settings.twitter_url }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                        placeholder="https://twitter.com/..."
+                    />
+                </div>
+
+                <!-- Instagram URL -->
+                <div>
+                    <label for="instagram_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                        Instagram URL
+                    </label>
+                    <input
+                        type="url"
+                        id="instagram_url"
+                        name="instagram_url"
+                        value="{{ settings.instagram_url }}"
+                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                        placeholder="https://instagram.com/..."
+                    />
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button
+                        type="submit"
+                        class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-colors duration-200"
+                    >
+                        Save Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Audit Log Section -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6">Audit Log</h2>
+
+            {% if audit_logs %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-outline-variant">
+                    <thead>
+                        <tr class="bg-surface-container-low">
+                            <th class="px-6 py-3 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+                                Timestamp
+                            </th>
+                            <th class="px-6 py-3 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+                                User
+                            </th>
+                            <th class="px-6 py-3 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+                                Action
+                            </th>
+                            <th class="px-6 py-3 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+                                Entity Type
+                            </th>
+                            <th class="px-6 py-3 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+                                Entity
+                            </th>
+                            <th class="px-6 py-3 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+                                Status
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-surface-container-lowest divide-y divide-outline-variant">
+                        {% for log in audit_logs %}
+                        <tr class="hover:bg-surface-container-low transition-colors duration-150">
+                            <td class="px-6 py-4 whitespace-nowrap font-body text-sm text-on-surface">
+                                {{ log.timestamp|date:"Y-m-d H:i:s" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap font-body text-sm text-on-surface">
+                                {% if log.user %}
+                                    {{ log.user.username }}
+                                {% else %}
+                                    <span class="text-on-surface-variant italic">System</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap font-body text-sm text-on-surface">
+                                {{ log.action }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap font-body text-sm text-on-surface">
+                                {{ log.entity_type }}
+                            </td>
+                            <td class="px-6 py-4 font-body text-sm text-on-surface">
+                                {{ log.entity_label }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if log.status == 'success' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                                    Success
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
+                                    Failure
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <p class="font-body text-on-surface-variant">No audit log entries found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

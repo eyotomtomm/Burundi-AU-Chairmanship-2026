@@ -1,0 +1,121 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Event Registrations{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-rounded text-5xl text-primary">how_to_reg</span>
+      <div>
+        <h1 class="font-headline text-4xl font-bold text-on-surface">Event Registrations</h1>
+        <p class="font-body text-on-surface-variant mt-1">Manage event and holiday registration forms</p>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:event_registration_create' %}"
+       class="inline-flex items-center gap-2 bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
+      <span class="material-symbols-rounded">add_circle</span>
+      Create Registration
+    </a>
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-2 mb-6 flex gap-2">
+    <a href="{% url 'custom_admin:event_registrations_list' %}"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if not current_filter %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      All Registrations
+    </a>
+    <a href="{% url 'custom_admin:event_registrations_list' %}?type=event"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'event' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Events
+    </a>
+    <a href="{% url 'custom_admin:event_registrations_list' %}?type=holiday"
+       class="flex-1 text-center py-3 px-4 rounded-lg font-headline font-semibold transition-all {% if current_filter == 'holiday' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+      Holidays
+    </a>
+  </div>
+
+  <!-- Registrations Grid -->
+  {% if registrations %}
+  <div class="grid grid-cols-1 gap-6">
+    {% for reg in registrations %}
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 hover:shadow-md transition-shadow">
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <h3 class="font-headline text-2xl font-bold text-on-surface">{{ reg.event_title }}</h3>
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold
+              {% if reg.card_type == 'event' %}bg-blue-100 text-blue-700
+              {% else %}bg-purple-100 text-purple-700
+              {% endif %}">
+              {{ reg.get_card_type_display }}
+            </span>
+            {% if reg.is_active %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold bg-emerald-100 text-emerald-700">
+              <span class="material-symbols-rounded text-sm">check_circle</span>
+              Active
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-headline font-bold bg-gray-100 text-gray-700">
+              <span class="material-symbols-rounded text-sm">pause_circle</span>
+              Inactive
+            </span>
+            {% endif %}
+          </div>
+          <div class="flex items-center gap-6 text-sm text-on-surface-variant font-body">
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-rounded text-sm">event</span>
+              {{ reg.event_date|date:"M d, Y" }}
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-rounded text-sm">people</span>
+              {{ reg.submission_count }} submission{{ reg.submission_count|pluralize }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-4 border-t border-outline-variant">
+        <a href="{% url 'custom_admin:event_registration_submissions' reg.pk %}"
+           class="inline-flex items-center gap-1 bg-primary-container text-white font-headline font-bold rounded-lg py-2 px-4 hover:bg-primary transition-all">
+          <span class="material-symbols-rounded text-sm">visibility</span>
+          View Submissions
+        </a>
+        <a href="{% url 'custom_admin:event_registration_edit' reg.pk %}"
+           class="inline-flex items-center gap-1 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container transition-all">
+          <span class="material-symbols-rounded text-sm">edit</span>
+          Edit
+        </a>
+        <form method="post" action="{% url 'custom_admin:event_registration_delete' reg.pk %}"
+              onsubmit="return confirm('Are you sure you want to delete this registration? This action cannot be undone.');"
+              class="inline">
+          {% csrf_token %}
+          <button type="submit"
+                  class="inline-flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg py-2 px-4 font-headline font-semibold transition-all">
+            <span class="material-symbols-rounded text-sm">delete</span>
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-12 text-center">
+    <span class="material-symbols-rounded text-6xl text-on-surface-variant opacity-50 mb-4 block">how_to_reg</span>
+    <p class="font-headline text-xl text-on-surface-variant">No event registrations found</p>
+    <p class="font-body text-sm text-on-surface-variant mt-2">
+      {% if current_filter %}Try changing the filter{% else %}Create your first registration to get started{% endif %}
+    </p>
+    {% if not current_filter %}
+    <a href="{% url 'custom_admin:event_registration_create' %}"
+       class="inline-flex items-center gap-2 bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all mt-6">
+      <span class="material-symbols-rounded">add_circle</span>
+      Create Registration
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

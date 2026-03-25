@@ -117,7 +117,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         );
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 48),
                   ],
                 ),
               ),
@@ -291,6 +291,15 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             isDark: isDark,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Email is required';
+              }
+              if (!value.contains('@') || !value.contains('.')) {
+                return 'Enter a valid email address';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
 
@@ -301,6 +310,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             icon: Icons.lock_outlined,
             obscureText: _obscureSignInPassword,
             isDark: isDark,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Password is required';
+              }
+              return null;
+            },
             suffixIcon: IconButton(
               icon: Icon(
                 _obscureSignInPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -762,13 +777,27 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _signIn(BuildContext context) async {
+    if (!(_signInFormKey.currentState?.validate() ?? false)) return;
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signIn(
       _signInEmailController.text,
       _signInPasswordController.text,
     );
     if (success && context.mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Check if profile is incomplete
+      final isProfileIncomplete = (authProvider.userName?.isEmpty ?? true) ||
+          (authProvider.phoneNumber?.isEmpty ?? true) ||
+          (authProvider.gender?.isEmpty ?? true);
+
+      if (isProfileIncomplete) {
+        // Show complete profile dialog
+        _showCompleteProfileDialog(context);
+      } else {
+        // Navigate to home
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    } else if (context.mounted && authProvider.errorMessage != null) {
+      _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
 
@@ -783,7 +812,18 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _signUpPasswordController.text,
     );
     if (success && context.mounted) {
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Account created! Please verify your email.'),
+          backgroundColor: AppColors.burundiGreen,
+        ),
+      );
+      // Navigate to home
       Navigator.of(context).pushReplacementNamed('/home');
+    } else if (context.mounted && authProvider.errorMessage != null) {
+      // Show error message
+      _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
 
@@ -813,6 +853,106 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         content: Text(message),
         backgroundColor: AppColors.burundiRed,
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showCompleteProfileDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.person_outline, color: AppColors.burundiGreen, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Complete Your Profile',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : AppColors.darkBackground,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Help us personalize your experience by completing your profile information.',
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.auGold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.auGold.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: AppColors.auGold, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This will only take a minute',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushReplacementNamed('/home');
+            },
+            child: Text(
+              'Skip for Now',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushNamed('/profile-completion');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.burundiGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('Complete Profile', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }

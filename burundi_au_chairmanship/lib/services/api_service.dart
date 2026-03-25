@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +8,7 @@ import '../config/environment.dart';
 import '../models/api_models.dart';
 import '../models/magazine_model.dart';
 import '../models/location_model.dart';
+import '../models/event_registration_model.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -53,7 +55,9 @@ class ApiService {
         return json.decode(response.body);
       }
       throw ApiException('HTTP ${response.statusCode}', response.statusCode);
-    } on http.ClientException {
+    } on ApiException {
+      rethrow;
+    } catch (e) {
       throw ApiException('Connection failed. Check your network.', 0);
     }
   }
@@ -98,7 +102,9 @@ class ApiService {
         }
       }
       throw ApiException(message, response.statusCode);
-    } on http.ClientException {
+    } on ApiException {
+      rethrow;
+    } catch (e) {
       throw ApiException('Connection failed. Check your network.', 0);
     }
   }
@@ -196,6 +202,52 @@ class ApiService {
         message = body['detail'];
       }
       throw ApiException(message, response.statusCode);
+    } on http.ClientException {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadProfilePicture(File imageFile) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/auth/profile/update/');
+      final request = http.MultipartRequest('PUT', uri);
+
+      // Add auth headers
+      final headers = await _headers(auth: true);
+      headers.remove('Content-Type'); // Let multipart set its own content type
+      request.headers.addAll(headers);
+
+      // Attach the image file
+      request.files.add(
+        await http.MultipartFile.fromPath('profile_picture', imageFile.path),
+      );
+
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      throw ApiException('Failed to upload profile picture', response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
+  }
+
+  Future<Map<String, dynamic>> deactivateAccount() async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/auth/deactivate-account/'),
+            headers: await _headers(auth: true),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+      throw ApiException('Failed to deactivate account', response.statusCode);
     } on http.ClientException {
       throw ApiException('Connection failed. Check your network.', 0);
     }
@@ -365,6 +417,42 @@ class ApiService {
     return _extractResults(data).cast<Map<String, dynamic>>();
   }
 
+  // ── Event Registrations ────────────────────────────────────
+  Future<List<EventRegistrationModel>> getEventRegistrations() async {
+    final data = await _get('event-registrations/', auth: true);
+    return _extractResults(data)
+        .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<EventRegistrationModel> getEventRegistration(int id) async {
+    final data = await _get('event-registrations/$id/', auth: true);
+    return EventRegistrationModel.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> submitEventRegistration(int eventId, Map<String, dynamic> formData) async {
+    return await _post('event-submissions/', {
+      'event_registration': eventId,
+      'form_data': formData,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> submitProxyRegistration({
+    required int eventId,
+    required String proxyName,
+    required String proxyEmail,
+    required String proxyPhone,
+    Map<String, dynamic>? formData,
+  }) async {
+    return await _post('event-submissions/register-proxy/', {
+      'event_registration': eventId,
+      'proxy_name': proxyName,
+      'proxy_email': proxyEmail,
+      'proxy_phone': proxyPhone,
+      'form_data': formData ?? {},
+    }, auth: true);
+  }
+
   // ── Home Feed (combined) ─────────────────────────────────
   Future<Map<String, dynamic>> getHomeFeed() async {
     final data = await _get('home-feed/');
@@ -396,6 +484,37 @@ class ApiService {
     final data = await _get('search/magazines/?q=$encodedQuery&lang=$language');
     final results = (data['results'] as List<dynamic>?) ?? [];
     return results.map((j) => MagazineEdition.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  // ── Verification ─────────────────────────────────────────
+  Future<Map<String, dynamic>> submitVerificationRequest({
+    required String title,
+    required String fullName,
+    required String email,
+    required String phoneNumber,
+    required String positionRole,
+    String? twitterUrl,
+    String? linkedinUrl,
+  }) async {
+    return await _post('verification/request/', {
+      'title': title,
+      'full_name': fullName,
+      'email': email,
+      'phone_number': phoneNumber,
+      'position_role': positionRole,
+      'twitter_url': twitterUrl ?? '',
+      'linkedin_url': linkedinUrl ?? '',
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> getVerificationStatus() async {
+    return await _get('verification/status/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> submitVerificationAppeal(String appealMessage) async {
+    return await _post('verification/appeal/', {
+      'appeal_message': appealMessage,
+    }, auth: true);
   }
 }
 

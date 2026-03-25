@@ -1,0 +1,170 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Embassies & Consulates{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8 flex items-center justify-between">
+    <div>
+      <h1 class="font-headline font-extrabold text-4xl text-on-surface mb-2">Embassies & Consulates</h1>
+      <p class="text-on-surface-variant">Manage diplomatic missions and consular offices</p>
+    </div>
+    <a href="{% url 'custom_admin:embassy_create' %}" class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium inline-flex items-center gap-2 transition-colors">
+      <span class="material-symbols-outlined text-xl">add</span>
+      Add Embassy
+    </a>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Missions</p>
+          <p class="text-3xl font-extrabold mt-1">{{ embassies|length }}</p>
+        </div>
+        <div class="bg-primary-container/10 p-3 rounded-lg">
+          <span class="material-symbols-outlined text-primary-container text-2xl">public</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Embassies</p>
+          <p class="text-3xl font-extrabold mt-1">{{ embassy_count }}</p>
+        </div>
+        <div class="bg-secondary/10 p-3 rounded-lg">
+          <span class="material-symbols-outlined text-secondary text-2xl">account_balance</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Consulates</p>
+          <p class="text-3xl font-extrabold mt-1">{{ consulate_count }}</p>
+        </div>
+        <div class="bg-primary-container/10 p-3 rounded-lg">
+          <span class="material-symbols-outlined text-primary-container text-2xl">location_city</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Embassies Table -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if embassies %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Mission</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Location</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Type</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Contact</th>
+            <th class="text-right py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for embassy in embassies %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-4 px-6">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-primary-container rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-white text-xl">
+                    {% if embassy.type == 'embassy' %}account_balance{% elif embassy.type == 'consulate' %}location_city{% else %}flag{% endif %}
+                  </span>
+                </div>
+                <div>
+                  <div class="font-medium text-on-surface">{{ embassy.name }}</div>
+                  {% if embassy.name_fr %}
+                  <div class="text-sm text-on-surface-variant">{{ embassy.name_fr }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="py-4 px-6">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-on-surface-variant text-sm">location_on</span>
+                <div>
+                  <div class="font-medium text-on-surface">{{ embassy.city }}</div>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-container text-on-secondary-container mt-1">
+                    {{ embassy.country }}
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td class="py-4 px-6">
+              {% if embassy.type == 'embassy' %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-tertiary-container text-on-tertiary-container">
+                <span class="material-symbols-outlined text-sm">account_balance</span>
+                Embassy
+              </span>
+              {% elif embassy.type == 'consulate' %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-secondary-container text-on-secondary-container">
+                <span class="material-symbols-outlined text-sm">location_city</span>
+                Consulate
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-surface-container text-on-surface-variant">
+                <span class="material-symbols-outlined text-sm">flag</span>
+                Mission
+              </span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6">
+              <div class="text-sm text-on-surface space-y-1">
+                {% if embassy.phone_number %}
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-sm">phone</span>
+                  <span>{{ embassy.phone_number }}</span>
+                </div>
+                {% endif %}
+                {% if embassy.email %}
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-sm">email</span>
+                  <span class="truncate max-w-[200px]">{{ embassy.email }}</span>
+                </div>
+                {% endif %}
+                {% if embassy.website %}
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-on-surface-variant text-sm">language</span>
+                  <a href="{{ embassy.website }}" target="_blank" class="text-secondary hover:underline truncate max-w-[200px]">Website</a>
+                </div>
+                {% endif %}
+              </div>
+            </td>
+            <td class="py-4 px-6">
+              <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'custom_admin:embassy_edit' embassy.pk %}" class="p-2 hover:bg-surface-container rounded-lg transition-colors" title="Edit">
+                  <span class="material-symbols-outlined text-primary">edit</span>
+                </a>
+                <form method="post" action="{% url 'custom_admin:embassy_delete' embassy.pk %}" class="inline-block" onsubmit="return confirm('Are you sure you want to delete {{ embassy.name }}? This action cannot be undone.');">
+                  {% csrf_token %}
+                  <button type="submit" class="p-2 hover:bg-surface-container rounded-lg transition-colors" title="Delete">
+                    <span class="material-symbols-outlined text-error">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+      <span class="material-symbols-outlined text-6xl text-on-surface-variant mb-4">public_off</span>
+      <h3 class="text-xl font-bold text-on-surface mb-2">No embassies found</h3>
+      <p class="text-on-surface-variant mb-6">Get started by adding your first diplomatic mission.</p>
+      <a href="{% url 'custom_admin:embassy_create' %}" class="inline-block bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium transition-colors">
+        <span class="material-symbols-outlined mr-2 align-middle">add</span>
+        Add First Embassy
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

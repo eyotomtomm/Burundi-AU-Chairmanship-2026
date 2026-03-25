@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 
@@ -35,8 +36,9 @@ class FeatureCardDetailScreen extends StatelessWidget {
 
   Color _hexToColor(String hex) {
     hex = hex.replaceFirst('#', '');
+    if (hex.isEmpty) return const Color(0xFF1EB53A);
     if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.parse(hex, radix: 16));
+    return Color(int.tryParse(hex, radix: 16) ?? 0xFF1EB53A);
   }
 
   @override
@@ -46,6 +48,7 @@ class FeatureCardDetailScreen extends StatelessWidget {
     final gradEnd = _hexToColor(
         cardData['gradient_end'] as String? ?? '#4CAF50');
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mediaItems = cardData['media'] as List<dynamic>? ?? [];
 
     return Scaffold(
       body: CustomScrollView(
@@ -79,6 +82,14 @@ class FeatureCardDetailScreen extends StatelessWidget {
                     _buildSectionTitle(context, _isEnglish(context) ? 'Impact Areas' : "Domaines d'Impact", gradStart),
                     const SizedBox(height: 12),
                     ..._buildImpactCards(context, isDark),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Media Gallery
+                  if (mediaItems.isNotEmpty) ...[
+                    _buildSectionTitle(context, _isEnglish(context) ? 'Gallery' : 'Galerie', gradStart),
+                    const SizedBox(height: 12),
+                    _buildMediaGallery(context, mediaItems, isDark),
                     const SizedBox(height: 24),
                   ],
 
@@ -316,5 +327,191 @@ class FeatureCardDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Build the media gallery — horizontal image scroll + video thumbnails
+  Widget _buildMediaGallery(BuildContext context, List<dynamic> mediaItems, bool isDark) {
+    final lang = Localizations.localeOf(context).languageCode;
+
+    return SizedBox(
+      height: 180,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: mediaItems.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final item = mediaItems[index] as Map<String, dynamic>;
+          final mediaType = item['media_type'] ?? 'image';
+          final caption = lang == 'fr'
+              ? (item['caption_fr'] ?? item['caption'] ?? '')
+              : (item['caption'] ?? '');
+          final imageUrl = item['image'] as String? ?? '';
+          final videoUrl = item['video_url'] as String? ?? '';
+
+          if (mediaType == 'video') {
+            return _buildVideoThumbnail(context, videoUrl, caption.toString(), isDark);
+          }
+          return _buildImageThumbnail(context, imageUrl, caption.toString(), isDark);
+        },
+      ),
+    );
+  }
+
+  Widget _buildImageThumbnail(BuildContext context, String imageUrl, String caption, bool isDark) {
+    return GestureDetector(
+      onTap: imageUrl.isNotEmpty ? () => _showFullImage(context, imageUrl, caption) : null,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 240,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (imageUrl.isNotEmpty)
+                CachedNetworkImage(
+                  imageUrl: Environment.fixMediaUrl(imageUrl),
+                  fit: BoxFit.cover,
+                  placeholder: (_, _) => Container(
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                  errorWidget: (_, _, _) => Container(
+                    color: isDark ? Colors.grey[800] : Colors.grey[200],
+                    child: const Icon(Icons.broken_image, size: 40),
+                  ),
+                )
+              else
+                Container(
+                  color: isDark ? Colors.grey[800] : Colors.grey[200],
+                  child: const Icon(Icons.image, size: 40),
+                ),
+              if (caption.isNotEmpty)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+                      ),
+                    ),
+                    child: Text(
+                      caption,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoThumbnail(BuildContext context, String videoUrl, String caption, bool isDark) {
+    return GestureDetector(
+      onTap: videoUrl.isNotEmpty ? () => _launchVideoUrl(videoUrl) : null,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 240,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[850] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Icon(Icons.videocam, size: 48, color: Colors.white54),
+                ),
+              ),
+              // Play button overlay
+              Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                ),
+              ),
+              if (caption.isNotEmpty)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+                      ),
+                    ),
+                    child: Text(
+                      caption,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFullImage(BuildContext context, String imageUrl, String caption) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: CachedNetworkImage(
+                imageUrl: Environment.fixMediaUrl(imageUrl),
+                fit: BoxFit.contain,
+                placeholder: (_, _) => const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (_, _, _) => const SizedBox(
+                  height: 200,
+                  child: Center(child: Icon(Icons.broken_image, size: 48, color: Colors.white)),
+                ),
+              ),
+            ),
+            if (caption.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchVideoUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 }

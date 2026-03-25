@@ -1,0 +1,292 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{% if resource %}Edit Resource{% else %}Create Resource{% endif %} - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-surface py-8">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-4 mb-4">
+                <a href="{% url 'custom_admin:resources_list' %}" class="p-2 hover:bg-surface-container rounded-full transition-colors">
+                    <span class="material-symbols-outlined text-on-surface-variant">arrow_back</span>
+                </a>
+                <div>
+                    <h1 class="text-3xl font-bold text-on-surface">
+                        {% if resource %}Edit Resource{% else %}Create New Resource{% endif %}
+                    </h1>
+                    <p class="mt-2 text-sm text-on-surface-variant">
+                        {% if resource %}Update resource details and file{% else %}Add a new official document, report, speech, or press release{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <form method="POST" action="{{ action }}" enctype="multipart/form-data" class="space-y-8">
+                {% csrf_token %}
+
+                <!-- Title (English) -->
+                <div>
+                    <label for="title" class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg">title</span>
+                            <span>Title (English)</span>
+                        </span>
+                    </label>
+                    <input
+                        type="text"
+                        name="title"
+                        id="title"
+                        value="{% if resource %}{{ resource.title }}{% endif %}"
+                        required
+                        class="w-full px-0 py-3 text-base text-on-surface bg-transparent border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 transition-colors placeholder-on-surface-variant"
+                        placeholder="Enter resource title in English"
+                    >
+                </div>
+
+                <!-- Title (French) -->
+                <div>
+                    <label for="title_fr" class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg">translate</span>
+                            <span>Title (French)</span>
+                        </span>
+                    </label>
+                    <input
+                        type="text"
+                        name="title_fr"
+                        id="title_fr"
+                        value="{% if resource %}{{ resource.title_fr }}{% endif %}"
+                        class="w-full px-0 py-3 text-base text-on-surface bg-transparent border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 transition-colors placeholder-on-surface-variant"
+                        placeholder="Entrez le titre de la ressource en français"
+                    >
+                </div>
+
+                <!-- Category -->
+                <div>
+                    <label for="category" class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg">category</span>
+                            <span>Category</span>
+                        </span>
+                    </label>
+                    <select
+                        name="category"
+                        id="category"
+                        required
+                        class="w-full px-0 py-3 text-base text-on-surface bg-transparent border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 transition-colors"
+                    >
+                        <option value="">Select a category</option>
+                        <option value="official_documents" {% if resource and resource.category == 'official_documents' %}selected{% endif %}>Official Documents</option>
+                        <option value="reports" {% if resource and resource.category == 'reports' %}selected{% endif %}>Reports</option>
+                        <option value="speeches" {% if resource and resource.category == 'speeches' %}selected{% endif %}>Speeches</option>
+                        <option value="press_releases" {% if resource and resource.category == 'press_releases' %}selected{% endif %}>Press Releases</option>
+                    </select>
+                </div>
+
+                <!-- File Upload -->
+                <div>
+                    <label for="file" class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg">upload_file</span>
+                            <span>File{% if not resource %} (Required){% endif %}</span>
+                        </span>
+                    </label>
+                    {% if resource and resource.file %}
+                        <div class="mb-4 p-4 bg-surface-container rounded-lg border border-outline-variant">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-2xl text-primary">description</span>
+                                    <div>
+                                        <p class="text-sm font-medium text-on-surface">Current file</p>
+                                        <a href="{{ resource.file.url }}" target="_blank" class="text-xs text-primary hover:underline">
+                                            {{ resource.file.name|slice:"10:" }}
+                                        </a>
+                                    </div>
+                                </div>
+                                <a href="{{ resource.file.url }}" target="_blank" class="text-primary hover:text-primary-container p-2 rounded-full hover:bg-surface-container transition-all">
+                                    <span class="material-symbols-outlined">download</span>
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                    <div class="relative">
+                        <input
+                            type="file"
+                            name="file"
+                            id="file"
+                            {% if not resource %}required{% endif %}
+                            accept=".pdf,.doc,.docx,.xlsx"
+                            class="block w-full text-sm text-on-surface-variant
+                                file:mr-4 file:py-3 file:px-6
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-medium
+                                file:bg-primary-container file:text-on-primary-container
+                                hover:file:shadow-lg file:transition-all file:duration-200
+                                file:cursor-pointer cursor-pointer"
+                        >
+                        <p class="mt-2 text-xs text-on-surface-variant">Accepted formats: PDF, DOC, DOCX, XLSX</p>
+                    </div>
+                </div>
+
+                <!-- File Type -->
+                <div>
+                    <label for="file_type" class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg">description</span>
+                            <span>File Type</span>
+                        </span>
+                    </label>
+                    <select
+                        name="file_type"
+                        id="file_type"
+                        class="w-full px-0 py-3 text-base text-on-surface bg-transparent border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 transition-colors"
+                    >
+                        <option value="">Select file type</option>
+                        <option value="pdf" {% if resource and resource.file_type == 'pdf' %}selected{% endif %}>PDF</option>
+                        <option value="doc" {% if resource and resource.file_type == 'doc' %}selected{% endif %}>DOC</option>
+                        <option value="docx" {% if resource and resource.file_type == 'docx' %}selected{% endif %}>DOCX</option>
+                        <option value="xlsx" {% if resource and resource.file_type == 'xlsx' %}selected{% endif %}>XLSX</option>
+                    </select>
+                </div>
+
+                <!-- File Size -->
+                <div>
+                    <label for="file_size" class="block text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-2">
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg">data_usage</span>
+                            <span>File Size</span>
+                        </span>
+                    </label>
+                    <input
+                        type="text"
+                        name="file_size"
+                        id="file_size"
+                        value="{% if resource %}{{ resource.file_size }}{% endif %}"
+                        class="w-full px-0 py-3 text-base text-on-surface bg-transparent border-0 border-b-2 border-outline-variant focus:border-primary focus:ring-0 transition-colors placeholder-on-surface-variant"
+                        placeholder="e.g., 2.5 MB"
+                    >
+                    <p class="mt-2 text-xs text-on-surface-variant">Optional: Enter file size (e.g., 2.5 MB, 1.2 GB)</p>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex items-center justify-between pt-6 border-t border-outline-variant">
+                    <a href="{% url 'custom_admin:resources_list' %}" class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container rounded-full transition-all duration-200">
+                        <span class="material-symbols-outlined text-xl">close</span>
+                        <span>Cancel</span>
+                    </a>
+                    <button type="submit" class="inline-flex items-center gap-2 px-8 py-3 bg-primary-container text-on-primary-container rounded-full hover:shadow-lg transition-all duration-200 font-medium">
+                        <span class="material-symbols-outlined text-xl">save</span>
+                        <span>{% if resource %}Update Resource{% else %}Create Resource{% endif %}</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Delete Section (Edit Mode Only) -->
+        {% if resource %}
+        <div class="mt-8 bg-error-container rounded-xl shadow-sm p-8">
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-on-error-container flex items-center gap-2">
+                        <span class="material-symbols-outlined">warning</span>
+                        <span>Danger Zone</span>
+                    </h3>
+                    <p class="mt-2 text-sm text-on-error-container opacity-90">
+                        Once you delete a resource, there is no going back. Please be certain.
+                    </p>
+                </div>
+                <button onclick="confirmDelete('{{ resource.title|escapejs }}')" class="inline-flex items-center gap-2 px-6 py-3 bg-error text-on-error rounded-full hover:shadow-lg transition-all duration-200 font-medium">
+                    <span class="material-symbols-outlined text-xl">delete</span>
+                    <span>Delete Resource</span>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if resource %}
+<div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-xl shadow-xl max-w-md w-full p-8">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="flex-shrink-0">
+                <span class="material-symbols-outlined text-4xl text-error">warning</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-on-surface">Delete Resource</h3>
+                <p class="text-sm text-on-surface-variant mt-1">This action cannot be undone.</p>
+            </div>
+        </div>
+        <p class="text-sm text-on-surface mb-6">
+            Are you sure you want to delete <strong id="resourceName"></strong>?
+        </p>
+        <div class="flex items-center justify-end gap-3">
+            <button onclick="closeDeleteModal()" class="px-6 py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+                Cancel
+            </button>
+            <form action="{% url 'custom_admin:resource_delete' resource.pk %}" method="POST" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="px-6 py-2.5 text-sm font-medium bg-error text-on-error rounded-full hover:shadow-lg transition-all duration-200">
+                    Delete Resource
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(resourceName) {
+    const modal = document.getElementById('deleteModal');
+    const nameSpan = document.getElementById('resourceName');
+
+    nameSpan.textContent = resourceName;
+    modal.classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteModal');
+    modal.classList.add('hidden');
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeDeleteModal();
+    }
+});
+
+// Close modal on backdrop click
+document.getElementById('deleteModal').addEventListener('click', function(event) {
+    if (event.target === this) {
+        closeDeleteModal();
+    }
+});
+</script>
+{% endif %}
+
+<script>
+// Auto-detect file type from file input
+document.getElementById('file').addEventListener('change', function(e) {
+    if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const fileName = file.name;
+        const fileExtension = fileName.split('.').pop().toLowerCase();
+        const fileSize = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+        // Set file type
+        const fileTypeSelect = document.getElementById('file_type');
+        if (['pdf', 'doc', 'docx', 'xlsx'].includes(fileExtension)) {
+            fileTypeSelect.value = fileExtension;
+        }
+
+        // Set file size
+        document.getElementById('file_size').value = fileSize;
+    }
+});
+</script>
+{% endblock %}

@@ -7,9 +7,35 @@ from django.core.files.base import ContentFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from .validators import validate_image_file, validate_document_file, validate_fcm_token
+from .validators import validate_image_file, validate_document_file, validate_fcm_token, validate_professional_email
 
 logger = logging.getLogger(__name__)
+
+# All 55 African Union member states + key international nationalities
+NATIONALITY_CHOICES = [
+    # AU Member States (alphabetical)
+    ('DZ', 'Algeria'), ('AO', 'Angola'), ('BJ', 'Benin'), ('BW', 'Botswana'),
+    ('BF', 'Burkina Faso'), ('BI', 'Burundi'), ('CV', 'Cabo Verde'), ('CM', 'Cameroon'),
+    ('CF', 'Central African Republic'), ('TD', 'Chad'), ('KM', 'Comoros'),
+    ('CG', 'Congo (Brazzaville)'), ('CD', 'Congo (DRC)'), ('CI', "Côte d'Ivoire"),
+    ('DJ', 'Djibouti'), ('EG', 'Egypt'), ('GQ', 'Equatorial Guinea'), ('ER', 'Eritrea'),
+    ('SZ', 'Eswatini'), ('ET', 'Ethiopia'), ('GA', 'Gabon'), ('GM', 'Gambia'),
+    ('GH', 'Ghana'), ('GN', 'Guinea'), ('GW', 'Guinea-Bissau'), ('KE', 'Kenya'),
+    ('LS', 'Lesotho'), ('LR', 'Liberia'), ('LY', 'Libya'), ('MG', 'Madagascar'),
+    ('MW', 'Malawi'), ('ML', 'Mali'), ('MR', 'Mauritania'), ('MU', 'Mauritius'),
+    ('MA', 'Morocco'), ('MZ', 'Mozambique'), ('NA', 'Namibia'), ('NE', 'Niger'),
+    ('NG', 'Nigeria'), ('RW', 'Rwanda'), ('ST', 'São Tomé and Príncipe'),
+    ('SN', 'Senegal'), ('SC', 'Seychelles'), ('SL', 'Sierra Leone'), ('SO', 'Somalia'),
+    ('ZA', 'South Africa'), ('SS', 'South Sudan'), ('SD', 'Sudan'),
+    ('TZ', 'Tanzania'), ('TG', 'Togo'), ('TN', 'Tunisia'), ('UG', 'Uganda'),
+    ('ZM', 'Zambia'), ('ZW', 'Zimbabwe'),
+    # Key international
+    ('BE', 'Belgium'), ('BR', 'Brazil'), ('CA', 'Canada'), ('CN', 'China'),
+    ('FR', 'France'), ('DE', 'Germany'), ('IN', 'India'), ('JP', 'Japan'),
+    ('RU', 'Russia'), ('SA', 'Saudi Arabia'), ('TR', 'Turkey'), ('AE', 'UAE'),
+    ('GB', 'United Kingdom'), ('US', 'United States'),
+    ('OTHER', 'Other'),
+]
 
 
 class UserProfile(models.Model):
@@ -24,6 +50,8 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone_number = models.CharField(max_length=20, blank=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True)
+    nationality = models.CharField(max_length=5, choices=NATIONALITY_CHOICES, blank=True, help_text='User nationality (ISO country code)')
+    date_of_birth = models.DateField(blank=True, null=True, help_text='Date of birth for age-based targeting')
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True, validators=[validate_image_file])
 
     # Firebase integration fields
@@ -45,8 +73,34 @@ class UserProfile(models.Model):
     # Verification fields
     is_email_verified = models.BooleanField(default=False)
     is_government_official = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=False, help_text='User has verified badge (approved by admin)')
+    badge_type = models.CharField(
+        max_length=10,
+        choices=[('GOLD', 'Gold Badge'), ('BLUE', 'Blue Badge')],
+        blank=True,
+        null=True,
+        help_text='Type of verification badge (Gold for VIPs, Blue for regular verified users)'
+    )
+    verification_requested_at = models.DateTimeField(null=True, blank=True, help_text='When user requested verification')
     email_verified_at = models.DateTimeField(null=True, blank=True)
     government_verified_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True, help_text='When admin approved verification')
+
+    # Account status fields
+    is_deactivated = models.BooleanField(
+        default=False,
+        help_text='User chose "Take a Break" - account inactive until they log in again'
+    )
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+    is_scheduled_for_deletion = models.BooleanField(
+        default=False,
+        help_text='User requested account deletion - will be purged after 30 days'
+    )
+    deletion_requested_at = models.DateTimeField(null=True, blank=True)
+    deletion_scheduled_for = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Date when account will be permanently deleted'
+    )
 
     # Additional metadata
     created_at = models.DateTimeField(auto_now_add=True)
@@ -309,6 +363,7 @@ class Event(models.Model):
     longitude = models.FloatField()
     event_date = models.DateTimeField()
     image = models.ImageField(upload_to='events/', blank=True, validators=[validate_image_file])
+    is_active = models.BooleanField(default=True, help_text='When off, event is hidden from the app')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -413,8 +468,8 @@ class FeatureCard(models.Model):
     icon_name = models.CharField(max_length=50, blank=True, choices=ICON_CHOICES, help_text='Fallback icon if no image is uploaded')
     icon_image = models.ImageField(upload_to='feature_cards/icons/', blank=True, validators=[validate_image_file],
                                    help_text='Upload a custom icon image (PNG/SVG recommended). Overrides icon_name.')
-    action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES, default='none')
-    action_value = models.CharField(max_length=500, blank=True, help_text='URL for "url" type, route name for "route" type (e.g. "/news", "/magazine")')
+    action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES, default='none', help_text='Leave as "No Action" to open detail page. Use URL/Route only for special redirects.')
+    action_value = models.CharField(max_length=500, blank=True, help_text='Only needed for URL or Route overrides. Leave blank for normal cards.')
 
     # Rich content fields for detail page
     overview = models.TextField(blank=True, help_text='Extended description for the detail page')
@@ -438,8 +493,247 @@ class FeatureCard(models.Model):
     class Meta:
         ordering = ['order']
 
+    def save(self, *args, **kwargs):
+        if not self.gradient_start:
+            self.gradient_start = '#1EB53A'
+        if not self.gradient_end:
+            self.gradient_end = '#4CAF50'
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.title
+
+
+class FeatureCardKeyPoint(models.Model):
+    """Individual key point for a feature card — replaces JSON key_points field."""
+    feature_card = models.ForeignKey(FeatureCard, on_delete=models.CASCADE, related_name='key_point_items')
+    text = models.CharField(max_length=500)
+    text_fr = models.CharField(max_length=500, blank=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Key Point'
+        verbose_name_plural = 'Key Points'
+
+    def __str__(self):
+        return self.text[:60]
+
+
+class FeatureCardImpactArea(models.Model):
+    """Individual impact area for a feature card — replaces JSON impact_areas field."""
+    ICON_CHOICES = FeatureCard.ICON_CHOICES
+
+    feature_card = models.ForeignKey(FeatureCard, on_delete=models.CASCADE, related_name='impact_area_items')
+    icon_name = models.CharField(max_length=50, choices=ICON_CHOICES, default='stars')
+    title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True)
+    description = models.TextField()
+    description_fr = models.TextField(blank=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Impact Area'
+        verbose_name_plural = 'Impact Areas'
+
+    def __str__(self):
+        return self.title
+
+
+class FeatureCardMedia(models.Model):
+    """Photo/video attachments for a feature card detail page.
+
+    Each row is either an image or a video.
+    Images can be uploaded files OR external URLs.
+    Videos can be uploaded files OR external URLs (YouTube, etc.).
+    """
+    MEDIA_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('video', 'Video'),
+    ]
+
+    feature_card = models.ForeignKey(FeatureCard, on_delete=models.CASCADE, related_name='media')
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES, default='image')
+
+    # Image source — upload OR external link
+    image = models.ImageField(upload_to='feature_card_media/', blank=True, validators=[validate_image_file],
+                              help_text='Upload an image file, OR paste a URL below')
+    image_url = models.URLField(blank=True, help_text='External image URL (used if no file uploaded)')
+
+    # Video source — upload OR external link
+    video_file = models.FileField(upload_to='feature_card_media/videos/', blank=True,
+                                  help_text='Upload a video file (MP4, MOV, etc.), OR paste a URL below')
+    video_url = models.URLField(blank=True, help_text='YouTube/external video URL (used if no file uploaded)')
+
+    caption = models.CharField(max_length=300, blank=True)
+    caption_fr = models.CharField(max_length=300, blank=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Feature Card Media'
+        verbose_name_plural = 'Feature Card Media'
+
+    def __str__(self):
+        return f"{self.get_media_type_display()} for {self.feature_card.title[:30]}"
+
+    @property
+    def effective_image_url(self):
+        """Return uploaded image URL if available, otherwise external URL."""
+        if self.image:
+            return self.image.url
+        return self.image_url or ''
+
+    @property
+    def effective_video_url(self):
+        """Return uploaded video file URL if available, otherwise external URL."""
+        if self.video_file:
+            return self.video_file.url
+        return self.video_url or ''
+
+
+class EventRegistration(models.Model):
+    """Standalone event registration — no longer tied to FeatureCard"""
+    CARD_TYPE_CHOICES = [
+        ('event', 'Event Registration'),
+        ('greeting', 'Greeting/Holiday Wish'),
+        ('announcement', 'General Announcement'),
+        ('survey', 'Survey/Feedback'),
+    ]
+
+    card_type = models.CharField(max_length=20, choices=CARD_TYPE_CHOICES, default='event')
+
+    # Event details
+    event_title = models.CharField(max_length=300)
+    event_title_fr = models.CharField(max_length=300, blank=True)
+    event_description = models.TextField(blank=True)
+    event_description_fr = models.TextField(blank=True)
+    event_poster = models.ImageField(upload_to='event_posters/', blank=True, validators=[validate_image_file])
+
+    # Date & venue
+    event_date = models.DateTimeField(null=True, blank=True, help_text='Event start date/time (for countdown)')
+    event_end_date = models.DateTimeField(null=True, blank=True, help_text='Event end date/time (multi-day events)')
+    venue = models.CharField(max_length=300, blank=True, help_text='Venue name')
+    venue_fr = models.CharField(max_length=300, blank=True)
+    venue_address = models.CharField(max_length=500, blank=True, help_text='Full address for directions')
+
+    # Contact
+    contact_email = models.EmailField(blank=True, help_text='Contact email for "Contact Us" button')
+    contact_phone = models.CharField(max_length=50, blank=True, help_text='Contact phone for "Contact Us" button')
+
+    # Registration settings
+    is_registration_enabled = models.BooleanField(default=True, help_text='Enable/disable registration form')
+    registration_deadline = models.DateTimeField(blank=True, null=True)
+    max_registrations = models.IntegerField(default=0, help_text='0 = unlimited')
+    send_confirmation_email = models.BooleanField(default=True)
+    confirmation_message = models.TextField(blank=True, help_text='Message sent to user after registration')
+    confirmation_message_fr = models.TextField(blank=True)
+    allow_proxy_registration = models.BooleanField(default=False, help_text='Allow users to register on behalf of others')
+
+    # Display
+    is_active = models.BooleanField(default=True, help_text='Show/hide in app')
+    order = models.IntegerField(default=0, help_text='Display order (lower = first)')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.event_title} - {self.get_card_type_display()}"
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = 'Event Registration'
+        verbose_name_plural = 'Event Registrations'
+
+
+class RegistrationFormField(models.Model):
+    """Dynamic form fields for event registration"""
+    FIELD_TYPE_CHOICES = [
+        ('text', 'Text Input'),
+        ('email', 'Email'),
+        ('phone', 'Phone Number'),
+        ('textarea', 'Text Area'),
+        ('number', 'Number'),
+        ('date', 'Date'),
+        ('time', 'Time'),
+        ('file', 'File Upload'),
+        ('image', 'Image Upload'),
+        ('select', 'Dropdown Select'),
+        ('radio', 'Radio Buttons'),
+        ('checkbox', 'Single Checkbox'),
+        ('multi_checkbox', 'Multiple Checkboxes'),
+        ('country', 'Country Selector'),
+        ('nationality', 'Nationality'),
+        ('passport', 'Passport Number'),
+        ('url', 'URL / Website'),
+    ]
+
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='form_fields')
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPE_CHOICES)
+    field_label = models.CharField(max_length=200, help_text='Label shown to user')
+    field_label_fr = models.CharField(max_length=200, blank=True)
+    field_name = models.CharField(max_length=100, help_text='Internal field name (e.g., "full_name", "passport_number")')
+    placeholder = models.CharField(max_length=200, blank=True)
+    placeholder_fr = models.CharField(max_length=200, blank=True)
+
+    is_required = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True, help_text='Show/hide this field')
+    options = models.JSONField(default=list, blank=True, help_text='For select/radio/multi_checkbox: ["Option 1", "Option 2"]')
+    validation_regex = models.CharField(max_length=500, blank=True, help_text='Optional regex for validation')
+    help_text = models.CharField(max_length=300, blank=True)
+    help_text_fr = models.CharField(max_length=300, blank=True)
+
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Registration Form Field'
+        verbose_name_plural = 'Registration Form Fields'
+
+    def __str__(self):
+        return f"{self.field_label} ({self.get_field_type_display()})"
+
+
+class EventSubmission(models.Model):
+    """User submissions for event registrations"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('waitlist', 'Waitlisted'),
+    ]
+
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='submissions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_submissions')
+
+    # Store all form data as JSON
+    form_data = models.JSONField(default=dict, help_text='All form field values')
+
+    # File uploads
+    uploaded_files = models.JSONField(default=list, blank=True, help_text='List of uploaded file URLs')
+
+    # Proxy registration fields
+    is_proxy = models.BooleanField(default=False, help_text='Submitted on behalf of someone else')
+    proxy_name = models.CharField(max_length=200, blank=True)
+    proxy_email = models.EmailField(blank=True)
+    proxy_phone = models.CharField(max_length=50, blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    admin_notes = models.TextField(blank=True, help_text='Internal notes from admin')
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_submissions')
+
+    class Meta:
+        ordering = ['-submitted_at']
+        verbose_name = 'Event Submission'
+        verbose_name_plural = 'Event Submissions'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event_registration.event_title}"
 
 
 class Notification(models.Model):
@@ -471,17 +765,64 @@ class Notification(models.Model):
         help_text='URL or route name (e.g., /news, /magazine)'
     )
 
+    # Optional image attachment
+    image = models.ImageField(
+        upload_to='notifications/',
+        blank=True,
+        null=True,
+        validators=[validate_image_file],
+        help_text='Optional image shown in push notification and in-app list'
+    )
+
     # Targeting
     is_global = models.BooleanField(
         default=True,
-        help_text='Send to all users (uncheck to send to specific users)'
+        help_text='Send to all users (uncheck to use filters below)'
     )
     target_users = models.ManyToManyField(
         User,
         blank=True,
         related_name='targeted_notifications',
-        help_text='Specific users (only if not global)'
+        help_text='Specific users (optional, overrides filters)'
     )
+
+    # Advanced targeting filters (only used if is_global=False and target_users is empty)
+    target_gender = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+        help_text='Filter by gender (leave blank for all)'
+    )
+    target_nationalities = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Filter by nationalities (JSON list of ISO codes, empty = all)'
+    )
+    target_age_min = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text='Minimum age (leave blank for no limit)'
+    )
+    target_age_max = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text='Maximum age (leave blank for no limit)'
+    )
+    target_verified_only = models.BooleanField(
+        default=False,
+        help_text='Only send to verified users (blue or gold badge)'
+    )
+    target_badge_type = models.CharField(
+        max_length=10,
+        blank=True,
+        choices=[('BLUE', 'Blue Badge'), ('GOLD', 'Gold Badge')],
+        help_text='Filter by badge type (leave blank for any verified)'
+    )
+
+    # Push notification tracking
+    push_sent = models.BooleanField(default=False, help_text='Has push notification been sent?')
+    push_sent_at = models.DateTimeField(blank=True, null=True)
+    push_recipient_count = models.IntegerField(default=0, help_text='Number of users who received push')
 
     # Status
     is_active = models.BooleanField(default=True, help_text='Active notifications appear in app')
@@ -628,7 +969,11 @@ class Video(models.Model):
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField()
     description_fr = models.TextField(blank=True)
-    video_url = models.URLField(help_text='YouTube or other video URL')
+
+    # Video source - either URL or uploaded file
+    video_url = models.URLField(blank=True, help_text='YouTube or external video URL (leave empty if uploading file)')
+    video_file = models.FileField(upload_to='videos/files/', blank=True, help_text='Upload video file (MP4, MOV, etc.) or leave empty if using URL')
+
     thumbnail = models.ImageField(upload_to='videos/thumbnails/', blank=True, validators=[validate_image_file])
     duration = models.CharField(max_length=20, help_text='e.g. 5:30')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='highlight')
@@ -732,3 +1077,272 @@ class QuickAccessMenuItem(models.Model):
 
     def __str__(self):
         return self.title_en
+
+
+class OTPVerification(models.Model):
+    """OTP tracking for email and phone verification"""
+    TYPE_CHOICES = [
+        ('email', 'Email'),
+        ('phone', 'Phone'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otp_verifications')
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    contact = models.CharField(max_length=200, help_text='Email or phone number')
+    otp_code = models.CharField(max_length=6)
+    is_verified = models.BooleanField(default=False)
+    attempts = models.IntegerField(default=0, help_text='Number of failed verification attempts')
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'OTP Verification'
+        verbose_name_plural = 'OTP Verifications'
+
+    def __str__(self):
+        return f"{self.type} OTP for {self.contact} - {'Verified' if self.is_verified else 'Pending'}"
+
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+
+class VerificationRequest(models.Model):
+    """
+    Verification request for users who want a verified badge (Gold or Blue).
+    Admins review and approve/reject requests.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('appealed', 'Appealed'),
+    ]
+
+    TITLE_CHOICES = [
+        ('mr', 'Mr.'),
+        ('mrs', 'Mrs.'),
+        ('ms', 'Ms.'),
+        ('dr', 'Dr.'),
+        ('prof', 'Prof.'),
+        ('he', 'H.E. (His/Her Excellency)'),
+        ('amb', 'Ambassador'),
+        ('hon', 'Honorable'),
+        ('other', 'Other'),
+    ]
+
+    BADGE_TYPE_CHOICES = [
+        ('GOLD', 'Gold Badge'),
+        ('BLUE', 'Blue Badge'),
+    ]
+
+    # User requesting verification
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_requests')
+
+    # Request details
+    title = models.CharField(max_length=10, choices=TITLE_CHOICES, help_text='Title/Role (Mr, Mrs, H.E, etc.)')
+    first_name = models.CharField(max_length=100, default='', help_text='First name (for identity verification)')
+    last_name = models.CharField(max_length=100, default='', help_text='Last name (for identity verification)')
+    full_name = models.CharField(max_length=200, help_text='Full legal name')
+
+    # Email verification
+    email = models.EmailField(
+        help_text='Professional email (no gmail/yahoo/outlook)',
+        validators=[validate_professional_email]
+    )
+    email_verified = models.BooleanField(default=False, help_text='Email verified via OTP')
+
+    # Phone verification
+    country_code = models.CharField(max_length=10, default='+1', help_text='Country calling code (e.g. +1, +257)')
+    phone_number = models.CharField(max_length=20, help_text='Phone number for SMS verification')
+    phone_verified = models.BooleanField(default=False, help_text='Phone number verified via Twilio SMS')
+
+    # Additional info
+    position_role = models.CharField(max_length=200, help_text='Current position/role')
+    reasoning_message = models.TextField(
+        blank=True,
+        help_text='User explanation for why they deserve the verification badge'
+    )
+    twitter_url = models.URLField(blank=True, help_text='Twitter profile URL (optional)')
+    linkedin_url = models.URLField(blank=True, help_text='LinkedIn profile URL (optional)')
+
+    # Status tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    badge_type = models.CharField(
+        max_length=10,
+        choices=BADGE_TYPE_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Badge type assigned by admin (Gold or Blue)'
+    )
+
+    # Admin review
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_verifications',
+        help_text='Admin who reviewed this request'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(
+        blank=True,
+        help_text='Admin-written reason for rejection (shown to user)'
+    )
+
+    # Appeal system
+    appeal_message = models.TextField(
+        blank=True,
+        help_text='User appeal message if rejected'
+    )
+    appeal_submitted_at = models.DateTimeField(null=True, blank=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Verification Request'
+        verbose_name_plural = 'Verification Requests'
+
+    def __str__(self):
+        return f"{self.full_name} ({self.status}) - {self.badge_type or 'No badge'}"
+
+    def approve(self, admin_user, badge_type='BLUE'):
+        """Approve verification request and grant badge to user"""
+        from django.utils import timezone
+
+        self.status = 'approved'
+        self.badge_type = badge_type
+        self.reviewed_by = admin_user
+        self.reviewed_at = timezone.now()
+        self.save()
+
+        # Update user profile with verification
+        profile = self.user.profile
+        profile.is_verified = True
+        profile.badge_type = badge_type
+        profile.verified_at = timezone.now()
+        profile.save()
+
+    def reject(self, admin_user, reason):
+        """Reject verification request with reason"""
+        from django.utils import timezone
+
+        self.status = 'rejected'
+        self.rejection_reason = reason
+        self.reviewed_by = admin_user
+        self.reviewed_at = timezone.now()
+        self.save()
+
+    def submit_appeal(self, message):
+        """User submits appeal for rejected request"""
+        from django.utils import timezone
+
+        if self.status != 'rejected':
+            raise ValueError('Can only appeal rejected requests')
+
+        self.status = 'appealed'
+        self.appeal_message = message
+        self.appeal_submitted_at = timezone.now()
+        self.save()
+
+
+class WeatherCity(models.Model):
+    """Weather cities displayed in the weather page"""
+    name = models.CharField(max_length=100, help_text='City name e.g. Bujumbura')
+    latitude = models.FloatField(help_text='City latitude for weather API')
+    longitude = models.FloatField(help_text='City longitude for weather API')
+    background_image = models.ImageField(
+        upload_to='weather/backgrounds/',
+        blank=True,
+        null=True,
+        validators=[validate_image_file],
+        help_text='Background image for this city (blurred in app)'
+    )
+    order = models.IntegerField(default=0, help_text='Display order (lower = first)')
+    is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False, help_text='Default cities cannot be removed by users')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Weather City'
+        verbose_name_plural = 'Weather Cities'
+
+    def __str__(self):
+        return self.name
+
+
+class AdminRole(models.Model):
+    """
+    Defines admin roles with granular access control.
+    Assign a role to a User to grant them specific admin permissions.
+    """
+    PERMISSION_CHOICES = [
+        ('content', 'Content Management (Articles, Magazines, Hero Slides)'),
+        ('events', 'Events & Registrations'),
+        ('users', 'User Management'),
+        ('verification', 'Verification Requests'),
+        ('notifications', 'Push Notifications'),
+        ('gallery', 'Gallery & Media'),
+        ('locations', 'Embassies & Locations'),
+        ('settings', 'App Settings & Configuration'),
+        ('audit', 'Audit Logs (View Only)'),
+    ]
+
+    name = models.CharField(max_length=100, unique=True, help_text='Role name (e.g., Content Editor, Event Manager)')
+    description = models.TextField(blank=True, help_text='What this role is responsible for')
+    permissions = models.JSONField(
+        default=list,
+        help_text='List of permission keys this role grants (e.g., ["content", "gallery"])'
+    )
+    users = models.ManyToManyField(User, blank=True, related_name='admin_roles')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Admin Role'
+        verbose_name_plural = 'Admin Roles'
+
+    def __str__(self):
+        return self.name
+
+    def get_permission_labels(self):
+        perm_dict = dict(self.PERMISSION_CHOICES)
+        return [perm_dict.get(p, p) for p in (self.permissions or [])]
+
+
+class AuditLogEntry(models.Model):
+    """Tracks admin actions for the audit log in settings page"""
+    ACTION_CHOICES = [
+        ('CREATE', 'Create'),
+        ('UPDATE', 'Update'),
+        ('DELETE', 'Delete'),
+        ('LOGIN', 'Login'),
+        ('EXPORT', 'Export'),
+    ]
+    STATUS_CHOICES = [
+        ('success', 'Success'),
+        ('failure', 'Failure'),
+    ]
+
+    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL, related_name='audit_logs')
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    entity_type = models.CharField(max_length=100)
+    entity_label = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='success')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Audit Log Entry'
+        verbose_name_plural = 'Audit Log Entries'
+
+    def __str__(self):
+        return f"{self.action} {self.entity_type}: {self.entity_label}"

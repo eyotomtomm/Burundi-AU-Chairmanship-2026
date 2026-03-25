@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
@@ -33,19 +35,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
 
     try {
-      final response = await _apiService.get('/notifications/');
-      if (response['results'] != null) {
-        setState(() {
-          _notifications = List<Map<String, dynamic>>.from(response['results']);
-          _isLoading = false;
-        });
+      final response = await _apiService.get('notifications/');
+      List<Map<String, dynamic>> items;
+      if (response is Map && response['results'] != null) {
+        items = List<Map<String, dynamic>>.from(response['results']);
+      } else if (response is List) {
+        items = List<Map<String, dynamic>>.from(response);
       } else {
-        setState(() {
-          _notifications = [];
-          _isLoading = false;
-        });
+        items = [];
       }
+      setState(() {
+        _notifications = items;
+        _isLoading = false;
+      });
     } catch (e) {
+      if (kDebugMode) debugPrint('Notifications load error: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -55,7 +59,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markAsRead(int notificationId) async {
     try {
-      await _apiService.post('/notifications/$notificationId/mark_as_read/', {});
+      await _apiService.post('notifications/$notificationId/mark_as_read/', {});
       // Update local state
       setState(() {
         final index = _notifications.indexWhere((n) => n['id'] == notificationId);
@@ -65,7 +69,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       });
     } catch (e) {
       // Silently fail - not critical
-      debugPrint('Failed to mark notification as read: $e');
+      if (kDebugMode) debugPrint('Failed to mark notification as read: $e');
     }
   }
 
@@ -116,22 +120,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     if (_error != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              loc?.translate('error_loading_notifications') ?? 'Error loading notifications',
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _loadNotifications,
-              icon: const Icon(Icons.refresh),
-              label: Text(loc?.translate('retry') ?? 'Retry'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.wifi_off_rounded, size: 64, color: isDarkMode ? Colors.grey[500] : Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                loc?.translate('error_loading_notifications') ?? 'Could not load notifications',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Check your connection and try again',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _loadNotifications,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(loc?.translate('retry') ?? 'Retry'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.burundiGreen,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -181,6 +206,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ? (notification['message_fr'] ?? notification['message'] ?? '')
         : (notification['message'] ?? '');
     final notificationType = notification['notification_type'] as String? ?? 'general';
+    final imageUrl = notification['image'] as String?;
     final createdAt = notification['created_at'] as String?;
 
     // Icon based on notification type
@@ -272,6 +298,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 160),
+                          child: CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              height: 100,
+                              color: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+                              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            ),
+                            errorWidget: (context, url, error) => const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    ],
                     if (createdAt != null) ...[
                       const SizedBox(height: 8),
                       Text(

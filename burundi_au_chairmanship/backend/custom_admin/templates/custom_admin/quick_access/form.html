@@ -1,0 +1,202 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if action == 'Edit' %}Edit{% else %}Create{% endif %} Quick Access Item{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center gap-4 mb-8">
+    <span class="material-symbols-outlined text-5xl text-primary">bolt</span>
+    <div>
+      <h1 class="font-headline text-4xl font-bold text-on-surface mb-1">
+        {{ action }} Quick Access Item
+      </h1>
+      <p class="font-body text-on-surface-variant">Configure quick access shortcut and action</p>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- Title (English) -->
+      <div class="mb-6">
+        <label for="title_en" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Title (English) *
+        </label>
+        <input
+          type="text"
+          id="title_en"
+          name="title_en"
+          value="{{ item.title_en|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Enter English title"
+        />
+      </div>
+
+      <!-- Title (French) -->
+      <div class="mb-6">
+        <label for="title_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Title (French) *
+        </label>
+        <input
+          type="text"
+          id="title_fr"
+          name="title_fr"
+          value="{{ item.title_fr|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Entrez le titre en français"
+        />
+      </div>
+
+      <!-- Icon Name -->
+      <div class="mb-6">
+        <label for="icon_name" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Icon Name (Material Symbols) *
+        </label>
+        <div class="flex items-center gap-4">
+          <input
+            type="text"
+            id="icon_name"
+            name="icon_name"
+            value="{{ item.icon_name|default:'' }}"
+            required
+            class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+            placeholder="e.g., star, home, settings"
+          />
+          <span id="icon-preview" class="material-symbols-outlined text-5xl text-primary">{{ item.icon_name|default:'bolt' }}</span>
+        </div>
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          Browse icons at <a href="https://fonts.google.com/icons" target="_blank" class="text-secondary underline">Google Material Symbols</a>
+        </p>
+      </div>
+
+      <!-- Action Type -->
+      <div class="mb-6">
+        <label for="action_type" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Action Type *
+        </label>
+        <select
+          id="action_type"
+          name="action_type"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+        >
+          <option value="">Select action type</option>
+          <option value="route" {% if item.action_type == 'route' %}selected{% endif %}>Route (In-App Navigation)</option>
+          <option value="url" {% if item.action_type == 'url' %}selected{% endif %}>URL (External Link)</option>
+        </select>
+      </div>
+
+      <!-- Action Value -->
+      <div class="mb-6">
+        <label for="action_value" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Action Value *
+        </label>
+        <input
+          type="text"
+          id="action_value"
+          name="action_value"
+          value="{{ item.action_value|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="e.g., /calendar or https://example.com"
+        />
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          For routes: use path like /calendar, /events. For URLs: use full URL like https://example.com
+        </p>
+      </div>
+
+      <!-- Order -->
+      <div class="mb-6">
+        <label for="order" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Display Order *
+        </label>
+        <input
+          type="number"
+          id="order"
+          name="order"
+          value="{{ item.order|default:'0' }}"
+          required
+          min="0"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="0"
+        />
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          Lower numbers appear first
+        </p>
+      </div>
+
+      <!-- Badge Text -->
+      <div class="mb-6">
+        <label for="badge_text" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Badge Text (Optional)
+        </label>
+        <input
+          type="text"
+          id="badge_text"
+          name="badge_text"
+          value="{{ item.badge_text|default:'' }}"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="e.g., New, Hot"
+        />
+      </div>
+
+      <!-- Checkboxes -->
+      <div class="mb-8 space-y-4">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            id="is_active"
+            name="is_active"
+            value="true"
+            {% if item.is_active %}checked{% endif %}
+            class="w-5 h-5 text-primary focus:ring-2 focus:ring-primary border-outline-variant rounded"
+          />
+          <span class="font-body text-on-surface font-semibold">Active (visible in app)</span>
+        </label>
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            id="has_live_indicator"
+            name="has_live_indicator"
+            value="true"
+            {% if item.has_live_indicator %}checked{% endif %}
+            class="w-5 h-5 text-primary focus:ring-2 focus:ring-primary border-outline-variant rounded"
+          />
+          <span class="font-body text-on-surface font-semibold">Show live indicator</span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-4">
+        <button
+          type="submit"
+          class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined">save</span>
+          {% if action == 'Edit' %}Update{% else %}Create{% endif %} Item
+        </button>
+        <a
+          href="{% url 'custom_admin:quick_access_list' %}"
+          class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined">cancel</span>
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Live icon preview
+  document.getElementById('icon_name').addEventListener('input', function(e) {
+    document.getElementById('icon-preview').textContent = e.target.value || 'bolt';
+  });
+</script>
+{% endblock %}

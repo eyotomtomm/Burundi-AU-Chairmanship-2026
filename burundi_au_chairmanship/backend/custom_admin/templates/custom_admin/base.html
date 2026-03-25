@@ -1,0 +1,306 @@
+{% load static %}<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>{% block title %}Diplomatic Portal | AU Chairmanship 2026–2027{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-container-low": "#f0f3ff",
+        "error-container": "#ffdad6",
+        "outline-variant": "#c5c6cd",
+        "surface-container-highest": "#d7e3fc",
+        "on-primary-fixed-variant": "#3c475b",
+        "inverse-primary": "#bbc7df",
+        "primary-fixed": "#d7e3fc",
+        "on-tertiary-fixed-variant": "#930015",
+        "primary-fixed-dim": "#bbc7df",
+        "outline": "#75777d",
+        "surface-container": "#e7eeff",
+        "primary": "#000000",
+        "on-primary": "#ffffff",
+        "secondary": "#745b17",
+        "on-error": "#ffffff",
+        "tertiary-container": "#410004",
+        "on-secondary-container": "#795f1b",
+        "primary-container": "#101c2e",
+        "on-background": "#101c2e",
+        "tertiary": "#000000",
+        "inverse-surface": "#253144",
+        "surface": "#f9f9ff",
+        "background": "#f9f9ff",
+        "surface-dim": "#cfdaf3",
+        "on-secondary": "#ffffff",
+        "secondary-fixed-dim": "#e5c374",
+        "on-tertiary-fixed": "#410004",
+        "surface-container-lowest": "#ffffff",
+        "on-tertiary-container": "#f8373e",
+        "on-primary-container": "#79849b",
+        "on-primary-fixed": "#101c2e",
+        "surface-container-high": "#dfe8ff",
+        "on-tertiary": "#ffffff",
+        "on-surface-variant": "#45474c",
+        "secondary-fixed": "#ffdf99",
+        "tertiary-fixed": "#ffdad7",
+        "surface-variant": "#d7e3fc",
+        "surface-bright": "#f9f9ff",
+        "secondary-container": "#ffdc8c",
+        "on-surface": "#101c2e",
+        "inverse-on-surface": "#ecf0ff",
+        "error": "#ba1a1a",
+        "tertiary-fixed-dim": "#ffb3ae",
+        "surface-tint": "#535f74",
+        "on-secondary-fixed-variant": "#5a4300",
+        "on-error-container": "#93000a",
+        "on-secondary-fixed": "#251a00"
+      },
+      fontFamily: {
+        "headline": ["Manrope", "sans-serif"],
+        "body": ["Inter", "sans-serif"],
+        "label": ["Inter", "sans-serif"]
+      },
+      borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+    },
+  },
+}
+</script>
+<style>
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+body { font-family: 'Inter', sans-serif; }
+h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+</style>
+{% block extra_css %}{% endblock %}
+</head>
+<body class="bg-surface text-on-surface">
+
+{% if user.is_authenticated %}
+<!-- Sidebar -->
+<aside class="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-900 z-50 flex flex-col py-8 px-4 shadow-2xl sidebar-scroll">
+  <div class="mb-10 px-4">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold text-lg">AU</div>
+      <span class="text-lg font-bold text-white tracking-tight font-headline">AU Chairmanship</span>
+    </div>
+    <p class="text-slate-400 text-xs tracking-widest uppercase ml-13 font-label">2026-2027</p>
+  </div>
+
+  <nav class="flex-1 space-y-1">
+    {% with url_name=request.resolver_match.url_name %}
+
+    <!-- Dashboard -->
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 ease-in-out {% if url_name == 'dashboard' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:dashboard' %}">
+      <span class="material-symbols-outlined">dashboard</span>
+      <span class="text-sm tracking-wide font-headline">Dashboard</span>
+    </a>
+
+    <!-- Content -->
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'hero_slide' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:hero_slides_list' %}">
+      <span class="material-symbols-outlined">view_carousel</span>
+      <span class="text-sm tracking-wide font-headline">Hero Slides</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'article' in url_name and 'category' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:articles_list' %}">
+      <span class="material-symbols-outlined">article</span>
+      <span class="text-sm tracking-wide font-headline">Articles</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'magazine' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:magazines_list' %}">
+      <span class="material-symbols-outlined">menu_book</span>
+      <span class="text-sm tracking-wide font-headline">Magazine</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name in 'events_list event_create event_edit' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:events_list' %}">
+      <span class="material-symbols-outlined">event</span>
+      <span class="text-sm tracking-wide font-headline">Events</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'live_feed' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:live_feeds_list' %}">
+      <span class="material-symbols-outlined">live_tv</span>
+      <span class="text-sm tracking-wide font-headline">Live Feeds</span>
+    </a>
+
+    <!-- Services divider -->
+    <div class="pt-6 pb-2 px-4">
+      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Services</p>
+    </div>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'resource' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:resources_list' %}">
+      <span class="material-symbols-outlined">folder_open</span>
+      <span class="text-sm tracking-wide font-headline">Resources</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'notification' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:notifications_list' %}">
+      <span class="material-symbols-outlined">notifications_active</span>
+      <span class="text-sm tracking-wide font-headline">Push Notifications</span>
+    </a>
+
+    <!-- Administration divider -->
+    <div class="pt-6 pb-2 px-4">
+      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Administration</p>
+    </div>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'user' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:users_list' %}">
+      <span class="material-symbols-outlined">group</span>
+      <span class="text-sm tracking-wide font-headline">User Management</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics' %}">
+      <span class="material-symbols-outlined">analytics</span>
+      <span class="text-sm tracking-wide font-headline">Analytics</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'app_settings' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:app_settings' %}">
+      <span class="material-symbols-outlined">settings</span>
+      <span class="text-sm tracking-wide font-headline">Settings</span>
+    </a>
+
+    <!-- More (collapsed) -->
+    <div class="pt-6 pb-2 px-4">
+      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">More</p>
+    </div>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'hero_text' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:hero_text_list' %}">
+      <span class="material-symbols-outlined">text_fields</span>
+      <span class="text-sm tracking-wide font-headline">Hero Text</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'feature_card' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:feature_cards_list' %}">
+      <span class="material-symbols-outlined">auto_awesome</span>
+      <span class="text-sm tracking-wide font-headline">Feature Cards</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'categor' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:categories_list' %}">
+      <span class="material-symbols-outlined">label</span>
+      <span class="text-sm tracking-wide font-headline">Categories</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'quick_access' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:quick_access_list' %}">
+      <span class="material-symbols-outlined">bolt</span>
+      <span class="text-sm tracking-wide font-headline">Quick Access</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'priority_agenda' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:priority_agendas_list' %}">
+      <span class="material-symbols-outlined">flag</span>
+      <span class="text-sm tracking-wide font-headline">Priority Agendas</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'gallery' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:gallery_list' %}">
+      <span class="material-symbols-outlined">photo_library</span>
+      <span class="text-sm tracking-wide font-headline">Gallery</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'video' in url_name and 'live' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:videos_list' %}">
+      <span class="material-symbols-outlined">videocam</span>
+      <span class="text-sm tracking-wide font-headline">Videos</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'social_media' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:social_media_list' %}">
+      <span class="material-symbols-outlined">share</span>
+      <span class="text-sm tracking-wide font-headline">Social Media</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'embass' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:embassies_list' %}">
+      <span class="material-symbols-outlined">pin_drop</span>
+      <span class="text-sm tracking-wide font-headline">Embassies</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'weather' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:weather_cities_list' %}">
+      <span class="material-symbols-outlined">cloud</span>
+      <span class="text-sm tracking-wide font-headline">Weather Cities</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'verification' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:verification_requests_list' %}">
+      <span class="material-symbols-outlined">verified</span>
+      <span class="text-sm tracking-wide font-headline">Verification</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'event_registration' in url_name or 'event_submission' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:event_registrations_list' %}">
+      <span class="material-symbols-outlined">how_to_reg</span>
+      <span class="text-sm tracking-wide font-headline">Event Registrations</span>
+    </a>
+
+    {% endwith %}
+  </nav>
+
+  <!-- User menu at bottom -->
+  <div class="mt-auto pt-6 px-4 border-t border-white/10">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold">{{ user.username.0|upper }}</div>
+      <div class="flex-1">
+        <p class="text-sm font-bold text-white">{{ user.username }}</p>
+        <p class="text-[10px] text-slate-500 uppercase tracking-wider">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
+      </div>
+      <a href="{% url 'custom_admin:logout' %}" class="text-slate-400 hover:text-red-400 transition-colors" title="Logout">
+        <span class="material-symbols-outlined text-sm">logout</span>
+      </a>
+    </div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<main class="ml-72 min-h-screen relative">
+  <!-- Top Bar -->
+  <header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+    <div class="flex items-center gap-8">
+      <h2 class="text-xl font-black text-slate-900 font-headline">Diplomatic Portal</h2>
+    </div>
+    <div class="flex items-center gap-6">
+      <button id="darkModeToggle" class="text-slate-500 hover:text-amber-600 transition-colors" onclick="document.documentElement.classList.toggle('dark');localStorage.setItem('darkMode',document.documentElement.classList.contains('dark'))">
+        <span class="material-symbols-outlined">dark_mode</span>
+      </button>
+      <div class="flex items-center gap-3 pl-6 border-l border-slate-200">
+        <div class="text-right">
+          <p class="text-xs font-bold text-slate-900">{{ user.get_full_name|default:user.username }}</p>
+          <p class="text-[10px] text-slate-500 uppercase tracking-tighter">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-white font-bold shadow-sm">{{ user.username.0|upper }}</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content Area -->
+  <section class="pt-32 px-12 pb-12 bg-surface min-h-screen">
+    <!-- Django Messages -->
+    {% if messages %}
+    <div class="mb-8 space-y-3">
+      {% for message in messages %}
+      <div class="flex items-center gap-3 p-4 rounded-xl {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+        <span class="material-symbols-outlined text-sm">{% if message.tags == 'success' %}check_circle{% elif message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}</span>
+        <span class="text-sm font-medium">{{ message }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </section>
+
+  <!-- Footer -->
+  <footer class="p-12 bg-surface text-center">
+    <div class="h-px bg-slate-200 w-full mb-8"></div>
+    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">&copy; 2026 Burundi African Union Chairmanship &bull; Minist&egrave;re des Affaires &Eacute;trang&egrave;res</p>
+  </footer>
+</main>
+
+{% else %}
+<!-- Non-authenticated: login page gets full control -->
+{% block full_content %}{% endblock %}
+{% endif %}
+
+<script>
+// Dark mode persistence
+if(localStorage.getItem('darkMode')==='true'){document.documentElement.classList.add('dark')}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

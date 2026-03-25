@@ -1,0 +1,140 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Hero Slide{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <div class="flex items-center gap-3 mb-2">
+            <a href="{% url 'custom_admin:hero_slides_list' %}"
+               class="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors">
+                <span class="material-symbols-outlined text-on-surface">arrow_back</span>
+            </a>
+            <h1 class="text-3xl font-headline font-bold text-on-surface">{{ action }} Hero Slide</h1>
+        </div>
+        <p class="text-on-surface-variant ml-13">Configure carousel slide details and upload image</p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+        <form method="post" enctype="multipart/form-data" class="p-8 space-y-6">
+            {% csrf_token %}
+
+            <!-- Label (English) -->
+            <div>
+                <label for="label" class="block text-sm font-medium text-on-surface mb-2">
+                    Label (English)
+                </label>
+                <input type="text"
+                       id="label"
+                       name="label"
+                       value="{% if slide %}{{ slide.label }}{% endif %}"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary text-on-surface placeholder-on-surface-variant"
+                       placeholder="Enter slide label in English">
+                <p class="mt-2 text-sm text-on-surface-variant">Display text shown on the slide (English version)</p>
+            </div>
+
+            <!-- Label (French) -->
+            <div>
+                <label for="label_fr" class="block text-sm font-medium text-on-surface mb-2">
+                    Label (French)
+                </label>
+                <input type="text"
+                       id="label_fr"
+                       name="label_fr"
+                       value="{% if slide %}{{ slide.label_fr }}{% endif %}"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary text-on-surface placeholder-on-surface-variant"
+                       placeholder="Saisissez le libellé de la diapositive en français">
+                <p class="mt-2 text-sm text-on-surface-variant">Display text shown on the slide (French version)</p>
+            </div>
+
+            <!-- Image Upload -->
+            <div>
+                <label for="image" class="block text-sm font-medium text-on-surface mb-2">
+                    Image
+                </label>
+                {% if slide and slide.image %}
+                <div class="mb-4">
+                    <p class="text-sm text-on-surface-variant mb-2">Current image:</p>
+                    <img src="{{ slide.image.url }}"
+                         alt="{{ slide.label }}"
+                         class="h-48 w-auto object-cover rounded-lg shadow-sm border border-outline-variant">
+                </div>
+                <p class="text-sm text-on-surface-variant mb-2">Upload a new image to replace:</p>
+                {% endif %}
+                <div class="relative">
+                    <input type="file"
+                           id="image"
+                           name="image"
+                           accept="image/*"
+                           {% if not slide %}required{% endif %}
+                           class="block w-full text-sm text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-surface-container file:text-on-surface hover:file:bg-surface-container-high transition-colors cursor-pointer">
+                </div>
+                <p class="mt-2 text-sm text-on-surface-variant">Recommended: 1920x1080px or 16:9 aspect ratio, JPG or PNG format</p>
+            </div>
+
+            <!-- Order -->
+            <div>
+                <label for="order" class="block text-sm font-medium text-on-surface mb-2">
+                    Display Order
+                </label>
+                <input type="number"
+                       id="order"
+                       name="order"
+                       value="{% if slide %}{{ slide.order }}{% else %}0{% endif %}"
+                       min="0"
+                       required
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary text-on-surface placeholder-on-surface-variant"
+                       placeholder="0">
+                <p class="mt-2 text-sm text-on-surface-variant">Lower numbers appear first in the carousel</p>
+            </div>
+
+            <!-- Is Active Checkbox -->
+            <div class="flex items-start gap-3 p-4 bg-surface-container rounded-lg">
+                <input type="checkbox"
+                       id="is_active"
+                       name="is_active"
+                       {% if slide and slide.is_active or not slide %}checked{% endif %}
+                       class="w-4 h-4 text-secondary bg-surface-container border-outline-variant rounded focus:ring-2 focus:ring-secondary mt-0.5">
+                <div>
+                    <label for="is_active" class="block text-sm font-medium text-on-surface cursor-pointer">
+                        Active
+                    </label>
+                    <p class="text-sm text-on-surface-variant mt-1">When checked, this slide will be visible in the carousel</p>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex items-center justify-end gap-3 pt-6 border-t border-outline-variant">
+                <a href="{% url 'custom_admin:hero_slides_list' %}"
+                   class="inline-flex items-center gap-2 px-6 py-3 bg-surface-container text-on-surface rounded-lg hover:bg-surface-container-high transition-colors font-medium">
+                    <span class="material-symbols-outlined text-xl">close</span>
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="inline-flex items-center gap-2 px-6 py-3 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors shadow-sm font-medium">
+                    <span class="material-symbols-outlined text-xl">save</span>
+                    {{ action }} Slide
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Help Section -->
+    <div class="mt-6 bg-surface-container-lowest rounded-xl shadow-sm p-6">
+        <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-secondary text-2xl">info</span>
+            <div>
+                <h3 class="text-sm font-semibold text-on-surface mb-2">Hero Slide Guidelines</h3>
+                <ul class="text-sm text-on-surface-variant space-y-1 list-disc list-inside">
+                    <li>Use high-quality images with 16:9 aspect ratio for best results</li>
+                    <li>Provide labels in both English and French for bilingual support</li>
+                    <li>Set display order to control carousel sequence (0 = first)</li>
+                    <li>Inactive slides are hidden from the public carousel but preserved in the system</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

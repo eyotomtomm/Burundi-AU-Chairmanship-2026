@@ -1,0 +1,253 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{% if event %}Edit Event{% else %}Create Event{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-4">
+        <a href="{% url 'custom_admin:events_list' %}"
+           class="p-2 rounded-lg hover:bg-surface-container transition-colors">
+            <svg class="w-6 h-6 text-on-surface" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-3xl font-headline font-bold text-on-surface">
+                {% if event %}Edit Event{% else %}Create New Event{% endif %}
+            </h1>
+            <p class="text-sm text-on-surface-variant mt-1">
+                {% if event %}Update event details and information{% else %}Add a new diplomatic event or conference{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <form method="post" action="{{ action }}" enctype="multipart/form-data" class="space-y-8">
+            {% csrf_token %}
+
+            <!-- Event Names Section -->
+            <div class="space-y-6">
+                <div class="border-l-4 border-primary-container pl-4">
+                    <h2 class="text-xl font-headline font-bold text-on-surface">Event Names</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Provide event name in both languages</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Name (English) -->
+                    <div>
+                        <label for="name" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Name (English) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text"
+                               id="name"
+                               name="name"
+                               value="{% if event %}{{ event.name }}{% endif %}"
+                               required
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
+                               placeholder="Enter event name in English">
+                    </div>
+
+                    <!-- Name (French) -->
+                    <div>
+                        <label for="name_fr" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Name (French) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text"
+                               id="name_fr"
+                               name="name_fr"
+                               value="{% if event %}{{ event.name_fr }}{% endif %}"
+                               required
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
+                               placeholder="Entrez le nom de l'événement en français">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Descriptions Section -->
+            <div class="space-y-6">
+                <div class="border-l-4 border-primary-container pl-4">
+                    <h2 class="text-xl font-headline font-bold text-on-surface">Descriptions</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Detailed event descriptions in both languages</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6">
+                    <!-- Description (English) -->
+                    <div>
+                        <label for="description" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Description (English)
+                        </label>
+                        <textarea id="description"
+                                  name="description"
+                                  rows="4"
+                                  class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body resize-y"
+                                  placeholder="Enter detailed event description in English">{% if event %}{{ event.description }}{% endif %}</textarea>
+                    </div>
+
+                    <!-- Description (French) -->
+                    <div>
+                        <label for="description_fr" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Description (French)
+                        </label>
+                        <textarea id="description_fr"
+                                  name="description_fr"
+                                  rows="4"
+                                  class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body resize-y"
+                                  placeholder="Entrez une description détaillée de l'événement en français">{% if event %}{{ event.description_fr }}{% endif %}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Section -->
+            <div class="space-y-6">
+                <div class="border-l-4 border-primary-container pl-4">
+                    <h2 class="text-xl font-headline font-bold text-on-surface">Location Details</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Event venue and coordinates</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6">
+                    <!-- Address -->
+                    <div>
+                        <label for="address" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Address
+                        </label>
+                        <input type="text"
+                               id="address"
+                               name="address"
+                               value="{% if event %}{{ event.address }}{% endif %}"
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
+                               placeholder="Enter event venue address">
+                    </div>
+
+                    <!-- Latitude & Longitude -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="latitude" class="block text-sm font-body font-medium text-on-surface mb-2">
+                                Latitude
+                            </label>
+                            <input type="number"
+                                   id="latitude"
+                                   name="latitude"
+                                   step="any"
+                                   value="{% if event %}{{ event.latitude }}{% endif %}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
+                                   placeholder="e.g., -3.3731">
+                        </div>
+                        <div>
+                            <label for="longitude" class="block text-sm font-body font-medium text-on-surface mb-2">
+                                Longitude
+                            </label>
+                            <input type="number"
+                                   id="longitude"
+                                   name="longitude"
+                                   step="any"
+                                   value="{% if event %}{{ event.longitude }}{% endif %}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
+                                   placeholder="e.g., 29.3644">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Event Details Section -->
+            <div class="space-y-6">
+                <div class="border-l-4 border-primary-container pl-4">
+                    <h2 class="text-xl font-headline font-bold text-on-surface">Event Details</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Date, time, and media</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6">
+                    <!-- Event Date -->
+                    <div>
+                        <label for="event_date" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Event Date & Time <span class="text-red-500">*</span>
+                        </label>
+                        <input type="datetime-local"
+                               id="event_date"
+                               name="event_date"
+                               value="{% if event %}{{ event.event_date|date:'Y-m-d\TH:i' }}{% endif %}"
+                               required
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body">
+                    </div>
+
+                    <!-- Image Upload -->
+                    <div>
+                        <label for="image" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Event Image
+                        </label>
+                        {% if event and event.image %}
+                        <div class="mb-4">
+                            <img src="{{ event.image.url }}"
+                                 alt="{{ event.name }}"
+                                 class="w-48 h-48 object-cover rounded-lg shadow-sm">
+                            <p class="text-xs text-on-surface-variant mt-2">Current image (upload new to replace)</p>
+                        </div>
+                        {% endif %}
+                        <input type="file"
+                               id="image"
+                               name="image"
+                               accept="image/*"
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-container file:text-white hover:file:bg-primary file:cursor-pointer">
+                        <p class="text-xs text-on-surface-variant mt-2">Recommended size: 800x600px. Formats: JPG, PNG, WebP</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Section -->
+            <div class="space-y-6">
+                <div class="border-l-4 border-primary-container pl-4">
+                    <h2 class="text-xl font-headline font-bold text-on-surface">Status</h2>
+                    <p class="text-sm text-on-surface-variant mt-1">Event visibility settings</p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <input type="checkbox"
+                           id="is_active"
+                           name="is_active"
+                           {% if not event or event.is_active or action == 'Create' %}checked{% endif %}
+                           class="w-5 h-5 text-primary-container bg-surface-container-low border-outline-variant rounded focus:ring-2 focus:ring-secondary">
+                    <label for="is_active" class="text-sm font-body font-medium text-on-surface">
+                        Active (visible to app users)
+                    </label>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex items-center justify-end gap-4 pt-6 border-t border-outline-variant">
+                <a href="{% url 'custom_admin:events_list' %}"
+                   class="px-6 py-3 rounded-lg font-body font-medium text-on-surface hover:bg-surface-container transition-colors">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-colors inline-flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    {% if event %}Update Event{% else %}Create Event{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Help Card -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
+        <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>
+                <h3 class="text-sm font-headline font-bold text-blue-900">Tips for Creating Events</h3>
+                <ul class="mt-2 text-sm text-blue-800 font-body space-y-1 list-disc list-inside">
+                    <li>Provide accurate date and time information for proper scheduling</li>
+                    <li>Upload high-quality images to enhance visual appeal</li>
+                    <li>Include GPS coordinates for map integration</li>
+                    <li>Fill in both English and French fields for bilingual support</li>
+                    <li>Mark events as inactive to hide them without deletion</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

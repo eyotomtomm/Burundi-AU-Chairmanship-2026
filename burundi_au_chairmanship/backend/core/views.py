@@ -1,20 +1,24 @@
+import logging
 from django.contrib.auth.models import User
 from django.db.models import Count, Exists, OuterRef, F, Q
 from django.utils import timezone
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
-from .throttling import ViewCountThrottle, LikeToggleThrottle
+from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle
+
+logger = logging.getLogger(__name__)
 from .models import (
     HeroSlide, MagazineEdition, MagazineLike, Article, EmbassyLocation,
     Event, LiveFeed, Resource, AppSettings,
     FeatureCard, ArticleComment, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
-    Notification, HeroTextContent, QuickAccessMenuItem,
+    Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
+    WeatherCity, EventRegistration, RegistrationFormField, EventSubmission,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -24,6 +28,10 @@ from .serializers import (
     ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
     GalleryAlbumSerializer, VideoSerializer, SocialMediaLinkSerializer,
     NotificationSerializer, HeroTextContentSerializer, QuickAccessMenuItemSerializer,
+    VerificationRequestSerializer, VerificationStatusSerializer,
+    VerificationAppealSerializer, AdminVerificationActionSerializer,
+    WeatherCitySerializer, EventRegistrationSerializer, EventSubmissionSerializer,
+    RegistrationFormFieldSerializer, ProxyRegistrationSerializer,
 )
 
 
@@ -31,13 +39,14 @@ from .serializers import (
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
 def register(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
         }, status=status.HTTP_201_CREATED)
@@ -46,6 +55,7 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
 def login(request):
     email = request.data.get('email', '')
     password = request.data.get('password', '')
@@ -64,9 +74,47 @@ def login(request):
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
+    # Handle deactivated / deletion-scheduled accounts
+    profile = user.profile
+    if not user.is_active and (profile.is_deactivated or profile.is_scheduled_for_deletion):
+        # Check if past 30-day window
+        if (profile.is_scheduled_for_deletion and
+                profile.deletion_scheduled_for and
+                timezone.now() > profile.deletion_scheduled_for):
+            return Response(
+                {'detail': 'This account has been permanently deleted and cannot be recovered.'},
+                status=status.HTTP_410_GONE,
+            )
+
+        # Auto-reactivate on login
+        was_scheduled = profile.is_scheduled_for_deletion
+        profile.is_deactivated = False
+        profile.deactivated_at = None
+        profile.is_scheduled_for_deletion = False
+        profile.deletion_requested_at = None
+        profile.deletion_scheduled_for = None
+        profile.save()
+
+        user.is_active = True
+        user.save()
+
+        refresh = RefreshToken.for_user(user)
+        message = 'Welcome back! Your account has been reactivated.'
+        if was_scheduled:
+            message = 'Welcome back! Your account deletion has been cancelled and your account is fully restored.'
+
+        return Response({
+            'user': UserSerializer(user, context={'request': request}).data,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'message': message,
+            'reactivated': True,
+            'was_scheduled_for_deletion': was_scheduled,
+        })
+
     refresh = RefreshToken.for_user(user)
     return Response({
-        'user': UserSerializer(user).data,
+        'user': UserSerializer(user, context={'request': request}).data,
         'access': str(refresh.access_token),
         'refresh': str(refresh),
     })
@@ -75,40 +123,140 @@ def login(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def profile(request):
-    return Response(UserSerializer(request.user).data)
+    return Response(UserSerializer(request.user, context={'request': request}).data)
 
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
-    serializer = UserSerializer(request.user, data=request.data, partial=True)
+    serializer = UserSerializer(request.user, data=request.data, partial=True, context={'request': request})
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def deactivate_account(request):
+    """
+    Deactivate account ("Take a Break").
+    Account becomes inactive until the user logs in again.
+    """
+    user = request.user
+    profile = user.profile
+
+    profile.is_deactivated = True
+    profile.deactivated_at = timezone.now()
+    profile.save()
+
+    # Mark Django user as inactive so they can't access protected endpoints
+    user.is_active = False
+    user.save()
+
+    return Response({
+        'message': 'Your account has been deactivated.',
+        'detail': 'You can reactivate it anytime by logging in again.',
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_account(request):
     """
-    Permanently delete user account and all related data.
+    Soft-delete: schedule account for permanent deletion in 30 days.
+    User can cancel by logging back in within 30 days.
     Required for Apple App Store compliance (Guideline 5.1.1)
     """
     user = request.user
+    profile = user.profile
 
-    # Delete user (Django will cascade delete related data)
-    user.delete()
+    now = timezone.now()
+    profile.is_scheduled_for_deletion = True
+    profile.deletion_requested_at = now
+    profile.deletion_scheduled_for = now + timezone.timedelta(days=30)
+    profile.is_deactivated = True
+    profile.deactivated_at = now
+    profile.save()
 
-    # Security: Don't leak email in response
+    # Mark user as inactive
+    user.is_active = False
+    user.save()
+
     return Response({
-        'message': 'Your account has been permanently deleted.',
-        'detail': 'All associated data has been removed.'
+        'message': 'Your account has been scheduled for deletion.',
+        'detail': 'Your data will be permanently deleted after 30 days. '
+                  'Log in again within 30 days to cancel deletion and reactivate your account.',
+        'deletion_scheduled_for': profile.deletion_scheduled_for.isoformat(),
     }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
+def reactivate_account(request):
+    """
+    Reactivate a deactivated or deletion-scheduled account.
+    Called during login when user is inactive.
+    """
+    email = request.data.get('email', '')
+    password = request.data.get('password', '')
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response(
+            {'detail': 'Invalid email or password.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if not user.check_password(password):
+        return Response(
+            {'detail': 'Invalid email or password.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    profile = user.profile
+
+    # Check if account is past the 30-day deletion window
+    if (profile.is_scheduled_for_deletion and
+            profile.deletion_scheduled_for and
+            timezone.now() > profile.deletion_scheduled_for):
+        return Response(
+            {'detail': 'This account has been permanently deleted and cannot be recovered.'},
+            status=status.HTTP_410_GONE,
+        )
+
+    # Reactivate the account
+    was_scheduled = profile.is_scheduled_for_deletion
+    profile.is_deactivated = False
+    profile.deactivated_at = None
+    profile.is_scheduled_for_deletion = False
+    profile.deletion_requested_at = None
+    profile.deletion_scheduled_for = None
+    profile.save()
+
+    user.is_active = True
+    user.save()
+
+    refresh = RefreshToken.for_user(user)
+
+    message = 'Welcome back! Your account has been reactivated.'
+    if was_scheduled:
+        message = 'Welcome back! Your account deletion has been cancelled and your account is fully restored.'
+
+    return Response({
+        'user': UserSerializer(user, context={'request': request}).data,
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+        'message': message,
+        'was_scheduled_for_deletion': was_scheduled,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
 def firebase_register(request):
     """
     Register a new user after Firebase Auth signup.
@@ -154,7 +302,7 @@ def firebase_register(request):
         profile.save()
 
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'message': 'User registered successfully'
         }, status=status.HTTP_201_CREATED)
 
@@ -164,14 +312,16 @@ def firebase_register(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
     except Exception as e:
+        logger.exception('Firebase registration failed')
         return Response(
-            {'detail': f'Registration failed: {str(e)}'},
+            {'detail': 'Registration failed. Please try again.'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([AuthRateThrottle])
 def firebase_login(request):
     """
     Login with Firebase ID token.
@@ -208,12 +358,31 @@ def firebase_login(request):
             profile.firebase_uid = firebase_uid
             is_new_user = True
 
+        # Handle deactivated / deletion-scheduled accounts
+        if not is_new_user and not user.is_active and (profile.is_deactivated or profile.is_scheduled_for_deletion):
+            if (profile.is_scheduled_for_deletion and
+                    profile.deletion_scheduled_for and
+                    timezone.now() > profile.deletion_scheduled_for):
+                return Response(
+                    {'detail': 'This account has been permanently deleted and cannot be recovered.'},
+                    status=status.HTTP_410_GONE,
+                )
+            # Auto-reactivate
+            was_scheduled = profile.is_scheduled_for_deletion
+            profile.is_deactivated = False
+            profile.deactivated_at = None
+            profile.is_scheduled_for_deletion = False
+            profile.deletion_requested_at = None
+            profile.deletion_scheduled_for = None
+            user.is_active = True
+            user.save()
+
         # Update email verification status from Firebase
         profile.is_email_verified = decoded_token.get('email_verified', False)
         profile.save()
 
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'message': 'Login successful',
             'is_new_user': is_new_user
         })
@@ -224,8 +393,9 @@ def firebase_login(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
     except Exception as e:
+        logger.exception('Firebase login failed')
         return Response(
-            {'detail': f'Login failed: {str(e)}'},
+            {'detail': 'Login failed. Please try again.'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -254,8 +424,9 @@ def update_fcm_token(request):
         })
 
     except Exception as e:
+        logger.exception('Failed to update FCM token')
         return Response(
-            {'detail': f'Failed to update FCM token: {str(e)}'},
+            {'detail': 'Failed to update notification settings. Please try again.'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -386,7 +557,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         qs = Article.objects.select_related('category').prefetch_related('media').annotate(
             comment_count=Count('comments', distinct=True),
             like_count=Count('likes', distinct=True),
-        )
+        ).order_by('-publish_date')  # Explicitly order by newest first
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -440,10 +611,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         if len(content) < 2:
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Basic HTML sanitization (remove tags)
-        import re
-        content = re.sub(r'<[^>]+>', '', content)  # Strip HTML tags
-        content = content.replace('<', '&lt;').replace('>', '&gt;')  # Escape remaining brackets
+        # HTML sanitization: escape all HTML entities (treat as plain text)
+        from django.utils.html import escape
+        content = escape(content)
 
         comment = ArticleComment.objects.create(user=request.user, article=article, content=content)
         serializer = ArticleCommentSerializer(comment, context={'request': request})
@@ -488,16 +658,16 @@ class EmbassyLocationViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view events"""
+    """Public endpoint: Anyone can view active events"""
     permission_classes = [AllowAny]
-    queryset = Event.objects.all()
+    queryset = Event.objects.filter(is_active=True)
     serializer_class = EventSerializer
 
 
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view live feeds"""
     permission_classes = [AllowAny]
-    queryset = LiveFeed.objects.all()
+    queryset = LiveFeed.objects.all().order_by('-created_at')  # Show newest first
     serializer_class = LiveFeedSerializer
     filterset_fields = ['status']
 
@@ -513,7 +683,9 @@ class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
 class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view feature cards"""
     permission_classes = [AllowAny]
-    queryset = FeatureCard.objects.filter(is_active=True)
+    queryset = FeatureCard.objects.filter(is_active=True).prefetch_related(
+        'key_point_items', 'impact_area_items', 'media',
+    )
     serializer_class = FeatureCardSerializer
     pagination_class = None
 
@@ -536,7 +708,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view videos"""
     permission_classes = [AllowAny]
-    queryset = Video.objects.all()
+    queryset = Video.objects.all().order_by('-is_featured', '-publish_date')  # Featured first, then newest
     serializer_class = VideoSerializer
     filterset_fields = ['category', 'is_featured']
 
@@ -558,6 +730,14 @@ class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     queryset = SocialMediaLink.objects.filter(is_active=True)
     serializer_class = SocialMediaLinkSerializer
+    pagination_class = None
+
+
+class WeatherCityViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view weather cities"""
+    permission_classes = [AllowAny]
+    queryset = WeatherCity.objects.filter(is_active=True)
+    serializer_class = WeatherCitySerializer
     pagination_class = None
 
 
@@ -662,13 +842,13 @@ def health_check(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def home_feed(request):
-    """Combined endpoint for home screen — hero slides, featured articles, feature cards, categories, and settings."""
+    """Combined endpoint for home screen — hero slides, featured articles, feature cards, categories, event cards, and settings."""
     hero_slides = HeroSlide.objects.filter(is_active=True)
 
     base_articles = Article.objects.select_related('category').prefetch_related('media').annotate(
         comment_count=Count('comments', distinct=True),
         like_count=Count('likes', distinct=True),
-    )
+    ).order_by('-publish_date')  # Explicitly order by newest first
     if request.user.is_authenticated:
         base_articles = base_articles.annotate(
             is_liked=Exists(ArticleLike.objects.filter(article=OuterRef('pk'), user=request.user)),
@@ -678,16 +858,24 @@ def home_feed(request):
         base_articles = base_articles.annotate(is_liked=Value(False, output_field=BooleanField()))
 
     featured_articles = base_articles.filter(is_featured=True)[:5]
-    articles = base_articles.all()[:10]
-    feature_cards = FeatureCard.objects.filter(is_active=True)
+    articles = base_articles[:10]  # Already ordered by -publish_date
+    feature_cards = FeatureCard.objects.filter(is_active=True).prefetch_related(
+        'key_point_items', 'impact_area_items', 'media',
+    )
     categories = Category.objects.all()
     settings = AppSettings.objects.first()
+
+    # Standalone event cards
+    event_cards = EventRegistration.objects.filter(
+        is_active=True
+    ).prefetch_related('form_fields')
 
     data = {
         'hero_slides': HeroSlideSerializer(hero_slides, many=True, context={'request': request}).data,
         'featured_articles': ArticleSerializer(featured_articles, many=True, context={'request': request}).data,
         'articles': ArticleSerializer(articles, many=True, context={'request': request}).data,
         'feature_cards': FeatureCardSerializer(feature_cards, many=True, context={'request': request}).data,
+        'event_cards': EventRegistrationSerializer(event_cards, many=True, context={'request': request}).data,
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
     }
@@ -786,3 +974,351 @@ class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = QuickAccessMenuItem.objects.filter(is_active=True)
     serializer_class = QuickAccessMenuItemSerializer
     permission_classes = [AllowAny]
+
+
+# ── Verification System ────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_verification_request(request):
+    """
+    Submit a verification request for Gold or Blue badge.
+    User must provide professional email, phone, position, and optional social links.
+    """
+    serializer = VerificationRequestSerializer(data=request.data, context={'request': request})
+
+    if serializer.is_valid():
+        verification_request = serializer.save(user=request.user)
+        return Response(
+            {
+                'message': 'Verification request submitted successfully! '
+                          'Review typically takes up to 24 hours.',
+                'request_id': verification_request.id,
+                'status': verification_request.status,
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_verification_status(request):
+    """
+    Check current user's verification status.
+    Returns latest verification request and profile verification status.
+    """
+    user = request.user
+
+    # Get latest verification request
+    latest_request = VerificationRequest.objects.filter(user=user).order_by('-created_at').first()
+
+    # Check if user is verified in profile
+    is_verified = user.profile.is_verified if hasattr(user, 'profile') else False
+    badge_type = user.profile.badge_type if hasattr(user, 'profile') else None
+
+    # Can appeal if latest request is rejected and no appeal yet
+    can_appeal = (
+        latest_request is not None and
+        latest_request.status == 'rejected' and
+        not latest_request.appeal_message
+    )
+
+    response_data = {
+        'is_verified': is_verified,
+        'badge_type': badge_type,
+        'has_verification_request': latest_request is not None,
+        'status': latest_request.status if latest_request else None,
+        'rejection_reason': latest_request.rejection_reason if latest_request else None,
+        'can_appeal': can_appeal,
+        'request_details': VerificationRequestSerializer(latest_request).data if latest_request else None,
+    }
+
+    return Response(response_data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_verification_appeal(request):
+    """
+    Submit appeal for rejected verification request.
+    User must provide explanation for why they believe rejection was incorrect.
+    """
+    # Get latest rejected request
+    latest_request = VerificationRequest.objects.filter(
+        user=request.user,
+        status='rejected'
+    ).order_by('-created_at').first()
+
+    if not latest_request:
+        return Response(
+            {'detail': 'No rejected verification request found.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if latest_request.appeal_message:
+        return Response(
+            {'detail': 'You have already submitted an appeal for this request.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    serializer = VerificationAppealSerializer(data=request.data)
+
+    if serializer.is_valid():
+        latest_request.submit_appeal(serializer.validated_data['appeal_message'])
+        return Response({
+            'message': 'Appeal submitted successfully. Our team will review it shortly.',
+            'status': latest_request.status,
+        })
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_verification_action(request, request_id):
+    """
+    Admin endpoint to approve or reject verification requests.
+    Requires staff/admin permissions.
+    """
+    # Require superuser for verification badge management
+    if not request.user.is_superuser:
+        return Response(
+            {'detail': 'Superuser permissions required.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        verification_request = VerificationRequest.objects.get(id=request_id)
+    except VerificationRequest.DoesNotExist:
+        return Response(
+            {'detail': 'Verification request not found.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if verification_request.status not in ['pending', 'appealed']:
+        return Response(
+            {'detail': 'Can only act on pending or appealed requests.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    serializer = AdminVerificationActionSerializer(data=request.data)
+
+    if serializer.is_valid():
+        action = serializer.validated_data['action']
+
+        if action == 'approve':
+            badge_type = serializer.validated_data['badge_type']
+            verification_request.approve(admin_user=request.user, badge_type=badge_type)
+            message = f'Verification request approved with {badge_type} badge.'
+        else:  # reject
+            reason = serializer.validated_data['rejection_reason']
+            verification_request.reject(admin_user=request.user, reason=reason)
+            message = 'Verification request rejected.'
+
+        return Response({
+            'message': message,
+            'status': verification_request.status,
+            'badge_type': verification_request.badge_type,
+        })
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: View standalone event registrations"""
+    permission_classes = [AllowAny]
+    serializer_class = EventRegistrationSerializer
+
+    def get_queryset(self):
+        return EventRegistration.objects.filter(
+            is_active=True
+        ).prefetch_related('form_fields')
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+
+class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
+                             mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """User submissions for event registrations (create/list/retrieve only)"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = EventSubmissionSerializer
+
+    def get_queryset(self):
+        # Users can only see their own submissions
+        return EventSubmission.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        event_reg = serializer.validated_data['event_registration']
+        user = self.request.user
+        # Enforce one self-registration per user per event
+        if not serializer.validated_data.get('is_proxy', False):
+            if EventSubmission.objects.filter(event_registration=event_reg, user=user, is_proxy=False).exists():
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'detail': 'You have already registered for this event.'})
+        serializer.save(user=user)
+
+    @action(detail=False, methods=['post'], url_path='register-proxy')
+    def register_proxy(self, request):
+        """Register on behalf of someone else"""
+        serializer = ProxyRegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            event_reg = EventRegistration.objects.get(pk=data['event_registration'])
+        except EventRegistration.DoesNotExist:
+            return Response({'detail': 'Event not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not event_reg.allow_proxy_registration:
+            return Response({'detail': 'Proxy registration is not allowed for this event.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        submission = EventSubmission.objects.create(
+            event_registration=event_reg,
+            user=request.user,
+            is_proxy=True,
+            proxy_name=data['proxy_name'],
+            proxy_email=data['proxy_email'],
+            proxy_phone=data.get('proxy_phone', ''),
+            form_data=data.get('form_data', {}),
+        )
+        return Response(EventSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_event_registrations(request):
+    """Return all event submissions for the current user"""
+    submissions = EventSubmission.objects.filter(user=request.user).select_related('event_registration')
+    serializer = EventSubmissionSerializer(submissions, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+  # Duplicate delete_account and export_user_data removed — canonical versions are above (lines ~96-304)
+
+
+# ── OTP Verification Endpoints ────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([OTPRateThrottle])
+def send_email_otp(request):
+    """Send OTP to user's email for verification"""
+    from .otp_utils import send_email_otp
+
+    email = request.data.get('email')
+    if not email:
+        return Response(
+            {'detail': 'Email is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    success, message, otp_id = send_email_otp(request.user, email)
+
+    if success:
+        return Response({
+            'message': message,
+            'otp_id': otp_id
+        })
+    else:
+        return Response(
+            {'detail': message},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([OTPRateThrottle])
+def verify_email_otp(request):
+    """Verify email OTP code"""
+    from .otp_utils import verify_email_otp
+
+    email = request.data.get('email')
+    otp_code = request.data.get('otp_code')
+
+    if not email or not otp_code:
+        return Response(
+            {'detail': 'Email and OTP code are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    success, message = verify_email_otp(request.user, email, otp_code)
+
+    if success:
+        return Response({'message': message})
+    else:
+        return Response(
+            {'detail': message},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([OTPRateThrottle])
+def send_phone_otp(request):
+    """Send OTP to user's phone via Twilio SMS"""
+    from .otp_utils import send_phone_otp_twilio
+
+    country_code = request.data.get('country_code')
+    phone_number = request.data.get('phone_number')
+
+    if not country_code or not phone_number:
+        return Response(
+            {'detail': 'Country code and phone number are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    success, message, otp_id = send_phone_otp_twilio(
+        request.user,
+        country_code,
+        phone_number
+    )
+
+    if success:
+        return Response({
+            'message': message,
+            'otp_id': otp_id
+        })
+    else:
+        return Response(
+            {'detail': message},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([OTPRateThrottle])
+def verify_phone_otp(request):
+    """Verify phone OTP code"""
+    from .otp_utils import verify_phone_otp
+
+    country_code = request.data.get('country_code')
+    phone_number = request.data.get('phone_number')
+    otp_code = request.data.get('otp_code')
+
+    if not country_code or not phone_number or not otp_code:
+        return Response(
+            {'detail': 'Country code, phone number, and OTP code are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    success, message = verify_phone_otp(
+        request.user,
+        country_code,
+        phone_number,
+        otp_code
+    )
+
+    if success:
+        return Response({'message': message})
+    else:
+        return Response(
+            {'detail': message},
+            status=status.HTTP_400_BAD_REQUEST
+        )

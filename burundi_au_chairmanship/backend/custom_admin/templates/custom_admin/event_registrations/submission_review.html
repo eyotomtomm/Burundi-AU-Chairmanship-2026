@@ -1,0 +1,164 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}Review Submission{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="font-headline text-4xl font-bold text-on-surface mb-2">Review Event Submission</h1>
+            <p class="font-body text-on-surface-variant">{{ submission.event_registration.event_title }}</p>
+        </div>
+        <a href="{% url 'custom_admin:event_registration_submissions' pk=submission.event_registration.pk %}" class="inline-flex items-center gap-2 bg-surface-container text-on-surface font-label rounded-lg py-2 px-4 hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">arrow_back</span>
+            Back to Submissions
+        </a>
+    </div>
+
+    <!-- Submission Info Card -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mb-8">
+        <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">person</span>
+            Submission Information
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Username</p>
+                <p class="font-body text-on-surface">{{ submission.user.username }}</p>
+            </div>
+
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Email</p>
+                <p class="font-body text-on-surface">{{ submission.user.email }}</p>
+            </div>
+
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Status</p>
+                <div class="inline-flex items-center gap-2">
+                    {% if submission.status == 'pending' %}
+                    <span class="bg-yellow-100 text-yellow-800 font-label text-xs px-3 py-1 rounded-full">Pending</span>
+                    {% elif submission.status == 'approved' %}
+                    <span class="bg-green-100 text-green-800 font-label text-xs px-3 py-1 rounded-full">Approved</span>
+                    {% elif submission.status == 'rejected' %}
+                    <span class="bg-red-100 text-red-800 font-label text-xs px-3 py-1 rounded-full">Rejected</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Submitted At</p>
+                <p class="font-body text-on-surface">{{ submission.submitted_at|date:"F d, Y H:i" }}</p>
+            </div>
+
+            {% if submission.is_proxy %}
+            <div class="md:col-span-2 bg-secondary-container/10 rounded-lg p-4 border-l-4 border-secondary">
+                <h3 class="font-headline text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-secondary">people</span>
+                    Proxy Registration
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1">Proxy Name</p>
+                        <p class="font-body text-on-surface">{{ submission.proxy_name|default:"N/A" }}</p>
+                    </div>
+                    <div>
+                        <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1">Proxy Email</p>
+                        <p class="font-body text-on-surface">{{ submission.proxy_email|default:"N/A" }}</p>
+                    </div>
+                    <div>
+                        <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-1">Proxy Phone</p>
+                        <p class="font-body text-on-surface">{{ submission.proxy_phone|default:"N/A" }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Form Data Card -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mb-8">
+        <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">description</span>
+            Registration Form Data
+        </h2>
+
+        <div class="space-y-4">
+            {% for label, value in field_labels.items %}
+            <div class="border-b border-outline-variant pb-4 last:border-b-0">
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">{{ label }}</p>
+                <p class="font-body text-on-surface">
+                    {% if value %}
+                        {{ value }}
+                    {% else %}
+                        <span class="text-on-surface-variant italic">Not provided</span>
+                    {% endif %}
+                </p>
+            </div>
+            {% empty %}
+            <p class="font-body text-on-surface-variant italic">No form data submitted</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if submission.status == 'pending' %}
+    <!-- Review Form Card -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">rate_review</span>
+            Review Submission
+        </h2>
+
+        <form method="post" action="" class="space-y-6">
+            {% csrf_token %}
+
+            <div>
+                <label for="admin_notes" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Admin Notes</label>
+                <textarea id="admin_notes" name="admin_notes" rows="4" placeholder="Add any notes or comments about this submission..." class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-4">
+                <button type="submit" name="action" value="reject" class="bg-error text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-error/90 transition-all inline-flex items-center gap-2">
+                    <span class="material-symbols-outlined">close</span>
+                    Reject
+                </button>
+                <button type="submit" name="action" value="approve" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all inline-flex items-center gap-2">
+                    <span class="material-symbols-outlined">check</span>
+                    Approve
+                </button>
+            </div>
+        </form>
+    </div>
+    {% else %}
+    <!-- Reviewed Info Card -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">task_alt</span>
+            Review Details
+        </h2>
+
+        <div class="space-y-4">
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Reviewed By</p>
+                <p class="font-body text-on-surface">{{ submission.reviewed_by.username }}</p>
+            </div>
+
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Reviewed At</p>
+                <p class="font-body text-on-surface">{{ submission.reviewed_at|date:"F d, Y H:i" }}</p>
+            </div>
+
+            {% if submission.admin_notes %}
+            <div>
+                <p class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Admin Notes</p>
+                <div class="bg-surface-container-low rounded-lg p-4">
+                    <p class="font-body text-on-surface">{{ submission.admin_notes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,239 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if article %}Edit Article{% else %}New Article{% endif %} - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-4 mb-4">
+      <a href="{% url 'custom_admin:articles_list' %}" class="p-2 hover:bg-surface-container rounded-lg transition-colors">
+        <span class="material-symbols-outlined text-2xl text-on-surface-variant">arrow_back</span>
+      </a>
+      <div>
+        <h1 class="font-headline font-extrabold text-4xl text-on-surface">
+          {% if article %}Edit Article{% else %}New Article{% endif %}
+        </h1>
+        <p class="text-on-surface-variant mt-1">
+          {% if article %}Update article details and content{% else %}Create a new article or press release{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <form method="post" action="{{ action }}" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- Title (English) -->
+      <div class="mb-6">
+        <label for="title" class="block font-headline font-bold text-on-surface mb-2">
+          Title (English) <span class="text-error">*</span>
+        </label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          value="{% if article %}{{ article.title }}{% endif %}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+          placeholder="Enter article title in English"
+        />
+      </div>
+
+      <!-- Title (French) -->
+      <div class="mb-6">
+        <label for="title_fr" class="block font-headline font-bold text-on-surface mb-2">
+          Title (French) <span class="text-error">*</span>
+        </label>
+        <input
+          type="text"
+          id="title_fr"
+          name="title_fr"
+          value="{% if article %}{{ article.title_fr }}{% endif %}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+          placeholder="Entrez le titre de l'article en français"
+        />
+      </div>
+
+      <!-- Content (English) -->
+      <div class="mb-6">
+        <label for="content" class="block font-headline font-bold text-on-surface mb-2">
+          Content (English) <span class="text-error">*</span>
+        </label>
+        <textarea
+          id="content"
+          name="content"
+          rows="8"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y"
+          placeholder="Enter article content in English"
+        >{% if article %}{{ article.content }}{% endif %}</textarea>
+      </div>
+
+      <!-- Content (French) -->
+      <div class="mb-6">
+        <label for="content_fr" class="block font-headline font-bold text-on-surface mb-2">
+          Content (French) <span class="text-error">*</span>
+        </label>
+        <textarea
+          id="content_fr"
+          name="content_fr"
+          rows="8"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y"
+          placeholder="Entrez le contenu de l'article en français"
+        >{% if article %}{{ article.content_fr }}{% endif %}</textarea>
+      </div>
+
+      <!-- Two Column Layout -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Category -->
+        <div>
+          <label for="category" class="block font-headline font-bold text-on-surface mb-2">
+            Category <span class="text-error">*</span>
+          </label>
+          <select
+            id="category"
+            name="category"
+            required
+            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+          >
+            <option value="">Select a category</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if article and article.category.id == cat.id %}selected{% endif %}>
+              {{ cat.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Author -->
+        <div>
+          <label for="author" class="block font-headline font-bold text-on-surface mb-2">
+            Author <span class="text-error">*</span>
+          </label>
+          <input
+            type="text"
+            id="author"
+            name="author"
+            value="{% if article %}{{ article.author }}{% endif %}"
+            required
+            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+            placeholder="Author name"
+          />
+        </div>
+      </div>
+
+      <!-- Image Upload -->
+      <div class="mb-6">
+        <label for="image" class="block font-headline font-bold text-on-surface mb-2">
+          Featured Image {% if not article %}<span class="text-error">*</span>{% endif %}
+        </label>
+        {% if article and article.image %}
+        <div class="mb-4">
+          <img src="{{ article.image.url }}" alt="{{ article.title }}" class="w-full max-w-md h-48 object-cover rounded-lg shadow-sm" />
+          <p class="text-sm text-on-surface-variant mt-2">Current image - upload a new one to replace</p>
+        </div>
+        {% endif %}
+        <input
+          type="file"
+          id="image"
+          name="image"
+          accept="image/*"
+          {% if not article %}required{% endif %}
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium hover:file:bg-primary"
+        />
+      </div>
+
+      <!-- Publish Date -->
+      <div class="mb-6">
+        <label for="publish_date" class="block font-headline font-bold text-on-surface mb-2">
+          Publish Date <span class="text-error">*</span>
+        </label>
+        <input
+          type="datetime-local"
+          id="publish_date"
+          name="publish_date"
+          value="{% if article %}{{ article.publish_date|date:'Y-m-d\TH:i' }}{% endif %}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+        />
+      </div>
+
+      <!-- Featured Checkbox -->
+      <div class="mb-8">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            id="is_featured"
+            name="is_featured"
+            value="true"
+            {% if article and article.is_featured %}checked{% endif %}
+            class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-2 focus:ring-secondary"
+          />
+          <span class="font-headline font-bold text-on-surface">Mark as Featured</span>
+          <span class="material-symbols-outlined text-tertiary">star</span>
+        </label>
+        <p class="text-sm text-on-surface-variant mt-2 ml-8">Featured articles appear prominently on the home screen</p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-4 pt-6 border-t border-outline-variant">
+        <button
+          type="submit"
+          class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium inline-flex items-center gap-2 transition-colors"
+        >
+          <span class="material-symbols-outlined text-xl">save</span>
+          {% if article %}Update Article{% else %}Create Article{% endif %}
+        </button>
+
+        <a
+          href="{% url 'custom_admin:articles_list' %}"
+          class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-3 px-6 font-medium transition-colors"
+        >
+          Cancel
+        </a>
+
+        {% if article %}
+        <div class="flex-1"></div>
+        <button
+          type="button"
+          onclick="if(confirm('Are you sure you want to delete this article? This action cannot be undone.')) { document.getElementById('deleteForm').submit(); }"
+          class="bg-error-container text-error hover:bg-error hover:text-white rounded-lg py-3 px-6 font-medium inline-flex items-center gap-2 transition-colors"
+        >
+          <span class="material-symbols-outlined text-xl">delete</span>
+          Delete Article
+        </button>
+        {% endif %}
+      </div>
+    </form>
+
+    {% if article %}
+    <!-- Hidden Delete Form -->
+    <form id="deleteForm" method="post" action="{% url 'custom_admin:article_delete' article.pk %}" class="hidden">
+      {% csrf_token %}
+    </form>
+    {% endif %}
+  </div>
+
+  <!-- Help Text -->
+  <div class="mt-6 bg-surface-container-lowest rounded-xl shadow-sm p-6">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-2xl text-primary">info</span>
+      <div>
+        <h3 class="font-headline font-bold text-on-surface mb-2">Article Guidelines</h3>
+        <ul class="text-sm text-on-surface-variant space-y-1">
+          <li>• Both English and French content are required for all articles</li>
+          <li>• Featured articles will be highlighted on the home screen</li>
+          <li>• Use high-quality images (minimum 1200x630px recommended)</li>
+          <li>• Choose the most relevant category for better organization</li>
+          <li>• Publish date can be set in the future for scheduled releases</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

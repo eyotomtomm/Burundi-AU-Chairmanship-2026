@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,8 +22,13 @@ class AuthProvider extends ChangeNotifier {
   String? _userEmail;
   String? _phoneNumber;
   String? _gender;
+  String? _nationality;
+  String? _dateOfBirth;
   bool _isEmailVerified = false;
   bool _isGovernmentOfficial = false;
+  bool _isVerified = false;
+  String? _badgeType; // 'GOLD' or 'BLUE'
+  String? _profilePictureUrl;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -32,8 +38,13 @@ class AuthProvider extends ChangeNotifier {
   String? get userEmail => _userEmail;
   String? get phoneNumber => _phoneNumber;
   String? get gender => _gender;
+  String? get nationality => _nationality;
+  String? get dateOfBirth => _dateOfBirth;
   bool get isEmailVerified => _isEmailVerified;
   bool get isGovernmentOfficial => _isGovernmentOfficial;
+  bool get isVerified => _isVerified;
+  String? get badgeType => _badgeType;
+  String? get profilePictureUrl => _profilePictureUrl;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -74,8 +85,13 @@ class AuthProvider extends ChangeNotifier {
         _userEmail = prefs.getString('user_email');
         _phoneNumber = prefs.getString('user_phone');
         _gender = prefs.getString('user_gender');
+        _nationality = prefs.getString('user_nationality');
+        _dateOfBirth = prefs.getString('user_date_of_birth');
         _isEmailVerified = prefs.getBool('user_email_verified') ?? false;
         _isGovernmentOfficial = prefs.getBool('user_is_official') ?? false;
+        _isVerified = prefs.getBool('user_is_verified') ?? false;
+        _badgeType = prefs.getString('user_badge_type');
+        _profilePictureUrl = prefs.getString('user_profile_picture');
       }
     }
     notifyListeners();
@@ -148,7 +164,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Registration failed: $e';
+      _errorMessage = 'Registration failed. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -192,7 +208,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Login failed: $e';
+      _errorMessage = 'Login failed. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -234,7 +250,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Google Sign-In failed: $e';
+      _errorMessage = 'Google Sign-In failed. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -276,7 +292,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Apple Sign-In failed: $e';
+      _errorMessage = 'Apple Sign-In failed. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -309,7 +325,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Failed to send reset email: $e';
+      _errorMessage = 'Failed to send reset email. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -322,7 +338,7 @@ class AuthProvider extends ChangeNotifier {
       await _firebaseAuth.sendEmailVerification();
       return true;
     } catch (e) {
-      _errorMessage = 'Failed to send verification email: $e';
+      _errorMessage = 'Failed to send verification email. Please try again.';
       notifyListeners();
       return false;
     }
@@ -343,19 +359,21 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Update user profile
-  Future<bool> updateProfile(String name) async {
+  Future<bool> updateProfile(String name, {String? gender, String? nationality, String? dateOfBirth, String? phoneNumber}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final data = await _api.updateProfile({'name': name});
+      final payload = <String, dynamic>{'name': name};
+      if (gender != null) payload['gender'] = gender;
+      if (nationality != null) payload['nationality'] = nationality;
+      if (dateOfBirth != null) payload['date_of_birth'] = dateOfBirth;
+      if (phoneNumber != null) payload['phone_number'] = phoneNumber;
 
-      final updatedName = data['name'] ?? name;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_name', updatedName);
+      final data = await _api.updateProfile(payload);
+      await _storeUserData(data);
 
-      _userName = updatedName;
       _isLoading = false;
       notifyListeners();
       return true;
@@ -365,7 +383,74 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Failed to update profile: $e';
+      _errorMessage = 'Failed to update profile. Please try again.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Refresh user profile from backend (e.g., after verification status changes)
+  Future<bool> refreshProfile() async {
+    try {
+      // Fetch latest profile data from backend
+      final data = await _api.getProfile();
+      await _storeUserData(data);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (kDebugMode) print('Failed to refresh profile: $e');
+      return false;
+    }
+  }
+
+  /// Upload profile picture
+  Future<bool> uploadProfilePicture(File imageFile) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final data = await _api.uploadProfilePicture(imageFile);
+      await _storeUserData(data);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Failed to upload profile picture. Please try again.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Deactivate account ("Take a Break")
+  Future<bool> deactivateAccount() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _api.deactivateAccount();
+      await _clearUserData();
+
+      _isAuthenticated = false;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Failed to deactivate account. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -403,7 +488,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Failed to delete account: $e';
+      _errorMessage = 'Failed to delete account. Please try again.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -419,24 +504,52 @@ class AuthProvider extends ChangeNotifier {
     final email = user['email'] ?? '';
     final phone = user['phone_number'] ?? '';
     final gender = user['gender'] ?? '';
+    final nationality = user['nationality'] ?? '';
+    final dateOfBirth = user['date_of_birth'] as String? ?? '';
     final emailVerified = user['is_email_verified'] ?? false;
     final isOfficial = user['is_government_official'] ?? false;
+    final isVerified = user['is_verified'] ?? false;
+    final badgeType = user['badge_type'] as String?;
+
+    // Profile picture: can be in top-level or nested in profile
+    String? profilePic = user['profile_picture'] as String?;
+    if (profilePic == null && user['profile'] is Map) {
+      profilePic = user['profile']['profile_picture'] as String?;
+    }
 
     if (uid != null) await prefs.setInt('user_id', uid);
     await prefs.setString('user_name', name);
     await prefs.setString('user_email', email);
     await prefs.setString('user_phone', phone);
     await prefs.setString('user_gender', gender);
+    await prefs.setString('user_nationality', nationality);
+    await prefs.setString('user_date_of_birth', dateOfBirth);
     await prefs.setBool('user_email_verified', emailVerified);
     await prefs.setBool('user_is_official', isOfficial);
+    await prefs.setBool('user_is_verified', isVerified);
+    if (badgeType != null) {
+      await prefs.setString('user_badge_type', badgeType);
+    } else {
+      await prefs.remove('user_badge_type');
+    }
+    if (profilePic != null && profilePic.isNotEmpty) {
+      await prefs.setString('user_profile_picture', profilePic);
+    } else {
+      await prefs.remove('user_profile_picture');
+    }
 
     _userId = uid;
     _userName = name;
     _userEmail = email;
     _phoneNumber = phone;
     _gender = gender;
+    _nationality = nationality;
+    _dateOfBirth = dateOfBirth;
     _isEmailVerified = emailVerified;
     _isGovernmentOfficial = isOfficial;
+    _isVerified = isVerified;
+    _badgeType = badgeType;
+    _profilePictureUrl = profilePic;
   }
 
   /// Clear user data from SharedPreferences
@@ -449,16 +562,26 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('user_email');
     await prefs.remove('user_phone');
     await prefs.remove('user_gender');
+    await prefs.remove('user_nationality');
+    await prefs.remove('user_date_of_birth');
     await prefs.remove('user_email_verified');
     await prefs.remove('user_is_official');
+    await prefs.remove('user_is_verified');
+    await prefs.remove('user_badge_type');
+    await prefs.remove('user_profile_picture');
 
     _userId = null;
     _userName = null;
     _userEmail = null;
     _phoneNumber = null;
     _gender = null;
+    _nationality = null;
+    _dateOfBirth = null;
     _isEmailVerified = false;
     _isGovernmentOfficial = false;
+    _isVerified = false;
+    _badgeType = null;
+    _profilePictureUrl = null;
   }
 
   /// Clear error message

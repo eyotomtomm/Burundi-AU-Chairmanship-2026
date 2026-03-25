@@ -1,0 +1,107 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if category %}Edit{% else %}Create{% endif %} Category - Burundi AU Chairmanship{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Page Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-primary">label</span>
+      <span class="font-label text-xs uppercase tracking-wider text-on-surface-variant">Content Management</span>
+    </div>
+    <h1 class="font-headline text-4xl font-bold text-on-surface">
+      {% if category %}Edit Category{% else %}Create Category{% endif %}
+    </h1>
+  </div>
+
+  <!-- Form Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <form method="POST" action="{{ action }}" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- English Name Field -->
+      <div class="mb-6">
+        <label for="name" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          English Name *
+        </label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          value="{{ category.name }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Enter category name in English"
+        />
+      </div>
+
+      <!-- French Name Field -->
+      <div class="mb-6">
+        <label for="name_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          French Name
+        </label>
+        <input
+          type="text"
+          id="name_fr"
+          name="name_fr"
+          value="{{ category.name_fr }}"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Enter category name in French (optional)"
+        />
+      </div>
+
+      <!-- Color Field -->
+      <div class="mb-6">
+        <label for="color" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Color *
+        </label>
+        <div class="flex items-center gap-4">
+          <input
+            type="color"
+            id="color"
+            name="color"
+            value="{{ category.color|default:'#1EB53A' }}"
+            required
+            class="h-12 w-24 cursor-pointer rounded border-2 border-outline-variant"
+          />
+          <span class="font-body text-on-surface-variant text-sm">Choose a color to represent this category</span>
+        </div>
+      </div>
+
+      <!-- Order Field -->
+      <div class="mb-8">
+        <label for="order" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Order
+        </label>
+        <input
+          type="number"
+          id="order"
+          name="order"
+          value="{{ category.order|default:'0' }}"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="0"
+        />
+        <p class="text-xs text-on-surface-variant mt-1 font-body">Lower numbers appear first</p>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="flex items-center gap-4 pt-6 border-t border-outline-variant">
+        <button
+          type="submit"
+          class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined">save</span>
+          {% if category %}Update Category{% else %}Create Category{% endif %}
+        </button>
+        <a
+          href="{% url 'custom_admin:categories_list' %}"
+          class="font-label text-on-surface-variant hover:text-on-surface transition-colors py-3 px-8"
+        >
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

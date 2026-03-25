@@ -1,0 +1,217 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if feed %}Edit Live Feed{% else %}Create Live Feed{% endif %} - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-surface p-6">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <a href="{% url 'custom_admin:live_feeds_list' %}"
+                   class="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors duration-200">
+                    <span class="material-symbols-outlined text-on-surface">arrow_back</span>
+                </a>
+                <h1 class="text-3xl font-bold text-on-surface">
+                    {% if feed %}Edit Live Feed{% else %}Create New Live Feed{% endif %}
+                </h1>
+            </div>
+            <p class="text-on-surface-variant ml-13">
+                {% if feed %}Update live feed details and settings{% else %}Add a new live stream or video feed{% endif %}
+            </p>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <form action="{{ action }}" method="post" enctype="multipart/form-data" class="space-y-8">
+                {% csrf_token %}
+
+                <!-- English Title -->
+                <div class="space-y-2">
+                    <label for="title" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">title</span>
+                        <span>Title (English)</span>
+                        <span class="text-error">*</span>
+                    </label>
+                    <input type="text"
+                           id="title"
+                           name="title"
+                           value="{% if feed %}{{ feed.title }}{% endif %}"
+                           required
+                           class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface placeholder-on-surface-variant transition-colors duration-200"
+                           placeholder="Enter feed title in English">
+                </div>
+
+                <!-- French Title -->
+                <div class="space-y-2">
+                    <label for="title_fr" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">translate</span>
+                        <span>Title (French)</span>
+                    </label>
+                    <input type="text"
+                           id="title_fr"
+                           name="title_fr"
+                           value="{% if feed %}{{ feed.title_fr }}{% endif %}"
+                           class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface placeholder-on-surface-variant transition-colors duration-200"
+                           placeholder="Enter feed title in French">
+                </div>
+
+                <!-- Stream URL -->
+                <div class="space-y-2">
+                    <label for="stream_url" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">link</span>
+                        <span>Stream URL</span>
+                        <span class="text-error">*</span>
+                    </label>
+                    <input type="url"
+                           id="stream_url"
+                           name="stream_url"
+                           value="{% if feed %}{{ feed.stream_url }}{% endif %}"
+                           required
+                           class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface placeholder-on-surface-variant transition-colors duration-200 font-mono text-sm"
+                           placeholder="https://example.com/stream">
+                    <p class="text-xs text-on-surface-variant flex items-start gap-1.5">
+                        <span class="material-symbols-outlined text-sm mt-0.5">info</span>
+                        <span>Enter the full URL to the live stream (YouTube, Vimeo, or custom RTMP/HLS URL)</span>
+                    </p>
+                </div>
+
+                <!-- Status -->
+                <div class="space-y-2">
+                    <label for="status" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">radio_button_checked</span>
+                        <span>Status</span>
+                        <span class="text-error">*</span>
+                    </label>
+                    <select id="status"
+                            name="status"
+                            required
+                            class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface transition-colors duration-200">
+                        <option value="upcoming" {% if feed and feed.status == 'upcoming' %}selected{% endif %}>Upcoming</option>
+                        <option value="live" {% if feed and feed.status == 'live' %}selected{% endif %}>Live</option>
+                        <option value="ended" {% if feed and feed.status == 'ended' %}selected{% endif %}>Ended</option>
+                    </select>
+                </div>
+
+                <!-- Scheduled Time -->
+                <div class="space-y-2">
+                    <label for="scheduled_time" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">calendar_today</span>
+                        <span>Scheduled Time</span>
+                    </label>
+                    <input type="datetime-local"
+                           id="scheduled_time"
+                           name="scheduled_time"
+                           value="{% if feed and feed.scheduled_time %}{{ feed.scheduled_time|date:'Y-m-d\TH:i' }}{% endif %}"
+                           class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface transition-colors duration-200">
+                    <p class="text-xs text-on-surface-variant flex items-start gap-1.5">
+                        <span class="material-symbols-outlined text-sm mt-0.5">info</span>
+                        <span>When is this stream scheduled to start?</span>
+                    </p>
+                </div>
+
+                <!-- Duration -->
+                <div class="space-y-2">
+                    <label for="duration" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">timer</span>
+                        <span>Duration</span>
+                    </label>
+                    <input type="text"
+                           id="duration"
+                           name="duration"
+                           value="{% if feed %}{{ feed.duration }}{% endif %}"
+                           class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface placeholder-on-surface-variant transition-colors duration-200"
+                           placeholder="e.g., 2 hours, 45 minutes">
+                    <p class="text-xs text-on-surface-variant flex items-start gap-1.5">
+                        <span class="material-symbols-outlined text-sm mt-0.5">info</span>
+                        <span>Expected or actual duration of the stream</span>
+                    </p>
+                </div>
+
+                <!-- Thumbnail Upload -->
+                <div class="space-y-2">
+                    <label for="thumbnail" class="flex items-center gap-2 text-sm font-medium text-on-surface">
+                        <span class="material-symbols-outlined text-lg">image</span>
+                        <span>Thumbnail Image</span>
+                    </label>
+
+                    {% if feed and feed.thumbnail %}
+                    <div class="mb-4 p-4 bg-surface-container rounded-lg">
+                        <p class="text-xs text-on-surface-variant mb-2">Current thumbnail:</p>
+                        <img src="{{ feed.thumbnail.url }}"
+                             alt="Current thumbnail"
+                             class="w-full max-w-md h-auto rounded-lg shadow-sm">
+                    </div>
+                    {% endif %}
+
+                    <input type="file"
+                           id="thumbnail"
+                           name="thumbnail"
+                           accept="image/*"
+                           class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-outline focus:border-primary focus:ring-0 text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-container file:text-on-primary-container hover:file:bg-primary-container-hover transition-colors duration-200">
+                    <p class="text-xs text-on-surface-variant flex items-start gap-1.5">
+                        <span class="material-symbols-outlined text-sm mt-0.5">info</span>
+                        <span>Recommended size: 1280x720 pixels (16:9 aspect ratio)</span>
+                    </p>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex items-center gap-4 pt-6 border-t border-outline-variant">
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 px-8 py-3 bg-primary-container text-on-primary-container rounded-full hover:shadow-md transition-all duration-200 font-medium">
+                        <span class="material-symbols-outlined text-xl">save</span>
+                        <span>{% if feed %}Update Live Feed{% else %}Create Live Feed{% endif %}</span>
+                    </button>
+
+                    <a href="{% url 'custom_admin:live_feeds_list' %}"
+                       class="inline-flex items-center gap-2 px-8 py-3 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-full transition-all duration-200 font-medium">
+                        <span class="material-symbols-outlined text-xl">cancel</span>
+                        <span>Cancel</span>
+                    </a>
+
+                    {% if feed %}
+                    <div class="flex-1"></div>
+                    <form action="{% url 'custom_admin:live_feed_delete' feed.pk %}"
+                          method="post"
+                          class="inline-block"
+                          onsubmit="return confirm('Are you sure you want to delete this live feed? This action cannot be undone.');">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="inline-flex items-center gap-2 px-6 py-3 bg-error-container hover:bg-error text-on-error-container hover:text-on-error rounded-full transition-all duration-200 font-medium">
+                            <span class="material-symbols-outlined text-xl">delete</span>
+                            <span>Delete Feed</span>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- Tips Card -->
+        <div class="mt-6 bg-primary-container/10 border border-primary-container rounded-xl p-6">
+            <h3 class="flex items-center gap-2 text-lg font-semibold text-on-surface mb-3">
+                <span class="material-symbols-outlined text-primary">lightbulb</span>
+                <span>Tips for Live Feeds</span>
+            </h3>
+            <ul class="space-y-2 text-sm text-on-surface-variant">
+                <li class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-sm mt-0.5 text-primary">check_circle</span>
+                    <span>Use high-quality thumbnail images to attract viewers (16:9 aspect ratio recommended)</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-sm mt-0.5 text-primary">check_circle</span>
+                    <span>Set status to "Upcoming" before the event, "Live" during streaming, and "Ended" when finished</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-sm mt-0.5 text-primary">check_circle</span>
+                    <span>Provide both English and French titles for better accessibility</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-sm mt-0.5 text-primary">check_circle</span>
+                    <span>Test your stream URL before going live to ensure compatibility</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

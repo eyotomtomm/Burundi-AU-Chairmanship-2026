@@ -17,9 +17,12 @@ router.register('priority-agendas', views.PriorityAgendaViewSet)
 router.register('gallery', views.GalleryAlbumViewSet)
 router.register('videos', views.VideoViewSet)
 router.register('social-media', views.SocialMediaLinkViewSet)
+router.register('weather-cities', views.WeatherCityViewSet)
 router.register('notifications', views.NotificationViewSet, basename='notification')
 router.register('hero-text-content', views.HeroTextContentViewSet)
 router.register('quick-access-menu', views.QuickAccessMenuViewSet)
+router.register('event-registrations', views.EventRegistrationViewSet, basename='event-registration')
+router.register('event-submissions', views.EventSubmissionViewSet, basename='event-submission')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -44,6 +47,23 @@ urlpatterns = [
     # Auth - Profile management
     path('auth/profile/', views.profile, name='auth-profile'),
     path('auth/profile/update/', views.update_profile, name='auth-profile-update'),
+    path('auth/deactivate-account/', views.deactivate_account, name='auth-deactivate-account'),
     path('auth/delete-account/', views.delete_account, name='auth-delete-account'),
+    path('auth/reactivate-account/', views.reactivate_account, name='auth-reactivate-account'),
     path('auth/export-data/', views.export_user_data, name='auth-export-data'),
+
+    # OTP Verification
+    path('otp/send-email/', views.send_email_otp, name='otp-send-email'),
+    path('otp/verify-email/', views.verify_email_otp, name='otp-verify-email'),
+    path('otp/send-phone/', views.send_phone_otp, name='otp-send-phone'),
+    path('otp/verify-phone/', views.verify_phone_otp, name='otp-verify-phone'),
+
+    # Event registrations
+    path('my-registrations/', views.my_event_registrations, name='my-registrations'),
+
+    # Verification System
+    path('verification/request/', views.submit_verification_request, name='verification-request'),
+    path('verification/status/', views.check_verification_status, name='verification-status'),
+    path('verification/appeal/', views.submit_verification_appeal, name='verification-appeal'),
+    path('verification/admin/<int:request_id>/action/', views.admin_verification_action, name='verification-admin-action'),
 ]

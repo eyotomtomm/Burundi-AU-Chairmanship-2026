@@ -1,0 +1,326 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{% if action == 'Create' %}Create New User{% else %}Edit User{% endif %} - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-4 mb-4">
+                <a href="{% url 'custom_admin:users_list' %}"
+                   class="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                        <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">
+                            {% if action == 'Create' %}person_add{% else %}edit{% endif %}
+                        </span>
+                        {% if action == 'Create' %}Create New User{% else %}Edit User{% endif %}
+                    </h1>
+                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                        {% if action == 'Create' %}Add a new user to the system{% else %}Update user information and permissions{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden">
+            <form method="post" class="p-8">
+                {% csrf_token %}
+
+                <!-- Basic Information Section -->
+                <div class="mb-8">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">badge</span>
+                        Basic Information
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Username (Create only) -->
+                        {% if action == 'Create' %}
+                        <div class="md:col-span-2">
+                            <label for="username" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Username <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text"
+                                   id="username"
+                                   name="username"
+                                   required
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="Enter username">
+                        </div>
+                        {% endif %}
+
+                        <!-- First Name -->
+                        <div>
+                            <label for="first_name" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                First Name
+                            </label>
+                            <input type="text"
+                                   id="first_name"
+                                   name="first_name"
+                                   value="{% if target_user %}{{ target_user.first_name }}{% endif %}"
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="Enter first name">
+                        </div>
+
+                        <!-- Last Name -->
+                        <div>
+                            <label for="last_name" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Last Name
+                            </label>
+                            <input type="text"
+                                   id="last_name"
+                                   name="last_name"
+                                   value="{% if target_user %}{{ target_user.last_name }}{% endif %}"
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="Enter last name">
+                        </div>
+
+                        <!-- Email -->
+                        <div class="md:col-span-2">
+                            <label for="email" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Email <span class="text-red-500">*</span>
+                            </label>
+                            <input type="email"
+                                   id="email"
+                                   name="email"
+                                   required
+                                   value="{% if target_user %}{{ target_user.email }}{% endif %}"
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="Enter email address">
+                        </div>
+
+                        <!-- Password -->
+                        <div class="md:col-span-2">
+                            <label for="password" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Password {% if action == 'Create' %}<span class="text-red-500">*</span>{% else %}<span class="text-slate-500 text-xs">(leave blank to keep current)</span>{% endif %}
+                            </label>
+                            <input type="password"
+                                   id="password"
+                                   name="password"
+                                   {% if action == 'Create' %}required{% endif %}
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="{% if action == 'Create' %}Enter password{% else %}Enter new password (optional){% endif %}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Information (Edit only) -->
+                {% if action == 'Edit' and profile %}
+                <div class="mb-8 pb-8 border-b border-slate-200 dark:border-slate-700">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">account_circle</span>
+                        Profile Information
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Phone Number -->
+                        <div>
+                            <label for="phone_number" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Phone Number
+                            </label>
+                            <input type="tel"
+                                   id="phone_number"
+                                   name="phone_number"
+                                   value="{% if profile.phone_number %}{{ profile.phone_number }}{% endif %}"
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="+257 XX XXX XXX">
+                        </div>
+
+                        <!-- Nationality -->
+                        <div>
+                            <label for="nationality" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Nationality
+                            </label>
+                            <input type="text"
+                                   id="nationality"
+                                   name="nationality"
+                                   value="{% if profile.nationality %}{{ profile.nationality }}{% endif %}"
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="Enter nationality">
+                        </div>
+
+                        <!-- Gender -->
+                        <div>
+                            <label for="gender" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Gender
+                            </label>
+                            <select id="gender"
+                                    name="gender"
+                                    class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white">
+                                <option value="">Select gender</option>
+                                <option value="male" {% if profile.gender == 'male' %}selected{% endif %}>Male</option>
+                                <option value="female" {% if profile.gender == 'female' %}selected{% endif %}>Female</option>
+                                <option value="other" {% if profile.gender == 'other' %}selected{% endif %}>Other</option>
+                                <option value="prefer_not_to_say" {% if profile.gender == 'prefer_not_to_say' %}selected{% endif %}>Prefer not to say</option>
+                            </select>
+                        </div>
+
+                        <!-- Badge Type -->
+                        <div>
+                            <label for="badge_type" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                                Badge Type
+                            </label>
+                            <input type="text"
+                                   id="badge_type"
+                                   name="badge_type"
+                                   value="{% if profile.badge_type %}{{ profile.badge_type }}{% endif %}"
+                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                                   placeholder="e.g., VIP, Delegate, Press">
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Permissions & Status Section -->
+                <div class="mb-8">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">security</span>
+                        Permissions & Status
+                    </h2>
+                    <div class="space-y-4">
+                        <!-- Active Status -->
+                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                            <div>
+                                <label for="is_active" class="font-semibold text-slate-900 dark:text-white">Active Status</label>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">User can log in and access the application</p>
+                            </div>
+                            <input type="checkbox"
+                                   id="is_active"
+                                   name="is_active"
+                                   {% if action == 'Create' or target_user.is_active %}checked{% endif %}
+                                   class="w-6 h-6 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600">
+                        </div>
+
+                        <!-- Staff Status -->
+                        {% if request.user.is_superuser %}
+                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                            <div>
+                                <label for="is_staff" class="font-semibold text-slate-900 dark:text-white">Staff Status</label>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">User can access the admin panel</p>
+                            </div>
+                            <input type="checkbox"
+                                   id="is_staff"
+                                   name="is_staff"
+                                   {% if target_user.is_staff %}checked{% endif %}
+                                   class="w-6 h-6 text-purple-600 bg-slate-100 border-slate-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600">
+                        </div>
+                        {% endif %}
+
+                        <!-- Verified Status (Edit only) -->
+                        {% if action == 'Edit' and profile %}
+                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                            <div>
+                                <label for="is_verified" class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-amber-500">verified</span>
+                                    Verified Status
+                                </label>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">User has been verified by administrators</p>
+                            </div>
+                            <input type="checkbox"
+                                   id="is_verified"
+                                   name="is_verified"
+                                   {% if profile.is_verified %}checked{% endif %}
+                                   class="w-6 h-6 text-amber-600 bg-slate-100 border-slate-300 rounded focus:ring-amber-500 dark:focus:ring-amber-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600">
+                        </div>
+
+                        <!-- Government Official Status (Edit only) -->
+                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                            <div>
+                                <label for="is_government_official" class="font-semibold text-slate-900 dark:text-white">Government Official</label>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">User is a government official</p>
+                            </div>
+                            <input type="checkbox"
+                                   id="is_government_official"
+                                   name="is_government_official"
+                                   {% if profile.is_government_official %}checked{% endif %}
+                                   class="w-6 h-6 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Verification Requests (Edit only) -->
+                {% if action == 'Edit' and verification_requests %}
+                <div class="mb-8 pb-8 border-b border-slate-200 dark:border-slate-700">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-amber-600 dark:text-amber-400">assignment</span>
+                        Verification Requests
+                    </h2>
+                    <div class="space-y-3">
+                        {% for request in verification_requests %}
+                        <div class="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-semibold text-slate-900 dark:text-white">
+                                        Status: <span class="text-amber-600 dark:text-amber-400">{{ request.status|title }}</span>
+                                    </p>
+                                    <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                        Submitted: {{ request.created_at|date:"M d, Y g:i A" }}
+                                    </p>
+                                    {% if request.document %}
+                                    <a href="{{ request.document.url }}"
+                                       target="_blank"
+                                       class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mt-2">
+                                        <span class="material-symbols-outlined text-sm">description</span>
+                                        View Document
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Form Actions -->
+                <div class="flex items-center justify-end gap-4 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <a href="{% url 'custom_admin:users_list' %}"
+                       class="px-6 py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                        Cancel
+                    </a>
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 hover:shadow-xl">
+                        <span class="material-symbols-outlined">save</span>
+                        {% if action == 'Create' %}Create User{% else %}Save Changes{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Additional Info Card (Edit only) -->
+        {% if action == 'Edit' and target_user %}
+        <div class="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-slate-600 dark:text-slate-400">info</span>
+                Account Information
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Account Created</p>
+                    <p class="font-semibold text-slate-900 dark:text-white">{{ target_user.date_joined|date:"M d, Y g:i A" }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Last Login</p>
+                    <p class="font-semibold text-slate-900 dark:text-white">
+                        {% if target_user.last_login %}{{ target_user.last_login|date:"M d, Y g:i A" }}{% else %}Never{% endif %}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">User ID</p>
+                    <p class="font-semibold text-slate-900 dark:text-white">{{ target_user.pk }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Username</p>
+                    <p class="font-semibold text-slate-900 dark:text-white">{{ target_user.username }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

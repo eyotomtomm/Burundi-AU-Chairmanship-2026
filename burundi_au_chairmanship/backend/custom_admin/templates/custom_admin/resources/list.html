@@ -1,0 +1,236 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}Resources - Burundi AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-surface py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-on-surface">Resources Management</h1>
+                    <p class="mt-2 text-sm text-on-surface-variant">Manage official documents, reports, speeches, and press releases</p>
+                </div>
+                <a href="{% url 'custom_admin:resource_create' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-container text-on-primary-container rounded-full hover:shadow-lg transition-all duration-200">
+                    <span class="material-symbols-outlined text-xl">add</span>
+                    <span class="font-medium">Add Resource</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Resources List -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+            {% if resources %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-outline-variant">
+                        <thead class="bg-surface-container">
+                            <tr>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    <div class="flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-lg">folder_open</span>
+                                        <span>Title</span>
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    Category
+                                </th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    File Type
+                                </th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    File Size
+                                </th>
+                                <th scope="col" class="px-6 py-4 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    Created
+                                </th>
+                                <th scope="col" class="px-6 py-4 text-right text-xs font-medium text-on-surface-variant uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-surface-container-lowest divide-y divide-outline-variant">
+                            {% for resource in resources %}
+                                <tr class="hover:bg-surface-container transition-colors duration-150">
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-col">
+                                            <div class="text-sm font-medium text-on-surface">{{ resource.title }}</div>
+                                            {% if resource.title_fr %}
+                                                <div class="text-xs text-on-surface-variant mt-1 italic">{{ resource.title_fr }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+                                            {% if resource.category == 'official_documents' %}bg-blue-100 text-blue-800
+                                            {% elif resource.category == 'reports' %}bg-green-100 text-green-800
+                                            {% elif resource.category == 'speeches' %}bg-purple-100 text-purple-800
+                                            {% elif resource.category == 'press_releases' %}bg-amber-100 text-amber-800
+                                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                            {{ resource.get_category_display|default:resource.category }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-on-surface uppercase">{{ resource.file_type|default:"-" }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-on-surface-variant">{{ resource.file_size|default:"-" }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-on-surface-variant">{{ resource.created_at|date:"M d, Y" }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end gap-2">
+                                            {% if resource.file %}
+                                                <a href="{{ resource.file.url }}" target="_blank" class="text-primary hover:text-primary-container p-2 rounded-full hover:bg-surface-container transition-all" title="Download">
+                                                    <span class="material-symbols-outlined text-xl">download</span>
+                                                </a>
+                                            {% endif %}
+                                            <a href="{% url 'custom_admin:resource_edit' resource.pk %}" class="text-tertiary hover:text-tertiary-container p-2 rounded-full hover:bg-surface-container transition-all" title="Edit">
+                                                <span class="material-symbols-outlined text-xl">edit</span>
+                                            </a>
+                                            <button onclick="confirmDelete({{ resource.pk }}, '{{ resource.title|escapejs }}')" class="text-error hover:text-error-container p-2 rounded-full hover:bg-surface-container transition-all" title="Delete">
+                                                <span class="material-symbols-outlined text-xl">delete</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if resources.has_other_pages %}
+                    <div class="bg-surface-container px-6 py-4 border-t border-outline-variant">
+                        <nav class="flex items-center justify-between">
+                            <div class="flex-1 flex justify-between sm:hidden">
+                                {% if resources.has_previous %}
+                                    <a href="?page={{ resources.previous_page_number }}" class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-on-surface-variant bg-surface-container-low hover:bg-surface-container">
+                                        Previous
+                                    </a>
+                                {% else %}
+                                    <span class="relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-on-surface-variant bg-surface opacity-50 cursor-not-allowed">
+                                        Previous
+                                    </span>
+                                {% endif %}
+                                {% if resources.has_next %}
+                                    <a href="?page={{ resources.next_page_number }}" class="ml-3 relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-on-surface-variant bg-surface-container-low hover:bg-surface-container">
+                                        Next
+                                    </a>
+                                {% else %}
+                                    <span class="ml-3 relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-on-surface-variant bg-surface opacity-50 cursor-not-allowed">
+                                        Next
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-sm text-on-surface-variant">
+                                        Showing page <span class="font-medium">{{ resources.number }}</span> of <span class="font-medium">{{ resources.paginator.num_pages }}</span>
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                        {% if resources.has_previous %}
+                                            <a href="?page=1" class="relative inline-flex items-center px-3 py-2 rounded-l-md text-sm font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container">
+                                                <span class="material-symbols-outlined text-lg">first_page</span>
+                                            </a>
+                                            <a href="?page={{ resources.previous_page_number }}" class="relative inline-flex items-center px-3 py-2 text-sm font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container">
+                                                <span class="material-symbols-outlined text-lg">chevron_left</span>
+                                            </a>
+                                        {% endif %}
+                                        <span class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-on-surface bg-surface-container">
+                                            {{ resources.number }}
+                                        </span>
+                                        {% if resources.has_next %}
+                                            <a href="?page={{ resources.next_page_number }}" class="relative inline-flex items-center px-3 py-2 text-sm font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container">
+                                                <span class="material-symbols-outlined text-lg">chevron_right</span>
+                                            </a>
+                                            <a href="?page={{ resources.paginator.num_pages }}" class="relative inline-flex items-center px-3 py-2 rounded-r-md text-sm font-medium text-on-surface-variant bg-surface-container-low hover:bg-surface-container">
+                                                <span class="material-symbols-outlined text-lg">last_page</span>
+                                            </a>
+                                        {% endif %}
+                                    </nav>
+                                </div>
+                            </div>
+                        </nav>
+                    </div>
+                {% endif %}
+            {% else %}
+                <!-- Empty State -->
+                <div class="text-center py-12 px-6">
+                    <span class="material-symbols-outlined text-6xl text-on-surface-variant opacity-50 mb-4">folder_open</span>
+                    <h3 class="text-lg font-medium text-on-surface mb-2">No resources yet</h3>
+                    <p class="text-sm text-on-surface-variant mb-6">Get started by adding your first resource.</p>
+                    <a href="{% url 'custom_admin:resource_create' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-container text-on-primary-container rounded-full hover:shadow-lg transition-all duration-200">
+                        <span class="material-symbols-outlined text-xl">add</span>
+                        <span class="font-medium">Add Resource</span>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-xl shadow-xl max-w-md w-full p-8">
+        <div class="flex items-center gap-4 mb-6">
+            <div class="flex-shrink-0">
+                <span class="material-symbols-outlined text-4xl text-error">warning</span>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-on-surface">Delete Resource</h3>
+                <p class="text-sm text-on-surface-variant mt-1">This action cannot be undone.</p>
+            </div>
+        </div>
+        <p class="text-sm text-on-surface mb-6">
+            Are you sure you want to delete <strong id="resourceName"></strong>?
+        </p>
+        <div class="flex items-center justify-end gap-3">
+            <button onclick="closeDeleteModal()" class="px-6 py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+                Cancel
+            </button>
+            <form id="deleteForm" method="POST" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="px-6 py-2.5 text-sm font-medium bg-error text-on-error rounded-full hover:shadow-lg transition-all duration-200">
+                    Delete Resource
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(resourceId, resourceName) {
+    const modal = document.getElementById('deleteModal');
+    const form = document.getElementById('deleteForm');
+    const nameSpan = document.getElementById('resourceName');
+
+    nameSpan.textContent = resourceName;
+    form.action = "{% url 'custom_admin:resource_delete' 0 %}".replace('0', resourceId);
+    modal.classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteModal');
+    modal.classList.add('hidden');
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeDeleteModal();
+    }
+});
+
+// Close modal on backdrop click
+document.getElementById('deleteModal').addEventListener('click', function(event) {
+    if (event.target === this) {
+        closeDeleteModal();
+    }
+});
+</script>
+{% endblock %}

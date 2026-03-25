@@ -1,445 +1,1222 @@
 from django.contrib import admin
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
+from django.utils import timezone
 from .models import (
     HeroSlide, MagazineEdition, MagazineImage, Article, EmbassyLocation,
     Event, LiveFeed, Resource, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, Notification, MagazineLike,
-    HeroTextContent, QuickAccessMenuItem,
+    HeroTextContent, QuickAccessMenuItem, VerificationRequest, WeatherCity,
+    EventRegistration, RegistrationFormField, EventSubmission,
+    FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
+    AuditLogEntry, AdminRole,
 )
 
 
 # ═══════════════════════════════════════════════════════════════
-#  ADMIN SITE BRANDING
+#  ADMIN SITE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-admin.site.site_header = 'Burundi4africa'
-admin.site.site_title = 'Burundi4africa Admin'
-admin.site.index_title = 'Content Management'
+admin.site.site_header = 'Burundi AU Chairmanship 2026'
+admin.site.site_title = 'Admin Panel'
+admin.site.index_title = 'Content Management System'
+
+# Hide unnecessary models
+admin.site.unregister(Group)
 
 
 # ═══════════════════════════════════════════════════════════════
-#  USERS — simplified, no technical fields
+#  USERS
 # ═══════════════════════════════════════════════════════════════
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
-    verbose_name_plural = 'Profile'
-    fields = ['phone_number', 'gender', 'profile_picture',
-              'is_government_official']
+    verbose_name_plural = 'User Profile Information'
+    fields = [
+        ('phone_number', 'gender'),
+        ('nationality', 'date_of_birth'),
+        'profile_picture',
+        ('is_deactivated', 'deactivated_at'),
+        ('is_scheduled_for_deletion', 'deletion_requested_at', 'deletion_scheduled_for'),
+    ]
+    readonly_fields = ['deactivated_at', 'deletion_requested_at', 'deletion_scheduled_for']
 
 
 class CustomUserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline,)
-    list_display = ['username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined']
-    # Simplified add form — just username, email, password
+    list_display = ['username', 'email', 'first_name', 'last_name', 'is_active',
+                    'is_staff', 'account_status', 'assigned_roles', 'date_joined']
+    list_filter = ['is_active', 'is_staff', 'is_superuser', 'date_joined',
+                   'profile__is_deactivated', 'profile__is_scheduled_for_deletion']
+    search_fields = ['username', 'email', 'first_name', 'last_name']
+    ordering = ['-date_joined']
+    actions = ['make_staff', 'remove_staff', 'reactivate_accounts']
+
     add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2'),
+        ('Account Information', {
+            'fields': ('username', 'email', 'first_name', 'last_name', 'password1', 'password2'),
+            'description': 'Create a new user account. To grant admin access, check "Staff status" below.',
         }),
-    )
-    # Simplified edit form — no technical permission stuff for content managers
-    fieldsets = (
-        ('Account', {'fields': ('username', 'password')}),
-        ('Personal Info', {'fields': ('first_name', 'last_name', 'email')}),
-        ('Access Level', {
+        ('Admin Access', {
             'fields': ('is_active', 'is_staff', 'is_superuser'),
-            'description': 'Staff = can access this admin panel. Superuser = full access to everything.',
+            'description': 'Staff status = can access admin portal. Superuser = full access to everything. '
+                           'For limited access, make them Staff and assign an Admin Role.',
         }),
     )
+
+    fieldsets = (
+        ('Account', {
+            'fields': ('username', 'email', 'first_name', 'last_name', 'password')
+        }),
+        ('Admin Access & Permissions', {
+            'fields': ('is_active', 'is_staff', 'is_superuser'),
+            'description': 'Staff status = can log into admin portal. Superuser = unrestricted access. '
+                           'For granular access, assign Admin Roles below.',
+        }),
+        ('Important Dates', {
+            'fields': ('date_joined', 'last_login'),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = ['date_joined', 'last_login']
+
+    def account_status(self, obj):
+        if hasattr(obj, 'profile'):
+            p = obj.profile
+            if p.is_scheduled_for_deletion:
+                days_left = (p.deletion_scheduled_for - timezone.now()).days if p.deletion_scheduled_for else 0
+                return format_html(
+                    '<span style="color:red; font-weight:bold;">Deleting in {} days</span>',
+                    max(0, days_left)
+                )
+            if p.is_deactivated:
+                return format_html('<span style="color:orange;">On Break</span>')
+        if obj.is_active:
+            return format_html('<span style="color:green;">Active</span>')
+        return format_html('<span style="color:gray;">Inactive</span>')
+    account_status.short_description = 'Status'
+
+    def assigned_roles(self, obj):
+        roles = AdminRole.objects.filter(users=obj, is_active=True)
+        if not roles.exists():
+            if obj.is_superuser:
+                return format_html('<span style="color:#B8860B; font-weight:bold;">Superuser (Full Access)</span>')
+            return '-'
+        return ', '.join(r.name for r in roles)
+    assigned_roles.short_description = 'Admin Roles'
+
+    def make_staff(self, request, queryset):
+        updated = queryset.update(is_staff=True)
+        self.message_user(request, f'{updated} user(s) granted admin portal access.')
+    make_staff.short_description = 'Grant admin portal access (Staff)'
+
+    def remove_staff(self, request, queryset):
+        updated = queryset.exclude(is_superuser=True).update(is_staff=False)
+        self.message_user(request, f'{updated} user(s) had admin access removed. Superusers were skipped.')
+    remove_staff.short_description = 'Remove admin portal access (Staff)'
+
+    def reactivate_accounts(self, request, queryset):
+        count = 0
+        for user in queryset:
+            if hasattr(user, 'profile') and (user.profile.is_deactivated or user.profile.is_scheduled_for_deletion):
+                user.profile.is_deactivated = False
+                user.profile.deactivated_at = None
+                user.profile.is_scheduled_for_deletion = False
+                user.profile.deletion_requested_at = None
+                user.profile.deletion_scheduled_for = None
+                user.profile.save()
+                user.is_active = True
+                user.save()
+                count += 1
+        self.message_user(request, f'{count} account(s) reactivated.')
+    reactivate_accounts.short_description = 'Reactivate selected accounts'
 
 
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
 
+@admin.register(AdminRole)
+class AdminRoleAdmin(admin.ModelAdmin):
+    """
+    ADMIN ROLES - Define access levels for admin users
+
+    HELP:
+    Create roles like "Content Editor", "Event Manager", "Notification Admin" etc.
+    Assign users to roles to control what they can access in the admin portal.
+
+    AVAILABLE PERMISSIONS:
+    - content: Articles, Magazines, Hero Slides, Feature Cards
+    - events: Events & Event Registrations
+    - users: User Management & Profiles
+    - verification: Verification Request approvals
+    - notifications: Push Notification management
+    - gallery: Photo Gallery & Albums
+    - locations: Embassy & Location data
+    - settings: App Settings & Configuration
+    - audit: View Audit Logs
+    """
+    list_display = ['name', 'description', 'permission_list', 'user_count', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['name', 'description']
+    filter_horizontal = ['users']
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'description', 'is_active'),
+        }),
+        ('Permissions', {
+            'fields': ('permissions',),
+            'description': (
+                'Enter a JSON list of permission keys. Available permissions:\n'
+                '["content", "events", "users", "verification", "notifications", '
+                '"gallery", "locations", "settings", "audit"]\n\n'
+                'Example for a Content Editor: ["content", "gallery"]\n'
+                'Example for an Event Manager: ["events", "notifications"]'
+            ),
+        }),
+        ('Assigned Users', {
+            'fields': ('users',),
+            'description': 'Select which users have this role. Users must also have "Staff" status to access the admin portal.',
+        }),
+    )
+
+    def permission_list(self, obj):
+        labels = obj.get_permission_labels()
+        if not labels:
+            return '-'
+        return ', '.join(labels)
+    permission_list.short_description = 'Permissions'
+
+    def user_count(self, obj):
+        count = obj.users.count()
+        return format_html('<strong>{}</strong> user(s)', count)
+    user_count.short_description = 'Users'
+
+
 # ═══════════════════════════════════════════════════════════════
-#  HOME – Hero Slides & Feature Cards
+#  HOME SCREEN CONTENT
 # ═══════════════════════════════════════════════════════════════
 
 @admin.register(HeroSlide)
 class HeroSlideAdmin(admin.ModelAdmin):
-    list_display = ['label', 'order', 'is_active']
+    """
+    HERO SLIDES - Top rotating banner images on home screen
+
+    HELP:
+    These images appear at the very top of the app home screen in a slideshow.
+    - Upload high-quality images (recommended: 1200x600px)
+    - Add a short label that appears over the image
+    - Set the order to control which appears first
+    - Use "is active" to show/hide slides without deleting them
+    """
+    list_display = ['label', 'image_preview', 'order', 'is_active']
     list_editable = ['order', 'is_active']
     list_filter = ['is_active']
-    fields = ['image', 'label', 'label_fr', 'order', 'is_active']
+    search_fields = ['label', 'label_fr']
+
+    fieldsets = (
+        (None, {
+            'fields': [
+                'image',
+                ('label', 'label_fr'),
+                ('order', 'is_active'),
+            ],
+        }),
+    )
+
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height:50px; border-radius:4px;" />', obj.image.url)
+        return '-'
+    image_preview.short_description = 'Preview'
+
+
+@admin.register(HeroTextContent)
+class HeroTextAdmin(admin.ModelAdmin):
+    """
+    HERO TEXT - Big text overlay on home screen
+
+    HELP:
+    This is the large text that appears over the hero slideshow.
+    Examples: "BURUNDI", "African Union", "Chairmanship", "2026"
+
+    KEYS:
+    - badge: Small text at top (e.g., "BURUNDI")
+    - title_line1: First line of big title (e.g., "African Union")
+    - title_line2: Second line of big title (e.g., "Chairmanship")
+    - year: Year text (e.g., "2026")
+    """
+    list_display = ['key', 'text_en', 'text_fr']
+    list_editable = ['text_en', 'text_fr']
+    fields = ['key', ('text_en', 'text_fr')]
+
+
+class FeatureCardKeyPointInline(admin.TabularInline):
+    model = FeatureCardKeyPoint
+    extra = 1
+    fields = ['order', 'text', 'text_fr']
+
+
+class FeatureCardImpactAreaInline(admin.TabularInline):
+    model = FeatureCardImpactArea
+    extra = 1
+    fields = ['order', 'icon_name', 'title', 'title_fr', 'description', 'description_fr']
+
+
+class FeatureCardMediaInline(admin.TabularInline):
+    model = FeatureCardMedia
+    extra = 1
+    fields = ['order', 'media_type', 'image', 'image_url', 'video_file', 'video_url', 'caption', 'caption_fr']
 
 
 @admin.register(FeatureCard)
 class FeatureCardAdmin(admin.ModelAdmin):
-    list_display = ['title', 'color_preview', 'action_type', 'order', 'is_active']
+    """
+    FEATURE CARDS - Main content cards on home screen
+
+    HELP:
+    These are the colorful cards that appear on the home screen.
+    Users can tap them to see more details or navigate to different sections.
+
+    HOW TO USE:
+    1. Add a title and description
+    2. Upload a background image (optional)
+    3. Upload an icon image or choose a built-in icon
+    4. Set gradient colors for the card background
+    5. Set the order (lower numbers appear first)
+    6. Check "is active" to make it visible in the app
+
+    DETAIL PAGE CONTENT:
+    Use the inline sections below to add:
+    - Key Points: Simple text rows (one per line)
+    - Impact Areas: Icon + title + description rows
+    - Media: Upload photos or add video URLs
+
+    No JSON needed — just fill in the rows!
+    """
+    inlines = [
+        FeatureCardKeyPointInline,
+        FeatureCardImpactAreaInline,
+        FeatureCardMediaInline,
+    ]
+    list_display = ['title', 'preview', 'order', 'is_active']
     list_editable = ['order', 'is_active']
-    search_fields = ['title', 'title_fr']
+    list_filter = ['is_active']
+    search_fields = ['title', 'title_fr', 'description']
 
     fieldsets = (
-        ('Basic Info', {
-            'fields': ('title', 'title_fr', 'description', 'description_fr',
-                       'image', 'gradient_start', 'gradient_end', 'order', 'is_active'),
+        ('Basic Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                ('description', 'description_fr'),
+                'image',
+            ],
         }),
-        ('Icon', {
-            'fields': ('icon_image', 'icon_name'),
-            'description': 'Upload a custom icon image (preferred), or pick a built-in icon as fallback.',
+        ('Visual Design', {
+            'fields': [
+                'icon_image',
+                'icon_name',
+                ('gradient_start', 'gradient_end'),
+            ],
+            'description': 'Upload a custom icon or select a built-in one. Set gradient colors for card background.',
         }),
-        ('Action', {
-            'fields': ('action_type', 'action_value'),
-            'description': 'Set action_type to "route" and action_value to "/feature-detail" to enable the detail page.',
+        ('Display Settings', {
+            'fields': [
+                ('order', 'is_active'),
+            ],
         }),
-        ('Detail Page Content', {
-            'fields': ('overview', 'overview_fr'),
+        ('Detail Page Text (Optional)', {
+            'fields': [
+                ('overview', 'overview_fr'),
+                ('extra_content', 'extra_content_fr'),
+            ],
             'classes': ('collapse',),
-            'description': 'Rich content shown when the card is tapped.',
-        }),
-        ('Detail Page — Extra Content', {
-            'fields': ('extra_content', 'extra_content_fr'),
-            'classes': ('collapse',),
-        }),
-        ('Advanced (technical)', {
-            'fields': ('key_points', 'key_points_fr', 'impact_areas', 'impact_areas_fr'),
-            'classes': ('collapse',),
-            'description': 'JSON fields managed by the developer.',
+            'description': 'Overview and extra text for the detail page. Key points, impact areas, and media are managed below.',
         }),
     )
 
-    @admin.display(description='Color')
-    def color_preview(self, obj):
-        return format_html(
-            '<span style="display:inline-block;width:40px;height:18px;border-radius:4px;'
-            'background:linear-gradient(135deg,{} 0%,{} 100%)"></span>',
-            obj.gradient_start, obj.gradient_end
-        )
+    def preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height:40px; border-radius:8px;" />', obj.image.url)
+        elif obj.gradient_start:
+            return format_html(
+                '<div style="width:40px; height:40px; background:linear-gradient(135deg, {}, {}); border-radius:8px;"></div>',
+                obj.gradient_start, obj.gradient_end
+            )
+        return '-'
+    preview.short_description = 'Preview'
+
+
+@admin.register(QuickAccessMenuItem)
+class QuickAccessAdmin(admin.ModelAdmin):
+    """
+    QUICK ACCESS MENU - Icon menu below hero section
+
+    HELP:
+    This is the row of icons that appears below the hero slideshow.
+    Each icon is a shortcut to a different section of the app.
+
+    HOW TO USE:
+    1. Set the title (shown below the icon)
+    2. Choose an icon name (e.g., live_tv, menu_book, article)
+    3. Set where it should navigate to (e.g., /live-feeds, /magazine)
+    4. Set the order to control position
+    5. Check "is active" to show/hide
+
+    SPECIAL FEATURES:
+    - "Has live indicator": Shows a red "LIVE" badge
+    - "Badge text": Custom badge text (e.g., "NEW", "HOT")
+    """
+    list_display = ['title_en', 'icon_name', 'action_value', 'order', 'is_active']
+    list_editable = ['order', 'is_active']
+    list_filter = ['is_active', 'has_live_indicator']
+    search_fields = ['title_en', 'title_fr']
+
+    fieldsets = (
+        ('Menu Item', {
+            'fields': [
+                ('title_en', 'title_fr'),
+                'icon_name',
+                'action_value',
+                ('order', 'is_active'),
+            ],
+        }),
+        ('Badges (Optional)', {
+            'fields': [
+                ('has_live_indicator', 'badge_text'),
+            ],
+            'classes': ('collapse',),
+        }),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
-#  NEWS – Categories & Articles
+#  EVENTS & HOLIDAY CARDS
+# ═══════════════════════════════════════════════════════════════
+
+class RegistrationFormFieldInline(admin.TabularInline):
+    model = RegistrationFormField
+    extra = 1
+    fields = ['order', 'field_type', 'field_label', 'field_label_fr', 'field_name', 'is_required', 'is_active']
+    classes = ['collapse']
+
+
+@admin.register(EventRegistration)
+class EventRegistrationAdmin(admin.ModelAdmin):
+    """
+    EVENT REGISTRATIONS - Standalone event registration management.
+
+    HOW TO USE:
+    1. Add event title, description, and poster image
+    2. Set event date, venue, and contact info
+    3. Configure registration settings (deadline, max, proxy)
+    4. Add form fields in the section below
+    5. Check "is active" to make visible in app
+    """
+    inlines = [RegistrationFormFieldInline]
+    list_display = ['event_title', 'card_type', 'event_date', 'venue', 'submission_count', 'is_active', 'order']
+    list_editable = ['is_active', 'order']
+    list_filter = ['card_type', 'is_registration_enabled', 'is_active', 'created_at']
+    search_fields = ['event_title', 'event_title_fr']
+
+    fieldsets = (
+        ('Event Information', {
+            'fields': [
+                'card_type',
+                ('event_title', 'event_title_fr'),
+                ('event_description', 'event_description_fr'),
+                'event_poster',
+            ],
+        }),
+        ('Date & Venue', {
+            'fields': [
+                ('event_date', 'event_end_date'),
+                ('venue', 'venue_fr'),
+                'venue_address',
+            ],
+        }),
+        ('Contact', {
+            'fields': [
+                ('contact_email', 'contact_phone'),
+            ],
+        }),
+        ('Registration Settings', {
+            'fields': [
+                'is_registration_enabled',
+                'registration_deadline',
+                'max_registrations',
+                'allow_proxy_registration',
+                'send_confirmation_email',
+                ('confirmation_message', 'confirmation_message_fr'),
+            ],
+        }),
+        ('Display', {
+            'fields': [
+                ('is_active', 'order'),
+            ],
+        }),
+    )
+
+    def submission_count(self, obj):
+        count = obj.submissions.count()
+        return format_html(
+            '<span style="background:#1E88E5; color:white; padding:2px 8px; border-radius:3px; font-size:11px;">{}</span>',
+            count
+        )
+    submission_count.short_description = 'Submissions'
+
+
+@admin.register(EventSubmission)
+class EventSubmissionAdmin(admin.ModelAdmin):
+    """
+    EVENT SUBMISSIONS - User registrations and form submissions
+
+    HELP:
+    This is where you see all user submissions for event registrations.
+    You can review, approve, or reject submissions here.
+
+    STATUS OPTIONS:
+    - Pending: Waiting for your review
+    - Approved: User registration accepted
+    - Rejected: User registration denied
+    - Waitlist: User added to waiting list
+
+    HOW TO REVIEW:
+    1. Click on a submission to see the details
+    2. Review the user's submitted information
+    3. Change the status to approve/reject
+    4. Add admin notes (optional)
+    5. Save
+
+    The system tracks when you reviewed it and who reviewed it.
+    """
+    list_display = ['user', 'event_title', 'status_badge', 'submitted_at']
+    list_filter = ['status', 'submitted_at']
+    search_fields = ['user__username', 'user__email', 'user__first_name', 'event_registration__event_title']
+    readonly_fields = ['user', 'event_registration', 'submitted_at', 'form_data_display']
+    date_hierarchy = 'submitted_at'
+
+    fieldsets = (
+        ('Submission Information', {
+            'fields': ['event_registration', 'user', 'submitted_at'],
+        }),
+        ('Submitted Data', {
+            'fields': ['form_data_display'],
+        }),
+        ('Review & Status', {
+            'fields': ['status', 'admin_notes', 'reviewed_at', 'reviewed_by'],
+        }),
+    )
+
+    def event_title(self, obj):
+        return obj.event_registration.event_title
+    event_title.short_description = 'Event'
+
+    def status_badge(self, obj):
+        colors = {
+            'pending': '#FFA500',
+            'approved': '#28A745',
+            'rejected': '#DC3545',
+            'waitlist': '#6C757D',
+        }
+        return format_html(
+            '<span style="background:{}; color:white; padding:3px 10px; border-radius:3px; font-size:11px; font-weight:600;">{}</span>',
+            colors.get(obj.status, '#666'),
+            obj.get_status_display().upper()
+        )
+    status_badge.short_description = 'Status'
+
+    def form_data_display(self, obj):
+        if not obj.form_data:
+            return 'No data submitted'
+        from django.utils.html import escape, format_html_join
+
+        header = '<table style="width:100%; border-collapse:collapse; margin:10px 0;"><thead><tr style="background:#f5f5f5;"><th style="padding:10px; text-align:left; border:1px solid #ddd;">Field</th><th style="padding:10px; text-align:left; border:1px solid #ddd;">Value</th></tr></thead><tbody>'
+        footer = '</tbody></table>'
+        rows = format_html_join(
+            '',
+            '<tr><td style="padding:10px; border:1px solid #ddd; font-weight:600;">{}</td><td style="padding:10px; border:1px solid #ddd;">{}</td></tr>',
+            ((escape(str(k)), escape(str(v))) for k, v in obj.form_data.items())
+        )
+        return format_html('{}{}{}', format_html(header), rows, format_html(footer))
+    form_data_display.short_description = 'User Submitted Information'
+
+    def save_model(self, request, obj, form, change):
+        if obj.status in ['approved', 'rejected'] and not obj.reviewed_at:
+            obj.reviewed_at = timezone.now()
+            obj.reviewed_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTENT - ARTICLES, MAGAZINES, VIDEOS
 # ═══════════════════════════════════════════════════════════════
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'name_fr', 'color_chip', 'order']
-    list_editable = ['order']
-    fields = ['name', 'name_fr', 'color', 'order']
+    """
+    CATEGORIES - Organize articles and videos by topic
 
-    @admin.display(description='Color')
-    def color_chip(self, obj):
-        return format_html(
-            '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;'
-            'background:{};vertical-align:middle"></span> {}',
-            obj.color, obj.color
-        )
+    HELP:
+    Categories help organize content into topics like Politics, Economy, Culture, etc.
+    Users can filter articles and videos by category in the app.
+    """
+    list_display = ['name', 'name_fr', 'order']
+    list_editable = ['order']
+    fields = [('name', 'name_fr'), 'order']
+
+
+class ArticleMediaInline(admin.TabularInline):
+    model = ArticleMedia
+    extra = 1
+    fields = ['media_type', 'file', 'caption', 'caption_fr', 'order']
+    classes = ['collapse']
 
 
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
-    list_display = ['title', 'author', 'category', 'publish_date', 'is_featured', 'view_count']
-    list_filter = ['category', 'is_featured']
-    search_fields = ['title', 'title_fr', 'author']
+    """
+    ARTICLES - News articles and blog posts
+
+    HELP:
+    Articles appear in the News section and on the home screen.
+
+    HOW TO USE:
+    1. Add a title and cover image
+    2. Choose a category
+    3. Write the article content
+    4. Check "is featured" to show on home screen
+    5. Set publish date
+    6. Add media files (images/videos) in the Media section below if needed
+
+    FEATURED ARTICLES:
+    Articles marked as "featured" appear in a special section on the home screen.
+    """
+    inlines = [ArticleMediaInline]
+    list_display = ['title', 'category', 'is_featured', 'publish_date', 'view_count']
+    list_filter = ['is_featured', 'category', 'publish_date']
     list_editable = ['is_featured']
-    readonly_fields = ['view_count']
+    search_fields = ['title', 'title_fr', 'content']
+    date_hierarchy = 'publish_date'
 
     fieldsets = (
-        ('English', {
-            'fields': ('title', 'content', 'image'),
-        }),
-        ('French', {
-            'fields': ('title_fr', 'content_fr'),
-            'classes': ('collapse',),
-            'description': 'French translation (optional)',
+        ('Article Content', {
+            'fields': [
+                ('title', 'title_fr'),
+                'cover_image',
+                'category',
+                'content',
+                'content_fr',
+            ],
         }),
         ('Publishing', {
-            'fields': ('author', 'category', 'publish_date', 'is_featured'),
+            'fields': [
+                'publish_date',
+                'is_featured',
+            ],
         }),
     )
 
 
-# ═══════════════════════════════════════════════════════════════
-#  MAGAZINE — no image inline, simplified
-# ═══════════════════════════════════════════════════════════════
+class MagazineImageInline(admin.TabularInline):
+    model = MagazineImage
+    extra = 1
+    fields = ['image', 'caption', 'caption_fr', 'order']
+    classes = ['collapse']
+
 
 @admin.register(MagazineEdition)
-class MagazineEditionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'publish_date', 'is_featured', 'view_count', 'like_count']
+class MagazineAdmin(admin.ModelAdmin):
+    """
+    MAGAZINE EDITIONS - Digital magazine publications
+
+    HELP:
+    Magazines are PDF publications that users can read in the app.
+    They can download magazines for offline reading.
+
+    HOW TO USE:
+    1. Add a title and description
+    2. Upload a cover image
+    3. Upload the PDF file
+    4. Set page count and file size
+    5. Check "is featured" to highlight on home screen
+    6. Add preview images in the Images section below (optional)
+
+    FEATURES:
+    - Users can like magazines
+    - Download for offline reading
+    - Screenshot protection (DRM)
+    """
+    inlines = [MagazineImageInline]
+    list_display = ['title', 'publish_date', 'is_featured', 'page_count', 'view_count']
     list_filter = ['is_featured', 'publish_date']
-    search_fields = ['title', 'title_fr']
     list_editable = ['is_featured']
-    readonly_fields = ['view_count', 'like_count']
+    search_fields = ['title', 'title_fr', 'description']
+    date_hierarchy = 'publish_date'
 
     fieldsets = (
-        ('Content', {
-            'fields': ('title', 'title_fr', 'description', 'description_fr'),
+        ('Magazine Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                ('description', 'description_fr'),
+                'cover_image',
+            ],
         }),
-        ('Files', {
-            'fields': ('cover_image', 'pdf_file', 'external_url'),
-            'description': 'Upload a cover image. Either upload a PDF or paste an external link.',
+        ('PDF File', {
+            'fields': [
+                'pdf_file',
+                ('page_count', 'file_size'),
+            ],
         }),
-        ('Details', {
-            'fields': ('publish_date', 'is_featured', 'page_count', 'file_size'),
+        ('Publishing', {
+            'fields': [
+                'publish_date',
+                'is_featured',
+            ],
         }),
     )
 
 
+@admin.register(Video)
+class VideoAdmin(admin.ModelAdmin):
+    """
+    VIDEOS - Video content library
+
+    HELP:
+    Videos appear in the Videos section of the app.
+
+    HOW TO USE:
+    1. Add a title and description
+    2. Upload a thumbnail image
+    3. Add the video URL (YouTube, Vimeo, or direct link)
+    4. Choose a category
+    5. Set duration (e.g., "5:30" or "1h 20m")
+
+    VIDEO URL:
+    Can be YouTube, Vimeo, or direct video file URL.
+    The app will automatically detect the type and play it correctly.
+    """
+    list_display = ['title', 'thumbnail_preview', 'category', 'duration', 'view_count']
+    list_filter = ['category', 'created_at']
+    search_fields = ['title', 'title_fr', 'description']
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Video Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                ('description', 'description_fr'),
+                'thumbnail',
+            ],
+        }),
+        ('Video Source', {
+            'fields': [
+                'video_url',
+                'category',
+                'duration',
+            ],
+        }),
+    )
+
+    def thumbnail_preview(self, obj):
+        if obj.thumbnail:
+            return format_html('<img src="{}" style="max-height:50px; border-radius:4px;" />', obj.thumbnail.url)
+        return '-'
+    thumbnail_preview.short_description = 'Thumbnail'
+
+
 # ═══════════════════════════════════════════════════════════════
-#  LOCATIONS & EVENTS — hide lat/long, simple address only
+#  GALLERY
+# ═══════════════════════════════════════════════════════════════
+
+class GalleryPhotoInline(admin.TabularInline):
+    model = GalleryPhoto
+    extra = 3
+    fields = ['image', 'caption', 'caption_fr', 'order']
+
+
+@admin.register(GalleryAlbum)
+class GalleryAlbumAdmin(admin.ModelAdmin):
+    """
+    PHOTO GALLERY - Photo albums
+
+    HELP:
+    Photo albums allow you to organize photos into collections.
+    Users can browse albums and download them for offline viewing.
+
+    HOW TO USE:
+    1. Create an album with title and description
+    2. Upload a cover image
+    3. Check "is featured" to highlight the album
+    4. Add photos in the Photos section below
+
+    FEATURES:
+    - Offline download with DRM protection
+    - Users can view photos in fullscreen
+    - Captions support bilingual text
+    """
+    inlines = [GalleryPhotoInline]
+    list_display = ['title', 'cover_preview', 'is_featured', 'photo_count', 'created_at']
+    list_filter = ['is_featured', 'created_at']
+    list_editable = ['is_featured']
+    search_fields = ['title', 'title_fr', 'description']
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Album Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                ('description', 'description_fr'),
+                'cover_image',
+                'is_featured',
+            ],
+        }),
+    )
+
+    def cover_preview(self, obj):
+        if obj.cover_image:
+            return format_html('<img src="{}" style="max-height:50px; border-radius:4px;" />', obj.cover_image.url)
+        return '-'
+    cover_preview.short_description = 'Cover'
+
+
+# ═══════════════════════════════════════════════════════════════
+#  NOTIFICATIONS
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    """
+    PUSH NOTIFICATIONS - Send notifications to users
+
+    HELP:
+    Send push notifications to inform users about news, events, or updates.
+
+    HOW TO USE:
+    1. Choose a notification type (article, event, magazine, etc.)
+    2. Write the title and message
+    3. Choose who should receive it:
+       - All users (check "is global")
+       - Specific filters (gender, nationality, age)
+       - Specific users (select individually)
+    4. Check "is active" to make it visible in app
+
+    TARGETING:
+    You can send notifications to specific groups:
+    - By gender (male, female, other)
+    - By nationality/country
+    - By age range (min/max age)
+    - To specific users only
+
+    Leave filters blank to send to everyone.
+
+    NOTE:
+    Notifications appear in the app's notification center.
+    Users can tap them to navigate to the related content.
+    """
+    list_display = ['title', 'notification_type', 'targeting_info', 'is_active', 'created_at']
+    list_filter = ['notification_type', 'is_active', 'is_global', 'created_at']
+    search_fields = ['title', 'title_fr', 'message']
+    filter_horizontal = ['target_users']
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Notification Content', {
+            'fields': [
+                'notification_type',
+                ('title', 'title_fr'),
+                ('message', 'message_fr'),
+            ],
+        }),
+        ('Targeting - Who Should See This?', {
+            'fields': [
+                'is_global',
+                'target_gender',
+                'target_nationality',
+                ('target_age_min', 'target_age_max'),
+                'target_users',
+            ],
+            'description': 'Check "is global" to send to everyone, or use filters below for specific groups.',
+        }),
+        ('Settings', {
+            'fields': [
+                'is_active',
+            ],
+        }),
+    )
+
+    def targeting_info(self, obj):
+        if obj.is_global:
+            return 'All Users'
+        filters = []
+        if obj.target_gender:
+            filters.append(obj.target_gender)
+        if obj.target_nationality:
+            filters.append(obj.target_nationality)
+        if obj.target_age_min or obj.target_age_max:
+            filters.append(f'Age {obj.target_age_min or "any"}-{obj.target_age_max or "any"}')
+        if obj.target_users.exists():
+            filters.append(f'{obj.target_users.count()} users')
+        return ', '.join(filters) if filters else 'No filters'
+    targeting_info.short_description = 'Targeting'
+
+
+# ═══════════════════════════════════════════════════════════════
+#  LOCATIONS & EVENTS
 # ═══════════════════════════════════════════════════════════════
 
 @admin.register(EmbassyLocation)
-class EmbassyLocationAdmin(admin.ModelAdmin):
-    list_display = ['name', 'city', 'country', 'type', 'phone_number']
-    list_filter = ['type', 'country']
-    search_fields = ['name', 'city', 'country']
+class EmbassyAdmin(admin.ModelAdmin):
+    """
+    EMBASSY LOCATIONS - Embassy and consulate information
+
+    HELP:
+    Store information about embassies and consulates.
+    Users can view locations on a map and get directions.
+
+    HOW TO USE:
+    1. Add embassy name and address
+    2. Set country and city
+    3. Add contact information (phone, email, website)
+    4. Add GPS coordinates for map display
+
+    GPS COORDINATES:
+    Get coordinates from Google Maps:
+    - Right-click on the location
+    - Click on the coordinates to copy them
+    - Paste latitude and longitude here
+    """
+    list_display = ['name', 'city', 'country', 'phone_number', 'email']
+    list_filter = ['country', 'city']
+    search_fields = ['name', 'name_fr', 'city', 'country', 'address']
 
     fieldsets = (
-        ('Info', {
-            'fields': ('name', 'name_fr', 'type', 'image'),
+        ('Embassy Information', {
+            'fields': [
+                ('name', 'name_fr'),
+                ('address', 'address_fr'),
+                ('city', 'country'),
+            ],
         }),
-        ('Address', {
-            'fields': ('address', 'city', 'country'),
+        ('Contact Information', {
+            'fields': [
+                ('phone_number', 'email'),
+                'website',
+            ],
         }),
-        ('Contact', {
-            'fields': ('phone_number', 'email', 'website', 'opening_hours'),
-        }),
-        ('Map Coordinates (optional)', {
-            'fields': ('latitude', 'longitude'),
-            'classes': ('collapse',),
-            'description': 'Leave as-is unless you need to update the map pin location.',
+        ('Map Location', {
+            'fields': [
+                ('latitude', 'longitude'),
+            ],
+            'description': 'GPS coordinates for map display. Get from Google Maps.',
         }),
     )
 
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ['name', 'address', 'event_date']
-    list_filter = ['event_date']
-    search_fields = ['name', 'name_fr', 'address']
+    """
+    CALENDAR EVENTS - Important dates and events
+
+    HELP:
+    Events appear in the Calendar section of the app.
+    Users can add them to their device calendar.
+
+    HOW TO USE:
+    1. Add event name and description
+    2. Set the event date and time
+    3. Add location/address
+    4. Add GPS coordinates (optional, for map)
+    5. Upload an image (optional)
+
+    FEATURES:
+    - Users can set reminders
+    - Add to iOS Calendar, Google Calendar, Outlook
+    - View location on map
+    """
+    list_display = ['name', 'event_date', 'address', 'created_at']
+    list_filter = ['event_date', 'created_at']
+    search_fields = ['name', 'name_fr', 'address', 'description']
+    date_hierarchy = 'event_date'
 
     fieldsets = (
-        ('Event', {
-            'fields': ('name', 'name_fr', 'description', 'description_fr', 'image'),
+        ('Event Information', {
+            'fields': [
+                ('name', 'name_fr'),
+                ('description', 'description_fr'),
+                'event_date',
+            ],
         }),
-        ('When & Where', {
-            'fields': ('event_date', 'address'),
+        ('Location', {
+            'fields': [
+                'address',
+                ('latitude', 'longitude'),
+            ],
         }),
-        ('Map Coordinates (optional)', {
-            'fields': ('latitude', 'longitude'),
+        ('Media', {
+            'fields': ['image'],
             'classes': ('collapse',),
-            'description': 'Leave as-is unless you need to update the map pin location.',
         }),
     )
 
 
 # ═══════════════════════════════════════════════════════════════
-#  MEDIA – Live Feeds, Videos, Gallery
+#  LIVE FEEDS & RESOURCES
 # ═══════════════════════════════════════════════════════════════
 
 @admin.register(LiveFeed)
 class LiveFeedAdmin(admin.ModelAdmin):
-    list_display = ['title', 'status_badge', 'scheduled_time', 'viewer_count']
-    list_filter = ['status']
-    search_fields = ['title', 'title_fr']
-    fields = ['title', 'title_fr', 'stream_url', 'thumbnail',
-              'status', 'scheduled_time', 'duration', 'viewer_count']
+    """
+    LIVE FEEDS - Live streams and videos
 
-    @admin.display(description='Status')
-    def status_badge(self, obj):
-        colors = {'live': '#1EB53A', 'upcoming': '#D4AF37', 'recorded': '#6c757d'}
-        color = colors.get(obj.status, '#6c757d')
-        return format_html(
-            '<span style="background:{};color:#fff;padding:3px 10px;border-radius:12px;'
-            'font-size:11px;font-weight:600">{}</span>',
-            color, obj.get_status_display()
-        )
+    HELP:
+    Manage live streams, upcoming broadcasts, and recorded videos.
 
+    STATUS:
+    - Live: Currently streaming
+    - Upcoming: Scheduled for future
+    - Recorded: Past broadcast/recording
 
-class GalleryPhotoInline(admin.TabularInline):
-    model = GalleryPhoto
-    extra = 1
-    fields = ['image', 'caption', 'photographer', 'display_order']
+    HOW TO USE:
+    1. Add title and description
+    2. Upload thumbnail image
+    3. Add stream URL (YouTube Live, Vimeo, etc.)
+    4. Set status (live/upcoming/recorded)
+    5. Set scheduled time for upcoming streams
+    6. Set duration for recorded videos
 
-
-@admin.register(GalleryAlbum)
-class GalleryAlbumAdmin(admin.ModelAdmin):
-    list_display = ['title', 'photo_count', 'is_featured', 'display_order']
-    list_editable = ['is_featured', 'display_order']
-    list_filter = ['is_featured']
-    search_fields = ['title', 'title_fr']
-    readonly_fields = ['photo_count']
-    inlines = [GalleryPhotoInline]
-
-    fields = ['title', 'title_fr', 'description', 'description_fr',
-              'cover_image', 'is_featured', 'display_order', 'photo_count']
-
-
-@admin.register(Video)
-class VideoAdmin(admin.ModelAdmin):
-    list_display = ['title', 'category', 'duration', 'view_count', 'is_featured']
-    list_editable = ['is_featured']
-    list_filter = ['category', 'is_featured']
-    search_fields = ['title', 'title_fr']
-    readonly_fields = ['view_count']
+    The app will automatically show a "LIVE" badge for live streams.
+    """
+    list_display = ['title', 'status', 'scheduled_time', 'viewer_count', 'created_at']
+    list_filter = ['status', 'scheduled_time', 'created_at']
+    search_fields = ['title', 'title_fr', 'description']
+    date_hierarchy = 'scheduled_time'
 
     fieldsets = (
-        ('Content', {
-            'fields': ('title', 'title_fr', 'description', 'description_fr'),
+        ('Stream Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                ('description', 'description_fr'),
+                'thumbnail',
+            ],
         }),
-        ('Video', {
-            'fields': ('video_url', 'thumbnail', 'duration', 'category'),
-            'description': 'Paste the YouTube link. Duration example: 5:30 or 1:45:30',
-        }),
-        ('Publishing', {
-            'fields': ('publish_date', 'is_featured'),
+        ('Stream Settings', {
+            'fields': [
+                'stream_url',
+                ('status', 'scheduled_time'),
+                'duration',
+            ],
         }),
     )
 
-
-# ═══════════════════════════════════════════════════════════════
-#  PRIORITY AGENDAS — simplified, hide JSON
-# ═══════════════════════════════════════════════════════════════
-
-@admin.register(PriorityAgenda)
-class PriorityAgendaAdmin(admin.ModelAdmin):
-    list_display = ['title', 'display_order', 'is_active']
-    list_editable = ['display_order', 'is_active']
-    search_fields = ['title', 'title_fr']
-    prepopulated_fields = {'slug': ('title',)}
-
-    fieldsets = (
-        ('Info', {
-            'fields': ('title', 'title_fr', 'slug', 'description', 'description_fr', 'hero_image'),
-        }),
-        ('Overview', {
-            'fields': ('overview', 'overview_fr'),
-        }),
-        ('Initiatives', {
-            'fields': ('current_initiatives', 'current_initiatives_fr'),
-        }),
-        ('Display', {
-            'fields': ('display_order', 'is_active'),
-        }),
-        ('Advanced (technical)', {
-            'fields': ('icon_name', 'objectives', 'objectives_fr', 'impact_areas', 'impact_areas_fr'),
-            'classes': ('collapse',),
-            'description': 'These are technical fields managed by the developer. Do not edit unless instructed.',
-        }),
-    )
-
-
-# ═══════════════════════════════════════════════════════════════
-#  RESOURCES — show download link
-# ═══════════════════════════════════════════════════════════════
 
 @admin.register(Resource)
 class ResourceAdmin(admin.ModelAdmin):
-    list_display = ['title', 'category', 'file_type', 'file_size', 'download_link']
+    """
+    RESOURCES - Downloadable files and documents
+
+    HELP:
+    Provide downloadable resources like PDFs, documents, guides, etc.
+
+    CATEGORIES:
+    - Official Documents: Government documents, official papers
+    - Country Information: Tourist guides, maps, general info
+    - Media Resources: Press kits, logos, media files
+    - Reference Guides: Manuals, handbooks, guides
+
+    HOW TO USE:
+    1. Add title and description
+    2. Choose category
+    3. Choose file type (PDF or ZIP)
+    4. Upload the file
+    5. Enter file size (e.g., "2.5 MB")
+
+    Users can download these files in the Resources section.
+    """
+    list_display = ['title', 'category', 'file_type', 'file_size']
     list_filter = ['category', 'file_type']
-    search_fields = ['title', 'title_fr']
-    fields = ['title', 'title_fr', 'category', 'file', 'file_type', 'file_size']
-
-    @admin.display(description='Download')
-    def download_link(self, obj):
-        if obj.file:
-            return format_html('<a href="{}" target="_blank">Download</a>', obj.file.url)
-        return '-'
-
-
-# ═══════════════════════════════════════════════════════════════
-#  SOCIAL & NOTIFICATIONS
-# ═══════════════════════════════════════════════════════════════
-
-@admin.register(SocialMediaLink)
-class SocialMediaLinkAdmin(admin.ModelAdmin):
-    list_display = ['platform', 'handle', 'follower_count', 'is_active', 'display_order']
-    list_editable = ['is_active', 'display_order']
-    list_filter = ['platform', 'is_active']
-    search_fields = ['handle', 'display_name']
-    fields = ['platform', 'display_name', 'display_name_fr', 'url', 'handle',
-              'follower_count', 'description', 'description_fr',
-              'icon_color', 'is_active', 'display_order']
-
-
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    list_display = ['title', 'notification_type', 'is_global', 'is_active', 'created_at']
-    list_filter = ['notification_type', 'is_global', 'is_active']
-    search_fields = ['title', 'message']
-    list_editable = ['is_active']
+    search_fields = ['title', 'title_fr', 'description']
 
     fieldsets = (
-        ('Message', {
-            'fields': ('title', 'title_fr', 'message', 'message_fr', 'notification_type'),
+        ('Resource Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                ('description', 'description_fr'),
+            ],
         }),
-        ('Who receives it', {
-            'fields': ('is_global', 'is_active'),
-            'description': 'Global = everyone gets it. Uncheck to target specific users below.',
+        ('File', {
+            'fields': [
+                ('category', 'file_type'),
+                'file',
+                'file_size',
+            ],
         }),
-        ('Target specific users', {
-            'fields': ('target_users',),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  OTHER SETTINGS
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(WeatherCity)
+class WeatherCityAdmin(admin.ModelAdmin):
+    """
+    WEATHER CITIES - Cities shown in weather section
+
+    HELP:
+    Configure which cities appear in the weather section.
+
+    HOW TO USE:
+    1. Add city name
+    2. Add GPS coordinates (latitude/longitude)
+    3. Upload background image (optional)
+    4. Check "is default" for main city (Bujumbura)
+    5. Check "is active" to show in app
+    6. Set order to control display position
+
+    GPS COORDINATES:
+    The app uses coordinates to fetch weather data from Open-Meteo API.
+    Get coordinates from Google Maps.
+    """
+    list_display = ['name', 'is_default', 'is_active', 'order']
+    list_editable = ['is_default', 'is_active', 'order']
+    list_filter = ['is_default', 'is_active']
+
+    fieldsets = (
+        ('City Information', {
+            'fields': [
+                'name',
+                'background_image',
+            ],
+        }),
+        ('Location', {
+            'fields': [
+                ('latitude', 'longitude'),
+            ],
+            'description': 'GPS coordinates for weather API',
+        }),
+        ('Display Settings', {
+            'fields': [
+                ('order', 'is_default', 'is_active'),
+            ],
+            'description': 'Default cities cannot be removed by users in the app',
+        }),
+    )
+
+
+@admin.register(PriorityAgenda)
+class PriorityAgendaAdmin(admin.ModelAdmin):
+    """
+    PRIORITY AGENDAS - Key focus areas and initiatives
+
+    HELP:
+    Priority agendas are the main focus areas of the AU Chairmanship.
+    Examples: Water & Sanitation, Economic Development, Peace & Security
+
+    HOW TO USE:
+    1. Add title and description
+    2. Create a unique slug (URL-friendly name)
+    3. Upload hero image
+    4. Add detailed content in Overview and Objectives sections
+
+    SLUG:
+    The slug is used in URLs. Use lowercase letters and hyphens.
+    Example: "water-sanitation", "economic-development"
+    """
+    list_display = ['title', 'slug']
+    search_fields = ['title', 'title_fr', 'slug', 'description']
+    prepopulated_fields = {'slug': ('title',)}
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': [
+                ('title', 'title_fr'),
+                'slug',
+                ('description', 'description_fr'),
+                'hero_image',
+            ],
+        }),
+        ('Detailed Content', {
+            'fields': [
+                ('overview', 'overview_fr'),
+                ('objectives', 'objectives_fr'),
+                ('current_initiatives', 'current_initiatives_fr'),
+            ],
             'classes': ('collapse',),
         }),
     )
-    filter_horizontal = ['target_users']
 
 
-# ═══════════════════════════════════════════════════════════════
-#  SETTINGS
-# ═══════════════════════════════════════════════════════════════
+@admin.register(SocialMediaLink)
+class SocialMediaAdmin(admin.ModelAdmin):
+    """
+    SOCIAL MEDIA LINKS - Social media accounts
+
+    HELP:
+    Add links to official social media accounts.
+    These appear in the app footer and More section.
+
+    PLATFORMS:
+    Facebook, Twitter, Instagram, YouTube, LinkedIn, TikTok
+    """
+    list_display = ['platform', 'url', 'display_order']
+    list_editable = ['display_order']
+    list_filter = ['platform']
+
 
 @admin.register(AppSettings)
 class AppSettingsAdmin(admin.ModelAdmin):
-    list_display = ['__str__']
+    """
+    APP SETTINGS - General app configuration
 
+    HELP:
+    Global settings for the app.
+
+    IMPORTANT:
+    Only one settings record should exist.
+    Edit the existing record instead of creating a new one.
+    """
     fieldsets = (
-        ('Summit Info', {
-            'fields': ('summit_year', 'summit_theme', 'summit_theme_fr'),
+        ('Summit Information', {
+            'fields': [
+                'summit_year',
+                ('summit_theme', 'summit_theme_fr'),
+            ],
         }),
-        ('Social Links', {
-            'fields': ('website_url', 'facebook_url', 'twitter_url', 'instagram_url'),
-            'description': 'Paste full URLs like https://facebook.com/YourPage',
+        ('Social Media & Links', {
+            'fields': [
+                'website_url',
+                'facebook_url',
+                'twitter_url',
+                'instagram_url',
+            ],
         }),
     )
 
     def has_add_permission(self, request):
         return not AppSettings.objects.exists()
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 # ═══════════════════════════════════════════════════════════════
-#  HERO TEXT & QUICK ACCESS MENU
+#  HIDE TECHNICAL MODELS
 # ═══════════════════════════════════════════════════════════════
 
-@admin.register(HeroTextContent)
-class HeroTextContentAdmin(admin.ModelAdmin):
-    list_display = ['text_en', 'text_fr', 'is_active', 'order']
-    list_editable = ['order', 'is_active']
-    list_filter = ['is_active']
-    fields = ['text_en', 'text_fr', 'is_active', 'order']
+# Hide Token Blacklist (technical authentication stuff)
+try:
+    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+    admin.site.unregister(OutstandingToken)
+    admin.site.unregister(BlacklistedToken)
+except (ImportError, admin.sites.NotRegistered):
+    pass
 
 
-@admin.register(QuickAccessMenuItem)
-class QuickAccessMenuItemAdmin(admin.ModelAdmin):
-    list_display = ['title_en', 'badge_preview', 'is_active', 'order']
-    list_editable = ['order', 'is_active']
-    list_filter = ['is_active']
-    fieldsets = (
-        (None, {
-            'fields': ('title_en', 'title_fr', 'icon_name', 'action_type', 'action_value',
-                       'order', 'is_active', 'has_live_indicator'),
-        }),
-        ('Badge / Promotion', {
-            'fields': ('auto_badge', 'auto_badge_days', 'badge_text', 'badge_color'),
-            'description': 'Auto badge detects new content automatically. Manual badge_text overrides auto detection.',
-        }),
-    )
-
-    @admin.display(description='Badge')
-    def badge_preview(self, obj):
-        if obj.badge_text:
-            return format_html(
-                '<span style="background:{};color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold">{}</span>',
-                obj.badge_color or '#E53935', obj.badge_text
-            )
-        return '—'
+@admin.register(AuditLogEntry)
+class AuditLogEntryAdmin(admin.ModelAdmin):
+    list_display = ('timestamp', 'user', 'action', 'entity_type', 'entity_label', 'status')
+    list_filter = ('action', 'status', 'entity_type')
+    search_fields = ('entity_label', 'entity_type')
+    readonly_fields = ('timestamp',)

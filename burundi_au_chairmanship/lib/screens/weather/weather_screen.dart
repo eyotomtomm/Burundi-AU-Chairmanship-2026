@@ -1,10 +1,16 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/api_service.dart';
+import '../../models/api_models.dart';
+import '../../config/environment.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -14,13 +20,10 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  static const _defaultCities = [
-    _CityData(name: 'Bujumbura', lat: -3.3731, lon: 29.3644),
-    _CityData(name: 'Addis Ababa', lat: 9.0192, lon: 38.7525),
-  ];
   static const _prefsKey = 'custom_weather_cities';
 
   final List<_CityWeather> _cities = [];
+  List<WeatherCity> _defaultCities = []; // Loaded from backend
   bool _isLoading = true;
   DateTime? _lastUpdated;
 
@@ -31,10 +34,28 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   Future<void> _loadCitiesAndFetch() async {
-    // Always start with defaults
+    setState(() => _isLoading = true);
+
+    try {
+      // Fetch default cities from backend API
+      final response = await ApiService().get('weather-cities/');
+      if (response != null && response is List) {
+        _defaultCities = response.map((json) => WeatherCity.fromJson(json)).toList();
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load weather cities from API: $e');
+      // Keep _defaultCities empty, user can still add custom cities
+    }
+
+    // Always start with cities from backend
     _cities.clear();
     for (final d in _defaultCities) {
-      _cities.add(_CityWeather(name: d.name, lat: d.lat, lon: d.lon));
+      _cities.add(_CityWeather(
+        name: d.name,
+        lat: d.latitude,
+        lon: d.longitude,
+        backgroundImageUrl: d.backgroundImage,
+      ));
     }
 
     // Load custom cities from SharedPreferences
@@ -239,52 +260,97 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      background: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                      background: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Background image (blurred) from backend
+                          if (primary?.backgroundImageUrl != null && primary!.backgroundImageUrl!.isNotEmpty)
+                            CachedNetworkImage(
+                              imageUrl: Environment.fixMediaUrl(primary.backgroundImageUrl!),
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                                ),
+                              ),
+                            ),
+
+                          // Blur effect
+                          BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              color: Colors.black.withValues(alpha: 0.1),
+                            ),
                           ),
-                        ),
-                        child: SafeArea(
+
+                          // Gradient overlay for better text contrast
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.burundiGreen.withValues(alpha: 0.7),
+                                  const Color(0xFF065A1A).withValues(alpha: 0.8),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // Content
+                          SafeArea(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 56, 24, 60),
+                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
                             child: primary != null
                                 ? Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       // Location label
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          const Icon(Icons.location_on_rounded, color: AppColors.auGold, size: 16),
+                                          const Icon(Icons.location_on_rounded, color: AppColors.auGold, size: 14),
                                           const SizedBox(width: 4),
                                           Text(
                                             primary.name,
                                             style: TextStyle(
-                                              fontSize: 16,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w500,
                                               color: Colors.white.withValues(alpha: 0.9),
                                             ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: 6),
                                       // Weather icon in tinted circle
                                       Container(
-                                        padding: const EdgeInsets.all(16),
+                                        padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           color: Colors.white.withValues(alpha: 0.15),
                                         ),
                                         child: Icon(
                                           _getWeatherIcon(primary.weatherCode),
-                                          size: 44,
+                                          size: 36,
                                           color: AppColors.auGold,
                                         ),
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 8),
                                       // Large temperature
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
@@ -292,19 +358,19 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                         children: [
                                           Text(
                                             primary.currentTemp.toStringAsFixed(0),
-                                            style: TextStyle(
-                                              fontSize: 64,
+                                            style: const TextStyle(
+                                              fontSize: 56,
                                               fontWeight: FontWeight.w700,
                                               color: Colors.white,
                                               height: 1,
                                             ),
                                           ),
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 8),
+                                            padding: const EdgeInsets.only(top: 6),
                                             child: Text(
                                               '°C',
                                               style: TextStyle(
-                                                fontSize: 24,
+                                                fontSize: 20,
                                                 fontWeight: FontWeight.w400,
                                                 color: Colors.white.withValues(alpha: 0.7),
                                               ),
@@ -312,12 +378,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 2),
                                       // Description
                                       Text(
                                         _getWeatherDescription(primary.weatherCode),
                                         style: TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 14,
                                           color: Colors.white.withValues(alpha: 0.85),
                                         ),
                                       ),
@@ -326,6 +392,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 : const SizedBox.shrink(),
                           ),
                         ),
+                        ],
                       ),
                     ),
                   ),
@@ -939,13 +1006,6 @@ class _AddCityDialogState extends State<_AddCityDialog> {
 
 // --- Data classes ---
 
-class _CityData {
-  final String name;
-  final double lat;
-  final double lon;
-  const _CityData({required this.name, required this.lat, required this.lon});
-}
-
 class _GeoResult {
   final String name;
   final String country;
@@ -959,6 +1019,7 @@ class _CityWeather {
   final String name;
   final double lat;
   final double lon;
+  final String? backgroundImageUrl;
   double currentTemp = 0;
   int humidity = 0;
   double windSpeed = 0;
@@ -973,6 +1034,7 @@ class _CityWeather {
     required this.name,
     required this.lat,
     required this.lon,
+    this.backgroundImageUrl,
   });
 }
 

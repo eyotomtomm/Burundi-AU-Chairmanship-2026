@@ -1,0 +1,254 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if embassy %}Edit Embassy{% else %}Add Embassy{% endif %}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <div class="flex items-center space-x-4">
+        <a href="{% url 'custom_admin:embassies_list' %}"
+           class="p-2 hover:bg-white dark:hover:bg-gray-800 rounded-lg transition-colors duration-200">
+          <span class="material-symbols-outlined text-gray-600 dark:text-gray-400">arrow_back</span>
+        </a>
+        <div class="bg-gradient-to-br from-blue-600 to-indigo-600 p-3 rounded-xl shadow-lg">
+          <span class="material-symbols-outlined text-white text-3xl">pin_drop</span>
+        </div>
+        <div>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            {% if embassy %}Edit Embassy{% else %}Add New Embassy{% endif %}
+          </h1>
+          <p class="text-gray-600 dark:text-gray-400 mt-1">
+            {% if embassy %}Update diplomatic mission information{% else %}Create a new diplomatic mission{% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+      <form method="post" action="{{ action }}" class="p-8">
+        {% csrf_token %}
+
+        <!-- Mission Information Section -->
+        <div class="mb-8">
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+            <span class="material-symbols-outlined mr-2 text-blue-600">info</span>
+            Mission Information
+          </h2>
+
+          <div class="space-y-6">
+            <!-- Name (English) -->
+            <div class="group">
+              <label for="name" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Name (English) <span class="text-red-500">*</span>
+              </label>
+              <input type="text"
+                     id="name"
+                     name="name"
+                     value="{% if embassy %}{{ embassy.name }}{% endif %}"
+                     required
+                     class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                     placeholder="e.g., Embassy of Burundi in Belgium">
+            </div>
+
+            <!-- Name (French) -->
+            <div class="group">
+              <label for="name_fr" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Name (French) <span class="text-red-500">*</span>
+              </label>
+              <input type="text"
+                     id="name_fr"
+                     name="name_fr"
+                     value="{% if embassy %}{{ embassy.name_fr }}{% endif %}"
+                     required
+                     class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                     placeholder="e.g., Ambassade du Burundi en Belgique">
+            </div>
+
+            <!-- Type -->
+            <div class="group">
+              <label for="type" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Mission Type <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <select id="type"
+                        name="type"
+                        required
+                        class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 appearance-none cursor-pointer">
+                  <option value="">Select type...</option>
+                  <option value="embassy" {% if embassy and embassy.type == 'embassy' %}selected{% endif %}>Embassy</option>
+                  <option value="consulate" {% if embassy and embassy.type == 'consulate' %}selected{% endif %}>Consulate</option>
+                  <option value="mission" {% if embassy and embassy.type == 'mission' %}selected{% endif %}>Mission</option>
+                </select>
+                <span class="material-symbols-outlined absolute right-0 top-2 text-gray-400 pointer-events-none">expand_more</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Location Details Section -->
+        <div class="mb-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+            <span class="material-symbols-outlined mr-2 text-blue-600">location_on</span>
+            Location Details
+          </h2>
+
+          <div class="space-y-6">
+            <!-- Address -->
+            <div class="group">
+              <label for="address" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Address <span class="text-red-500">*</span>
+              </label>
+              <textarea id="address"
+                        name="address"
+                        rows="3"
+                        required
+                        class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400 resize-none"
+                        placeholder="e.g., 46 Square Marie-Louise">{% if embassy %}{{ embassy.address }}{% endif %}</textarea>
+            </div>
+
+            <!-- City and Country -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="group">
+                <label for="city" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  City <span class="text-red-500">*</span>
+                </label>
+                <input type="text"
+                       id="city"
+                       name="city"
+                       value="{% if embassy %}{{ embassy.city }}{% endif %}"
+                       required
+                       class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                       placeholder="e.g., Brussels">
+              </div>
+
+              <div class="group">
+                <label for="country" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Country <span class="text-red-500">*</span>
+                </label>
+                <input type="text"
+                       id="country"
+                       name="country"
+                       value="{% if embassy %}{{ embassy.country }}{% endif %}"
+                       required
+                       class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                       placeholder="e.g., Belgium">
+              </div>
+            </div>
+
+            <!-- Coordinates -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="group">
+                <label for="latitude" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Latitude
+                </label>
+                <input type="number"
+                       id="latitude"
+                       name="latitude"
+                       step="any"
+                       value="{% if embassy %}{{ embassy.latitude }}{% endif %}"
+                       class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                       placeholder="e.g., 50.8503">
+              </div>
+
+              <div class="group">
+                <label for="longitude" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Longitude
+                </label>
+                <input type="number"
+                       id="longitude"
+                       name="longitude"
+                       step="any"
+                       value="{% if embassy %}{{ embassy.longitude }}{% endif %}"
+                       class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                       placeholder="e.g., 4.3517">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Information Section -->
+        <div class="mb-8 pt-8 border-t border-gray-200 dark:border-gray-700">
+          <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+            <span class="material-symbols-outlined mr-2 text-blue-600">contact_mail</span>
+            Contact Information
+          </h2>
+
+          <div class="space-y-6">
+            <!-- Phone Number -->
+            <div class="group">
+              <label for="phone_number" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Phone Number
+              </label>
+              <input type="text"
+                     id="phone_number"
+                     name="phone_number"
+                     value="{% if embassy %}{{ embassy.phone_number }}{% endif %}"
+                     class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                     placeholder="e.g., +32 2 230 45 35">
+            </div>
+
+            <!-- Email -->
+            <div class="group">
+              <label for="email" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Email Address
+              </label>
+              <input type="email"
+                     id="email"
+                     name="email"
+                     value="{% if embassy %}{{ embassy.email }}{% endif %}"
+                     class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                     placeholder="e.g., info@burundiembassy.be">
+            </div>
+
+            <!-- Website -->
+            <div class="group">
+              <label for="website" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Website URL
+              </label>
+              <input type="url"
+                     id="website"
+                     name="website"
+                     value="{% if embassy %}{{ embassy.website }}{% endif %}"
+                     class="w-full px-0 py-2 text-gray-900 dark:text-white bg-transparent border-0 border-b-2 border-gray-300 dark:border-gray-600 focus:border-blue-600 dark:focus:border-blue-400 focus:ring-0 transition-colors duration-200 placeholder-gray-400"
+                     placeholder="e.g., https://burundiembassy.be">
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-between pt-8 border-t border-gray-200 dark:border-gray-700">
+          <a href="{% url 'custom_admin:embassies_list' %}"
+             class="inline-flex items-center px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors duration-200">
+            <span class="material-symbols-outlined mr-2">close</span>
+            Cancel
+          </a>
+          <button type="submit"
+                  class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+            <span class="material-symbols-outlined mr-2">save</span>
+            {% if embassy %}Update Embassy{% else %}Create Embassy{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Help Text -->
+    <div class="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      <div class="flex items-start">
+        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 mr-3 mt-0.5">info</span>
+        <div class="text-sm text-blue-800 dark:text-blue-200">
+          <p class="font-semibold mb-1">Tips for adding embassies:</p>
+          <ul class="list-disc list-inside space-y-1 text-blue-700 dark:text-blue-300">
+            <li>Provide both English and French names for bilingual support</li>
+            <li>Include complete address information for accurate mapping</li>
+            <li>Coordinates enable map integration and directions</li>
+            <li>Contact details help users reach the diplomatic mission</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

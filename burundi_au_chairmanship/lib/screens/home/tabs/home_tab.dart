@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,16 +9,22 @@ import '../../../config/environment.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/language_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../widgets/verified_badge.dart';
 import '../../../models/api_models.dart';
 import '../../../models/magazine_model.dart';
+import '../../../models/event_registration_model.dart';
 import '../../../services/api_service.dart';
 import '../../news/article_detail_screen.dart';
 import '../../feature_card/feature_card_detail_screen.dart';
+import '../../events/event_detail_screen.dart';
+import '../../priority_agenda_detail_screen.dart';
 import '../painters/zigzag_line_painter.dart';
 import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
 import '../widgets/news_card.dart';
 import '../widgets/feature_item.dart';
+import '../widgets/event_card.dart';
 
 class HomeTab extends StatefulWidget {
   final ValueChanged<int>? onSwitchTab;
@@ -47,6 +54,7 @@ class _HomeTabState extends State<HomeTab> {
   List<Article>? _apiArticles;
   List<Map<String, dynamic>>? _apiFeatureCards;
   List<Map<String, dynamic>>? _apiPriorityAgendas;
+  List<EventRegistrationModel>? _apiEventCards;
   Map<String, String>? _heroTextContent;
   List<Map<String, dynamic>>? _quickAccessItems;
 
@@ -59,42 +67,16 @@ class _HomeTabState extends State<HomeTab> {
         'isNetwork': true,
       }).toList();
     }
-    // Fallback to local assets when API unavailable
-    return [
-      {'image': 'assets/images/AU HQ.webp', 'label': 'Unity & Progress', 'isNetwork': false},
-      {'image': 'assets/images/Burundi President.jpg', 'label': 'AU Leadership', 'isNetwork': false},
-      {'image': 'assets/images/au_chairmanship_3.png', 'label': 'Pan-African Vision', 'isNetwork': false},
-    ];
+    // No fallback - show empty state
+    return [];
   }
 
   List<Map<String, dynamic>> get _featureCards {
     if (_apiFeatureCards != null && _apiFeatureCards!.isNotEmpty) {
       return _apiFeatureCards!;
     }
-    // Fallback feature cards when API is unavailable
-    return [
-      {
-        'title': 'AU Vision 2063',
-        'description': 'An integrated, prosperous and peaceful Africa, driven by its own citizens.',
-        'icon': Icons.stars,
-        'gradient': [const Color(0xFF1EB53A), const Color(0xFF4CAF50)],
-        'imageUrl': '',
-      },
-      {
-        'title': 'Diplomatic Relations',
-        'description': 'Strengthening ties across the continent through dialogue and cooperation.',
-        'icon': Icons.travel_explore,
-        'gradient': [const Color(0xFFD4AF37), const Color(0xFFDAA520)],
-        'imageUrl': '',
-      },
-      {
-        'title': 'Peace & Security',
-        'description': 'Building a stable and secure Africa for future generations.',
-        'icon': Icons.gavel,
-        'gradient': [const Color(0xFF0A5C1E), const Color(0xFF1EB53A)],
-        'imageUrl': '',
-      },
-    ];
+    // No fallback - show empty state
+    return [];
   }
 
   List<Article> get _articles {
@@ -106,21 +88,18 @@ class _HomeTabState extends State<HomeTab> {
     if (_heroTextContent != null && _heroTextContent!.containsKey(key)) {
       return _heroTextContent![key]!;
     }
-    // Fallback values
-    const fallbacks = {
-      'badge': 'BURUNDI',
-      'title_line1': 'African Union',
-      'title_line2': 'Chairmanship',
-      'year': '2026',
-    };
-    return fallbacks[key] ?? '';
+    // No fallback - return empty string
+    return '';
   }
 
   /// Parse hex color string like "#1EB53A" into a Color
   static Color _hexToColor(String hex) {
     hex = hex.replaceFirst('#', '');
+    if (hex.isEmpty) return const Color(0xFF1EB53A);
     if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.parse(hex, radix: 16));
+    final parsed = int.tryParse(hex, radix: 16);
+    if (parsed == null) return const Color(0xFF1EB53A);
+    return Color(parsed);
   }
 
   @override
@@ -183,6 +162,7 @@ class _HomeTabState extends State<HomeTab> {
           'impact_areas_fr': j['impact_areas_fr'] ?? [],
           'extra_content': j['extra_content'] ?? '',
           'extra_content_fr': j['extra_content_fr'] ?? '',
+          'media': j['media'] ?? [],
           // Keep raw title fields for detail screen localization
           'title_raw': j['title'] ?? '',
           'title_fr': j['title_fr'] ?? '',
@@ -203,6 +183,12 @@ class _HomeTabState extends State<HomeTab> {
         heroTextMap[key] = text;
       }
 
+      // Parse event cards
+      final rawEventCards = homeFeed['event_cards'] as List<dynamic>? ?? [];
+      final eventCards = rawEventCards
+          .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>))
+          .toList();
+
       // Fetch quick access menu
       final quickAccessMenu = await api.getQuickAccessMenu();
 
@@ -211,11 +197,13 @@ class _HomeTabState extends State<HomeTab> {
         _apiArticles = articles;
         _apiFeatureCards = featureCards;
         _apiPriorityAgendas = priorityAgendas;
+        _apiEventCards = eventCards;
         _heroTextContent = heroTextMap;
         _quickAccessItems = quickAccessMenu;
       });
-    } catch (_) {
-      // Fallback data will be used via computed getters
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load home feed data: $e');
+      // No fallback - empty state will be shown via computed getters
     }
   }
 
@@ -262,6 +250,11 @@ class _HomeTabState extends State<HomeTab> {
           child: _buildHeroSlideshow(context, l10n),
         ),
 
+        // Welcome Banner
+        SliverToBoxAdapter(
+          child: _buildWelcomeBanner(context),
+        ),
+
         // Feature Cards Slideshow
         SliverToBoxAdapter(
           child: _buildFeatureCardsSection(context),
@@ -281,6 +274,41 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
         ),
+
+        // Upcoming Events Section
+        if (_apiEventCards != null && _apiEventCards!.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+              child: _buildSectionTitle(context, langCode == 'fr' ? 'Prochains Événements' : 'Upcoming Events'),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 200,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _apiEventCards!.length,
+                itemBuilder: (context, index) {
+                  final event = _apiEventCards![index];
+                  return EventCard(
+                    event: event,
+                    langCode: langCode,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EventDetailScreen(event: event),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
 
         // Latest News Section
         SliverToBoxAdapter(
@@ -378,6 +406,73 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  Widget _buildWelcomeBanner(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+
+    // Only show if user is authenticated
+    if (!authProvider.isAuthenticated) {
+      return const SizedBox.shrink();
+    }
+
+    // Get time-based greeting
+    final hour = DateTime.now().hour;
+    String greeting;
+
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Good Morning';
+    } else if (hour >= 12 && hour < 17) {
+      greeting = 'Good Afternoon';
+    } else if (hour >= 17 && hour < 21) {
+      greeting = 'Good Evening';
+    } else {
+      greeting = 'Good Night';
+    }
+
+    final userName = authProvider.userName ?? 'User';
+    final isVerified = authProvider.isVerified;
+    final badgeType = authProvider.badgeType;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      child: Row(
+        children: [
+          Flexible(
+            child: RichText(
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'HeatherGreen',
+                  color: isDark ? const Color(0xFF8FB7A3) : const Color(0xFF4A7C5D), // Heather green (more visible)
+                ),
+                children: [
+                  TextSpan(text: '$greeting, '),
+                  TextSpan(
+                    text: userName,
+                    style: TextStyle(
+                      color: isDark ? const Color(0xFF8FB7A3) : const Color(0xFF4A7C5D), // Heather green (more visible)
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'HeatherGreen',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isVerified) ...[
+            const SizedBox(width: 6),
+            VerifiedBadge(badgeType: badgeType, size: 20),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeroSlideshow(BuildContext context, AppLocalizations l10n) {
     final screenWidth = MediaQuery.of(context).size.width;
 
@@ -458,7 +553,7 @@ class _HomeTabState extends State<HomeTab> {
                         );
                       },
                     ),
-                  // Dark greenish gradient overlay from bottom
+                  // Dark gradient overlay for better text readability
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -466,10 +561,10 @@ class _HomeTabState extends State<HomeTab> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          const Color(0xFF0A3D1A).withValues(alpha: 0.25),
-                          const Color(0xFF0A3D1A).withValues(alpha: 0.7),
+                          Colors.black.withValues(alpha: 0.3),
+                          Colors.black.withValues(alpha: 0.8),
                         ],
-                        stops: const [0.25, 0.55, 1.0],
+                        stops: const [0.2, 0.5, 1.0],
                       ),
                     ),
                   ),
@@ -741,15 +836,15 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             ),
                           ),
-                        // Dark gradient overlay
+                        // Dark gradient overlay for better text readability
                         Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withValues(alpha: 0.2),
-                                Colors.black.withValues(alpha: 0.7),
+                                Colors.black.withValues(alpha: 0.3),
+                                Colors.black.withValues(alpha: 0.75),
                               ],
                             ),
                           ),
@@ -776,15 +871,29 @@ class _HomeTabState extends State<HomeTab> {
                                         fontSize: 20,
                                         fontFamily: 'HeatherGreen',
                                         fontWeight: FontWeight.bold,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black45,
+                                            blurRadius: 3,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
                                       card['description'] as String,
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.9),
+                                        color: Colors.white.withValues(alpha: 0.95),
                                         fontSize: 13,
                                         height: 1.4,
+                                        shadows: const [
+                                          Shadow(
+                                            color: Colors.black38,
+                                            blurRadius: 2,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ],
                                       ),
                                       maxLines: 3,
                                       overflow: TextOverflow.ellipsis,
@@ -863,9 +972,14 @@ class _HomeTabState extends State<HomeTab> {
           'badgeColor': badgeColor,
           'onTap': () {
             if (actionType == 'route') {
-              Navigator.pushNamed(context, actionValue);
+              if (actionValue.startsWith('/')) {
+                Navigator.pushNamed(context, actionValue);
+              }
             } else if (actionType == 'url') {
-              launchUrl(Uri.parse(actionValue));
+              final uri = Uri.tryParse(actionValue);
+              if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+                launchUrl(uri);
+              }
             }
           },
         };
@@ -874,61 +988,18 @@ class _HomeTabState extends State<HomeTab> {
       return QuickAccessGrid(items: items);
     }
 
-    // Fallback to hardcoded items when API is unavailable
-    final items = <Map<String, dynamic>>[
-      {'title': l10n.translate('live'), 'icon': Icons.play_circle_filled_rounded, 'hasLiveDot': true,
-        'onTap': () => Navigator.pushNamed(context, '/live-feeds')},
-      {'title': l10n.magazine, 'icon': Icons.auto_stories_rounded,
-        'onTap': () => widget.onSwitchTab?.call(1)},
-      {'title': l10n.resources, 'icon': Icons.folder_copy_rounded,
-        'onTap': () => Navigator.pushNamed(context, '/resources')},
-      {'title': 'News', 'icon': Icons.article_rounded,
-        'onTap': () => Navigator.pushNamed(context, '/news')},
-      {'title': l10n.translate('translate'), 'icon': Icons.translate_rounded,
-        'onTap': () => Navigator.pushNamed(context, '/translate')},
-      {'title': l10n.translate('weather'), 'icon': Icons.cloud_rounded,
-        'onTap': () => Navigator.pushNamed(context, '/weather')},
-      {'title': l10n.translate('calendar'), 'icon': Icons.calendar_month_rounded,
-        'onTap': () => Navigator.pushNamed(context, '/calendar')},
-    ];
-
-    return QuickAccessGrid(items: items);
+    // No fallback - show empty state
+    return const SizedBox.shrink();
   }
 
   Widget _buildPriorityAgendasSection(BuildContext context) {
-    // Map slugs to routes and icons
-    final slugRoutes = {
-      'water-sanitation': {'route': '/water-sanitation', 'icon': Icons.water_drop},
-      'arise-initiative': {'route': '/arise-initiative', 'icon': Icons.trending_up},
-      'peace-security': {'route': '/peace-security', 'icon': Icons.security},
-    };
-
-    // Use API data if available, otherwise fallback
-    final agendas = _apiPriorityAgendas ?? [
-      {
-        'title': 'Water & Sanitation',
-        'description': 'Clean water access and sanitation infrastructure for all',
-        'slug': 'water-sanitation',
-        'hero_image': null,
-      },
-      {
-        'title': 'A-RISE Initiative',
-        'description': 'Africa Rising Initiative for Sustainable Economy',
-        'slug': 'arise-initiative',
-        'hero_image': null,
-      },
-      {
-        'title': 'Peace & Security',
-        'description': 'Building a stable and secure Africa',
-        'slug': 'peace-security',
-        'hero_image': null,
-      },
-    ];
+    // Use API data if available, otherwise show empty
+    final agendas = _apiPriorityAgendas ?? [];
 
     final langCode = Localizations.localeOf(context).languageCode;
 
     // Theme colors per agenda for fallback backgrounds
-    final slugColors = {
+    final Map<String, List<Color>> slugColors = {
       'water-sanitation': [const Color(0xFF0077B6), const Color(0xFF00B4D8)],
       'arise-initiative': [const Color(0xFFB8860B), const Color(0xFFDAA520)],
       'peace-security': [const Color(0xFF1B5E20), const Color(0xFF2E7D32)],
@@ -936,20 +1007,26 @@ class _HomeTabState extends State<HomeTab> {
 
     return Column(
       children: agendas.map((agenda) {
-        final slug = agenda['slug'] as String;
-        final routeInfo = slugRoutes[slug];
-        if (routeInfo == null) return const SizedBox.shrink();
-
+        final slug = agenda['slug'] as String?;
         final title = langCode == 'fr' ? (agenda['title_fr'] ?? agenda['title']) : agenda['title'];
         final description = langCode == 'fr' ? (agenda['description_fr'] ?? agenda['description']) : agenda['description'];
         final heroImage = agenda['hero_image'];
         final hasImage = heroImage != null && heroImage.toString().isNotEmpty;
-        final fallbackColors = slugColors[slug] ?? [AppColors.burundiGreen, AppColors.auGold];
+        final fallbackColors = (slug != null && slugColors.containsKey(slug))
+            ? slugColors[slug]!
+            : [AppColors.burundiGreen, AppColors.auGold];
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: InkWell(
-            onTap: () => Navigator.pushNamed(context, routeInfo['route'] as String),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PriorityAgendaDetailScreen(agenda: agenda),
+                ),
+              );
+            },
             borderRadius: BorderRadius.circular(16),
             child: Container(
               height: 130,
@@ -1046,7 +1123,7 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             ),
                             child: Icon(
-                              routeInfo['icon'] as IconData,
+                              _getIconFromAgenda(agenda),
                               size: 32,
                               color: Colors.white,
                             ),
@@ -1137,24 +1214,28 @@ class _HomeTabState extends State<HomeTab> {
     final actionType = card['actionType'] as String?;
     final actionValue = card['actionValue'] as String?;
 
-    if (actionType == null || actionType == 'none') {
-      return; // No action defined
+    // Special overrides: external URL or a different app route
+    if (actionType == 'url' && actionValue != null && actionValue.isNotEmpty) {
+      final uri = Uri.tryParse(actionValue);
+      if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
+    if (actionType == 'route' && actionValue != null && actionValue.isNotEmpty && actionValue != '/feature-detail') {
+      if (actionValue.startsWith('/')) {
+        Navigator.pushNamed(context, actionValue);
+      }
+      return;
     }
 
-    if (actionType == 'route' && actionValue == '/feature-detail') {
-      // Navigate to the feature card detail screen with full card data
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => FeatureCardDetailScreen(cardData: card),
-        ),
-      );
-    } else if (actionType == 'route' && actionValue != null && actionValue.isNotEmpty) {
-      Navigator.pushNamed(context, actionValue);
-    } else if (actionType == 'url' && actionValue != null && actionValue.isNotEmpty) {
-      final uri = Uri.parse(actionValue);
-      launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    // Default: always open the detail page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FeatureCardDetailScreen(cardData: card),
+      ),
+    );
   }
 
   IconData _getIconFromName(String iconName) {
@@ -1184,6 +1265,25 @@ class _HomeTabState extends State<HomeTab> {
     };
 
     return iconMap[iconName] ?? Icons.stars;
+  }
+
+  IconData _getIconFromAgenda(Map<String, dynamic> agenda) {
+    final iconName = agenda['icon_name'] as String?;
+    final iconMap = {
+      'water_drop': Icons.water_drop,
+      'trending_up': Icons.trending_up,
+      'security': Icons.security,
+      'public': Icons.public,
+      'groups': Icons.groups,
+      'gavel': Icons.gavel,
+      'handshake': Icons.handshake,
+      'landscape': Icons.landscape,
+      'school': Icons.school,
+      'health_and_safety': Icons.health_and_safety,
+      'agriculture': Icons.agriculture,
+      'business': Icons.business,
+    };
+    return iconMap[iconName] ?? Icons.star;
   }
 
   Widget _buildSectionTitle(BuildContext context, String title, {bool showSeeAll = false}) {

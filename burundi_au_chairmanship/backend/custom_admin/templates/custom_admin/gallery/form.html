@@ -1,0 +1,95 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if album.pk %}Edit{% else %}New{% endif %} Album - Burundi AU Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <span class="material-symbols-outlined text-4xl text-primary">photo_library</span>
+        <h1 class="font-headline text-3xl font-bold text-on-surface">
+            {% if album.pk %}Edit{% else %}New{% endif %} Album
+        </h1>
+    </div>
+
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <form method="post" action="{{ action }}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="title" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Title (English)
+                    </label>
+                    <input type="text" id="title" name="title" value="{{ album.title|default:'' }}"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+                </div>
+
+                <div>
+                    <label for="title_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Title (French)
+                    </label>
+                    <input type="text" id="title_fr" name="title_fr" value="{{ album.title_fr|default:'' }}"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="description" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Description (English)
+                    </label>
+                    <textarea id="description" name="description" rows="4"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ album.description|default:'' }}</textarea>
+                </div>
+
+                <div>
+                    <label for="description_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Description (French)
+                    </label>
+                    <textarea id="description_fr" name="description_fr" rows="4"
+                              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">{{ album.description_fr|default:'' }}</textarea>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label for="cover_image" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Cover Image
+                </label>
+                {% if album.cover_image %}
+                <div class="mb-3">
+                    <img src="{{ album.cover_image.url }}" alt="Current cover" class="w-48 h-32 object-cover rounded-lg shadow-sm">
+                </div>
+                {% endif %}
+                <input type="file" id="cover_image" name="cover_image" accept="image/*"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+            </div>
+
+            <div class="mb-6">
+                <label for="photos" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Add Photos
+                </label>
+                <input type="file" id="photos" name="photos" accept="image/*" multiple
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                <p class="text-xs text-on-surface-variant mt-2">Select multiple photos to add to this album</p>
+            </div>
+
+            <div class="mb-8">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="is_featured" name="is_featured" {% if album.is_featured %}checked{% endif %}
+                           class="w-5 h-5 text-secondary border-outline-variant rounded focus:ring-2 focus:ring-secondary">
+                    <span class="font-label text-sm text-on-surface font-bold">Featured Album</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end gap-4">
+                <a href="{% url 'custom_admin:gallery_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
+                    {% if album.pk %}Update{% else %}Create{% endif %} Album
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

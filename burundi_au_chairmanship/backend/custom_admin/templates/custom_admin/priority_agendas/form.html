@@ -1,0 +1,216 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if action == 'Edit' %}Edit{% else %}Create{% endif %} Priority Agenda{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center gap-4 mb-8">
+    <span class="material-symbols-outlined text-5xl text-primary">flag</span>
+    <div>
+      <h1 class="font-headline text-4xl font-bold text-on-surface mb-1">
+        {{ action }} Priority Agenda
+      </h1>
+      <p class="font-body text-on-surface-variant">Configure priority initiative details</p>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- Title (English) -->
+      <div class="mb-6">
+        <label for="title" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Title (English) *
+        </label>
+        <input
+          type="text"
+          id="title"
+          name="title"
+          value="{{ agenda.title|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Enter English title"
+        />
+      </div>
+
+      <!-- Title (French) -->
+      <div class="mb-6">
+        <label for="title_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Title (French) *
+        </label>
+        <input
+          type="text"
+          id="title_fr"
+          name="title_fr"
+          value="{{ agenda.title_fr|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Entrez le titre en français"
+        />
+      </div>
+
+      <!-- Description (English) -->
+      <div class="mb-6">
+        <label for="description" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Description (English) *
+        </label>
+        <input
+          type="text"
+          id="description"
+          name="description"
+          value="{{ agenda.description|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Brief description for card display"
+        />
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          Short description shown on agenda cards
+        </p>
+      </div>
+
+      <!-- Description (French) -->
+      <div class="mb-6">
+        <label for="description_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Description (French) *
+        </label>
+        <input
+          type="text"
+          id="description_fr"
+          name="description_fr"
+          value="{{ agenda.description_fr|default:'' }}"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+          placeholder="Brève description pour l'affichage de la carte"
+        />
+      </div>
+
+      <!-- Overview (English) -->
+      <div class="mb-6">
+        <label for="overview" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Overview (English) *
+        </label>
+        <textarea
+          id="overview"
+          name="overview"
+          rows="6"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface resize-y"
+          placeholder="Detailed overview of the agenda..."
+        >{{ agenda.overview|default:'' }}</textarea>
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          Full content shown on detail page
+        </p>
+      </div>
+
+      <!-- Overview (French) -->
+      <div class="mb-6">
+        <label for="overview_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Overview (French) *
+        </label>
+        <textarea
+          id="overview_fr"
+          name="overview_fr"
+          rows="6"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface resize-y"
+          placeholder="Aperçu détaillé de l'ordre du jour..."
+        >{{ agenda.overview_fr|default:'' }}</textarea>
+      </div>
+
+      <!-- Icon Name -->
+      <div class="mb-6">
+        <label for="icon_name" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Icon Name (Material Symbols) *
+        </label>
+        <div class="flex items-center gap-4">
+          <input
+            type="text"
+            id="icon_name"
+            name="icon_name"
+            value="{{ agenda.icon_name|default:'' }}"
+            required
+            class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+            placeholder="e.g., water_drop, security, public"
+          />
+          <span id="icon-preview" class="material-symbols-outlined text-5xl text-primary">{{ agenda.icon_name|default:'flag' }}</span>
+        </div>
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          Browse icons at <a href="https://fonts.google.com/icons" target="_blank" class="text-secondary underline">Google Material Symbols</a>
+        </p>
+      </div>
+
+      <!-- Hero Image -->
+      <div class="mb-6">
+        <label for="hero_image" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+          Hero Image
+        </label>
+
+        {% if agenda.hero_image %}
+        <div class="mb-4">
+          <p class="font-body text-sm text-on-surface-variant mb-2">Current image:</p>
+          <img
+            src="{{ agenda.hero_image.url }}"
+            alt="Hero image preview"
+            class="max-w-md rounded-lg shadow-sm border border-outline-variant"
+          />
+        </div>
+        {% endif %}
+
+        <input
+          type="file"
+          id="hero_image"
+          name="hero_image"
+          accept="image/*"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-semibold file:cursor-pointer hover:file:bg-primary"
+        />
+        <p class="font-body text-xs text-on-surface-variant mt-2">
+          Recommended: 1200x600px or similar aspect ratio
+        </p>
+      </div>
+
+      <!-- Active Checkbox -->
+      <div class="mb-8">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            id="is_active"
+            name="is_active"
+            value="true"
+            {% if agenda.is_active %}checked{% endif %}
+            class="w-5 h-5 text-primary focus:ring-2 focus:ring-primary border-outline-variant rounded"
+          />
+          <span class="font-body text-on-surface font-semibold">Active (visible in app)</span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-4">
+        <button
+          type="submit"
+          class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined">save</span>
+          {% if action == 'Edit' %}Update{% else %}Create{% endif %} Agenda
+        </button>
+        <a
+          href="{% url 'custom_admin:priority_agendas_list' %}"
+          class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all flex items-center gap-2"
+        >
+          <span class="material-symbols-outlined">cancel</span>
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Live icon preview
+  document.getElementById('icon_name').addEventListener('input', function(e) {
+    document.getElementById('icon-preview').textContent = e.target.value || 'flag';
+  });
+</script>
+{% endblock %}

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import 'album_detail_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -12,42 +14,6 @@ class GalleryScreen extends StatefulWidget {
 class _GalleryScreenState extends State<GalleryScreen> {
   List<Map<String, dynamic>> albums = [];
   bool _isLoading = true;
-
-  // Mock fallback data
-  static const List<Map<String, dynamic>> _mockAlbums = [
-    {
-      'id': 1,
-      'title': 'AU Summit 2026 Highlights',
-      'title_fr': 'Points forts du Sommet de l\'UA 2026',
-      'photo_count': 24,
-      'cover_image': null,
-      'is_featured': true,
-    },
-    {
-      'id': 2,
-      'title': 'Cultural Heritage of Burundi',
-      'title_fr': 'Patrimoine culturel du Burundi',
-      'photo_count': 18,
-      'cover_image': null,
-      'is_featured': true,
-    },
-    {
-      'id': 3,
-      'title': 'Infrastructure Development',
-      'title_fr': 'Développement des infrastructures',
-      'photo_count': 15,
-      'cover_image': null,
-      'is_featured': false,
-    },
-    {
-      'id': 4,
-      'title': 'Youth & Education',
-      'title_fr': 'Jeunesse et éducation',
-      'photo_count': 12,
-      'cover_image': null,
-      'is_featured': false,
-    },
-  ];
 
   @override
   void initState() {
@@ -64,10 +30,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load gallery albums: $e');
       if (mounted) {
         setState(() {
-          albums = List<Map<String, dynamic>>.from(_mockAlbums);
+          albums = []; // No fallback - show empty state
           _isLoading = false;
         });
       }
@@ -221,8 +188,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
         child: Material(
           child: InkWell(
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Opening ${album['title']}')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AlbumDetailScreen(album: album),
+                ),
               );
             },
             child: Stack(
@@ -327,8 +297,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
       child: Material(
         child: InkWell(
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Opening ${album['title']}')),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AlbumDetailScreen(album: album),
+              ),
             );
           },
           child: Stack(

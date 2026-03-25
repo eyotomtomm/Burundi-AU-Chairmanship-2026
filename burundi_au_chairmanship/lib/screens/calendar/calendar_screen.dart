@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:add_2_calendar/add_2_calendar.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/location_model.dart';
@@ -12,14 +14,34 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> {
+class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObserver {
   List<EventLocation>? _events;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadEvents();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Rebuild when app returns from background (e.g., after calendar app closes)
+    if (state == AppLifecycleState.resumed) {
+      if (mounted) {
+        setState(() {
+          // Force rebuild to ensure UI is properly restored
+        });
+      }
+    }
   }
 
   Future<void> _loadEvents() async {
@@ -32,78 +54,77 @@ class _CalendarScreenState extends State<CalendarScreen> {
         _events = events;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load events: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _events = _fallbackEvents();
+        _events = []; // No fallback - show empty state
       });
     }
   }
 
-  List<EventLocation> _fallbackEvents() {
-    return [
-      EventLocation(
-        id: '1',
-        name: 'AU Summit Opening Ceremony',
-        nameFr: "Cérémonie d'ouverture du Sommet de l'UA",
-        description: 'Official opening of the African Union Summit under Burundi Chairmanship.',
-        descriptionFr: "Ouverture officielle du Sommet de l'Union africaine sous la présidence du Burundi.",
-        address: 'AU Conference Centre, Addis Ababa',
-        latitude: 9.0227,
-        longitude: 38.7468,
-        eventDate: DateTime(2026, 2, 15, 9, 0),
-        imageUrl: '',
-      ),
-      EventLocation(
-        id: '2',
-        name: 'Heads of State Meeting',
-        nameFr: "Réunion des chefs d'État",
-        description: 'Assembly of heads of state and government.',
-        descriptionFr: "Assemblée des chefs d'État et de gouvernement.",
-        address: 'AU Conference Centre, Addis Ababa',
-        latitude: 9.0227,
-        longitude: 38.7468,
-        eventDate: DateTime(2026, 2, 16, 10, 0),
-        imageUrl: '',
-      ),
-      EventLocation(
-        id: '3',
-        name: 'Peace & Security Council',
-        nameFr: 'Conseil de paix et de sécurité',
-        description: 'Special session on continental peace and security.',
-        descriptionFr: 'Session spéciale sur la paix et la sécurité continentales.',
-        address: 'AU Headquarters, Addis Ababa',
-        latitude: 9.0227,
-        longitude: 38.7468,
-        eventDate: DateTime(2026, 2, 17, 14, 0),
-        imageUrl: '',
-      ),
-      EventLocation(
-        id: '4',
-        name: 'Cultural Gala Dinner',
-        nameFr: 'Dîner de gala culturel',
-        description: 'Celebrating Burundi culture and African unity.',
-        descriptionFr: "Célébration de la culture burundaise et de l'unité africaine.",
-        address: 'Sheraton Addis, Addis Ababa',
-        latitude: 9.0127,
-        longitude: 38.7568,
-        eventDate: DateTime(2026, 2, 18, 19, 0),
-        imageUrl: '',
-      ),
-      EventLocation(
-        id: '5',
-        name: 'Youth Forum',
-        nameFr: 'Forum de la jeunesse',
-        description: 'Engaging African youth in continental development.',
-        descriptionFr: 'Engager la jeunesse africaine dans le développement continental.',
-        address: 'UNECA, Addis Ababa',
-        latitude: 9.0200,
-        longitude: 38.7500,
-        eventDate: DateTime(2026, 3, 5, 9, 0),
-        imageUrl: '',
-      ),
-    ];
+  Future<void> _addToCalendar(EventLocation event) async {
+    try {
+      final langCode = Localizations.localeOf(context).languageCode;
+      final startTime = event.eventDate;
+      final endTime = startTime.add(const Duration(hours: 2));
+
+      final calendarEvent = Event(
+        title: event.getName(langCode),
+        description: event.getDescription(langCode),
+        location: event.address,
+        startDate: startTime,
+        endDate: endTime,
+        allDay: false,
+        iosParams: const IOSParams(
+          reminder: Duration(minutes: 30),
+          url: 'https://burundi.gov.bi',
+        ),
+        androidParams: const AndroidParams(
+          emailInvites: [],
+        ),
+      );
+
+      final result = await Add2Calendar.addEvent2Cal(calendarEvent);
+
+      if (result && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    langCode == 'fr'
+                        ? 'Événement ajouté au calendrier'
+                        : 'Event added to calendar',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to add event to calendar: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              Localizations.localeOf(context).languageCode == 'fr'
+                  ? 'Échec de l\'ajout au calendrier'
+                  : 'Failed to add to calendar',
+            ),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -199,7 +220,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ],
               ),
             ),
-            ...events.map((event) => _EventCard(event: event, langCode: langCode)),
+            ...events.map((event) => _EventCard(
+              event: event,
+              langCode: langCode,
+              onAddToCalendar: () => _addToCalendar(event),
+            )),
             if (index < entries.length - 1) const Divider(height: 24),
           ],
         );
@@ -211,8 +236,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
 class _EventCard extends StatelessWidget {
   final EventLocation event;
   final String langCode;
+  final VoidCallback onAddToCalendar;
 
-  const _EventCard({required this.event, required this.langCode});
+  const _EventCard({
+    required this.event,
+    required this.langCode,
+    required this.onAddToCalendar,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -300,6 +330,27 @@ class _EventCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Set Reminder button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onAddToCalendar,
+                        icon: const Icon(Icons.notifications_outlined, size: 16),
+                        label: Text(
+                          langCode == 'fr' ? 'Définir un rappel' : 'Set Reminder',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.burundiGreen,
+                          side: const BorderSide(color: AppColors.burundiGreen),
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

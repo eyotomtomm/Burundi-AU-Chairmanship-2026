@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import 'video_detail_screen.dart';
 
 class VideosScreen extends StatefulWidget {
   const VideosScreen({super.key});
@@ -24,64 +26,6 @@ class _VideosScreenState extends State<VideosScreen> {
     'cultural': 'Cultural',
   };
 
-  // Mock fallback data
-  static const List<Map<String, dynamic>> _mockVideos = [
-    {
-      'id': 1,
-      'title': 'AU Chairmanship Opening Ceremony',
-      'duration': '1:45:30',
-      'category': 'highlight',
-      'view_count': 15420,
-      'thumbnail': null,
-      'is_featured': true,
-    },
-    {
-      'id': 2,
-      'title': 'President\'s Vision for Africa',
-      'duration': '32:15',
-      'category': 'speech',
-      'view_count': 8750,
-      'thumbnail': null,
-      'is_featured': true,
-    },
-    {
-      'id': 3,
-      'title': 'Burundi: Heart of Africa Documentary',
-      'duration': '28:40',
-      'category': 'documentary',
-      'view_count': 12300,
-      'thumbnail': null,
-      'is_featured': true,
-    },
-    {
-      'id': 4,
-      'title': 'AU Leaders Summit Roundtable',
-      'duration': '1:15:20',
-      'category': 'event',
-      'view_count': 5640,
-      'thumbnail': null,
-      'is_featured': false,
-    },
-    {
-      'id': 5,
-      'title': 'Traditional Burundian Drumming',
-      'duration': '8:45',
-      'category': 'cultural',
-      'view_count': 9200,
-      'thumbnail': null,
-      'is_featured': false,
-    },
-    {
-      'id': 6,
-      'title': 'Interview: Peace & Security',
-      'duration': '18:30',
-      'category': 'interview',
-      'view_count': 3850,
-      'thumbnail': null,
-      'is_featured': false,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -97,10 +41,11 @@ class _VideosScreenState extends State<VideosScreen> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to load videos: $e');
       if (mounted) {
         setState(() {
-          _allVideos = List<Map<String, dynamic>>.from(_mockVideos);
+          _allVideos = []; // No fallback - show empty state
           _isLoading = false;
         });
       }
@@ -118,6 +63,22 @@ class _VideosScreenState extends State<VideosScreen> {
     if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
     if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
     return n.toString();
+  }
+
+  void _playVideo(Map<String, dynamic> video) {
+    // Record view
+    final id = video['id'];
+    if (id != null) {
+      ApiService().recordVideoView(id.toString()).catchError((_) => <String, dynamic>{});
+    }
+
+    // Navigate to video detail screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoDetailScreen(video: video),
+      ),
+    );
   }
 
   @override
@@ -227,16 +188,7 @@ class _VideosScreenState extends State<VideosScreen> {
         ],
       ),
       child: InkWell(
-        onTap: () {
-          // Record view
-          final id = video['id'];
-          if (id != null) {
-            ApiService().recordVideoView(id.toString()).catchError((_) => <String, dynamic>{});
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Playing ${video['title']}')),
-          );
-        },
+        onTap: () => _playVideo(video),
         borderRadius: BorderRadius.circular(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

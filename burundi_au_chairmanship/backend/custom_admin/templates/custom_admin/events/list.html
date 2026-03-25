@@ -1,0 +1,268 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}Events Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-headline font-bold text-on-surface">Events Management</h1>
+            <p class="text-sm text-on-surface-variant mt-1">Manage diplomatic events and conferences</p>
+        </div>
+        <a href="{% url 'custom_admin:event_create' %}"
+           class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-6 hover:bg-primary transition-colors inline-flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add New Event
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Total Events -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 border-l-4 border-primary-container">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-body text-on-surface-variant uppercase tracking-wide">Total Events</p>
+                    <p class="text-3xl font-headline font-bold text-on-surface mt-2">{{ total_count }}</p>
+                </div>
+                <div class="bg-primary-container bg-opacity-10 rounded-full p-4">
+                    <svg class="w-8 h-8 text-primary-container" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Events -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 border-l-4 border-emerald-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-body text-on-surface-variant uppercase tracking-wide">Active Events</p>
+                    <p class="text-3xl font-headline font-bold text-emerald-700 mt-2">{{ active_count }}</p>
+                </div>
+                <div class="bg-emerald-50 rounded-full p-4">
+                    <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inactive Events -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 border-l-4 border-slate-400">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-body text-on-surface-variant uppercase tracking-wide">Inactive Events</p>
+                    <p class="text-3xl font-headline font-bold text-slate-600 mt-2">{{ inactive_count }}</p>
+                </div>
+                <div class="bg-slate-100 rounded-full p-4">
+                    <svg class="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-4">
+        <div class="flex gap-2">
+            <a href="{% url 'custom_admin:events_list' %}"
+               class="px-4 py-2 rounded-lg font-body font-medium transition-colors {% if not current_filter or current_filter == 'all' %}bg-primary-container text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+                All Events
+            </a>
+            <a href="{% url 'custom_admin:events_list' %}?status=active"
+               class="px-4 py-2 rounded-lg font-body font-medium transition-colors {% if current_filter == 'active' %}bg-emerald-600 text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+                Active
+            </a>
+            <a href="{% url 'custom_admin:events_list' %}?status=inactive"
+               class="px-4 py-2 rounded-lg font-body font-medium transition-colors {% if current_filter == 'inactive' %}bg-slate-600 text-white{% else %}text-on-surface-variant hover:bg-surface-container{% endif %}">
+                Inactive
+            </a>
+        </div>
+    </div>
+
+    <!-- Events Table -->
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+        {% if events %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-surface-container">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
+                            Date
+                        </th>
+                        <th class="px-6 py-4 text-left text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
+                            Event
+                        </th>
+                        <th class="px-6 py-4 text-left text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
+                            Location
+                        </th>
+                        <th class="px-6 py-4 text-left text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
+                            Status
+                        </th>
+                        <th class="px-6 py-4 text-right text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant">
+                    {% for event in events %}
+                    <tr class="hover:bg-surface-container-low transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="bg-primary-container text-white rounded-lg p-2 text-center min-w-[50px]">
+                                <p class="text-[10px] uppercase font-bold">{{ event.event_date|date:"M" }}</p>
+                                <p class="text-lg font-black leading-none">{{ event.event_date|date:"d" }}</p>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-4">
+                                {% if event.image %}
+                                <img src="{{ event.image.url }}" alt="{{ event.name }}"
+                                     class="w-16 h-16 rounded-lg object-cover">
+                                {% else %}
+                                <div class="w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-on-surface-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                    </svg>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <p class="font-headline font-bold text-on-surface">{{ event.name }}</p>
+                                    <p class="text-sm text-on-surface-variant font-body">{{ event.name_fr }}</p>
+                                    <p class="text-xs text-on-surface-variant font-body mt-1">
+                                        {{ event.event_date|date:"F j, Y - g:i A" }}
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <p class="text-sm text-on-surface font-body">{{ event.address|default:"—" }}</p>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if event.is_active %}
+                            <span class="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-xs font-bold">
+                                Active
+                            </span>
+                            {% else %}
+                            <span class="bg-slate-100 text-slate-500 px-2 py-1 rounded text-xs font-bold">
+                                Inactive
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <!-- Toggle Active -->
+                                <form method="post" action="{% url 'custom_admin:event_toggle_active' event.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="p-2 rounded-lg hover:bg-surface-container transition-colors group relative"
+                                            title="{% if event.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                        {% if event.is_active %}
+                                        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        {% else %}
+                                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        {% endif %}
+                                        <span class="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                            {% if event.is_active %}Deactivate{% else %}Activate{% endif %}
+                                        </span>
+                                    </button>
+                                </form>
+
+                                <!-- Edit -->
+                                <a href="{% url 'custom_admin:event_edit' event.pk %}"
+                                   class="p-2 rounded-lg hover:bg-surface-container transition-colors group relative"
+                                   title="Edit">
+                                    <svg class="w-5 h-5 text-primary-container" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                    <span class="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        Edit
+                                    </span>
+                                </a>
+
+                                <!-- Delete -->
+                                <form method="post" action="{% url 'custom_admin:event_delete' event.pk %}"
+                                      class="inline"
+                                      onsubmit="return confirm('Are you sure you want to delete this event?');">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="p-2 rounded-lg hover:bg-red-50 transition-colors group relative"
+                                            title="Delete">
+                                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                        <span class="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                            Delete
+                                        </span>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if events.has_other_pages %}
+        <div class="bg-surface-container px-6 py-4 border-t border-outline-variant">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-on-surface-variant font-body">
+                    Showing page {{ events.number }} of {{ events.paginator.num_pages }}
+                </div>
+                <div class="flex gap-2">
+                    {% if events.has_previous %}
+                    <a href="?page={{ events.previous_page_number }}{% if current_filter and current_filter != 'all' %}&status={{ current_filter }}{% endif %}"
+                       class="px-4 py-2 bg-surface-container-low rounded-lg text-on-surface font-body hover:bg-surface-container transition-colors">
+                        Previous
+                    </a>
+                    {% endif %}
+
+                    {% if events.has_next %}
+                    <a href="?page={{ events.next_page_number }}{% if current_filter and current_filter != 'all' %}&status={{ current_filter }}{% endif %}"
+                       class="px-4 py-2 bg-primary-container text-white rounded-lg font-body hover:bg-primary transition-colors">
+                        Next
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-16">
+            <svg class="mx-auto w-24 h-24 text-on-surface-variant opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <h3 class="mt-4 text-xl font-headline font-bold text-on-surface">No Events Found</h3>
+            <p class="mt-2 text-on-surface-variant font-body">
+                {% if current_filter and current_filter != 'all' %}
+                No {{ current_filter }} events to display.
+                {% else %}
+                Get started by creating your first event.
+                {% endif %}
+            </p>
+            {% if not current_filter or current_filter == 'all' %}
+            <a href="{% url 'custom_admin:event_create' %}"
+               class="mt-6 inline-flex items-center gap-2 bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-6 hover:bg-primary transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add New Event
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

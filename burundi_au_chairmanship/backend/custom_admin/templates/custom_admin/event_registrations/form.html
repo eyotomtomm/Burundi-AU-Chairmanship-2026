@@ -1,0 +1,318 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{% if reg %}Edit{% else %}Create{% endif %} Event Registration{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="font-headline text-4xl font-bold text-on-surface mb-2">
+                {% if reg %}Edit Event Registration{% else %}Create Event Registration{% endif %}
+            </h1>
+            <p class="font-body text-on-surface-variant">Configure event details and registration form fields</p>
+        </div>
+        <a href="{% url 'custom_admin:event_registrations_list' %}" class="inline-flex items-center gap-2 bg-surface-container text-on-surface font-label rounded-lg py-2 px-4 hover:bg-surface-container-high transition-all">
+            <span class="material-symbols-outlined">arrow_back</span>
+            Back to List
+        </a>
+    </div>
+
+    <form method="post" action="{{ action }}" enctype="multipart/form-data" class="space-y-8">
+        {% csrf_token %}
+
+        <!-- Event Details Card -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">event</span>
+                Event Details
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="card_type" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Card Type</label>
+                    <select id="card_type" name="card_type" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg" required>
+                        <option value="event" {% if reg and reg.card_type == 'event' %}selected{% endif %}>Event</option>
+                        <option value="holiday" {% if reg and reg.card_type == 'holiday' %}selected{% endif %}>Holiday</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="order" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Display Order</label>
+                    <input type="number" id="order" name="order" value="{{ reg.order|default:0 }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="event_title" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event Title (EN)</label>
+                    <input type="text" id="event_title" name="event_title" value="{{ reg.event_title|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg" required>
+                </div>
+
+                <div>
+                    <label for="event_title_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event Title (FR)</label>
+                    <input type="text" id="event_title_fr" name="event_title_fr" value="{{ reg.event_title_fr|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="event_description" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event Description (EN)</label>
+                    <textarea id="event_description" name="event_description" rows="4" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">{{ reg.event_description|default:'' }}</textarea>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="event_description_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event Description (FR)</label>
+                    <textarea id="event_description_fr" name="event_description_fr" rows="4" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">{{ reg.event_description_fr|default:'' }}</textarea>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="event_poster" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event Poster</label>
+                    {% if reg and reg.event_poster %}
+                    <div class="mb-3">
+                        <img src="{{ reg.event_poster.url }}" alt="Current poster" class="max-w-xs rounded-lg shadow">
+                        <p class="text-sm text-on-surface-variant mt-2">Current poster (upload a new file to replace)</p>
+                    </div>
+                    {% endif %}
+                    <input type="file" id="event_poster" name="event_poster" accept="image/*" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="event_date" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event Start Date</label>
+                    <input type="datetime-local" id="event_date" name="event_date" value="{% if reg.event_date %}{{ reg.event_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg" required>
+                </div>
+
+                <div>
+                    <label for="event_end_date" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Event End Date</label>
+                    <input type="datetime-local" id="event_end_date" name="event_end_date" value="{% if reg.event_end_date %}{{ reg.event_end_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="venue" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Venue (EN)</label>
+                    <input type="text" id="venue" name="venue" value="{{ reg.venue|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="venue_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Venue (FR)</label>
+                    <input type="text" id="venue_fr" name="venue_fr" value="{{ reg.venue_fr|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="venue_address" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Venue Address</label>
+                    <input type="text" id="venue_address" name="venue_address" value="{{ reg.venue_address|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="contact_email" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Contact Email</label>
+                    <input type="email" id="contact_email" name="contact_email" value="{{ reg.contact_email|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="contact_phone" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Contact Phone</label>
+                    <input type="tel" id="contact_phone" name="contact_phone" value="{{ reg.contact_phone|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+            </div>
+        </div>
+
+        <!-- Registration Settings Card -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">app_registration</span>
+                Registration Settings
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="flex items-center">
+                    <input type="checkbox" id="is_registration_enabled" name="is_registration_enabled" {% if reg.is_registration_enabled %}checked{% endif %} class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-secondary focus:ring-2">
+                    <label for="is_registration_enabled" class="ml-3 font-body text-on-surface">Enable Registration</label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="is_active" name="is_active" {% if reg.is_active or not reg %}checked{% endif %} class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-secondary focus:ring-2">
+                    <label for="is_active" class="ml-3 font-body text-on-surface">Active</label>
+                </div>
+
+                <div>
+                    <label for="registration_deadline" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Registration Deadline</label>
+                    <input type="datetime-local" id="registration_deadline" name="registration_deadline" value="{% if reg.registration_deadline %}{{ reg.registration_deadline|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label for="max_registrations" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Max Registrations</label>
+                    <input type="number" id="max_registrations" name="max_registrations" value="{{ reg.max_registrations|default:'' }}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="allow_proxy_registration" name="allow_proxy_registration" {% if reg.allow_proxy_registration %}checked{% endif %} class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-secondary focus:ring-2">
+                    <label for="allow_proxy_registration" class="ml-3 font-body text-on-surface">Allow Proxy Registration</label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox" id="send_confirmation_email" name="send_confirmation_email" {% if reg.send_confirmation_email %}checked{% endif %} class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-secondary focus:ring-2">
+                    <label for="send_confirmation_email" class="ml-3 font-body text-on-surface">Send Confirmation Email</label>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="confirmation_message" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Confirmation Message (EN)</label>
+                    <textarea id="confirmation_message" name="confirmation_message" rows="3" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">{{ reg.confirmation_message|default:'' }}</textarea>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="confirmation_message_fr" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Confirmation Message (FR)</label>
+                    <textarea id="confirmation_message_fr" name="confirmation_message_fr" rows="3" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">{{ reg.confirmation_message_fr|default:'' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dynamic Form Builder Card -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="font-headline text-2xl font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">dynamic_form</span>
+                    Registration Form Fields
+                </h2>
+                <button type="button" onclick="addFormField()" class="inline-flex items-center gap-2 bg-secondary text-white font-label rounded-lg py-2 px-4 hover:bg-secondary-container transition-all">
+                    <span class="material-symbols-outlined">add</span>
+                    Add Field
+                </button>
+            </div>
+
+            <div id="formFieldsContainer" class="space-y-4">
+                <!-- Dynamic fields will be added here -->
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex items-center justify-end gap-4">
+            <a href="{% url 'custom_admin:event_registrations_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                Cancel
+            </a>
+            <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all inline-flex items-center gap-2">
+                <span class="material-symbols-outlined">save</span>
+                Save Event Registration
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let fieldCounter = 0;
+const existingFieldsJson = {{ existing_fields_json|safe|default:"[]" }};
+const fieldTypeChoices = {{ field_type_choices|safe }};
+
+function addFormField(existingData = null) {
+    const index = fieldCounter++;
+    const fieldData = existingData || {};
+
+    const fieldHtml = `
+        <div class="bg-surface-container rounded-lg p-6 border-2 border-outline-variant" data-field-index="${index}">
+            <input type="hidden" name="field_${index}_id" value="${fieldData.id || ''}">
+
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-headline text-lg font-bold text-on-surface">Form Field #${index + 1}</h3>
+                <button type="button" onclick="removeFormField(this)" class="text-error hover:text-error-container transition-colors">
+                    <span class="material-symbols-outlined">delete</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Field Type</label>
+                    <select name="field_${index}_type" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg" required onchange="toggleOptionsField(this)">
+                        ${fieldTypeChoices.map(choice => `<option value="${choice[0]}" ${fieldData.field_type === choice[0] ? 'selected' : ''}>${choice[1]}</option>`).join('')}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Field Name</label>
+                    <input type="text" name="field_${index}_name" value="${fieldData.field_name || ''}" placeholder="field_identifier" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg" required>
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Label (EN)</label>
+                    <input type="text" name="field_${index}_label" value="${fieldData.field_label || ''}" placeholder="Field Label" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg" required>
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Label (FR)</label>
+                    <input type="text" name="field_${index}_label_fr" value="${fieldData.field_label_fr || ''}" placeholder="Étiquette du champ" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Placeholder (EN)</label>
+                    <input type="text" name="field_${index}_placeholder" value="${fieldData.placeholder || ''}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Placeholder (FR)</label>
+                    <input type="text" name="field_${index}_placeholder_fr" value="${fieldData.placeholder_fr || ''}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Help Text (EN)</label>
+                    <input type="text" name="field_${index}_help_text" value="${fieldData.help_text || ''}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Help Text (FR)</label>
+                    <input type="text" name="field_${index}_help_text_fr" value="${fieldData.help_text_fr || ''}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div>
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Validation Regex</label>
+                    <input type="text" name="field_${index}_validation_regex" value="${fieldData.validation_regex || ''}" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div class="md:col-span-3 options-field" style="display: ${['select', 'radio', 'multi_checkbox'].includes(fieldData.field_type) ? 'block' : 'none'}">
+                    <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Options (comma-separated)</label>
+                    <input type="text" name="field_${index}_options" value="${Array.isArray(fieldData.options) ? fieldData.options.join(', ') : (fieldData.options || '')}" placeholder="Option 1, Option 2, Option 3" class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg">
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center">
+                        <input type="checkbox" name="field_${index}_required" ${fieldData.is_required ? 'checked' : ''} class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-secondary focus:ring-2">
+                        <label class="ml-2 font-body text-on-surface">Required</label>
+                    </div>
+
+                    <div class="flex items-center">
+                        <input type="checkbox" name="field_${index}_active" ${fieldData.is_active !== false ? 'checked' : ''} class="w-5 h-5 text-primary bg-surface-container-low border-outline-variant rounded focus:ring-secondary focus:ring-2">
+                        <label class="ml-2 font-body text-on-surface">Active</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('formFieldsContainer').insertAdjacentHTML('beforeend', fieldHtml);
+}
+
+function removeFormField(button) {
+    const fieldContainer = button.closest('[data-field-index]');
+    if (fieldContainer) {
+        fieldContainer.remove();
+    }
+}
+
+function toggleOptionsField(selectElement) {
+    const fieldContainer = selectElement.closest('[data-field-index]');
+    const optionsField = fieldContainer.querySelector('.options-field');
+    const selectedType = selectElement.value;
+
+    if (['select', 'radio', 'multi_checkbox'].includes(selectedType)) {
+        optionsField.style.display = 'block';
+    } else {
+        optionsField.style.display = 'none';
+    }
+}
+
+// Initialize existing fields on page load
+document.addEventListener('DOMContentLoaded', function() {
+    if (existingFieldsJson && existingFieldsJson.length > 0) {
+        existingFieldsJson.forEach(field => {
+            addFormField(field);
+        });
+    } else {
+        // Add one empty field by default for new forms
+        addFormField();
+    }
+});
+</script>
+{% endblock %}

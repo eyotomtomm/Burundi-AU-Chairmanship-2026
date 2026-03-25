@@ -7,6 +7,8 @@ from .models import (
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
+    VerificationRequest, WeatherCity, EventRegistration, RegistrationFormField,
+    EventSubmission, FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
 )
 
 
@@ -20,7 +22,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('A user with this email already exists.')
+            raise serializers.ValidationError('Unable to register with this email address.')
         return value
 
     def create(self, validated_data):
@@ -36,10 +38,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['phone_number', 'gender', 'profile_picture', 'is_email_verified',
-                  'is_government_official', 'email_verified_at', 'government_verified_at']
-        read_only_fields = ['is_email_verified', 'is_government_official',
-                            'email_verified_at', 'government_verified_at']
+        fields = ['phone_number', 'gender', 'nationality', 'date_of_birth', 'profile_picture', 'is_email_verified',
+                  'is_government_official', 'is_verified', 'badge_type', 'verification_requested_at',
+                  'email_verified_at', 'government_verified_at', 'verified_at']
+        read_only_fields = ['is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
+                            'email_verified_at', 'government_verified_at', 'verified_at',
+                            'verification_requested_at']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -49,15 +53,32 @@ class UserSerializer(serializers.ModelSerializer):
     # Computed fields for easy access
     phone_number = serializers.CharField(source='profile.phone_number', required=False, allow_blank=True)
     gender = serializers.CharField(source='profile.gender', required=False, allow_blank=True)
+    nationality = serializers.CharField(source='profile.nationality', required=False, allow_blank=True)
+    date_of_birth = serializers.DateField(source='profile.date_of_birth', required=False, allow_null=True)
     profile_picture = serializers.ImageField(source='profile.profile_picture', required=False, allow_null=True)
     is_email_verified = serializers.BooleanField(source='profile.is_email_verified', read_only=True)
     is_government_official = serializers.BooleanField(source='profile.is_government_official', read_only=True)
+    is_verified = serializers.BooleanField(source='profile.is_verified', read_only=True)
+    badge_type = serializers.CharField(source='profile.badge_type', read_only=True, allow_null=True)
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'profile', 'phone_number', 'gender',
-                  'profile_picture', 'is_email_verified', 'is_government_official']
-        read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official']
+        fields = ['id', 'name', 'email', 'profile', 'phone_number', 'gender', 'nationality', 'date_of_birth',
+                  'profile_picture', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
+        read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Ensure profile_picture is a full URL
+        if hasattr(instance, 'profile') and instance.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                ret['profile_picture'] = request.build_absolute_uri(instance.profile.profile_picture.url)
+            else:
+                ret['profile_picture'] = instance.profile.profile_picture.url
+        else:
+            ret['profile_picture'] = None
+        return ret
 
     def update(self, instance, validated_data):
         # Update user fields
@@ -75,6 +96,10 @@ class UserSerializer(serializers.ModelSerializer):
             profile_data['phone_number'] = validated_data['phone_number']
         if 'gender' in validated_data:
             profile_data['gender'] = validated_data['gender']
+        if 'nationality' in validated_data:
+            profile_data['nationality'] = validated_data['nationality']
+        if 'date_of_birth' in validated_data:
+            profile_data['date_of_birth'] = validated_data['date_of_birth']
         if 'profile_picture' in validated_data:
             profile_data['profile_picture'] = validated_data['profile_picture']
 
@@ -196,15 +221,93 @@ class ResourceSerializer(serializers.ModelSerializer):
                   'file_size', 'file_type']
 
 
+class FeatureCardKeyPointSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCardKeyPoint
+        fields = ['id', 'text', 'text_fr', 'order']
+
+
+class FeatureCardImpactAreaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeatureCardImpactArea
+        fields = ['id', 'icon_name', 'title', 'title_fr', 'description', 'description_fr', 'order']
+
+
+class FeatureCardMediaSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeatureCardMedia
+        fields = ['id', 'media_type', 'image', 'video_url', 'caption', 'caption_fr', 'order']
+
+    def get_image(self, obj):
+        """Return uploaded image URL or external image URL."""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.image_url or None
+
+    def get_video_url(self, obj):
+        """Return uploaded video file URL or external video URL."""
+        if obj.video_file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.video_file.url)
+            return obj.video_file.url
+        return obj.video_url or None
+
+
 class FeatureCardSerializer(serializers.ModelSerializer):
+    key_points = serializers.SerializerMethodField()
+    key_points_fr = serializers.SerializerMethodField()
+    impact_areas = serializers.SerializerMethodField()
+    impact_areas_fr = serializers.SerializerMethodField()
+    media = FeatureCardMediaSerializer(many=True, read_only=True)
+
     class Meta:
         model = FeatureCard
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'image', 'gradient_start', 'gradient_end', 'icon_name', 'icon_image',
                   'action_type', 'action_value', 'order',
                   'overview', 'overview_fr', 'key_points', 'key_points_fr',
-                  'impact_areas', 'impact_areas_fr', 'extra_content', 'extra_content_fr']
+                  'impact_areas', 'impact_areas_fr', 'extra_content', 'extra_content_fr',
+                  'media']
 
+    def get_key_points(self, obj):
+        """Return list of strings — from child model rows, fallback to JSON field."""
+        items = obj.key_point_items.all() if hasattr(obj, 'key_point_items') else []
+        if items:
+            return [item.text for item in items]
+        # Fallback to legacy JSON field
+        return obj.key_points if obj.key_points else []
+
+    def get_key_points_fr(self, obj):
+        items = obj.key_point_items.all() if hasattr(obj, 'key_point_items') else []
+        if items:
+            return [item.text_fr or item.text for item in items]
+        return obj.key_points_fr if obj.key_points_fr else []
+
+    def get_impact_areas(self, obj):
+        """Return list of dicts — from child model rows, fallback to JSON field."""
+        items = obj.impact_area_items.all() if hasattr(obj, 'impact_area_items') else []
+        if items:
+            return [
+                {'icon': item.icon_name, 'title': item.title, 'description': item.description}
+                for item in items
+            ]
+        return obj.impact_areas if obj.impact_areas else []
+
+    def get_impact_areas_fr(self, obj):
+        items = obj.impact_area_items.all() if hasattr(obj, 'impact_area_items') else []
+        if items:
+            return [
+                {'icon': item.icon_name, 'title': item.title_fr or item.title, 'description': item.description_fr or item.description}
+                for item in items
+            ]
+        return obj.impact_areas_fr if obj.impact_areas_fr else []
 
 class NotificationSerializer(serializers.ModelSerializer):
     is_read = serializers.SerializerMethodField()
@@ -213,7 +316,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = ['id', 'title', 'title_fr', 'message', 'message_fr',
                   'notification_type', 'action_type', 'action_value',
-                  'is_read', 'created_at']
+                  'image', 'is_read', 'created_at']
 
     def get_is_read(self, obj):
         request = self.context.get('request')
@@ -256,11 +359,23 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
 
 
 class VideoSerializer(serializers.ModelSerializer):
+    # Return either the uploaded file URL or the external video_url
+    video_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Video
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'video_url', 'thumbnail', 'duration', 'category', 'view_count',
                   'publish_date', 'is_featured']
+
+    def get_video_url(self, obj):
+        """Return video_file URL if exists, otherwise return video_url"""
+        request = self.context.get('request')
+        if obj.video_file:
+            if request:
+                return request.build_absolute_uri(obj.video_file.url)
+            return obj.video_file.url
+        return obj.video_url
 
 
 class SocialMediaLinkSerializer(serializers.ModelSerializer):
@@ -329,3 +444,182 @@ class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
                 return 'NEW'
 
         return ''
+
+
+class VerificationRequestSerializer(serializers.ModelSerializer):
+    """Serializer for creating and viewing verification requests"""
+    user_name = serializers.CharField(source='user.first_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+
+    class Meta:
+        model = VerificationRequest
+        fields = [
+            'id', 'user', 'user_name', 'user_email',
+            'title', 'full_name', 'email', 'phone_number', 'phone_verified',
+            'position_role', 'twitter_url', 'linkedin_url',
+            'status', 'badge_type', 'rejection_reason',
+            'appeal_message', 'appeal_submitted_at',
+            'created_at', 'updated_at', 'reviewed_at'
+        ]
+        read_only_fields = [
+            'id', 'user', 'user_name', 'user_email',
+            'status', 'badge_type', 'rejection_reason', 'phone_verified',
+            'appeal_submitted_at', 'created_at', 'updated_at', 'reviewed_at'
+        ]
+
+    def validate(self, data):
+        """Ensure user only has one pending/approved request"""
+        user = self.context['request'].user
+
+        # Check for existing pending or approved requests
+        existing = VerificationRequest.objects.filter(
+            user=user,
+            status__in=['pending', 'approved', 'appealed']
+        ).exists()
+
+        if existing:
+            raise serializers.ValidationError(
+                'You already have a pending or approved verification request.'
+            )
+
+        return data
+
+
+class VerificationStatusSerializer(serializers.Serializer):
+    """Serializer for checking verification status"""
+    has_verification = serializers.BooleanField()
+    status = serializers.CharField(allow_null=True)
+    badge_type = serializers.CharField(allow_null=True)
+    rejection_reason = serializers.CharField(allow_null=True)
+    can_appeal = serializers.BooleanField()
+    request_details = VerificationRequestSerializer(allow_null=True)
+
+
+class VerificationAppealSerializer(serializers.Serializer):
+    """Serializer for submitting appeals"""
+    appeal_message = serializers.CharField(
+        max_length=1000,
+        help_text='Explain why you believe the rejection was incorrect'
+    )
+
+    def validate_appeal_message(self, value):
+        if len(value.strip()) < 50:
+            raise serializers.ValidationError(
+                'Appeal message must be at least 50 characters long.'
+            )
+        return value
+
+
+class AdminVerificationActionSerializer(serializers.Serializer):
+    """Serializer for admin approve/reject actions"""
+    action = serializers.ChoiceField(choices=['approve', 'reject'])
+    badge_type = serializers.ChoiceField(
+        choices=['GOLD', 'BLUE'],
+        required=False,
+        help_text='Required for approve action'
+    )
+    rejection_reason = serializers.CharField(
+        required=False,
+        max_length=500,
+        help_text='Required for reject action'
+    )
+
+    def validate(self, data):
+        if data['action'] == 'approve' and not data.get('badge_type'):
+            raise serializers.ValidationError({
+                'badge_type': 'Badge type is required when approving.'
+            })
+
+        if data['action'] == 'reject' and not data.get('rejection_reason'):
+            raise serializers.ValidationError({
+                'rejection_reason': 'Rejection reason is required when rejecting.'
+            })
+
+        return data
+
+
+class WeatherCitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WeatherCity
+        fields = ['id', 'name', 'latitude', 'longitude', 'background_image',
+                  'order', 'is_default']
+
+class RegistrationFormFieldSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegistrationFormField
+        fields = ['id', 'field_type', 'field_label', 'field_label_fr', 'field_name',
+                  'placeholder', 'placeholder_fr', 'is_required', 'is_active',
+                  'options', 'validation_regex', 'help_text', 'help_text_fr', 'order']
+
+
+class EventRegistrationSerializer(serializers.ModelSerializer):
+    form_fields = RegistrationFormFieldSerializer(many=True, read_only=True)
+    has_registered = serializers.SerializerMethodField()
+    user_submission_status = serializers.SerializerMethodField()
+    is_registration_open = serializers.SerializerMethodField()
+    current_registration_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventRegistration
+        fields = ['id', 'card_type', 'event_title', 'event_title_fr',
+                  'event_description', 'event_description_fr', 'event_poster',
+                  'event_date', 'event_end_date', 'venue', 'venue_fr', 'venue_address',
+                  'contact_email', 'contact_phone',
+                  'is_registration_enabled', 'registration_deadline',
+                  'max_registrations', 'allow_proxy_registration',
+                  'confirmation_message', 'confirmation_message_fr',
+                  'is_active', 'order',
+                  'form_fields', 'has_registered', 'user_submission_status',
+                  'is_registration_open', 'current_registration_count']
+
+    def get_has_registered(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.submissions.filter(user=request.user, is_proxy=False).exists()
+        return False
+
+    def get_user_submission_status(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            submission = obj.submissions.filter(user=request.user, is_proxy=False).first()
+            if submission:
+                return submission.status
+        return None
+
+    def get_is_registration_open(self, obj):
+        if not obj.is_registration_enabled:
+            return False
+        if obj.registration_deadline:
+            from django.utils import timezone
+            if timezone.now() > obj.registration_deadline:
+                return False
+        if obj.max_registrations > 0:
+            if obj.submissions.count() >= obj.max_registrations:
+                return False
+        return True
+
+    def get_current_registration_count(self, obj):
+        return obj.submissions.count()
+
+
+class EventSubmissionSerializer(serializers.ModelSerializer):
+    event_title = serializers.CharField(source='event_registration.event_title', read_only=True)
+    user_name = serializers.CharField(source='user.first_name', read_only=True)
+    user_email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = EventSubmission
+        fields = ['id', 'event_registration', 'event_title', 'user', 'user_name', 'user_email',
+                  'form_data', 'uploaded_files',
+                  'is_proxy', 'proxy_name', 'proxy_email', 'proxy_phone',
+                  'status',
+                  'submitted_at', 'reviewed_at', 'reviewed_by']
+        read_only_fields = ['id', 'user', 'submitted_at', 'reviewed_at', 'reviewed_by']
+
+
+class ProxyRegistrationSerializer(serializers.Serializer):
+    event_registration = serializers.IntegerField()
+    proxy_name = serializers.CharField(max_length=200)
+    proxy_email = serializers.EmailField()
+    proxy_phone = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    form_data = serializers.JSONField(required=False, default=dict)

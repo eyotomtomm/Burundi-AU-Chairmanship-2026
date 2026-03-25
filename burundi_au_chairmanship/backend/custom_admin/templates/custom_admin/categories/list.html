@@ -1,0 +1,78 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Categories - Burundi AU Chairmanship{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Page Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-primary">label</span>
+      <span class="font-label text-xs uppercase tracking-wider text-on-surface-variant">Content Management</span>
+    </div>
+    <div class="flex items-center justify-between">
+      <h1 class="font-headline text-4xl font-bold text-on-surface">Categories</h1>
+      <a href="{% url 'custom_admin:category_create' %}" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined">add</span>
+        Add Category
+      </a>
+    </div>
+  </div>
+
+  <!-- Categories Table Card -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-outline-variant">
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-left pb-4">Color</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-left pb-4">English Name</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-left pb-4">French Name</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-center pb-4">Order</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-center pb-4">Articles</th>
+          <th class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold text-right pb-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in categories %}
+        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+          <td class="py-4">
+            <span class="w-4 h-4 rounded-full inline-block" style="background:{{ cat.color }}"></span>
+          </td>
+          <td class="py-4 font-body text-on-surface">{{ cat.name }}</td>
+          <td class="py-4 font-body text-on-surface-variant">{{ cat.name_fr|default:"--" }}</td>
+          <td class="py-4 font-body text-on-surface text-center">{{ cat.order }}</td>
+          <td class="py-4 text-center">
+            <span class="bg-surface-container px-3 py-1 rounded text-sm font-body text-on-surface">
+              {{ cat.article_count }}
+            </span>
+          </td>
+          <td class="py-4 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <a href="{% url 'custom_admin:category_edit' cat.pk %}" class="text-primary hover:text-secondary transition-colors flex items-center gap-1">
+                <span class="material-symbols-outlined text-xl">edit</span>
+                <span class="font-label text-sm">Edit</span>
+              </a>
+              <form method="POST" action="{% url 'custom_admin:category_delete' cat.pk %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this category? This will not delete associated articles.');">
+                {% csrf_token %}
+                <button type="submit" class="text-red-600 hover:text-red-800 transition-colors flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xl">delete</span>
+                  <span class="font-label text-sm">Delete</span>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="py-12 text-center">
+            <span class="material-symbols-outlined text-6xl text-on-surface-variant opacity-30">label</span>
+            <p class="font-body text-on-surface-variant mt-4">No categories found.</p>
+            <a href="{% url 'custom_admin:category_create' %}" class="inline-block mt-4 text-primary hover:text-secondary font-label">Add your first category</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

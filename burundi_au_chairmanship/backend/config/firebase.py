@@ -8,7 +8,7 @@ Firebase ID tokens sent from the Flutter mobile app.
 import os
 import logging
 import firebase_admin
-from firebase_admin import credentials, auth
+from firebase_admin import credentials, auth, messaging
 from django.conf import settings
 
 logger = logging.getLogger(__name__)

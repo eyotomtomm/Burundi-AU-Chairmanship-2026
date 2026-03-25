@@ -1,0 +1,96 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if city.pk %}Edit{% else %}New{% endif %} Weather City - Burundi AU Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <span class="material-symbols-outlined text-4xl text-primary">cloud</span>
+        <h1 class="font-headline text-3xl font-bold text-on-surface">
+            {% if city.pk %}Edit{% else %}New{% endif %} Weather City
+        </h1>
+    </div>
+
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+        <form method="post" action="{{ action }}" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="mb-6">
+                <label for="name" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    City Name
+                </label>
+                <input type="text" id="name" name="name" value="{{ city.name|default:'' }}"
+                       placeholder="e.g., Bujumbura"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label for="latitude" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Latitude
+                    </label>
+                    <input type="number" id="latitude" name="latitude" value="{{ city.latitude|default:'0' }}"
+                           step="0.000001" min="-90" max="90"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface font-mono" required>
+                </div>
+
+                <div>
+                    <label for="longitude" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                        Longitude
+                    </label>
+                    <input type="number" id="longitude" name="longitude" value="{{ city.longitude|default:'0' }}"
+                           step="0.000001" min="-180" max="180"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface font-mono" required>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label for="background_image" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Background Image
+                </label>
+                {% if city.background_image %}
+                <div class="mb-3">
+                    <img src="{{ city.background_image.url }}" alt="Current background" class="w-full h-48 object-cover rounded-lg shadow-sm">
+                </div>
+                {% endif %}
+                <input type="file" id="background_image" name="background_image" accept="image/*"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                <p class="text-xs text-on-surface-variant mt-2">Optional background image for weather display</p>
+            </div>
+
+            <div class="mb-6">
+                <label for="order" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Display Order
+                </label>
+                <input type="number" id="order" name="order" value="{{ city.order|default:'0' }}"
+                       min="0"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                <p class="text-xs text-on-surface-variant mt-2">Lower numbers appear first</p>
+            </div>
+
+            <div class="flex gap-6 mb-8">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="is_default" name="is_default" {% if city.is_default %}checked{% endif %}
+                           class="w-5 h-5 text-secondary border-outline-variant rounded focus:ring-2 focus:ring-secondary">
+                    <span class="font-label text-sm text-on-surface font-bold">Default City</span>
+                </label>
+
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" id="is_active" name="is_active" {% if city.is_active %}checked{% endif %}
+                           class="w-5 h-5 text-secondary border-outline-variant rounded focus:ring-2 focus:ring-secondary">
+                    <span class="font-label text-sm text-on-surface font-bold">Active</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end gap-4">
+                <a href="{% url 'custom_admin:weather_cities_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                    Cancel
+                </a>
+                <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
+                    {% if city.pk %}Update{% else %}Create{% endif %} City
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

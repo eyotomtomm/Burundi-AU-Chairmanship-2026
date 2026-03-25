@@ -23,7 +23,7 @@ Future<void> showVerificationApprovedDialog(
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.burundiGreen.withOpacity(0.1),
+                color: AppColors.burundiGreen.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -68,8 +68,8 @@ Future<void> showVerificationApprovedDialog(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: badgeType == 'GOLD'
-                    ? const Color(0xFFFFD700).withOpacity(0.1)
-                    : const Color(0xFF2196F3).withOpacity(0.1),
+                    ? const Color(0xFFFFD700).withValues(alpha: 0.1)
+                    : const Color(0xFF2196F3).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -142,7 +142,7 @@ Future<bool?> showVerificationRejectedDialog(
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.burundiRed.withOpacity(0.1),
+                color: AppColors.burundiRed.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -185,7 +185,7 @@ Future<bool?> showVerificationRejectedDialog(
                     : AppColors.lightBackground,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppColors.burundiRed.withOpacity(0.3),
+                  color: AppColors.burundiRed.withValues(alpha: 0.3),
                 ),
               ),
               child: Column(

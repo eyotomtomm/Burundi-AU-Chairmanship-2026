@@ -268,7 +268,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                             CachedNetworkImage(
                               imageUrl: Environment.fixMediaUrl(primary.backgroundImageUrl!),
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => Container(
+                              errorWidget: (_, _, _) => Container(
                                 decoration: const BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topLeft,

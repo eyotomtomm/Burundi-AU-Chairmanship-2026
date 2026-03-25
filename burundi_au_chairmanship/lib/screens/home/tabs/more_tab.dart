@@ -13,7 +13,6 @@ import '../../../providers/theme_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
-import '../../support/contact_support_screen.dart';
 import '../../../widgets/verified_badge.dart';
 
 class MoreTab extends StatelessWidget {
@@ -450,12 +449,7 @@ class MoreTab extends StatelessWidget {
                       subtitle: 'Get help and support',
                       isDark: isDark,
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ContactSupportScreen(),
-                          ),
-                        );
+                        Navigator.pushNamed(context, '/support-tickets');
                       },
                     ),
                     // Export Data & Delete Account - Only show if logged in

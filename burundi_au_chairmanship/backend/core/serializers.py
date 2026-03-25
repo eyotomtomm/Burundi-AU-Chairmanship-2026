@@ -9,6 +9,7 @@ from .models import (
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
     VerificationRequest, WeatherCity, EventRegistration, RegistrationFormField,
     EventSubmission, FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
+    SupportTicket, TicketMessage,
 )
 
 
@@ -212,8 +213,9 @@ class EventSerializer(serializers.ModelSerializer):
 class LiveFeedSerializer(serializers.ModelSerializer):
     class Meta:
         model = LiveFeed
-        fields = ['id', 'title', 'title_fr', 'stream_url', 'thumbnail',
-                  'status', 'viewer_count', 'duration', 'scheduled_time']
+        fields = ['id', 'title', 'title_fr', 'stream_url', 'stream_type',
+                  'meeting_id', 'passcode', 'thumbnail', 'status',
+                  'viewer_count', 'duration', 'scheduled_time']
 
 
 class ResourceSerializer(serializers.ModelSerializer):
@@ -331,7 +333,8 @@ class AppSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppSettings
         fields = ['summit_year', 'summit_theme', 'summit_theme_fr',
-                  'website_url', 'facebook_url', 'twitter_url', 'instagram_url']
+                  'website_url', 'facebook_url', 'twitter_url', 'instagram_url',
+                  'sms_verification_enabled', 'whatsapp_verification_enabled']
 
 
 class PriorityAgendaSerializer(serializers.ModelSerializer):
@@ -664,3 +667,49 @@ class ProxyRegistrationSerializer(serializers.Serializer):
     proxy_email = serializers.EmailField()
     proxy_phone = serializers.CharField(max_length=50, required=False, allow_blank=True)
     form_data = serializers.JSONField(required=False, default=dict)
+
+
+class TicketMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TicketMessage
+        fields = ['id', 'sender', 'sender_name', 'message', 'is_admin_reply',
+                  'is_read', 'attachment', 'created_at']
+        read_only_fields = ['id', 'sender', 'sender_name', 'is_admin_reply',
+                            'is_read', 'created_at']
+
+    def get_sender_name(self, obj):
+        return obj.sender.first_name or obj.sender.username
+
+
+class SupportTicketListSerializer(serializers.ModelSerializer):
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SupportTicket
+        fields = ['id', 'subject', 'status', 'priority', 'created_at',
+                  'updated_at', 'last_message', 'unread_count']
+
+    def get_last_message(self, obj):
+        msg = obj.messages.order_by('-created_at').first()
+        if msg:
+            return {
+                'message': msg.message[:100],
+                'is_admin_reply': msg.is_admin_reply,
+                'created_at': msg.created_at.isoformat(),
+            }
+        return None
+
+    def get_unread_count(self, obj):
+        return obj.messages.filter(is_read=False, is_admin_reply=True).count()
+
+
+class SupportTicketDetailSerializer(serializers.ModelSerializer):
+    messages = TicketMessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = ['id', 'subject', 'status', 'priority', 'created_at',
+                  'updated_at', 'resolved_at', 'messages']

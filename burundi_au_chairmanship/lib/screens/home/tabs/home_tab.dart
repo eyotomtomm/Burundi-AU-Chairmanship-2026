@@ -57,6 +57,8 @@ class _HomeTabState extends State<HomeTab> {
   List<EventRegistrationModel>? _apiEventCards;
   Map<String, String>? _heroTextContent;
   List<Map<String, dynamic>>? _quickAccessItems;
+  int _unreadBadgeCount = 0;
+  Timer? _badgeTimer;
 
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
@@ -106,8 +108,23 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _loadData();
+    _loadUnreadCount();
     _startHeroAutoSlide();
     _startFeatureAutoSlide();
+    // Poll unread count every 60 seconds
+    _badgeTimer = Timer.periodic(const Duration(seconds: 60), (_) => _loadUnreadCount());
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final authProvider = context.read<AuthProvider>();
+    if (!authProvider.isAuthenticated) return;
+    try {
+      final api = ApiService();
+      final count = await api.getUnreadSupportCount();
+      if (mounted) setState(() => _unreadBadgeCount = count);
+    } catch (_) {
+      // Silently fail - badge is non-critical
+    }
   }
 
   Future<void> _loadData() async {
@@ -211,6 +228,7 @@ class _HomeTabState extends State<HomeTab> {
   void dispose() {
     _heroTimer?.cancel();
     _featureTimer?.cancel();
+    _badgeTimer?.cancel();
     _heroPageController.dispose();
     _featureCardPageController.dispose();
     super.dispose();
@@ -630,17 +648,48 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                       Row(
                         children: [
-                          // Notification bell
+                          // Notification bell with unread badge
                           IconButton(
-                            icon: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.notifications_outlined, color: Colors.white),
+                            icon: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.notifications_outlined, color: Colors.white),
+                                ),
+                                if (_unreadBadgeCount > 0)
+                                  Positioned(
+                                    right: -2,
+                                    top: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.burundiRed,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white, width: 1.5),
+                                      ),
+                                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                      child: Text(
+                                        _unreadBadgeCount > 99 ? '99+' : '$_unreadBadgeCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                            onPressed: () => Navigator.pushNamed(context, '/notifications'),
+                            onPressed: () async {
+                              await Navigator.pushNamed(context, '/notifications');
+                              _loadUnreadCount();
+                            },
                           ),
                           // Theme toggle
                           Consumer<ThemeProvider>(

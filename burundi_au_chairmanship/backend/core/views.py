@@ -19,6 +19,7 @@ from .models import (
     PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
     Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
     WeatherCity, EventRegistration, RegistrationFormField, EventSubmission,
+    SupportTicket, TicketMessage,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -32,6 +33,7 @@ from .serializers import (
     VerificationAppealSerializer, AdminVerificationActionSerializer,
     WeatherCitySerializer, EventRegistrationSerializer, EventSubmissionSerializer,
     RegistrationFormFieldSerializer, ProxyRegistrationSerializer,
+    SupportTicketListSerializer, SupportTicketDetailSerializer, TicketMessageSerializer,
 )
 
 
@@ -1344,11 +1346,12 @@ def verify_email_otp(request):
 @permission_classes([IsAuthenticated])
 @throttle_classes([OTPRateThrottle])
 def send_phone_otp(request):
-    """Send OTP to user's phone via Twilio SMS"""
+    """Send OTP to user's phone via Twilio SMS or WhatsApp"""
     from .otp_utils import send_phone_otp_twilio
 
     country_code = request.data.get('country_code')
     phone_number = request.data.get('phone_number')
+    channel = request.data.get('channel', 'sms')  # 'sms' or 'whatsapp'
 
     if not country_code or not phone_number:
         return Response(
@@ -1359,7 +1362,8 @@ def send_phone_otp(request):
     success, message, otp_id = send_phone_otp_twilio(
         request.user,
         country_code,
-        phone_number
+        phone_number,
+        channel=channel
     )
 
     if success:
@@ -1405,3 +1409,113 @@ def verify_phone_otp(request):
             {'detail': message},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+# ── Support Ticket System ────────────────────────────────────────────
+
+class SupportTicketViewSet(viewsets.ModelViewSet):
+    """
+    Support ticket endpoints for authenticated users.
+    - GET  /api/support/tickets/          — list user's tickets
+    - POST /api/support/tickets/          — create new ticket (subject + message)
+    - GET  /api/support/tickets/{id}/     — ticket detail with all messages
+    - POST /api/support/tickets/{id}/reply/     — add a message to ticket
+    - POST /api/support/tickets/{id}/mark_read/ — mark all admin replies as read
+    """
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return SupportTicketListSerializer
+        return SupportTicketDetailSerializer
+
+    def get_queryset(self):
+        return SupportTicket.objects.filter(
+            user=self.request.user
+        ).prefetch_related('messages')
+
+    def create(self, request, *args, **kwargs):
+        """Create a new ticket with the first message."""
+        subject = request.data.get('subject', '').strip()
+        message_text = request.data.get('message', '').strip()
+
+        if not subject:
+            return Response(
+                {'detail': 'Subject is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not message_text:
+            return Response(
+                {'detail': 'Message is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ticket = SupportTicket.objects.create(
+            user=request.user,
+            subject=subject,
+        )
+
+        TicketMessage.objects.create(
+            ticket=ticket,
+            sender=request.user,
+            message=message_text,
+            is_admin_reply=False,
+            is_read=True,
+        )
+
+        serializer = SupportTicketDetailSerializer(ticket)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def reply(self, request, pk=None):
+        """User adds a message to an existing ticket."""
+        ticket = self.get_object()
+        message_text = request.data.get('message', '').strip()
+
+        if not message_text:
+            return Response(
+                {'detail': 'Message is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        TicketMessage.objects.create(
+            ticket=ticket,
+            sender=request.user,
+            message=message_text,
+            is_admin_reply=False,
+            is_read=True,
+        )
+
+        # Reopen ticket if it was resolved/closed
+        if ticket.status in ('resolved', 'closed'):
+            ticket.status = 'open'
+            ticket.save(update_fields=['status'])
+
+        serializer = SupportTicketDetailSerializer(ticket)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark all admin replies in this ticket as read."""
+        ticket = self.get_object()
+        count = ticket.messages.filter(
+            is_admin_reply=True, is_read=False
+        ).update(is_read=True)
+
+        return Response({
+            'message': f'{count} message(s) marked as read',
+            'marked_count': count,
+        })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def support_unread_count(request):
+    """Total unread support message count across all tickets (for bell badge)."""
+    count = TicketMessage.objects.filter(
+        ticket__user=request.user,
+        is_admin_reply=True,
+        is_read=False,
+    ).count()
+    return Response({'unread_count': count})

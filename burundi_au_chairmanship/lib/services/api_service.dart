@@ -535,6 +535,55 @@ class ApiService {
     return await _post('auth/verify-signup-otp/', {'otp_code': otpCode}, auth: true);
   }
 
+  // ── Phone OTP Verification (Twilio) ──────────────────────
+  Future<Map<String, dynamic>> sendPhoneOtp(String countryCode, String phoneNumber, {String channel = 'sms'}) async {
+    return await _post('otp/send-phone/', {
+      'country_code': countryCode,
+      'phone_number': phoneNumber,
+      'channel': channel,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> verifyPhoneOtp(String countryCode, String phoneNumber, String otpCode) async {
+    return await _post('otp/verify-phone/', {
+      'country_code': countryCode,
+      'phone_number': phoneNumber,
+      'otp_code': otpCode,
+    }, auth: true);
+  }
+
+  // ── Support Tickets ──────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getTickets() async {
+    final data = await _get('support/tickets/', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createTicket(String subject, String message) async {
+    return await _post('support/tickets/', {
+      'subject': subject,
+      'message': message,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> getTicketDetail(int ticketId) async {
+    return await _get('support/tickets/$ticketId/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> replyToTicket(int ticketId, String message) async {
+    return await _post('support/tickets/$ticketId/reply/', {
+      'message': message,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> markTicketRead(int ticketId) async {
+    return await _post('support/tickets/$ticketId/mark_read/', {}, auth: true);
+  }
+
+  Future<int> getUnreadSupportCount() async {
+    final data = await _get('support/unread-count/', auth: true);
+    return data['unread_count'] ?? 0;
+  }
+
   Future<Map<String, dynamic>> getVerificationStatus() async {
     return await _get('verification/status/', auth: true);
   }

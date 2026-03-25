@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -572,19 +573,54 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                   ),
                 ),
 
-              // Play button
+              // Platform badge (below LIVE badge) for external platforms
+              if (feed.isExternalPlatform)
+                Positioned(
+                  top: 48,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getPlatformColor(feed.streamType),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_getPlatformIcon(feed.streamType),
+                            color: Colors.white, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          feed.platformName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Play/Join button
               Positioned.fill(
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: feed.isExternalPlatform
+                          ? _getPlatformColor(feed.streamType).withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                       border: Border.all(
                           color: Colors.white.withValues(alpha: 0.4), width: 2),
                     ),
-                    child: const Icon(Icons.play_arrow_rounded,
-                        color: Colors.white, size: 36),
+                    child: Icon(
+                      feed.isExternalPlatform ? Icons.open_in_new_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
                   ),
                 ),
               ),
@@ -825,11 +861,37 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.3),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.schedule,
-                            color: Colors.white, size: 28),
+                      child: Center(
+                        child: Icon(
+                          feed.isExternalPlatform
+                              ? _getPlatformIcon(feed.streamType)
+                              : Icons.schedule,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ),
+                    // Platform badge on thumbnail
+                    if (feed.isExternalPlatform)
+                      Positioned(
+                        bottom: 4,
+                        left: 4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _getPlatformColor(feed.streamType),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            feed.platformName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1012,9 +1074,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                       ),
                     ),
 
-                    // YouTube badge (top-left) if YouTube URL
-                    if (feed.streamUrl.contains('youtube.com') ||
-                        feed.streamUrl.contains('youtu.be'))
+                    // Platform badge (top-left) for external platforms
+                    if (feed.isExternalPlatform)
                       Positioned(
                         top: 6,
                         left: 6,
@@ -1022,18 +1083,18 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF0000), // YouTube red
+                            color: _getPlatformColor(feed.streamType),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.play_arrow,
+                            children: [
+                              Icon(_getPlatformIcon(feed.streamType),
                                   color: Colors.white, size: 12),
-                              SizedBox(width: 2),
+                              const SizedBox(width: 2),
                               Text(
-                                'YouTube',
-                                style: TextStyle(
+                                feed.platformName,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 9,
                                   fontWeight: FontWeight.bold,
@@ -1279,12 +1340,18 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   }
 
   void _openFeed(ApiLiveFeed feed) {
-    // If it's a recorded video with a YouTube URL, open in YouTube/browser
-    if (feed.isRecorded && feed.streamUrl.isNotEmpty &&
-        (feed.streamUrl.contains('youtube.com') || feed.streamUrl.contains('youtu.be'))) {
-      _openYouTubeVideo(feed.streamUrl);
+    // External platforms (Zoom, Teams, YouTube, Webex, Google Meet)
+    // open in their native app or browser
+    if (feed.isExternalPlatform && feed.streamUrl.isNotEmpty) {
+      // Show meeting credentials if available before opening
+      if ((feed.isZoom || feed.isTeams || feed.isWebex || feed.isGoogleMeet) &&
+          (feed.meetingId.isNotEmpty || feed.passcode.isNotEmpty)) {
+        _showMeetingCredentials(feed);
+      } else {
+        _openExternalUrl(feed.streamUrl, feed.platformName);
+      }
     } else {
-      // For live streams or non-YouTube recorded videos, use video player screen
+      // Regular video streams use the in-app video player
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -1292,6 +1359,124 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         ),
       );
     }
+  }
+
+  void _showMeetingCredentials(ApiLiveFeed feed) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _getPlatformIcon(feed.streamType),
+                    color: _getPlatformColor(feed.streamType),
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Join on ${feed.platformName}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (feed.meetingId.isNotEmpty) ...[
+                _buildCredentialRow(
+                  'Meeting ID',
+                  feed.meetingId,
+                  Icons.tag,
+                  isDark,
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (feed.passcode.isNotEmpty) ...[
+                _buildCredentialRow(
+                  'Passcode',
+                  feed.passcode,
+                  Icons.lock_outline,
+                  isDark,
+                ),
+                const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _openExternalUrl(feed.streamUrl, feed.platformName);
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: Text('Open ${feed.platformName}'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _getPlatformColor(feed.streamType),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: MediaQuery.of(ctx).viewPadding.bottom + 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCredentialRow(String label, String value, IconData icon, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: isDark ? Colors.white54 : Colors.black45),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45)),
+                Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: value));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$label copied'),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            },
+            tooltip: 'Copy',
+          ),
+        ],
+      ),
+    );
   }
 
   /// Add event to device calendar (iOS Calendar, Google Calendar, Outlook, etc.)
@@ -1366,19 +1551,41 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   }
 
   /// Open YouTube video or recorded stream
-  Future<void> _openYouTubeVideo(String youtubeUrl) async {
+  IconData _getPlatformIcon(String streamType) {
+    switch (streamType) {
+      case 'zoom': return Icons.videocam;
+      case 'teams': return Icons.groups;
+      case 'webex': return Icons.video_call;
+      case 'meet': return Icons.video_camera_front;
+      case 'youtube': return Icons.play_arrow;
+      default: return Icons.open_in_new;
+    }
+  }
+
+  Color _getPlatformColor(String streamType) {
+    switch (streamType) {
+      case 'zoom': return const Color(0xFF2D8CFF);
+      case 'teams': return const Color(0xFF6264A7);
+      case 'webex': return const Color(0xFF00BCF2);
+      case 'meet': return const Color(0xFF00897B);
+      case 'youtube': return const Color(0xFFFF0000);
+      default: return AppColors.burundiGreen;
+    }
+  }
+
+  Future<void> _openExternalUrl(String url, String platformName) async {
     try {
-      final uri = Uri.parse(youtubeUrl);
+      final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        throw 'Could not launch $youtubeUrl';
+        throw 'Could not launch $platformName';
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to open video: $e'),
+            content: Text('Failed to open $platformName: $e'),
             backgroundColor: AppColors.error,
           ),
         );

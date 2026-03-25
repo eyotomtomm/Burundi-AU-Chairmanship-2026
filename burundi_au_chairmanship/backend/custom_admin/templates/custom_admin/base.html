@@ -144,6 +144,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Push Notifications</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'support_ticket' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:support_tickets_list' %}">
+      <span class="material-symbols-outlined">support_agent</span>
+      <span class="text-sm tracking-wide font-headline">Support Tickets</span>
+    </a>
+
     <!-- Administration divider -->
     <div class="pt-6 pb-2 px-4">
       <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Administration</p>

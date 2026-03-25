@@ -126,6 +126,40 @@
                     />
                 </div>
 
+                <!-- Phone Verification Channels -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Phone Verification (Twilio)</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">Toggle which OTP channels are available to users during sign-up. Both off = phone step is skipped.</p>
+
+                    <div class="flex flex-wrap gap-6">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="sms_verification_enabled"
+                                {% if settings.sms_verification_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-primary">sms</span>
+                                <span class="font-body text-on-surface font-medium">SMS Verification</span>
+                            </span>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="whatsapp_verification_enabled"
+                                {% if settings.whatsapp_verification_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-emerald-600 focus:ring-emerald-600"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-emerald-600">chat</span>
+                                <span class="font-body text-on-surface font-medium">WhatsApp Verification</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Submit Button -->
                 <div class="pt-4">
                     <button

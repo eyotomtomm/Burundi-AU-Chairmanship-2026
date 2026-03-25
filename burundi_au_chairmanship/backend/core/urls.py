@@ -23,6 +23,7 @@ router.register('hero-text-content', views.HeroTextContentViewSet)
 router.register('quick-access-menu', views.QuickAccessMenuViewSet)
 router.register('event-registrations', views.EventRegistrationViewSet, basename='event-registration')
 router.register('event-submissions', views.EventSubmissionViewSet, basename='event-submission')
+router.register('support/tickets', views.SupportTicketViewSet, basename='support-ticket')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -64,6 +65,9 @@ urlpatterns = [
 
     # Event registrations
     path('my-registrations/', views.my_event_registrations, name='my-registrations'),
+
+    # Support Tickets
+    path('support/unread-count/', views.support_unread_count, name='support-unread-count'),
 
     # Verification System
     path('verification/request/', views.submit_verification_request, name='verification-request'),

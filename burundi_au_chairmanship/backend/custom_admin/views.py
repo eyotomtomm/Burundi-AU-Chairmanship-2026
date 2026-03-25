@@ -15,7 +15,7 @@ from core.models import (
     EventRegistration, EventSubmission, RegistrationFormField, AppSettings, User,
     UserProfile, VerificationRequest,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
-    AuditLogEntry,
+    AuditLogEntry, SupportTicket, TicketMessage,
 )
 
 
@@ -1882,6 +1882,8 @@ def app_settings(request):
         settings.facebook_url = request.POST.get('facebook_url', '')
         settings.twitter_url = request.POST.get('twitter_url', '')
         settings.instagram_url = request.POST.get('instagram_url', '')
+        settings.sms_verification_enabled = request.POST.get('sms_verification_enabled') == 'on'
+        settings.whatsapp_verification_enabled = request.POST.get('whatsapp_verification_enabled') == 'on'
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')
@@ -1892,6 +1894,148 @@ def app_settings(request):
 # ═══════════════════════════════════════════════════════════════
 #  ANALYTICS
 # ═══════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════
+#  SUPPORT TICKETS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def support_tickets_list(request):
+    tickets = SupportTicket.objects.all().select_related('user', 'assigned_to').order_by('-updated_at')
+
+    # Filters
+    status_filter = request.GET.get('status')
+    if status_filter:
+        tickets = tickets.filter(status=status_filter)
+    search = request.GET.get('search')
+    if search:
+        tickets = tickets.filter(
+            Q(subject__icontains=search) | Q(user__email__icontains=search) |
+            Q(user__first_name__icontains=search)
+        )
+
+    total = SupportTicket.objects.count()
+    open_count = SupportTicket.objects.filter(status='open').count()
+    in_progress_count = SupportTicket.objects.filter(status='in_progress').count()
+    resolved_count = SupportTicket.objects.filter(status='resolved').count()
+
+    paginator = Paginator(tickets, 20)
+    page = request.GET.get('page')
+    tickets_page = paginator.get_page(page)
+
+    return render(request, 'custom_admin/support/list.html', {
+        'tickets': tickets_page,
+        'total': total,
+        'open_count': open_count,
+        'in_progress_count': in_progress_count,
+        'resolved_count': resolved_count,
+        'current_status': status_filter,
+        'search': search or '',
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def support_ticket_detail(request, pk):
+    ticket = get_object_or_404(SupportTicket.objects.select_related('user', 'assigned_to'), pk=pk)
+    ticket_messages = ticket.messages.select_related('sender').all()
+    return render(request, 'custom_admin/support/detail.html', {
+        'ticket': ticket,
+        'messages': ticket_messages,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def support_ticket_reply(request, pk):
+    ticket = get_object_or_404(SupportTicket, pk=pk)
+    message_text = request.POST.get('message', '').strip()
+
+    if not message_text:
+        messages.error(request, 'Reply message cannot be empty.')
+        return redirect('custom_admin:support_ticket_detail', pk=pk)
+
+    # Create admin reply
+    TicketMessage.objects.create(
+        ticket=ticket,
+        sender=request.user,
+        message=message_text,
+        is_admin_reply=True,
+        is_read=False,
+    )
+
+    # Update ticket status
+    if ticket.status == 'open':
+        ticket.status = 'in_progress'
+        ticket.assigned_to = request.user
+        ticket.save(update_fields=['status', 'assigned_to'])
+
+    # Send email copy to user
+    try:
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+        send_mail(
+            subject=f'Re: {ticket.subject} - Support Ticket #{ticket.pk}',
+            message=(
+                f'Hello {ticket.user.first_name or ticket.user.username},\n\n'
+                f'You have a new reply to your support ticket:\n\n'
+                f'"{message_text}"\n\n'
+                f'Open the Burundi AU app to continue the conversation.\n\n'
+                f'Best regards,\n'
+                f'Burundi AU Support Team'
+            ),
+            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[ticket.user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass  # Don't block reply if email fails
+
+    # Send push notification to user
+    try:
+        from config.firebase import initialize_firebase
+        initialize_firebase()
+        from firebase_admin import messaging
+
+        fcm_token = ticket.user.profile.fcm_token if hasattr(ticket.user, 'profile') else ''
+        if fcm_token:
+            fcm_message = messaging.Message(
+                notification=messaging.Notification(
+                    title=f'Support Reply: {ticket.subject}',
+                    body=message_text[:100],
+                ),
+                data={
+                    'type': 'support_reply',
+                    'ticket_id': str(ticket.pk),
+                },
+                token=fcm_token,
+            )
+            messaging.send(fcm_message)
+    except Exception:
+        pass  # Don't block reply if push fails
+
+    messages.success(request, 'Reply sent successfully! User has been notified.')
+    return redirect('custom_admin:support_ticket_detail', pk=pk)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def support_ticket_update_status(request, pk):
+    ticket = get_object_or_404(SupportTicket, pk=pk)
+    new_status = request.POST.get('status')
+    if new_status in dict(SupportTicket.STATUS_CHOICES):
+        ticket.status = new_status
+        if new_status == 'resolved':
+            ticket.resolved_at = timezone.now()
+        ticket.save()
+        messages.success(request, f'Ticket status updated to {new_status}.')
+    else:
+        messages.error(request, 'Invalid status.')
+    return redirect('custom_admin:support_ticket_detail', pk=pk)
+
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')

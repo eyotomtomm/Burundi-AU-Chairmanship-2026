@@ -65,9 +65,16 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(AppConstants.splashDuration);
     if (!mounted) return;
 
-    // Check authentication status
+    // Wait for auth provider to finish checking status (max 3 seconds)
     final authProvider = context.read<AuthProvider>();
-    await Future.delayed(const Duration(milliseconds: 500)); // Let provider initialize
+    final deadline = DateTime.now().add(const Duration(seconds: 3));
+    while (DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
+      // If provider has finished initializing (authenticated or checked), break
+      if (authProvider.isAuthenticated || authProvider.userId != null) break;
+      // Small safety: always exit loop after deadline
+    }
     if (!mounted) return;
 
     if (authProvider.isAuthenticated) {

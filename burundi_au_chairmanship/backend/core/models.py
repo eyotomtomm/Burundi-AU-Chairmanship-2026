@@ -379,10 +379,25 @@ class LiveFeed(models.Model):
         ('upcoming', 'Upcoming'),
         ('recorded', 'Recorded'),
     ]
+    STREAM_TYPE_CHOICES = [
+        ('video', 'Video'),
+        ('youtube', 'YouTube'),
+        ('zoom', 'Zoom'),
+        ('teams', 'Microsoft Teams'),
+        ('webex', 'Webex'),
+        ('meet', 'Google Meet'),
+        ('external', 'External Link'),
+    ]
 
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     stream_url = models.URLField()
+    stream_type = models.CharField(
+        max_length=20, choices=STREAM_TYPE_CHOICES, default='video',
+        help_text='Auto-detected from URL on save. External platforms open in their app.',
+    )
+    meeting_id = models.CharField(max_length=100, blank=True, help_text='Meeting ID for Zoom/Teams/Webex (shown to users)')
+    passcode = models.CharField(max_length=100, blank=True, help_text='Meeting passcode (shown to users)')
     thumbnail = models.ImageField(upload_to='live_feeds/', blank=True, validators=[validate_image_file])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
     viewer_count = models.IntegerField(default=0)
@@ -395,6 +410,23 @@ class LiveFeed(models.Model):
 
     def __str__(self):
         return f"[{self.get_status_display()}] {self.title}"
+
+    def save(self, *args, **kwargs):
+        # Auto-detect stream type from URL
+        url = self.stream_url.lower()
+        if 'zoom.us' in url or 'zoom.com' in url:
+            self.stream_type = 'zoom'
+        elif 'youtube.com' in url or 'youtu.be' in url:
+            self.stream_type = 'youtube'
+        elif 'teams.microsoft.com' in url or 'teams.live.com' in url:
+            self.stream_type = 'teams'
+        elif 'webex.com' in url:
+            self.stream_type = 'webex'
+        elif 'meet.google.com' in url:
+            self.stream_type = 'meet'
+        else:
+            self.stream_type = 'video'
+        super().save(*args, **kwargs)
 
 
 class Resource(models.Model):
@@ -840,6 +872,60 @@ class Notification(models.Model):
         return f'{self.title} ({self.notification_type})'
 
 
+class SupportTicket(models.Model):
+    """Support ticket for user-admin messaging"""
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('in_progress', 'In Progress'),
+        ('resolved', 'Resolved'),
+        ('closed', 'Closed'),
+    ]
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='support_tickets')
+    subject = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    assigned_to = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='assigned_tickets'
+    )
+
+    class Meta:
+        ordering = ['-updated_at']
+        verbose_name = 'Support Ticket'
+        verbose_name_plural = 'Support Tickets'
+
+    def __str__(self):
+        return f"#{self.pk} {self.subject} ({self.status})"
+
+
+class TicketMessage(models.Model):
+    """Individual message within a support ticket conversation"""
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.TextField()
+    is_admin_reply = models.BooleanField(default=False)
+    is_read = models.BooleanField(default=False)
+    attachment = models.ImageField(upload_to='support/attachments/', blank=True, null=True, validators=[validate_image_file])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Ticket Message'
+        verbose_name_plural = 'Ticket Messages'
+
+    def __str__(self):
+        return f"Message on #{self.ticket_id} by {self.sender.username}"
+
+
 class AppSettings(models.Model):
     summit_year = models.CharField(max_length=10, default='2026')
     summit_theme = models.CharField(max_length=300)
@@ -848,6 +934,10 @@ class AppSettings(models.Model):
     facebook_url = models.URLField(blank=True)
     twitter_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
+
+    # Phone verification toggles (controlled from admin)
+    sms_verification_enabled = models.BooleanField(default=False, help_text='Enable SMS OTP verification via Twilio')
+    whatsapp_verification_enabled = models.BooleanField(default=False, help_text='Enable WhatsApp OTP verification via Twilio')
 
     class Meta:
         verbose_name = 'App Settings'

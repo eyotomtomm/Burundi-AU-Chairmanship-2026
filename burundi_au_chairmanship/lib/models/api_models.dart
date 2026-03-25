@@ -33,6 +33,9 @@ class ApiLiveFeed {
   final String description;
   final String descriptionFr;
   final String streamUrl;
+  final String streamType;
+  final String meetingId;
+  final String passcode;
   final String thumbnail;
   final String status;
   final int viewerCount;
@@ -46,6 +49,9 @@ class ApiLiveFeed {
     required this.description,
     required this.descriptionFr,
     required this.streamUrl,
+    required this.streamType,
+    required this.meetingId,
+    required this.passcode,
     required this.thumbnail,
     required this.status,
     required this.viewerCount,
@@ -61,6 +67,9 @@ class ApiLiveFeed {
       description: json['description'] ?? '',
       descriptionFr: json['description_fr'] ?? '',
       streamUrl: json['stream_url'] ?? '',
+      streamType: json['stream_type'] ?? 'video',
+      meetingId: json['meeting_id'] ?? '',
+      passcode: json['passcode'] ?? '',
       thumbnail: json['thumbnail'] ?? '',
       status: json['status'] ?? 'upcoming',
       viewerCount: json['viewer_count'] ?? 0,
@@ -77,6 +86,24 @@ class ApiLiveFeed {
   bool get isLive => status == 'live';
   bool get isUpcoming => status == 'upcoming';
   bool get isRecorded => status == 'recorded';
+
+  bool get isExternalPlatform => streamType != 'video';
+  bool get isZoom => streamType == 'zoom';
+  bool get isYouTube => streamType == 'youtube';
+  bool get isTeams => streamType == 'teams';
+  bool get isWebex => streamType == 'webex';
+  bool get isGoogleMeet => streamType == 'meet';
+
+  String get platformName {
+    switch (streamType) {
+      case 'zoom': return 'Zoom';
+      case 'youtube': return 'YouTube';
+      case 'teams': return 'Teams';
+      case 'webex': return 'Webex';
+      case 'meet': return 'Google Meet';
+      default: return '';
+    }
+  }
 
   Duration? get parsedDuration {
     if (duration.isEmpty) return null;
@@ -158,6 +185,8 @@ class AppSettingsModel {
   final String facebookUrl;
   final String twitterUrl;
   final String instagramUrl;
+  final bool smsVerificationEnabled;
+  final bool whatsappVerificationEnabled;
 
   AppSettingsModel({
     required this.summitYear,
@@ -167,6 +196,8 @@ class AppSettingsModel {
     required this.facebookUrl,
     required this.twitterUrl,
     required this.instagramUrl,
+    required this.smsVerificationEnabled,
+    required this.whatsappVerificationEnabled,
   });
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -178,8 +209,12 @@ class AppSettingsModel {
       facebookUrl: json['facebook_url'] ?? '',
       twitterUrl: json['twitter_url'] ?? '',
       instagramUrl: json['instagram_url'] ?? '',
+      smsVerificationEnabled: json['sms_verification_enabled'] ?? false,
+      whatsappVerificationEnabled: json['whatsapp_verification_enabled'] ?? false,
     );
   }
+
+  bool get phoneVerificationEnabled => smsVerificationEnabled || whatsappVerificationEnabled;
 
   String getTheme(String langCode) => langCode == 'fr' ? summitThemeFr : summitTheme;
 }

@@ -137,6 +137,12 @@ urlpatterns = [
     # App Settings
     path('app-settings/', views.app_settings, name='app_settings'),
 
+    # Support Tickets
+    path('support/', views.support_tickets_list, name='support_tickets_list'),
+    path('support/<int:pk>/', views.support_ticket_detail, name='support_ticket_detail'),
+    path('support/<int:pk>/reply/', views.support_ticket_reply, name='support_ticket_reply'),
+    path('support/<int:pk>/status/', views.support_ticket_update_status, name='support_ticket_update_status'),
+
     # Analytics
     path('analytics/', views.analytics_dashboard, name='analytics'),
 ]

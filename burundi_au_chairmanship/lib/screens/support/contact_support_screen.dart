@@ -81,23 +81,26 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     try {
       final api = ApiService();
 
-      // Prepare form data
-      final data = {
-        'subject': _subjectController.text.trim(),
-        'message': _messageController.text.trim(),
-        'email': _emailController.text.trim(),
-        'screenshot_count': _screenshots.length,
-      };
-
-      // TODO: In production, upload screenshots to backend
-      // For now, just send the support request
-      await api.post('support/contact/', data, auth: true);
+      // Create a real support ticket
+      final result = await api.createTicket(
+        _subjectController.text.trim(),
+        _messageController.text.trim(),
+      );
 
       if (mounted) {
-        Navigator.pop(context);
+        // Navigate to the ticket conversation
+        final ticketId = result['id'];
+        Navigator.pop(context, true); // Return true to signal ticket created
+        if (ticketId != null) {
+          Navigator.pushNamed(
+            context,
+            '/ticket-conversation',
+            arguments: ticketId,
+          );
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Support request submitted successfully! We\'ll get back to you soon.'),
+            content: Text('Support ticket created! We\'ll get back to you soon.'),
             backgroundColor: AppColors.success,
           ),
         );

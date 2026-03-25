@@ -40,27 +40,28 @@ import 'screens/videos/videos_screen.dart';
 import 'screens/social_media/social_media_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
 import 'screens/auth/email_verification_screen.dart';
+import 'screens/support/support_tickets_screen.dart';
+import 'screens/support/ticket_conversation_screen.dart';
+import 'screens/support/contact_support_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> _initializeApp() async {
-  // Initialize Firebase
+  // Initialize Firebase (with timeout — don't block app startup forever)
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
-    );
+    ).timeout(const Duration(seconds: 5));
 
     // Initialize Crashlytics — chain with Sentry for dual reporting
     FlutterError.onError = (details) {
       FirebaseCrashlytics.instance.recordFlutterError(details);
-      // Sentry's own FlutterError handler is set up by SentryFlutter.init
     };
   } catch (e) {
     if (kDebugMode) {
       print('Firebase initialization failed: $e');
       print('App will continue without Firebase features');
-      print('To enable Firebase: Follow steps in FIREBASE_SETUP_GUIDE.md');
     }
   }
 
@@ -78,30 +79,35 @@ Future<void> _initializeApp() async {
     ),
   );
 
-  // Initialize services
+  // Initialize local analytics (fast, no network)
   final analytics = AnalyticsService();
   await analytics.init();
   await analytics.logAppLaunch();
 
-  // Initialize Firebase Messaging (if Firebase was initialized)
-  try {
-    final messaging = FirebaseMessagingService();
-    await messaging.initialize(navigatorKey);
-  } catch (e) {
-    if (kDebugMode) {
-      print('Firebase Messaging initialization failed: $e');
-    }
-  }
+  // Initialize Firebase services in background — don't block app startup
+  _initFirebaseServicesAsync();
+}
 
-  // Initialize Remote Config (if Firebase was initialized)
-  try {
-    final remoteConfig = RemoteConfigService();
-    await remoteConfig.initialize();
-  } catch (e) {
-    if (kDebugMode) {
-      print('Remote Config initialization failed: $e');
+/// Non-blocking: init messaging + remote config after the app is running
+void _initFirebaseServicesAsync() {
+  // Fire-and-forget — these run in the background
+  Future(() async {
+    try {
+      final messaging = FirebaseMessagingService();
+      await messaging.initialize(navigatorKey).timeout(const Duration(seconds: 8));
+    } catch (e) {
+      if (kDebugMode) print('Firebase Messaging init failed: $e');
     }
-  }
+  });
+
+  Future(() async {
+    try {
+      final remoteConfig = RemoteConfigService();
+      await remoteConfig.initialize().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      if (kDebugMode) print('Remote Config init failed: $e');
+    }
+  });
 }
 
 void main() async {
@@ -198,6 +204,9 @@ class BurundiAUApp extends StatelessWidget {
               '/videos': (context) => const VideosScreen(),
               '/social-media': (context) => const SocialMediaScreen(),
               '/notifications': (context) => const NotificationsScreen(),
+              '/support-tickets': (context) => const SupportTicketsScreen(),
+              '/ticket-conversation': (context) => const TicketConversationScreen(),
+              '/contact-support': (context) => const ContactSupportScreen(),
             },
 
             // Route not found

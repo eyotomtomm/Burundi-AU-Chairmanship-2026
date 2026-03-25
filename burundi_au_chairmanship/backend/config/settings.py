@@ -260,7 +260,7 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
-    'Burundi AU Chairmanship <noreply@burundi4africa.com>'
+    'Burundi AU Chairmanship <info@burundi4africa.com>'
 )
 
 # ─── Sentry Error Tracking ───────────────────────────────────

@@ -123,9 +123,10 @@ def verify_email_otp(user, email, otp_code):
         return False, 'Verification failed. Please try again.'
 
 
-def send_phone_otp_twilio(user, country_code, phone_number):
+def send_phone_otp_twilio(user, country_code, phone_number, channel='sms'):
     """
-    Send OTP via Twilio Verify Service (or fallback to SMS)
+    Send OTP via Twilio Verify Service (or fallback to SMS).
+    channel: 'sms' or 'whatsapp'
     Returns (success, message, otp_id)
     """
     try:
@@ -148,15 +149,19 @@ def send_phone_otp_twilio(user, country_code, phone_number):
 
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
+        # Validate channel
+        if channel not in ('sms', 'whatsapp'):
+            channel = 'sms'
+
         # Use Twilio Verify if Service SID is configured (recommended)
+        # Twilio Verify supports both 'sms' and 'whatsapp' channels
         if hasattr(settings, 'TWILIO_VERIFY_SERVICE_SID') and settings.TWILIO_VERIFY_SERVICE_SID:
             try:
-                # Twilio Verify handles OTP generation and storage automatically
                 verification = client.verify.v2.services(
                     settings.TWILIO_VERIFY_SERVICE_SID
                 ).verifications.create(
                     to=full_phone,
-                    channel='sms'
+                    channel=channel  # 'sms' or 'whatsapp'
                 )
 
                 # Create OTP record for tracking (Twilio manages the actual code)
@@ -164,21 +169,22 @@ def send_phone_otp_twilio(user, country_code, phone_number):
                     user=user,
                     type='phone',
                     contact=full_phone,
-                    otp_code='TWILIO_VERIFY',  # Placeholder - Twilio manages the code
+                    otp_code='TWILIO_VERIFY',
                     expires_at=timezone.now() + timedelta(minutes=10)
                 )
 
-                return True, 'OTP sent successfully via SMS', otp.id
+                channel_label = 'WhatsApp' if channel == 'whatsapp' else 'SMS'
+                return True, f'OTP sent via {channel_label}', otp.id
 
             except Exception as verify_error:
-                # If Verify fails, fall back to manual SMS
-                pass
+                logger.warning('Twilio Verify failed (%s), falling back to manual SMS: %s', channel, verify_error)
+                # WhatsApp only works via Verify — no fallback possible
+                if channel == 'whatsapp':
+                    return False, 'WhatsApp delivery failed. Please try SMS instead.', None
 
         # Fallback: Manual SMS with Alphanumeric Sender ID or Phone Number
-        # Generate OTP
         otp_code = generate_otp()
 
-        # Create OTP record
         otp = OTPVerification.objects.create(
             user=user,
             type='phone',
@@ -190,22 +196,19 @@ def send_phone_otp_twilio(user, country_code, phone_number):
         # Determine sender (Alphanumeric Sender ID or Phone Number)
         sender = None
         if hasattr(settings, 'TWILIO_SENDER_ID') and settings.TWILIO_SENDER_ID:
-            # Use Alphanumeric Sender ID (works in most countries except USA/Canada)
             sender = settings.TWILIO_SENDER_ID
         elif hasattr(settings, 'TWILIO_PHONE_NUMBER') and settings.TWILIO_PHONE_NUMBER:
-            # Fallback to phone number
             sender = settings.TWILIO_PHONE_NUMBER
         else:
             return False, 'No sender configured. Please set TWILIO_SENDER_ID or TWILIO_PHONE_NUMBER in settings.', None
 
-        # Send SMS via Twilio with custom sender
-        message = client.messages.create(
+        client.messages.create(
             body=f'Your Burundi AU Chairmanship verification code is: {otp_code}. Valid for 10 minutes.',
             from_=sender,
             to=full_phone
         )
 
-        return True, 'OTP sent successfully via SMS', otp.id
+        return True, 'OTP sent via SMS', otp.id
 
     except Exception as e:
         logger.exception('Failed to send phone OTP')
@@ -214,7 +217,8 @@ def send_phone_otp_twilio(user, country_code, phone_number):
 
 def verify_phone_otp(user, country_code, phone_number, otp_code):
     """
-    Verify phone OTP code with brute-force protection
+    Verify phone OTP code with brute-force protection.
+    On success, marks user profile phone_verified=True.
     Returns (success, message)
     """
     try:
@@ -235,7 +239,7 @@ def verify_phone_otp(user, country_code, phone_number, otp_code):
         # Check brute-force attempts
         attempts = getattr(otp, 'attempts', 0)
         if attempts >= MAX_OTP_ATTEMPTS:
-            otp.is_verified = True  # Invalidate it
+            otp.is_verified = True
             otp.save()
             return False, 'Too many failed attempts. Please request a new code.'
 
@@ -255,6 +259,7 @@ def verify_phone_otp(user, country_code, phone_number, otp_code):
                 if verification_check.status == 'approved':
                     otp.is_verified = True
                     otp.save()
+                    _mark_phone_verified(user, country_code, phone_number)
                     return True, 'Phone number verified successfully'
                 else:
                     OTPVerification.objects.filter(pk=otp.pk).update(
@@ -280,8 +285,21 @@ def verify_phone_otp(user, country_code, phone_number, otp_code):
         otp.is_verified = True
         otp.save()
 
+        _mark_phone_verified(user, country_code, phone_number)
         return True, 'Phone number verified successfully'
 
     except Exception as e:
         logger.exception('Failed to verify phone OTP')
         return False, 'Verification failed. Please try again.'
+
+
+def _mark_phone_verified(user, country_code, phone_number):
+    """Update user profile with verified phone number."""
+    try:
+        profile = user.profile
+        profile.phone_verified = True
+        profile.country_code = country_code
+        profile.phone_number = phone_number
+        profile.save(update_fields=['phone_verified', 'country_code', 'phone_number'])
+    except Exception:
+        logger.exception('Failed to update phone_verified on profile')

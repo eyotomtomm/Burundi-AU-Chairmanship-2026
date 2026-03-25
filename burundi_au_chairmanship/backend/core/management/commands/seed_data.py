@@ -539,6 +539,24 @@ class Command(BaseCommand):
                 'viewer_count': 18500,
                 'duration': '2h',
             },
+            {
+                'title': 'Ministerial Roundtable on Zoom',
+                'title_fr': 'Table ronde ministérielle sur Zoom',
+                'stream_url': 'https://zoom.us/j/1234567890',
+                'status': 'upcoming',
+                'viewer_count': 0,
+                'scheduled_time': timezone.now() + timezone.timedelta(hours=8),
+                'meeting_id': '123 456 7890',
+                'passcode': 'AU2026',
+            },
+            {
+                'title': 'Climate Action Working Group',
+                'title_fr': 'Groupe de travail sur l\'action climatique',
+                'stream_url': 'https://teams.microsoft.com/l/meetup-join/example',
+                'status': 'upcoming',
+                'viewer_count': 0,
+                'scheduled_time': timezone.now() + timezone.timedelta(hours=12),
+            },
         ]
         for feed in feeds:
             LiveFeed.objects.get_or_create(title=feed['title'], defaults=feed)

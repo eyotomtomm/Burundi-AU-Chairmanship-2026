@@ -24,6 +24,15 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
   final _phoneOtpController = TextEditingController();
   final _reasoningController = TextEditingController();
 
+  // Social media controllers
+  final _twitterController = TextEditingController();
+  final _facebookController = TextEditingController();
+  final _linkedinController = TextEditingController();
+  final _instagramController = TextEditingController();
+  final _tiktokController = TextEditingController();
+  final _youtubeController = TextEditingController();
+  final _otherSocialController = TextEditingController();
+
   // State
   String _selectedCountryCode = '+257'; // Burundi default
   bool _emailVerified = false;
@@ -62,6 +71,13 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     _phoneController.dispose();
     _phoneOtpController.dispose();
     _reasoningController.dispose();
+    _twitterController.dispose();
+    _facebookController.dispose();
+    _linkedinController.dispose();
+    _instagramController.dispose();
+    _tiktokController.dispose();
+    _youtubeController.dispose();
+    _otherSocialController.dispose();
     _emailTimer?.cancel();
     _phoneTimer?.cancel();
     super.dispose();
@@ -236,14 +252,27 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     setState(() => _isLoading = true);
 
     try {
-      await ApiService().post('verification/request/', {
+      final body = <String, dynamic>{
         'first_name': _firstNameController.text,
         'last_name': _lastNameController.text,
+        'full_name': '${_firstNameController.text} ${_lastNameController.text}'.trim(),
         'email': _emailController.text,
         'country_code': _selectedCountryCode,
         'phone_number': _phoneController.text,
+        'position_role': 'User',
         'reasoning_message': _reasoningController.text,
-      }, auth: true);
+      };
+
+      // Add social media URLs (only non-empty)
+      if (_twitterController.text.isNotEmpty) body['twitter_url'] = _twitterController.text;
+      if (_facebookController.text.isNotEmpty) body['facebook_url'] = _facebookController.text;
+      if (_linkedinController.text.isNotEmpty) body['linkedin_url'] = _linkedinController.text;
+      if (_instagramController.text.isNotEmpty) body['instagram_url'] = _instagramController.text;
+      if (_tiktokController.text.isNotEmpty) body['tiktok_url'] = _tiktokController.text;
+      if (_youtubeController.text.isNotEmpty) body['youtube_url'] = _youtubeController.text;
+      if (_otherSocialController.text.isNotEmpty) body['other_social_url'] = _otherSocialController.text;
+
+      await ApiService().post('verification/request/', body, auth: true);
 
       if (mounted) {
         _showSuccess('Verification request submitted successfully!');
@@ -380,7 +409,7 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       child: Row(
-        children: List.generate(4, (index) {
+        children: List.generate(5, (index) {
           final isActive = index == _currentStep;
           final isCompleted = index < _currentStep;
 
@@ -398,7 +427,7 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                     ),
                   ),
                 ),
-                if (index < 3) const SizedBox(width: 8),
+                if (index < 4) const SizedBox(width: 8),
               ],
             ),
           );
@@ -416,6 +445,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
       case 2:
         return _buildPhoneVerificationStep();
       case 3:
+        return _buildSocialMediaStep();
+      case 4:
         return _buildReasoningStep();
       default:
         return const SizedBox();
@@ -692,6 +723,121 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     );
   }
 
+  Widget _buildSocialMediaStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStepHeader(
+          icon: Icons.share,
+          title: 'Social Media',
+          subtitle: 'Link your social profiles to help verify your identity',
+        ),
+        const SizedBox(height: 24),
+
+        // Info card
+        Container(
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            color: AppColors.info.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: AppColors.info, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'At least one social media profile is recommended. All fields are optional.',
+                  style: TextStyle(fontSize: 13, color: AppColors.info, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        _buildSocialField(
+          controller: _twitterController,
+          label: 'X (Twitter)',
+          hint: 'https://x.com/username',
+          icon: Icons.close, // X icon
+        ),
+        const SizedBox(height: 14),
+
+        _buildSocialField(
+          controller: _facebookController,
+          label: 'Facebook',
+          hint: 'https://facebook.com/username',
+          icon: Icons.facebook,
+        ),
+        const SizedBox(height: 14),
+
+        _buildSocialField(
+          controller: _linkedinController,
+          label: 'LinkedIn',
+          hint: 'https://linkedin.com/in/username',
+          icon: Icons.work_outline,
+        ),
+        const SizedBox(height: 14),
+
+        _buildSocialField(
+          controller: _instagramController,
+          label: 'Instagram',
+          hint: 'https://instagram.com/username',
+          icon: Icons.camera_alt_outlined,
+        ),
+        const SizedBox(height: 14),
+
+        _buildSocialField(
+          controller: _tiktokController,
+          label: 'TikTok',
+          hint: 'https://tiktok.com/@username',
+          icon: Icons.music_note_outlined,
+        ),
+        const SizedBox(height: 14),
+
+        _buildSocialField(
+          controller: _youtubeController,
+          label: 'YouTube',
+          hint: 'https://youtube.com/@channel',
+          icon: Icons.play_circle_outline,
+        ),
+        const SizedBox(height: 14),
+
+        _buildSocialField(
+          controller: _otherSocialController,
+          label: 'Other',
+          hint: 'https://...',
+          icon: Icons.link,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.url,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 20),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        filled: true,
+        fillColor: Colors.grey[100],
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
   Widget _buildReasoningStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -885,6 +1031,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
       case 2:
         return _phoneVerified ? 'Continue' : 'Verify Phone First';
       case 3:
+        return 'Continue';
+      case 4:
         return 'Submit Request';
       default:
         return 'Next';
@@ -915,6 +1063,10 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
         setState(() => _currentStep++);
         break;
       case 3:
+        // Social media step - optional, always allow continue
+        setState(() => _currentStep++);
+        break;
+      case 4:
         _submitVerificationRequest();
         break;
     }

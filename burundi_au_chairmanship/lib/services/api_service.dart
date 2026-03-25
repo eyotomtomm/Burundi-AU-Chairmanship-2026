@@ -493,18 +493,46 @@ class ApiService {
     required String email,
     required String phoneNumber,
     required String positionRole,
+    String? firstName,
+    String? lastName,
+    String? countryCode,
+    String? reasoningMessage,
     String? twitterUrl,
     String? linkedinUrl,
+    String? facebookUrl,
+    String? instagramUrl,
+    String? tiktokUrl,
+    String? youtubeUrl,
+    String? otherSocialUrl,
   }) async {
-    return await _post('verification/request/', {
+    final body = <String, dynamic>{
       'title': title,
       'full_name': fullName,
       'email': email,
       'phone_number': phoneNumber,
       'position_role': positionRole,
-      'twitter_url': twitterUrl ?? '',
-      'linkedin_url': linkedinUrl ?? '',
-    }, auth: true);
+    };
+    if (firstName != null) body['first_name'] = firstName;
+    if (lastName != null) body['last_name'] = lastName;
+    if (countryCode != null) body['country_code'] = countryCode;
+    if (reasoningMessage != null) body['reasoning_message'] = reasoningMessage;
+    if (twitterUrl != null && twitterUrl.isNotEmpty) body['twitter_url'] = twitterUrl;
+    if (linkedinUrl != null && linkedinUrl.isNotEmpty) body['linkedin_url'] = linkedinUrl;
+    if (facebookUrl != null && facebookUrl.isNotEmpty) body['facebook_url'] = facebookUrl;
+    if (instagramUrl != null && instagramUrl.isNotEmpty) body['instagram_url'] = instagramUrl;
+    if (tiktokUrl != null && tiktokUrl.isNotEmpty) body['tiktok_url'] = tiktokUrl;
+    if (youtubeUrl != null && youtubeUrl.isNotEmpty) body['youtube_url'] = youtubeUrl;
+    if (otherSocialUrl != null && otherSocialUrl.isNotEmpty) body['other_social_url'] = otherSocialUrl;
+    return await _post('verification/request/', body, auth: true);
+  }
+
+  // ── Sign-Up Email Verification ──────────────────────────
+  Future<Map<String, dynamic>> sendSignupOtp() async {
+    return await _post('auth/send-signup-otp/', {}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> verifySignupOtp(String otpCode) async {
+    return await _post('auth/verify-signup-otp/', {'otp_code': otpCode}, auth: true);
   }
 
   Future<Map<String, dynamic>> getVerificationStatus() async {

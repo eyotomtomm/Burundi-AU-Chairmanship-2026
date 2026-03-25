@@ -31,6 +31,7 @@ class AuthProvider extends ChangeNotifier {
   String? _profilePictureUrl;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _requiresEmailVerification = false;
 
   bool get isAuthenticated => _isAuthenticated;
   int? get userId => _userId;
@@ -47,6 +48,7 @@ class AuthProvider extends ChangeNotifier {
   String? get profilePictureUrl => _profilePictureUrl;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get requiresEmailVerification => _requiresEmailVerification;
 
   AuthProvider() {
     _checkAuthStatus();
@@ -106,6 +108,9 @@ class AuthProvider extends ChangeNotifier {
       final data = await _api.firebaseLogin(idToken: idToken);
       await _storeUserData(data['user']);
 
+      // Capture email verification requirement
+      _requiresEmailVerification = data['requires_email_verification'] == true;
+
       _isAuthenticated = true;
       notifyListeners();
     } catch (e) {
@@ -148,6 +153,9 @@ class AuthProvider extends ChangeNotifier {
 
       // 5. Store user data locally
       await _storeUserData(data['user']);
+
+      // Capture email verification requirement
+      _requiresEmailVerification = data['requires_email_verification'] == true;
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -193,6 +201,9 @@ class AuthProvider extends ChangeNotifier {
       // 4. Store user data locally
       await _storeUserData(data['user']);
 
+      // Capture email verification requirement
+      _requiresEmailVerification = data['requires_email_verification'] == true;
+
       _isAuthenticated = true;
       _isLoading = false;
       notifyListeners();
@@ -234,6 +245,9 @@ class AuthProvider extends ChangeNotifier {
       // 3. Login or register with backend (backend auto-creates if new)
       final data = await _api.firebaseLogin(idToken: idToken);
       await _storeUserData(data['user']);
+
+      // Google sign-in: backend trusts Firebase email_verified flag
+      _requiresEmailVerification = data['requires_email_verification'] == true;
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -277,6 +291,9 @@ class AuthProvider extends ChangeNotifier {
       final data = await _api.firebaseLogin(idToken: idToken);
       await _storeUserData(data['user']);
 
+      // Apple sign-in: backend trusts Firebase email_verified flag
+      _requiresEmailVerification = data['requires_email_verification'] == true;
+
       _isAuthenticated = true;
       _isLoading = false;
       notifyListeners();
@@ -294,6 +311,52 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Apple Sign-In failed. Please try again.';
       _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Send sign-up email verification OTP
+  Future<bool> sendSignupEmailOtp() async {
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _api.post('auth/send-signup-otp/', {}, auth: true);
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Failed to send verification code. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Verify sign-up email OTP
+  Future<bool> verifySignupEmailOtp(String code) async {
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final data = await _api.post('auth/verify-signup-otp/', {'otp_code': code}, auth: true);
+      if (data['email_verified'] == true) {
+        _isEmailVerified = true;
+        _requiresEmailVerification = false;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('user_email_verified', true);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Verification failed. Try again.';
       notifyListeners();
       return false;
     }

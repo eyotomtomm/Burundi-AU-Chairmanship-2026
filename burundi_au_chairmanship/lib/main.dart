@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,10 +6,12 @@ import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'firebase_options.dart';
 import 'config/app_theme.dart';
 import 'config/app_constants.dart';
+import 'config/environment.dart';
 import 'providers/theme_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/auth_provider.dart';
@@ -36,21 +39,23 @@ import 'screens/gallery/gallery_screen.dart';
 import 'screens/videos/videos_screen.dart';
 import 'screens/social_media/social_media_screen.dart';
 import 'screens/notifications/notifications_screen.dart';
+import 'screens/auth/email_verification_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
+Future<void> _initializeApp() async {
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Initialize Crashlytics
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
+    // Initialize Crashlytics — chain with Sentry for dual reporting
+    FlutterError.onError = (details) {
+      FirebaseCrashlytics.instance.recordFlutterError(details);
+      // Sentry's own FlutterError handler is set up by SentryFlutter.init
+    };
   } catch (e) {
     if (kDebugMode) {
       print('Firebase initialization failed: $e');
@@ -97,9 +102,36 @@ void main() async {
       print('Remote Config initialization failed: $e');
     }
   }
+}
 
-  // Run the app — binding was initialized in this zone, so runApp must stay here
-  runApp(const BurundiAUApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await _initializeApp();
+
+  // Initialize Sentry if DSN is configured
+  if (Environment.sentryDsn.isNotEmpty) {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = Environment.sentryDsn;
+        options.environment = Environment.displayName.toLowerCase();
+        options.release = 'burundi-au-app@1.0.0+1';
+        options.tracesSampleRate = Environment.sentryTracesSampleRate;
+        options.profilesSampleRate = Environment.sentryProfilesSampleRate;
+        options.sendDefaultPii = true;
+        options.attachScreenshot = true;
+        options.attachViewHierarchy = true;
+        // In debug mode, log Sentry events for visibility
+        options.debug = kDebugMode;
+      },
+      appRunner: () => runApp(
+        SentryWidget(child: const BurundiAUApp()),
+      ),
+    );
+  } else {
+    // No Sentry DSN — run the app directly
+    runApp(const BurundiAUApp());
+  }
 }
 
 class BurundiAUApp extends StatelessWidget {
@@ -120,6 +152,10 @@ class BurundiAUApp extends StatelessWidget {
             navigatorKey: navigatorKey,
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
+            navigatorObservers: [
+              if (Environment.sentryDsn.isNotEmpty)
+                SentryNavigatorObserver(),
+            ],
 
             // Theme
             theme: AppTheme.lightTheme,
@@ -154,6 +190,7 @@ class BurundiAUApp extends StatelessWidget {
               '/weather': (context) => const WeatherScreen(),
               '/profile': (context) => const ProfileScreen(),
               '/profile-completion': (context) => const ProfileCompletionScreen(),
+              '/email-verification': (context) => const EmailVerificationScreen(),
               '/water-sanitation': (context) => const WaterSanitationScreen(),
               '/arise-initiative': (context) => const AriseInitiativeScreen(),
               '/peace-security': (context) => const PeaceSecurityScreen(),

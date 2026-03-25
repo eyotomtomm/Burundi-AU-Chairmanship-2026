@@ -1,0 +1,101 @@
+# DigitalOcean App Platform Specification
+# Deploy: doctl apps create --spec .do/app.yaml
+# Update: doctl apps update <app-id> --spec .do/app.yaml
+#
+# Before deploying, set encrypted env vars in DO dashboard:
+#   DJANGO_SECRET_KEY, DATABASE_URL, EMAIL_HOST_PASSWORD,
+#   TWILIO_AUTH_TOKEN, TWILIO_ACCOUNT_SID, SENTRY_DSN, etc.
+
+name: burundi-au-chairmanship
+
+region: fra  # Frankfurt — closest to Africa
+
+services:
+  - name: api
+    github:
+      repo: your-github-org/burundi-au-chairmanship
+      branch: main
+      deploy_on_push: true
+    source_dir: /burundi_au_chairmanship/backend
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: professional-xs  # $12/mo, 1 vCPU, 1GB RAM
+    http_port: 8080
+    run_command: |
+      python manage.py migrate --noinput &&
+      python manage.py collectstatic --noinput &&
+      gunicorn config.wsgi --bind 0.0.0.0:8080 --workers 3 --timeout 120 --log-file -
+    health_check:
+      http_path: /api/health/
+      initial_delay_seconds: 30
+      period_seconds: 15
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      # Non-sensitive (can be set here)
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "api.burundi4africa.com,burundi4africa.com"
+      - key: SITE_URL
+        value: "https://api.burundi4africa.com"
+      - key: EMAIL_BACKEND
+        value: "django.core.mail.backends.smtp.EmailBackend"
+      - key: EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        value: "noreply@burundi4africa.com"
+      - key: DEFAULT_FROM_EMAIL
+        value: "Burundi AU Chairmanship <noreply@burundi4africa.com>"
+      - key: TWILIO_SENDER_ID
+        value: "B4africa"
+      - key: SENTRY_ENVIRONMENT
+        value: "production"
+      - key: SENTRY_RELEASE
+        value: "burundi-au-backend@1.0.0"
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.2"
+      # Sensitive — set as ENCRYPTED in DigitalOcean dashboard
+      - key: DJANGO_SECRET_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DATABASE_URL
+        type: SECRET
+        value: "${db.DATABASE_URL}"
+      - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: TWILIO_ACCOUNT_SID
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: TWILIO_AUTH_TOKEN
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: TWILIO_VERIFY_SERVICE_SID
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: SENTRY_DSN
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_SECRET
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_BUCKET
+        value: "burundi-au-media"
+      - key: DO_SPACES_ENDPOINT
+        value: "https://fra1.digitaloceanspaces.com"
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-1vcpu-1gb  # $15/mo managed PostgreSQL
+    num_nodes: 1

@@ -1,6 +1,7 @@
 """
 File upload validators for the Burundi AU Chairmanship backend.
 """
+import re
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import os
@@ -84,6 +85,48 @@ def validate_fcm_token(token):
     return token
 
 
+def validate_non_disposable_email(email):
+    """
+    Block disposable/temporary email providers at sign-up.
+    This is separate from validate_professional_email (used for badge verification).
+    """
+    if not email:
+        raise ValidationError('Email cannot be empty')
+
+    DISPOSABLE_DOMAINS = [
+        # Major disposable email services
+        'mailinator.com', 'guerrillamail.com', 'guerrillamail.info',
+        'tempmail.com', 'temp-mail.org', 'temp-mail.io',
+        'yopmail.com', 'yopmail.fr', 'yopmail.net',
+        'throwaway.email', 'throwaway.com',
+        'sharklasers.com', 'guerrillamailblock.com', 'grr.la',
+        'dispostable.com', 'mailnesia.com', 'maildrop.cc',
+        'fakeinbox.com', 'trashmail.com', 'trashmail.me', 'trashmail.net',
+        'getnada.com', 'tempinbox.com', 'tempr.email',
+        'discard.email', 'discardmail.com', 'discardmail.de',
+        'mailcatch.com', 'mailexpire.com', 'mailnull.com',
+        'harakirimail.com', 'mailforspam.com', 'safetymail.info',
+        'spamgourmet.com', 'mytemp.email', 'mohmal.com',
+        'burnermail.io', 'inboxkitten.com',
+        'guerrillamail.de', 'guerrillamail.net', 'guerrillamail.org',
+        'mailsac.com', '10minutemail.com', '10minutemail.net',
+        'minutemail.com', 'tempail.com',
+    ]
+
+    try:
+        domain = email.split('@')[1].lower()
+    except IndexError:
+        raise ValidationError('Invalid email format')
+
+    if domain in DISPOSABLE_DOMAINS:
+        raise ValidationError(
+            'Disposable email addresses are not allowed. '
+            'Please use a permanent email address.'
+        )
+
+    return email
+
+
 def validate_professional_email(email):
     """
     Validate that email is from a professional/organizational domain.
@@ -124,3 +167,29 @@ def validate_professional_email(email):
         )
 
     return email
+
+
+def validate_social_media_url(platform, url):
+    """
+    Validate social media URL format for badge verification.
+    Returns the URL if valid, raises ValidationError if not.
+    """
+    if not url:
+        return url  # Allow blank
+
+    PLATFORM_PATTERNS = {
+        'twitter': r'^https?://(www\.)?(twitter\.com|x\.com)/[A-Za-z0-9_]{1,15}/?$',
+        'facebook': r'^https?://(www\.|m\.)?facebook\.com/[A-Za-z0-9_.]+/?$',
+        'linkedin': r'^https?://(www\.)?linkedin\.com/in/[A-Za-z0-9_-]+/?$',
+        'instagram': r'^https?://(www\.)?instagram\.com/[A-Za-z0-9_.]+/?$',
+        'tiktok': r'^https?://(www\.)?tiktok\.com/@[A-Za-z0-9_.]+/?$',
+        'youtube': r'^https?://(www\.)?(youtube\.com/(c/|channel/|@)?[A-Za-z0-9_-]+|youtu\.be/[A-Za-z0-9_-]+)/?$',
+    }
+
+    pattern = PLATFORM_PATTERNS.get(platform)
+    if pattern and not re.match(pattern, url):
+        raise ValidationError(
+            f'Invalid {platform} URL format. Please provide a valid {platform} profile URL.'
+        )
+
+    return url

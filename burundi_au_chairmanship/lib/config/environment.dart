@@ -87,6 +87,36 @@ class Environment {
   /// Check if verbose logging should be enabled
   static bool get enableVerboseLogging => isDevelopment;
 
+  /// Sentry DSN configured via --dart-define
+  static const String sentryDsn = String.fromEnvironment(
+    'SENTRY_DSN',
+    defaultValue: '',
+  );
+
+  /// Sentry traces sample rate (0.0 to 1.0)
+  static double get sentryTracesSampleRate {
+    switch (current) {
+      case EnvironmentType.production:
+        return 0.2;
+      case EnvironmentType.staging:
+        return 0.5;
+      case EnvironmentType.development:
+        return 1.0;
+    }
+  }
+
+  /// Sentry profiles sample rate (0.0 to 1.0)
+  static double get sentryProfilesSampleRate {
+    switch (current) {
+      case EnvironmentType.production:
+        return 0.1;
+      case EnvironmentType.staging:
+        return 0.3;
+      case EnvironmentType.development:
+        return 1.0;
+    }
+  }
+
   /// Get environment display name
   static String get displayName {
     switch (current) {

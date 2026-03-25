@@ -74,6 +74,9 @@ dependencies:
   # Local Notifications (for foreground push notifications)
   flutter_local_notifications: ^20.1.0
 
+  # Error Tracking & Performance Monitoring
+  sentry_flutter: ^8.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

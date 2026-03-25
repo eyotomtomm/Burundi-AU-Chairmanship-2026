@@ -21,6 +21,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ['name', 'email', 'password']
 
     def validate_email(self, value):
+        from .validators import validate_non_disposable_email
+        validate_non_disposable_email(value)
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError('Unable to register with this email address.')
         return value
@@ -455,8 +457,11 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         model = VerificationRequest
         fields = [
             'id', 'user', 'user_name', 'user_email',
-            'title', 'full_name', 'email', 'phone_number', 'phone_verified',
-            'position_role', 'twitter_url', 'linkedin_url',
+            'title', 'first_name', 'last_name', 'full_name',
+            'email', 'country_code', 'phone_number', 'phone_verified',
+            'position_role', 'reasoning_message',
+            'twitter_url', 'linkedin_url', 'facebook_url',
+            'instagram_url', 'tiktok_url', 'youtube_url', 'other_social_url',
             'status', 'badge_type', 'rejection_reason',
             'appeal_message', 'appeal_submitted_at',
             'created_at', 'updated_at', 'reviewed_at'
@@ -466,6 +471,42 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
             'status', 'badge_type', 'rejection_reason', 'phone_verified',
             'appeal_submitted_at', 'created_at', 'updated_at', 'reviewed_at'
         ]
+
+    def validate_twitter_url(self, value):
+        if value:
+            from .validators import validate_social_media_url
+            validate_social_media_url('twitter', value)
+        return value
+
+    def validate_facebook_url(self, value):
+        if value:
+            from .validators import validate_social_media_url
+            validate_social_media_url('facebook', value)
+        return value
+
+    def validate_linkedin_url(self, value):
+        if value:
+            from .validators import validate_social_media_url
+            validate_social_media_url('linkedin', value)
+        return value
+
+    def validate_instagram_url(self, value):
+        if value:
+            from .validators import validate_social_media_url
+            validate_social_media_url('instagram', value)
+        return value
+
+    def validate_tiktok_url(self, value):
+        if value:
+            from .validators import validate_social_media_url
+            validate_social_media_url('tiktok', value)
+        return value
+
+    def validate_youtube_url(self, value):
+        if value:
+            from .validators import validate_social_media_url
+            validate_social_media_url('youtube', value)
+        return value
 
     def validate(self, data):
         """Ensure user only has one pending/approved request"""

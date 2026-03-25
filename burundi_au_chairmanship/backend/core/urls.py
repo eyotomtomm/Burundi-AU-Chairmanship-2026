@@ -52,7 +52,11 @@ urlpatterns = [
     path('auth/reactivate-account/', views.reactivate_account, name='auth-reactivate-account'),
     path('auth/export-data/', views.export_user_data, name='auth-export-data'),
 
-    # OTP Verification
+    # Sign-Up Email Verification
+    path('auth/send-signup-otp/', views.send_signup_otp, name='auth-send-signup-otp'),
+    path('auth/verify-signup-otp/', views.verify_signup_otp, name='auth-verify-signup-otp'),
+
+    # OTP Verification (for badge verification flow)
     path('otp/send-email/', views.send_email_otp, name='otp-send-email'),
     path('otp/verify-email/', views.verify_email_otp, name='otp-verify-email'),
     path('otp/send-phone/', views.send_phone_otp, name='otp-send-phone'),

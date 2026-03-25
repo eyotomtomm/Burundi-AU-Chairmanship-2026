@@ -1164,8 +1164,13 @@ class VerificationRequest(models.Model):
         blank=True,
         help_text='User explanation for why they deserve the verification badge'
     )
-    twitter_url = models.URLField(blank=True, help_text='Twitter profile URL (optional)')
+    twitter_url = models.URLField(blank=True, help_text='Twitter/X profile URL (optional)')
     linkedin_url = models.URLField(blank=True, help_text='LinkedIn profile URL (optional)')
+    facebook_url = models.URLField(blank=True, help_text='Facebook profile URL (optional)')
+    instagram_url = models.URLField(blank=True, help_text='Instagram profile URL (optional)')
+    tiktok_url = models.URLField(blank=True, help_text='TikTok profile URL (optional)')
+    youtube_url = models.URLField(blank=True, help_text='YouTube channel URL (optional)')
+    other_social_url = models.URLField(blank=True, help_text='Other social media URL (optional)')
 
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

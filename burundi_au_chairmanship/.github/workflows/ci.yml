@@ -1,0 +1,169 @@
+# CI/CD Pipeline — Burundi AU Chairmanship
+# Runs on every push & PR to main
+# - Backend: Django checks, migrations, tests
+# - Frontend: Flutter analyze, build APK & IPA
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FLUTTER_VERSION: "3.32.0"
+  PYTHON_VERSION: "3.9"
+
+jobs:
+  # ─── Backend Tests ─────────────────────────────────────────
+  backend:
+    name: Backend (Django)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship/backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DJANGO_SECRET_KEY: "test-secret-key-for-ci-only"
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DATABASE_URL: "postgresql://test_user:test_pass@localhost:5432/test_db"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: burundi_au_chairmanship/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Django system checks
+        run: python manage.py check --deploy
+
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+
+      - name: Collect static files
+        run: python manage.py collectstatic --noinput
+
+  # ─── Flutter Analyze ───────────────────────────────────────
+  flutter-analyze:
+    name: Flutter Analyze
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze code
+        run: flutter analyze --no-fatal-infos
+
+  # ─── Build Android APK ─────────────────────────────────────
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: [backend, flutter-analyze]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --dart-define=ENVIRONMENT=production \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_FLUTTER }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: burundi_au_chairmanship/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  # ─── Build iOS IPA ─────────────────────────────────────────
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    needs: [backend, flutter-analyze]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Build iOS (no code sign)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=ENVIRONMENT=production \
+            --dart-define=SENTRY_DSN=${{ secrets.SENTRY_DSN_FLUTTER }}

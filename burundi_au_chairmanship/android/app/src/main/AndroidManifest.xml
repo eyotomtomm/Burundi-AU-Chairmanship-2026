@@ -3,6 +3,26 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Permission for push notifications on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Camera access for profile photo and QR code scanning -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Photo library access for profile photo selection (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Legacy storage permission for devices below Android 13 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <!-- Location access for nearby embassies and events -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Contacts access for sharing embassy info -->
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <!-- Vibration for notifications -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- Camera is optional — app still works without it -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <!-- Location is optional -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
 
     <application
         android:label="Burundi4africa"

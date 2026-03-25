@@ -784,6 +784,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _signInPasswordController.text,
     );
     if (success && context.mounted) {
+      // Check if email verification is required
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+        return;
+      }
+
       // Check if profile is incomplete
       final isProfileIncomplete = (authProvider.userName?.isEmpty ?? true) ||
           (authProvider.phoneNumber?.isEmpty ?? true) ||
@@ -812,15 +818,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _signUpPasswordController.text,
     );
     if (success && context.mounted) {
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Account created! Please verify your email.'),
-          backgroundColor: AppColors.burundiGreen,
-        ),
-      );
-      // Navigate to home
-      Navigator.of(context).pushReplacementNamed('/home');
+      // After sign-up: require email verification
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } else if (context.mounted && authProvider.errorMessage != null) {
       // Show error message
       _showErrorSnackBar(context, authProvider.errorMessage!);
@@ -831,7 +834,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signInWithGoogle();
     if (success && context.mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } else if (context.mounted && authProvider.errorMessage != null) {
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
@@ -841,7 +848,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signInWithApple();
     if (success && context.mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } else if (context.mounted && authProvider.errorMessage != null) {
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }

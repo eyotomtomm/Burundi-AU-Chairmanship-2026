@@ -45,10 +45,13 @@ def register(request):
     if serializer.is_valid():
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
+        profile = user.profile
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
+            'email_verified': profile.is_email_verified,
+            'requires_email_verification': not profile.is_email_verified,
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -113,10 +116,13 @@ def login(request):
         })
 
     refresh = RefreshToken.for_user(user)
+    profile = user.profile
     return Response({
         'user': UserSerializer(user, context={'request': request}).data,
         'access': str(refresh.access_token),
         'refresh': str(refresh),
+        'email_verified': profile.is_email_verified,
+        'requires_email_verification': not profile.is_email_verified,
     })
 
 
@@ -303,7 +309,9 @@ def firebase_register(request):
 
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
-            'message': 'User registered successfully'
+            'message': 'User registered successfully',
+            'email_verified': profile.is_email_verified,
+            'requires_email_verification': not profile.is_email_verified,
         }, status=status.HTTP_201_CREATED)
 
     except ValueError as e:
@@ -384,7 +392,9 @@ def firebase_login(request):
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
             'message': 'Login successful',
-            'is_new_user': is_new_user
+            'is_new_user': is_new_user,
+            'email_verified': profile.is_email_verified,
+            'requires_email_verification': not profile.is_email_verified,
         })
 
     except ValueError as e:
@@ -1198,6 +1208,79 @@ def my_event_registrations(request):
 
 
   # Duplicate delete_account and export_user_data removed — canonical versions are above (lines ~96-304)
+
+
+# ── Sign-Up Email Verification OTP Endpoints ─────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([OTPRateThrottle])
+def send_signup_otp(request):
+    """Send OTP to user's registration email for sign-up verification"""
+    from .otp_utils import send_email_otp as _send_email_otp
+
+    email = request.user.email
+    if not email:
+        return Response(
+            {'detail': 'No email associated with this account'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Already verified
+    if request.user.profile.is_email_verified:
+        return Response({
+            'message': 'Email already verified',
+            'email_verified': True,
+        })
+
+    success, message, otp_id = _send_email_otp(request.user, email)
+
+    if success:
+        return Response({
+            'message': message,
+            'otp_id': otp_id,
+            'email': email,
+        })
+    else:
+        return Response(
+            {'detail': message},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([OTPRateThrottle])
+def verify_signup_otp(request):
+    """Verify sign-up email OTP and mark user as email-verified"""
+    from .otp_utils import verify_email_otp as _verify_email_otp
+
+    otp_code = request.data.get('otp_code')
+    if not otp_code:
+        return Response(
+            {'detail': 'OTP code is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    email = request.user.email
+    success, message = _verify_email_otp(request.user, email, otp_code)
+
+    if success:
+        # Mark profile as email verified
+        profile = request.user.profile
+        profile.is_email_verified = True
+        profile.email_verified_at = timezone.now()
+        profile.save()
+
+        return Response({
+            'message': message,
+            'email_verified': True,
+        })
+    else:
+        return Response(
+            {'detail': message},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 # ── OTP Verification Endpoints ────────────────────────────────────────────

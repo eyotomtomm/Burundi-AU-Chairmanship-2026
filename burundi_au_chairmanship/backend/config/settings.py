@@ -64,6 +64,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'core.middleware.cloudflare.CloudflareProxyMiddleware',  # Must be first — sets real client IP
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -166,6 +167,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     'https://burundi4africa.com',
     'https://www.burundi4africa.com',
+    'https://api.burundi4africa.com',
 ]
 if DEBUG:
     CORS_ALLOWED_ORIGINS += [
@@ -197,6 +199,8 @@ REST_FRAMEWORK = {
         'auth': '5/min',  # Strict limit on login/register to prevent brute-force
         'otp': '3/min',  # Strict limit on OTP send/verify
     },
+    # Use real client IP behind Cloudflare / reverse proxies
+    'NUM_PROXIES': 1,
 }
 
 # ─── JWT settings with auto-logout ────────────────────────────
@@ -230,6 +234,9 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    # Cloudflare sends the original host in X-Forwarded-Host
+    USE_X_FORWARDED_HOST = True
+    USE_X_FORWARDED_PORT = True
 # ─── Twilio SMS Configuration ─────────────────────────────────
 # For OTP verification via SMS
 # SECURITY: All Twilio credentials MUST be set via environment variables
@@ -241,11 +248,32 @@ TWILIO_SENDER_ID = os.environ.get('TWILIO_SENDER_ID', 'B4africa')
 
 # ─── Email Configuration ──────────────────────────────────────
 # For email OTP verification
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Console for testing
-DEFAULT_FROM_EMAIL = 'Burundi AU Chairmanship <noreply@burundi4africa.com>'
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # Uncomment for real emails
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'your-email@gmail.com'
-# EMAIL_HOST_PASSWORD = 'your-app-password'
+# Uses SMTP in production (Google Workspace), console backend for local dev
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'  # Fallback for local dev
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    'Burundi AU Chairmanship <noreply@burundi4africa.com>'
+)
+
+# ─── Sentry Error Tracking ───────────────────────────────────
+SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.2')),
+        profiles_sample_rate=float(os.environ.get('SENTRY_PROFILES_SAMPLE_RATE', '0.1')),
+        send_default_pii=True,
+        environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
+        release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
+    )

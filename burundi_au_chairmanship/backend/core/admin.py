@@ -1202,6 +1202,96 @@ class AppSettingsAdmin(admin.ModelAdmin):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  VERIFICATION SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(VerificationRequest)
+class VerificationRequestAdmin(admin.ModelAdmin):
+    """
+    VERIFICATION REQUESTS - Review and approve/reject user verification badges
+
+    HELP:
+    Users submit verification requests to receive Gold or Blue badges.
+    Review their professional email, phone, social media, and reasoning.
+
+    STATUS:
+    - Pending: Waiting for your review
+    - Approved: Badge granted
+    - Rejected: Request denied (user can appeal)
+    - Appealed: User submitted appeal after rejection
+    """
+    list_display = ['full_name', 'user', 'status_badge', 'email', 'phone_number', 'created_at']
+    list_filter = ['status', 'badge_type', 'created_at']
+    search_fields = ['full_name', 'first_name', 'last_name', 'email', 'user__email']
+    readonly_fields = ['created_at', 'updated_at', 'reviewed_at', 'appeal_submitted_at']
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('Applicant', {
+            'fields': [
+                'user',
+                ('title', 'first_name', 'last_name'),
+                'full_name',
+                'position_role',
+            ],
+        }),
+        ('Contact Verification', {
+            'fields': [
+                ('email', 'email_verified'),
+                ('country_code', 'phone_number', 'phone_verified'),
+            ],
+        }),
+        ('Social Media Profiles', {
+            'fields': [
+                ('twitter_url', 'linkedin_url'),
+                ('facebook_url', 'instagram_url'),
+                ('tiktok_url', 'youtube_url'),
+                'other_social_url',
+            ],
+            'description': 'Review the applicant\'s social media presence to help verify identity.',
+        }),
+        ('Reasoning', {
+            'fields': ['reasoning_message'],
+        }),
+        ('Admin Review', {
+            'fields': [
+                ('status', 'badge_type'),
+                'rejection_reason',
+                ('reviewed_by', 'reviewed_at'),
+            ],
+        }),
+        ('Appeal', {
+            'fields': ['appeal_message', 'appeal_submitted_at'],
+            'classes': ('collapse',),
+        }),
+        ('Timestamps', {
+            'fields': ['created_at', 'updated_at'],
+            'classes': ('collapse',),
+        }),
+    )
+
+    def status_badge(self, obj):
+        colors = {
+            'pending': '#FFA500',
+            'approved': '#28A745',
+            'rejected': '#DC3545',
+            'appealed': '#6C757D',
+        }
+        return format_html(
+            '<span style="background:{}; color:white; padding:3px 10px; border-radius:3px; font-size:11px; font-weight:600;">{}</span>',
+            colors.get(obj.status, '#666'),
+            obj.get_status_display().upper()
+        )
+    status_badge.short_description = 'Status'
+
+    def save_model(self, request, obj, form, change):
+        if obj.status in ['approved', 'rejected'] and not obj.reviewed_at:
+            obj.reviewed_at = timezone.now()
+            obj.reviewed_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  HIDE TECHNICAL MODELS
 # ═══════════════════════════════════════════════════════════════
 

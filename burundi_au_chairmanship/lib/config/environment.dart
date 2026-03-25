@@ -69,6 +69,9 @@ class Environment {
     return apiUrl;
   }
 
+  /// Base URL for legal/public web pages (privacy policy, terms of service)
+  static String get siteBaseUrl => mediaBaseUrl;
+
   /// Check if we're in production
   static bool get isProduction => current == EnvironmentType.production;
 

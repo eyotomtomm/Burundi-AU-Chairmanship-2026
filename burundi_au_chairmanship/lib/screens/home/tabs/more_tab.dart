@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../../../config/app_colors.dart';
 import '../../../config/app_constants.dart';
+import '../../../config/environment.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/language_provider.dart';
@@ -387,7 +388,21 @@ class MoreTab extends StatelessWidget {
                       iconBgColor: const Color(0xFF8D6E63),
                       title: l10n.translate('privacy_policy'),
                       isDark: isDark,
-                      onTap: () => launchUrl(Uri.parse(AppConstants.websiteUrl)),
+                      onTap: () => launchUrl(
+                        Uri.parse('${Environment.siteBaseUrl}/privacy-policy/'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                    _buildMenuItem(
+                      context: context,
+                      icon: Icons.description_outlined,
+                      iconBgColor: const Color(0xFF78909C),
+                      title: l10n.translate('terms_of_service'),
+                      isDark: isDark,
+                      onTap: () => launchUrl(
+                        Uri.parse('${Environment.siteBaseUrl}/terms-of-service/'),
+                        mode: LaunchMode.externalApplication,
+                      ),
                     ),
                     _buildMenuItem(
                       context: context,

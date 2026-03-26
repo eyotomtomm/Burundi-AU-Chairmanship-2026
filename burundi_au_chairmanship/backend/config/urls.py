@@ -12,6 +12,7 @@ urlpatterns = [
     path('privacy-policy/', TemplateView.as_view(template_name='legal/privacy_policy.html'), name='privacy-policy'),
     path('terms-of-service/', TemplateView.as_view(template_name='legal/terms_of_service.html'), name='terms-of-service'),
     path('support/', TemplateView.as_view(template_name='legal/support.html'), name='support'),
+    path('delete-account/', TemplateView.as_view(template_name='legal/delete_account.html'), name='delete-account'),
 ]
 
 if settings.DEBUG:

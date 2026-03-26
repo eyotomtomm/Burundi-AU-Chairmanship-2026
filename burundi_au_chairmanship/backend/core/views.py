@@ -468,7 +468,7 @@ def export_user_data(request):
             'is_staff': user.is_staff,
         },
         'data_export_info': {
-            'export_date': user.date_joined.now().isoformat(),
+            'export_date': timezone.now().isoformat(),
             'format': 'JSON',
             'version': '1.0',
         },

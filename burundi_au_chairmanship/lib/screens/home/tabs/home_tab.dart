@@ -25,6 +25,7 @@ import '../widgets/quick_access_grid.dart';
 import '../widgets/news_card.dart';
 import '../widgets/feature_item.dart';
 import '../widgets/event_card.dart';
+import '../../../widgets/shimmer_loading.dart';
 
 class HomeTab extends StatefulWidget {
   final ValueChanged<int>? onSwitchTab;
@@ -59,6 +60,7 @@ class _HomeTabState extends State<HomeTab> {
   List<Map<String, dynamic>>? _quickAccessItems;
   int _unreadBadgeCount = 0;
   Timer? _badgeTimer;
+  bool _isLoading = true;
 
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
@@ -217,10 +219,11 @@ class _HomeTabState extends State<HomeTab> {
         _apiEventCards = eventCards;
         _heroTextContent = heroTextMap;
         _quickAccessItems = quickAccessMenu;
+        _isLoading = false;
       });
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to load home feed data: $e');
-      // No fallback - empty state will be shown via computed getters
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -261,7 +264,15 @@ class _HomeTabState extends State<HomeTab> {
     final l10n = AppLocalizations.of(context);
     final langCode = context.watch<LanguageProvider>().languageCode;
 
-    return CustomScrollView(
+    if (_isLoading) return const ShimmerHomeTabSkeleton();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() => _isLoading = true);
+        await _loadData();
+      },
+      color: AppColors.burundiGreen,
+      child: CustomScrollView(
       slivers: [
         // Hero Slideshow
         SliverToBoxAdapter(
@@ -421,6 +432,7 @@ class _HomeTabState extends State<HomeTab> {
           child: SizedBox(height: 100),
         ),
       ],
+    ),
     );
   }
 

@@ -4,6 +4,7 @@ import '../../../services/api_service.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/environment.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../widgets/shimmer_loading.dart';
 
 class AgendaTab extends StatefulWidget {
   const AgendaTab({super.key});
@@ -74,8 +75,11 @@ class _AgendaTabState extends State<AgendaTab> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          onRefresh: _loadAgendas,
+          color: AppColors.burundiGreen,
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             // Header
             SliverToBoxAdapter(
@@ -109,8 +113,8 @@ class _AgendaTabState extends State<AgendaTab> {
 
             // Loading or content
             if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+              const SliverToBoxAdapter(
+                child: ShimmerAgendaListSkeleton(),
               )
             else if (_agendas == null || _agendas!.isEmpty)
               SliverFillRemaining(
@@ -167,6 +171,7 @@ class _AgendaTabState extends State<AgendaTab> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
+        ),
         ),
       ),
     );

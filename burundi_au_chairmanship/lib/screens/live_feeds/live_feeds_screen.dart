@@ -8,6 +8,7 @@ import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
+import '../../widgets/shimmer_loading.dart';
 import 'video_player_screen.dart';
 
 class LiveFeedsScreen extends StatefulWidget {
@@ -107,8 +108,11 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
 
     return Scaffold(
       body: _isLoading
-          ? _buildLoadingState(isDark)
-          : CustomScrollView(
+          ? const ShimmerLiveFeedsSkeleton()
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              color: AppColors.burundiGreen,
+              child: CustomScrollView(
               slivers: [
                 // Hero App Bar
                 _buildHeroAppBar(isDark, l10n),
@@ -196,6 +200,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 // Bottom padding
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
               ],
+            ),
             ),
     );
   }
@@ -1183,40 +1188,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Loading State ─────────────────────────────────────────────────────
-
-  Widget _buildLoadingState(bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.burundiGreen,
-            isDark ? AppColors.darkBackground : AppColors.lightBackground,
-          ],
-          stops: const [0.0, 0.4],
-        ),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 16),
-            Text(
-              'Loading streams...',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
               ),
             ),
           ],

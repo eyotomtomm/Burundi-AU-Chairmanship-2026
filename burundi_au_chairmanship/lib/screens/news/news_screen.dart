@@ -7,6 +7,7 @@ import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/shimmer_loading.dart';
 import 'article_detail_screen.dart';
 
 class NewsScreen extends StatefulWidget {
@@ -80,8 +81,8 @@ class _NewsScreenState extends State<NewsScreen> {
             return CustomScrollView(
               slivers: [
                 _buildSliverAppBar(l10n),
-                const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
+                const SliverToBoxAdapter(
+                  child: ShimmerArticleListSkeleton(),
                 ),
               ],
             );

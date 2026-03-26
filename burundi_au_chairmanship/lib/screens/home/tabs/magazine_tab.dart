@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../providers/language_provider.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/api_service.dart';
+import '../../../widgets/shimmer_loading.dart';
 import '../../magazine/pdf_viewer_screen.dart';
 
 class MagazineTab extends StatefulWidget {
@@ -160,7 +161,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return const ShimmerMagazineGridSkeleton();
 
     final editions = _editions ?? [];
     if (editions.isEmpty && (_articles ?? []).isEmpty) {
@@ -179,7 +180,10 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     }
 
     return Scaffold(
-      body: NestedScrollView(
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.burundiGreen,
+        child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           // Gradient app bar
           SliverAppBar(
@@ -286,6 +290,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             ),
           ],
         ),
+      ),
       ),
     );
   }

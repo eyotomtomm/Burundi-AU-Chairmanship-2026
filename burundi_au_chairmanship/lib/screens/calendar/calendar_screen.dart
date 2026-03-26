@@ -6,6 +6,7 @@ import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/location_model.dart';
 import '../../services/api_service.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -148,7 +149,7 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
+          ? const ShimmerCalendarSkeleton()
           : _events == null || _events!.isEmpty
               ? Center(
                   child: Column(

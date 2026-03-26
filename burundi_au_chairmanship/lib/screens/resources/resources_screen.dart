@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../widgets/african_pattern.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class ResourcesScreen extends StatefulWidget {
   const ResourcesScreen({super.key});
@@ -60,10 +61,26 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
         title: Text(l10n.resources),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerListItemSkeleton()
           : _error != null && (_resources == null || _resources!.isEmpty)
               ? _buildError()
-              : AfricanPatternBackground(
+              : _grouped.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.folder_open, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(l10n.translate('no_data'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey)),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () { setState(() => _isLoading = true); _loadData(); },
+                            child: Text(l10n.retry),
+                          ),
+                        ],
+                      ),
+                    )
+                  : AfricanPatternBackground(
                   opacity: 0.03,
                   child: RefreshIndicator(
                     onRefresh: () async {

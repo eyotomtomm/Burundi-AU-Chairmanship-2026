@@ -8,6 +8,7 @@ import '../../l10n/app_localizations.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -115,7 +116,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Widget _buildBody(bool isDarkMode, String langCode, AppLocalizations? loc) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ShimmerListItemSkeleton();
     }
 
     if (_error != null) {

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../widgets/shimmer_loading.dart';
 import 'video_detail_screen.dart';
 
 class VideosScreen extends StatefulWidget {
@@ -85,7 +86,7 @@ class _VideosScreenState extends State<VideosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerVideoGridSkeleton()
           : RefreshIndicator(
               onRefresh: _loadVideos,
               child: CustomScrollView(

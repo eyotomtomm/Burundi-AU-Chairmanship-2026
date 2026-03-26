@@ -6,6 +6,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../providers/language_provider.dart';
 import '../../../models/location_model.dart';
 import '../../../services/api_service.dart';
+import '../../../widgets/shimmer_loading.dart';
 
 class LocationsTab extends StatefulWidget {
   const LocationsTab({super.key});
@@ -59,12 +60,36 @@ class _LocationsTabState extends State<LocationsTab> {
           title: Text(l10n.embassyLocations),
           backgroundColor: AppColors.info,
         ),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const ShimmerLocationListSkeleton(),
+      );
+    }
+
+    if (embassies.isEmpty && events.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.embassyLocations),
+          backgroundColor: AppColors.info,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.location_off, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(l10n.translate('no_data'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey)),
+              const SizedBox(height: 8),
+              TextButton(onPressed: () { setState(() => _isLoading = true); _loadData(); }, child: Text(l10n.retry)),
+            ],
+          ),
+        ),
       );
     }
 
     return Scaffold(
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        color: AppColors.burundiGreen,
+        child: CustomScrollView(
         slivers: [
           // Header
           SliverAppBar(
@@ -354,6 +379,7 @@ class _LocationsTabState extends State<LocationsTab> {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
+      ),
       ),
     );
   }

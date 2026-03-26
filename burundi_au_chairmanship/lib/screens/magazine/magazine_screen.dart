@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
 import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
 import 'pdf_viewer_screen.dart';
@@ -38,6 +39,15 @@ class _MagazineScreenState extends State<MagazineScreen> {
   }
 
   Future<void> _toggleLike(MagazineEdition magazine) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('login_to_like'))),
+      );
+      return;
+    }
+
     final index = _magazines?.indexWhere((e) => e.id == magazine.id) ?? -1;
     if (index == -1) return;
     final wasLiked = magazine.isLiked;
@@ -48,7 +58,15 @@ class _MagazineScreenState extends State<MagazineScreen> {
       );
     });
     try {
-      await ApiService().post('magazines/${magazine.id}/toggle_like/', {});
+      final result = await ApiService().toggleMagazineLike(magazine.id);
+      if (mounted) {
+        setState(() {
+          _magazines![index] = magazine.copyWith(
+            isLiked: result['is_liked'],
+            likeCount: result['like_count'],
+          );
+        });
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() { _magazines![index] = magazine; });

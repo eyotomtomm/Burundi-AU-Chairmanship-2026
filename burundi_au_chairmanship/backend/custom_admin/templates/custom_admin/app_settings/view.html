@@ -126,6 +126,66 @@
                     />
                 </div>
 
+                <!-- About Page -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">About Page</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">These fields control what appears in the About dialog inside the app.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="app_description" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                App Description (English)
+                            </label>
+                            <textarea
+                                id="app_description"
+                                name="app_description"
+                                rows="3"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg"
+                            >{{ settings.app_description }}</textarea>
+                        </div>
+                        <div>
+                            <label for="app_description_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                App Description (French)
+                            </label>
+                            <textarea
+                                id="app_description_fr"
+                                name="app_description_fr"
+                                rows="3"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface rounded-t-lg"
+                            >{{ settings.app_description_fr }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="developer_name" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Developer Name
+                            </label>
+                            <input
+                                type="text"
+                                id="developer_name"
+                                name="developer_name"
+                                value="{{ settings.developer_name }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="e.g. Eyosias Tamene"
+                            />
+                        </div>
+                        <div>
+                            <label for="developer_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Developer Website URL
+                            </label>
+                            <input
+                                type="url"
+                                id="developer_url"
+                                name="developer_url"
+                                value="{{ settings.developer_url }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="https://example.com"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Phone Verification Channels -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Phone Verification (Twilio)</h3>

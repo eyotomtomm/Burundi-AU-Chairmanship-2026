@@ -1097,16 +1097,7 @@ class Video(models.Model):
 
 class SocialMediaLink(models.Model):
     """Social media profiles and links"""
-    PLATFORM_CHOICES = [
-        ('facebook', 'Facebook'),
-        ('twitter', 'Twitter/X'),
-        ('instagram', 'Instagram'),
-        ('youtube', 'YouTube'),
-        ('linkedin', 'LinkedIn'),
-        ('tiktok', 'TikTok'),
-    ]
-
-    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES, unique=True)
+    platform = models.CharField(max_length=50, unique=True, help_text='e.g. facebook, twitter, instagram, tiktok, threads, telegram, whatsapp')
     display_name = models.CharField(max_length=100)
     display_name_fr = models.CharField(max_length=100, blank=True)
     url = models.URLField()

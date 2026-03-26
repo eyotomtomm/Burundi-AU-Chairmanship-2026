@@ -1774,8 +1774,7 @@ def social_media_create(request):
         )
         messages.success(request, 'Social media link created successfully!')
         return redirect('custom_admin:social_media_list')
-    platform_choices = SocialMediaLink.PLATFORM_CHOICES
-    return render(request, 'custom_admin/social_media/form.html', {'action': 'Create', 'platform_choices': platform_choices})
+    return render(request, 'custom_admin/social_media/form.html', {'action': 'Create'})
 
 
 @login_required(login_url='custom_admin:login')
@@ -1794,8 +1793,7 @@ def social_media_edit(request, pk):
         link.save()
         messages.success(request, 'Social media link updated successfully!')
         return redirect('custom_admin:social_media_list')
-    platform_choices = SocialMediaLink.PLATFORM_CHOICES
-    return render(request, 'custom_admin/social_media/form.html', {'link': link, 'action': 'Edit', 'platform_choices': platform_choices})
+    return render(request, 'custom_admin/social_media/form.html', {'link': link, 'action': 'Edit'})
 
 
 @login_required(login_url='custom_admin:login')
@@ -1882,6 +1880,10 @@ def app_settings(request):
         settings.facebook_url = request.POST.get('facebook_url', '')
         settings.twitter_url = request.POST.get('twitter_url', '')
         settings.instagram_url = request.POST.get('instagram_url', '')
+        settings.app_description = request.POST.get('app_description', '')
+        settings.app_description_fr = request.POST.get('app_description_fr', '')
+        settings.developer_name = request.POST.get('developer_name', '')
+        settings.developer_url = request.POST.get('developer_url', '')
         settings.sms_verification_enabled = request.POST.get('sms_verification_enabled') == 'on'
         settings.whatsapp_verification_enabled = request.POST.get('whatsapp_verification_enabled') == 'on'
         settings.live_agent_online = request.POST.get('live_agent_online') == 'on'

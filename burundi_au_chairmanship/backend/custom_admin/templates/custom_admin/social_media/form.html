@@ -20,13 +20,9 @@
                     <label for="platform" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
                         Platform
                     </label>
-                    <select id="platform" name="platform"
-                            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
-                        <option value="">Select platform</option>
-                        {% for value, label in platform_choices %}
-                        <option value="{{ value }}" {% if link.platform == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    <input type="text" id="platform" name="platform" value="{{ link.platform|default:'' }}"
+                           placeholder="e.g. facebook, twitter, instagram, tiktok, threads, telegram"
+                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface" required>
                 </div>
 
                 <div>

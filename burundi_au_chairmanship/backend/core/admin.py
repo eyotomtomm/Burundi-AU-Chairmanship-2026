@@ -1187,6 +1187,14 @@ class AppSettingsAdmin(admin.ModelAdmin):
                 ('summit_theme', 'summit_theme_fr'),
             ],
         }),
+        ('About Page', {
+            'description': 'These fields control what appears in the About dialog inside the app.',
+            'fields': [
+                ('app_description', 'app_description_fr'),
+                'developer_name',
+                'developer_url',
+            ],
+        }),
         ('Social Media & Links', {
             'fields': [
                 'website_url',

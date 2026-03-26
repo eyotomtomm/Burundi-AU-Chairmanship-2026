@@ -185,6 +185,10 @@ class AppSettingsModel {
   final String facebookUrl;
   final String twitterUrl;
   final String instagramUrl;
+  final String appDescription;
+  final String appDescriptionFr;
+  final String developerName;
+  final String developerUrl;
   final bool smsVerificationEnabled;
   final bool whatsappVerificationEnabled;
   final bool liveAgentOnline;
@@ -197,6 +201,10 @@ class AppSettingsModel {
     required this.facebookUrl,
     required this.twitterUrl,
     required this.instagramUrl,
+    required this.appDescription,
+    required this.appDescriptionFr,
+    required this.developerName,
+    required this.developerUrl,
     required this.smsVerificationEnabled,
     required this.whatsappVerificationEnabled,
     required this.liveAgentOnline,
@@ -211,6 +219,10 @@ class AppSettingsModel {
       facebookUrl: json['facebook_url'] ?? '',
       twitterUrl: json['twitter_url'] ?? '',
       instagramUrl: json['instagram_url'] ?? '',
+      appDescription: json['app_description'] ?? 'Official application for the Burundi African Union Chairmanship 2026.',
+      appDescriptionFr: json['app_description_fr'] ?? 'Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.',
+      developerName: json['developer_name'] ?? 'Eyosias Tamene',
+      developerUrl: json['developer_url'] ?? 'https://eyosias.dev',
       smsVerificationEnabled: json['sms_verification_enabled'] ?? false,
       whatsappVerificationEnabled: json['whatsapp_verification_enabled'] ?? false,
       liveAgentOnline: json['live_agent_online'] ?? false,
@@ -220,6 +232,7 @@ class AppSettingsModel {
   bool get phoneVerificationEnabled => smsVerificationEnabled || whatsappVerificationEnabled;
 
   String getTheme(String langCode) => langCode == 'fr' ? summitThemeFr : summitTheme;
+  String getDescription(String langCode) => langCode == 'fr' ? appDescriptionFr : appDescription;
 }
 
 class WeatherCity {

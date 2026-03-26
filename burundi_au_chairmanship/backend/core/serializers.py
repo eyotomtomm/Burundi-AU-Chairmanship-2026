@@ -335,6 +335,8 @@ class AppSettingsSerializer(serializers.ModelSerializer):
         model = AppSettings
         fields = ['summit_year', 'summit_theme', 'summit_theme_fr',
                   'website_url', 'facebook_url', 'twitter_url', 'instagram_url',
+                  'app_description', 'app_description_fr',
+                  'developer_name', 'developer_url',
                   'sms_verification_enabled', 'whatsapp_verification_enabled',
                   'live_agent_online']
 

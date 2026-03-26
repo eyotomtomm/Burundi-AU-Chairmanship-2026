@@ -337,50 +337,7 @@ class MoreTab extends StatelessWidget {
                       subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
                       isDark: isDark,
                       isFirst: true,
-                      onTap: () {
-                        showAboutDialog(
-                          context: context,
-                          applicationName: AppConstants.appName,
-                          applicationVersion: AppConstants.appVersion,
-                          applicationIcon: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: AppColors.burundiGreen,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.stars, color: Colors.white, size: 28),
-                          ),
-                          children: [
-                            Text(AppConstants.summitTheme),
-                            const SizedBox(height: 8),
-                            const Text('Official application for the Burundi African Union Chairmanship 2026.'),
-                            const SizedBox(height: 16),
-                            GestureDetector(
-                              onTap: () => launchUrl(Uri.parse('https://eyosias.dev'), mode: LaunchMode.externalApplication),
-                              child: RichText(
-                                text: TextSpan(
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Theme.of(context).textTheme.bodyMedium?.color,
-                                  ),
-                                  children: const [
-                                    TextSpan(text: 'Designed and developed by '),
-                                    TextSpan(
-                                      text: 'Eyosias Tamene',
-                                      style: TextStyle(
-                                        color: AppColors.burundiGreen,
-                                        fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                      onTap: () => _showAboutDialog(context, l10n),
                     ),
                     _buildMenuItem(
                       context: context,
@@ -714,6 +671,78 @@ class MoreTab extends StatelessWidget {
         ],
       ),
     ));
+  }
+
+  void _showAboutDialog(BuildContext context, AppLocalizations l10n) async {
+    // Fetch about info from backend, fallback to hardcoded values
+    String description = 'Official application for the Burundi African Union Chairmanship 2026.';
+    String summitTheme = AppConstants.summitTheme;
+    String developerName = 'Eyosias Tamene';
+    String developerUrl = 'https://eyosias.dev';
+
+    try {
+      final settings = await ApiService().getSettings();
+      if (settings != null) {
+        final langCode = l10n.locale.languageCode;
+        description = settings.getDescription(langCode).isNotEmpty
+            ? settings.getDescription(langCode)
+            : description;
+        summitTheme = settings.getTheme(langCode).isNotEmpty
+            ? settings.getTheme(langCode)
+            : summitTheme;
+        if (settings.developerName.isNotEmpty) {
+          developerName = settings.developerName;
+        }
+        if (settings.developerUrl.isNotEmpty) {
+          developerUrl = settings.developerUrl;
+        }
+      }
+    } catch (_) {}
+
+    if (!context.mounted) return;
+
+    showAboutDialog(
+      context: context,
+      applicationName: AppConstants.appName,
+      applicationVersion: AppConstants.appVersion,
+      applicationIcon: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: AppColors.burundiGreen,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.stars, color: Colors.white, size: 28),
+      ),
+      children: [
+        Text(summitTheme),
+        const SizedBox(height: 8),
+        Text(description),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: () => launchUrl(Uri.parse(developerUrl), mode: LaunchMode.externalApplication),
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
+              children: [
+                TextSpan(text: '${l10n.translate('designed_by')} '),
+                TextSpan(
+                  text: developerName,
+                  style: const TextStyle(
+                    color: AppColors.burundiGreen,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   void _showSupportOptions(BuildContext context, bool isDark) async {

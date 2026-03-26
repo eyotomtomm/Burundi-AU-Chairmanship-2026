@@ -940,6 +940,12 @@ class AppSettings(models.Model):
     twitter_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
 
+    # About page fields (editable from admin)
+    app_description = models.TextField(blank=True, default='Official application for the Burundi African Union Chairmanship 2026.', help_text='Description shown in the About dialog (English)')
+    app_description_fr = models.TextField(blank=True, default='Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.', help_text='Description shown in the About dialog (French)')
+    developer_name = models.CharField(max_length=100, blank=True, default='Eyosias Tamene', help_text='Developer/company name shown in About dialog')
+    developer_url = models.URLField(blank=True, default='https://eyosias.dev', help_text='Developer website URL')
+
     # Phone verification toggles (controlled from admin)
     sms_verification_enabled = models.BooleanField(default=False, help_text='Enable SMS OTP verification via Twilio')
     whatsapp_verification_enabled = models.BooleanField(default=False, help_text='Enable WhatsApp OTP verification via Twilio')

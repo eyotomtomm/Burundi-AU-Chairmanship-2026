@@ -41,6 +41,8 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>We need access to your calendar to add AU Chairmanship events and meeting reminders to your personal calendar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need camera access to allow you to take photos for your profile or to scan QR codes at embassy events.</string>
 	<key>NSContactsUsageDescription</key>

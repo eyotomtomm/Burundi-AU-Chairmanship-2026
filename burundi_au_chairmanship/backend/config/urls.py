@@ -11,6 +11,7 @@ urlpatterns = [
     # Public legal pages (for Play Store / App Store listing)
     path('privacy-policy/', TemplateView.as_view(template_name='legal/privacy_policy.html'), name='privacy-policy'),
     path('terms-of-service/', TemplateView.as_view(template_name='legal/terms_of_service.html'), name='terms-of-service'),
+    path('support/', TemplateView.as_view(template_name='legal/support.html'), name='support'),
 ]
 
 if settings.DEBUG:

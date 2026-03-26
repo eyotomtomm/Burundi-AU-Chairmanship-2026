@@ -353,6 +353,14 @@ class ApiService {
         .toList();
   }
 
+  Future<Map<String, dynamic>> recordMagazineView(String magazineId) async {
+    return await _post('magazines/$magazineId/record-view/', {});
+  }
+
+  Future<Map<String, dynamic>> toggleMagazineLike(String magazineId) async {
+    return await _post('magazines/$magazineId/toggle-like/', {}, auth: true);
+  }
+
   // ── Embassies ────────────────────────────────────────────
   Future<List<EmbassyLocation>> getEmbassies() async {
     final data = await _get('embassies/');
@@ -585,7 +593,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> markTicketRead(int ticketId) async {
-    return await _post('support/tickets/$ticketId/mark_read/', {}, auth: true);
+    return await _post('support/tickets/$ticketId/mark-read/', {}, auth: true);
   }
 
   Future<Map<String, dynamic>> rateTicket(int ticketId, int rating, {String comment = ''}) async {

@@ -30,7 +30,7 @@ class VerificationProvider extends ChangeNotifier {
       final response = await _api.getVerificationStatus();
 
       // Only update if we got a valid response
-      if (response['has_request'] == true) {
+      if (response['has_verification_request'] == true) {
         _verificationStatus = response;
 
         // Track if we need to show popup

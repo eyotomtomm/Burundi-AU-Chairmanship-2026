@@ -507,7 +507,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return qs
 
-    @action(detail=True, methods=['post'], permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle], url_path='record-view')
     def record_view(self, request, pk=None):
         """
         Record a view for this magazine edition.
@@ -520,7 +520,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
         edition.refresh_from_db()
         return Response({'view_count': edition.view_count})
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle], url_path='toggle-like')
     def toggle_like(self, request, pk=None):
         """
         Toggle like on magazine. Requires authentication.
@@ -780,7 +780,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
         return qs
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='mark-as-read')
     def mark_as_read(self, request, pk=None):
         """
         Mark a single notification as read for the current user.
@@ -794,7 +794,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             'is_read': True
         })
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], url_path='mark-all-as-read')
     def mark_all_as_read(self, request):
         """
         Mark all notifications as read for the current user.
@@ -1536,7 +1536,7 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
         serializer = SupportTicketDetailSerializer(ticket)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='mark-read')
     def mark_read(self, request, pk=None):
         """Mark all admin replies in this ticket as read."""
         ticket = self.get_object()

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../../config/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/api_service.dart';
@@ -67,7 +68,15 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   }
 
   Future<void> _toggleLike(MagazineEdition edition) async {
-    // Optimistic update
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('login_to_like'))),
+      );
+      return;
+    }
+
     final index = _editions?.indexWhere((e) => e.id == edition.id) ?? -1;
     if (index == -1) return;
     final wasLiked = edition.isLiked;
@@ -78,9 +87,16 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
       );
     });
     try {
-      await ApiService().post('magazines/${edition.id}/toggle_like/', {});
+      final result = await ApiService().toggleMagazineLike(edition.id);
+      if (mounted) {
+        setState(() {
+          _editions![index] = edition.copyWith(
+            isLiked: result['is_liked'],
+            likeCount: result['like_count'],
+          );
+        });
+      }
     } catch (_) {
-      // Revert on failure
       if (!mounted) return;
       setState(() {
         _editions![index] = edition;

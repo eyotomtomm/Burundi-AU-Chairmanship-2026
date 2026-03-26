@@ -17,7 +17,7 @@ class MagazineImage {
 
   factory MagazineImage.fromJson(Map<String, dynamic> json) {
     return MagazineImage(
-      id: json['id'],
+      id: json['id'] ?? 0,
       imageUrl: json['image'] ?? '',
       caption: json['caption'] ?? '',
       captionFr: json['caption_fr'] ?? '',
@@ -151,7 +151,7 @@ class Category {
 
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
-      id: json['id'],
+      id: json['id'] ?? 0,
       name: json['name'] ?? '',
       nameFr: json['name_fr'] ?? '',
       color: json['color'] ?? '#1EB53A',
@@ -330,8 +330,8 @@ class ArticleComment {
 
   factory ArticleComment.fromJson(Map<String, dynamic> json) {
     return ArticleComment(
-      id: json['id'],
-      userId: json['user_id'],
+      id: json['id'] ?? 0,
+      userId: json['user_id'] ?? 0,
       userName: json['user_name'] ?? '',
       profilePicture: json['profile_picture'],
       content: json['content'] ?? '',

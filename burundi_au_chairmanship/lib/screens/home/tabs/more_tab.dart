@@ -357,7 +357,7 @@ class MoreTab extends StatelessWidget {
                             const Text('Official application for the Burundi African Union Chairmanship 2026.'),
                             const SizedBox(height: 16),
                             GestureDetector(
-                              onTap: () => launchUrl(Uri.parse('https://eyosias.dev')),
+                              onTap: () => launchUrl(Uri.parse('https://eyosias.dev'), mode: LaunchMode.externalApplication),
                               child: RichText(
                                 text: TextSpan(
                                   style: TextStyle(

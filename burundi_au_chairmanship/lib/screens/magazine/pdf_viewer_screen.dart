@@ -204,10 +204,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   Future<void> _recordView() async {
     if (widget.magazineId != null) {
       try {
-        await ApiService().post(
-          'magazines/${widget.magazineId}/record_view/',
-          {},
-        );
+        await ApiService().recordMagazineView(widget.magazineId!);
       } catch (_) {}
     }
   }

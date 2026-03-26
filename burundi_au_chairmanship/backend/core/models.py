@@ -391,6 +391,8 @@ class LiveFeed(models.Model):
 
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    description_fr = models.TextField(blank=True)
     stream_url = models.URLField()
     stream_type = models.CharField(
         max_length=20, choices=STREAM_TYPE_CHOICES, default='video',

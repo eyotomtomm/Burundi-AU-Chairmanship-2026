@@ -1039,7 +1039,7 @@ class _HomeTabState extends State<HomeTab> {
             } else if (actionType == 'url') {
               final uri = Uri.tryParse(actionValue);
               if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
-                launchUrl(uri);
+                launchUrl(uri, mode: LaunchMode.externalApplication);
               }
             }
           },

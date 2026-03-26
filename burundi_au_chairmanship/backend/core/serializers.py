@@ -213,7 +213,8 @@ class EventSerializer(serializers.ModelSerializer):
 class LiveFeedSerializer(serializers.ModelSerializer):
     class Meta:
         model = LiveFeed
-        fields = ['id', 'title', 'title_fr', 'stream_url', 'stream_type',
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'stream_url', 'stream_type',
                   'meeting_id', 'passcode', 'thumbnail', 'status',
                   'viewer_count', 'duration', 'scheduled_time']
 

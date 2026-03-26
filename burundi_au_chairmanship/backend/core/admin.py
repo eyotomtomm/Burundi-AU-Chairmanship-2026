@@ -12,7 +12,7 @@ from .models import (
     HeroTextContent, QuickAccessMenuItem, VerificationRequest, WeatherCity,
     EventRegistration, RegistrationFormField, EventSubmission,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
-    AuditLogEntry, AdminRole,
+    AuditLogEntry, AdminRole, SupportTicket, TicketMessage,
 )
 
 
@@ -898,7 +898,7 @@ class EmbassyAdmin(admin.ModelAdmin):
         ('Embassy Information', {
             'fields': [
                 ('name', 'name_fr'),
-                ('address', 'address_fr'),
+                'address',
                 ('city', 'country'),
             ],
         }),
@@ -1310,3 +1310,18 @@ class AuditLogEntryAdmin(admin.ModelAdmin):
     list_filter = ('action', 'status', 'entity_type')
     search_fields = ('entity_label', 'entity_type')
     readonly_fields = ('timestamp',)
+
+
+class TicketMessageInline(admin.TabularInline):
+    model = TicketMessage
+    extra = 0
+    readonly_fields = ('created_at',)
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    list_display = ('subject', 'user', 'status', 'priority', 'created_at')
+    list_filter = ('status', 'priority')
+    search_fields = ('subject', 'user__username', 'user__email')
+    readonly_fields = ('created_at', 'updated_at')
+    inlines = [TicketMessageInline]

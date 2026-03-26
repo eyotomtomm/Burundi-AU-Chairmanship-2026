@@ -446,7 +446,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         if (_event.contactEmail.isNotEmpty) {
                           launchUrl(Uri.parse(
                             'mailto:${_event.contactEmail}?subject=Thank you - $title',
-                          ));
+                          ), mode: LaunchMode.externalApplication);
                         }
                       },
                     ),
@@ -1409,7 +1409,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             _contactButton(
               Icons.email_outlined,
               _event.contactEmail,
-              () => launchUrl(Uri.parse('mailto:${_event.contactEmail}')),
+              () => launchUrl(Uri.parse('mailto:${_event.contactEmail}'), mode: LaunchMode.externalApplication),
               isDark,
             ),
           if (_event.contactPhone.isNotEmpty) ...[
@@ -1417,7 +1417,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             _contactButton(
               Icons.phone_outlined,
               _event.contactPhone,
-              () => launchUrl(Uri.parse('tel:${_event.contactPhone}')),
+              () => launchUrl(Uri.parse('tel:${_event.contactPhone}'), mode: LaunchMode.externalApplication),
               isDark,
             ),
           ],

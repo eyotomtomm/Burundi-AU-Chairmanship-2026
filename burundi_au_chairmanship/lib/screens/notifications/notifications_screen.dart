@@ -60,7 +60,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markAsRead(int notificationId) async {
     try {
-      await _apiService.post('notifications/$notificationId/mark_as_read/', {});
+      await _apiService.post('notifications/$notificationId/mark-as-read/', {});
       // Update local state
       setState(() {
         final index = _notifications.indexWhere((n) => n['id'] == notificationId);

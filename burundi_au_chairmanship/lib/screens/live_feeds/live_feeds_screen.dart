@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import 'video_player_screen.dart';
+import 'youtube_player_screen.dart';
+import 'in_app_webview_screen.dart';
 
 class LiveFeedsScreen extends StatefulWidget {
   const LiveFeedsScreen({super.key});
@@ -1311,25 +1312,44 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   }
 
   void _openFeed(ApiLiveFeed feed) {
-    // External platforms (Zoom, Teams, YouTube, Webex, Google Meet)
-    // open in their native app or browser
-    if (feed.isExternalPlatform && feed.streamUrl.isNotEmpty) {
-      // Show meeting credentials if available before opening
-      if ((feed.isZoom || feed.isTeams || feed.isWebex || feed.isGoogleMeet) &&
-          (feed.meetingId.isNotEmpty || feed.passcode.isNotEmpty)) {
-        _showMeetingCredentials(feed);
-      } else {
-        _openExternalUrl(feed.streamUrl, feed.platformName);
-      }
-    } else {
-      // Regular video streams use the in-app video player
+    if (feed.streamUrl.isEmpty) return;
+
+    if (feed.isYouTube) {
+      // YouTube → embedded YouTube player
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => VideoPlayerScreen(feed: feed),
+          builder: (_) => YouTubePlayerScreen(feed: feed),
+        ),
+      );
+    } else if (feed.isZoom || feed.isTeams || feed.isWebex || feed.isGoogleMeet) {
+      // Meeting platforms → show credentials if available, then in-app WebView
+      if (feed.meetingId.isNotEmpty || feed.passcode.isNotEmpty) {
+        _showMeetingCredentials(feed);
+      } else {
+        _openInWebView(feed);
+      }
+    } else if (feed.streamType == 'external') {
+      // Generic external links → in-app WebView
+      _openInWebView(feed);
+    } else {
+      // Direct video streams (MP4/HLS) → chewie player
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(feed: feed),
         ),
       );
     }
+  }
+
+  void _openInWebView(ApiLiveFeed feed) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => InAppWebViewScreen(feed: feed),
+      ),
+    );
   }
 
   void _showMeetingCredentials(ApiLiveFeed feed) {
@@ -1390,10 +1410,10 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _openExternalUrl(feed.streamUrl, feed.platformName);
+                    _openInWebView(feed);
                   },
-                  icon: const Icon(Icons.open_in_new),
-                  label: Text('Open ${feed.platformName}'),
+                  icon: const Icon(Icons.login_rounded),
+                  label: Text('Join ${feed.platformName}'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _getPlatformColor(feed.streamType),
                     foregroundColor: Colors.white,
@@ -1544,23 +1564,4 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
     }
   }
 
-  Future<void> _openExternalUrl(String url, String platformName) async {
-    try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        throw 'Could not launch $platformName';
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to open $platformName: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
 }

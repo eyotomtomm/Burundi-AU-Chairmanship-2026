@@ -50,6 +50,7 @@ dependencies:
   video_player: ^2.9.2
   chewie: ^1.8.5
   youtube_player_flutter: ^9.0.3
+  webview_flutter: ^4.10.0
 
   # Calendar Integration
   add_2_calendar: ^3.0.1

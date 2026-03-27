@@ -1,4 +1,5 @@
 {% extends 'custom_admin/base.html' %}
+{% load media_tags %}
 
 {% block title %}{{ action }} Hero Slide{% endblock %}
 
@@ -54,12 +55,17 @@
                 <label for="image" class="block text-sm font-medium text-on-surface mb-2">
                     Image
                 </label>
-                {% if slide and slide.image %}
+                {% if slide and slide.image and slide.image|safe_image_url %}
                 <div class="mb-4">
                     <p class="text-sm text-on-surface-variant mb-2">Current image:</p>
-                    <img src="{{ slide.image.url }}"
+                    <img src="{{ slide.image|safe_image_url }}"
                          alt="{{ slide.label }}"
                          class="h-48 w-auto object-cover rounded-lg shadow-sm border border-outline-variant">
+                </div>
+                <p class="text-sm text-on-surface-variant mb-2">Upload a new image to replace:</p>
+                {% elif slide and slide.image %}
+                <div class="mb-4">
+                    <p class="text-sm text-on-surface-variant mb-2">Current image: <em>{{ slide.image.name }}</em></p>
                 </div>
                 <p class="text-sm text-on-surface-variant mb-2">Upload a new image to replace:</p>
                 {% endif %}

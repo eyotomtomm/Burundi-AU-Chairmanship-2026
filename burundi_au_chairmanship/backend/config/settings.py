@@ -139,10 +139,11 @@ SITE_URL = os.environ.get('SITE_URL', 'http://127.0.0.1:8000' if DEBUG else '')
 
 # DigitalOcean Spaces for media files (production only)
 if not DEBUG:
-    AWS_ACCESS_KEY_ID = os.environ.get('DO_SPACES_KEY')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('DO_SPACES_SECRET')
-    AWS_STORAGE_BUCKET_NAME = os.environ.get('DO_SPACES_BUCKET')
-    AWS_S3_ENDPOINT_URL = os.environ.get('DO_SPACES_ENDPOINT')
+    AWS_ACCESS_KEY_ID = os.environ.get('DO_SPACES_KEY', '').strip()
+    AWS_SECRET_ACCESS_KEY = os.environ.get('DO_SPACES_SECRET', '').strip()
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('DO_SPACES_BUCKET', '').strip()
+    AWS_S3_ENDPOINT_URL = os.environ.get('DO_SPACES_ENDPOINT', '').strip()
+    AWS_S3_REGION_NAME = 'fra1'
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
     AWS_DEFAULT_ACL = 'public-read'
     AWS_QUERYSTRING_AUTH = False

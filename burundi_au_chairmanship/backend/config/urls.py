@@ -1,7 +1,26 @@
+import sys
+import traceback
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView, RedirectView
+from django.http import HttpResponse
+
+
+def handler500_view(request):
+    """Show actual error details for staff users, generic message for others."""
+    exc_type, exc_value, exc_tb = sys.exc_info()
+    if request.user.is_authenticated and request.user.is_staff:
+        tb = traceback.format_exception(exc_type, exc_value, exc_tb)
+        return HttpResponse(
+            '<h1>Server Error (500)</h1><pre>' + ''.join(tb) + '</pre>',
+            status=500,
+            content_type='text/html',
+        )
+    return HttpResponse('<h1>Server Error (500)</h1>', status=500)
+
+
+handler500 = 'config.urls.handler500_view'
 
 urlpatterns = [
     # Root redirects to admin panel

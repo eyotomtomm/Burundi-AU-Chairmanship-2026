@@ -1,3 +1,4 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -7,6 +8,9 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.utils import timezone
+from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 from core.models import (
     HeroSlide, FeatureCard, Article, MagazineEdition, Event,
     LiveFeed, Video, GalleryAlbum, GalleryPhoto, EmbassyLocation, Resource,
@@ -92,15 +96,25 @@ def hero_slides_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def hero_slide_create(request):
     if request.method == 'POST':
-        HeroSlide.objects.create(
-            label=request.POST.get('label'),
-            label_fr=request.POST.get('label_fr', ''),
-            image=request.FILES.get('image'),
-            order=request.POST.get('order', 0),
-            is_active=request.POST.get('is_active') == 'on'
-        )
-        messages.success(request, 'Hero slide created successfully!')
-        return redirect('custom_admin:hero_slides_list')
+        try:
+            slide = HeroSlide(
+                label=request.POST.get('label'),
+                label_fr=request.POST.get('label_fr', ''),
+                image=request.FILES.get('image'),
+                order=request.POST.get('order', 0),
+                is_active=request.POST.get('is_active') == 'on'
+            )
+            slide.full_clean()
+            slide.save()
+            messages.success(request, 'Hero slide created successfully!')
+            return redirect('custom_admin:hero_slides_list')
+        except ValidationError as e:
+            for field, errors in e.message_dict.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+        except Exception as e:
+            logger.exception('Hero slide create failed')
+            messages.error(request, f'Failed to save hero slide: {e}')
     return render(request, 'custom_admin/hero_slides/form.html', {'action': 'Create'})
 
 
@@ -109,15 +123,24 @@ def hero_slide_create(request):
 def hero_slide_edit(request, pk):
     slide = get_object_or_404(HeroSlide, pk=pk)
     if request.method == 'POST':
-        slide.label = request.POST.get('label')
-        slide.label_fr = request.POST.get('label_fr', '')
-        if request.FILES.get('image'):
-            slide.image = request.FILES.get('image')
-        slide.order = request.POST.get('order', 0)
-        slide.is_active = request.POST.get('is_active') == 'on'
-        slide.save()
-        messages.success(request, 'Hero slide updated successfully!')
-        return redirect('custom_admin:hero_slides_list')
+        try:
+            slide.label = request.POST.get('label')
+            slide.label_fr = request.POST.get('label_fr', '')
+            if request.FILES.get('image'):
+                slide.image = request.FILES.get('image')
+            slide.order = request.POST.get('order', 0)
+            slide.is_active = request.POST.get('is_active') == 'on'
+            slide.full_clean()
+            slide.save()
+            messages.success(request, 'Hero slide updated successfully!')
+            return redirect('custom_admin:hero_slides_list')
+        except ValidationError as e:
+            for field, errors in e.message_dict.items():
+                for error in errors:
+                    messages.error(request, f'{field}: {error}')
+        except Exception as e:
+            logger.exception('Hero slide edit failed')
+            messages.error(request, f'Failed to save hero slide: {e}')
     return render(request, 'custom_admin/hero_slides/form.html', {'slide': slide, 'action': 'Edit'})
 
 

@@ -242,6 +242,13 @@ if not DEBUG:
     # Cloudflare sends the original host in X-Forwarded-Host
     USE_X_FORWARDED_HOST = True
     USE_X_FORWARDED_PORT = True
+    # Django 4.2+ requires explicit trusted origins for HTTPS CSRF checks
+    CSRF_TRUSTED_ORIGINS = [
+        'https://api.burundi4africa.com',
+        'https://burundi4africa.com',
+        'https://www.burundi4africa.com',
+        'https://burundi-au-api-mgo34.ondigitalocean.app',
+    ]
 # ─── Twilio SMS Configuration ─────────────────────────────────
 # For OTP verification via SMS
 # SECURITY: All Twilio credentials MUST be set via environment variables

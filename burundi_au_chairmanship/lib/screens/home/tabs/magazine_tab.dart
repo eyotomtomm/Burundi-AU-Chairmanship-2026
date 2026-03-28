@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -118,7 +119,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     }
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => PdfViewerScreen(
           pdfUrl: url,
           title: edition.getTitle(langCode),

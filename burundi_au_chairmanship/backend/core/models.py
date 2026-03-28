@@ -1318,8 +1318,14 @@ class VerificationRequest(models.Model):
         return f"{self.full_name} ({self.status}) - {self.badge_type or 'No badge'}"
 
     def approve(self, admin_user, badge_type='BLUE'):
-        """Approve verification request and grant badge to user"""
+        """Approve verification request and grant badge to user.
+        Government officials automatically receive GOLD badge."""
         from django.utils import timezone
+
+        # Auto-upgrade to GOLD for government officials
+        profile = self.user.profile
+        if profile.is_government_official:
+            badge_type = 'GOLD'
 
         self.status = 'approved'
         self.badge_type = badge_type
@@ -1328,7 +1334,6 @@ class VerificationRequest(models.Model):
         self.save()
 
         # Update user profile with verification
-        profile = self.user.profile
         profile.is_verified = True
         profile.badge_type = badge_type
         profile.verified_at = timezone.now()

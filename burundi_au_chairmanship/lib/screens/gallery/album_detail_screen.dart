@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:screen_protector/screen_protector.dart';
 import 'package:path_provider/path_provider.dart';
@@ -201,7 +202,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   void _openPhotoViewer(int initialIndex) {
     final photos = widget.album['photos'] as List? ?? [];
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => _PhotoViewerScreen(
           photos: photos,
           initialIndex: initialIndex,

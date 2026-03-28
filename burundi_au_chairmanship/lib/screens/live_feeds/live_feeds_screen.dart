@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -1318,7 +1319,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       // YouTube → embedded YouTube player
       Navigator.push(
         context,
-        MaterialPageRoute(
+        CupertinoPageRoute(
           builder: (_) => YouTubePlayerScreen(feed: feed),
         ),
       );
@@ -1336,7 +1337,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       // Direct video streams (MP4/HLS) → chewie player
       Navigator.push(
         context,
-        MaterialPageRoute(
+        CupertinoPageRoute(
           builder: (_) => VideoPlayerScreen(feed: feed),
         ),
       );
@@ -1346,7 +1347,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   void _openInWebView(ApiLiveFeed feed) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => InAppWebViewScreen(feed: feed),
       ),
     );

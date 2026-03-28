@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -86,7 +87,7 @@ class _MagazineScreenState extends State<MagazineScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => PdfViewerScreen(
           pdfUrl: url,
           title: magazine.getTitle(langCode),

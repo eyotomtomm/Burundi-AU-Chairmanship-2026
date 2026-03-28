@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -401,7 +402,7 @@ class _HomeTabState extends State<HomeTab> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        CupertinoPageRoute(
                           builder: (_) => EventDetailScreen(event: event),
                         ),
                       );
@@ -436,7 +437,7 @@ class _HomeTabState extends State<HomeTab> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
+                        CupertinoPageRoute(
                           builder: (_) => ArticleDetailScreen(article: article),
                         ),
                       );
@@ -1161,7 +1162,7 @@ class _HomeTabState extends State<HomeTab> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                CupertinoPageRoute(
                   builder: (context) => PriorityAgendaDetailScreen(agenda: agenda),
                 ),
               );
@@ -1371,7 +1372,7 @@ class _HomeTabState extends State<HomeTab> {
     // Default: always open the detail page
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => FeatureCardDetailScreen(cardData: card),
       ),
     );

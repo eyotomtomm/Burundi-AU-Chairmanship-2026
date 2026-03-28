@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -534,7 +535,7 @@ class _NewsScreenState extends State<NewsScreen> {
   void _openDetail(Article article) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => ArticleDetailScreen(article: article),
       ),
     );

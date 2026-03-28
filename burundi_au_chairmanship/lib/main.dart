@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -181,38 +182,47 @@ class BurundiAUApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
 
-            // Routes
+            // Routes — CupertinoPageRoute enables swipe-back gesture
             initialRoute: '/',
-            routes: {
-              '/': (context) => const SplashScreen(),
-              '/auth': (context) => const AuthScreen(),
-              '/home': (context) => const HomeScreen(),
-              '/live-feeds': (context) => const LiveFeedsScreen(),
-              '/resources': (context) => const ResourcesScreen(),
-              '/calendar': (context) => const CalendarScreen(),
-              '/news': (context) => const NewsScreen(),
-              '/magazine': (context) => const MagazineScreen(),
-              '/translate': (context) => const TranslateScreen(),
-              '/weather': (context) => const WeatherScreen(),
-              '/profile': (context) => const ProfileScreen(),
-              '/profile-completion': (context) => const ProfileCompletionScreen(),
-              '/email-verification': (context) => const EmailVerificationScreen(),
-              '/water-sanitation': (context) => const WaterSanitationScreen(),
-              '/arise-initiative': (context) => const AriseInitiativeScreen(),
-              '/peace-security': (context) => const PeaceSecurityScreen(),
-              '/gallery': (context) => const GalleryScreen(),
-              '/videos': (context) => const VideosScreen(),
-              '/social-media': (context) => const SocialMediaScreen(),
-              '/notifications': (context) => const NotificationsScreen(),
-              '/support-tickets': (context) => const SupportTicketsScreen(),
-              '/ticket-conversation': (context) => const TicketConversationScreen(),
-              '/contact-support': (context) => const ContactSupportScreen(),
-            },
+            onGenerateRoute: (settings) {
+              final routes = <String, WidgetBuilder>{
+                '/': (context) => const SplashScreen(),
+                '/auth': (context) => const AuthScreen(),
+                '/home': (context) => const HomeScreen(),
+                '/live-feeds': (context) => const LiveFeedsScreen(),
+                '/resources': (context) => const ResourcesScreen(),
+                '/calendar': (context) => const CalendarScreen(),
+                '/news': (context) => const NewsScreen(),
+                '/magazine': (context) => const MagazineScreen(),
+                '/translate': (context) => const TranslateScreen(),
+                '/weather': (context) => const WeatherScreen(),
+                '/profile': (context) => const ProfileScreen(),
+                '/profile-completion': (context) => const ProfileCompletionScreen(),
+                '/email-verification': (context) => const EmailVerificationScreen(),
+                '/water-sanitation': (context) => const WaterSanitationScreen(),
+                '/arise-initiative': (context) => const AriseInitiativeScreen(),
+                '/peace-security': (context) => const PeaceSecurityScreen(),
+                '/gallery': (context) => const GalleryScreen(),
+                '/videos': (context) => const VideosScreen(),
+                '/social-media': (context) => const SocialMediaScreen(),
+                '/notifications': (context) => const NotificationsScreen(),
+                '/support-tickets': (context) => const SupportTicketsScreen(),
+                '/ticket-conversation': (context) => const TicketConversationScreen(),
+                '/contact-support': (context) => const ContactSupportScreen(),
+              };
 
-            // Route not found
-            onUnknownRoute: (settings) {
-              return MaterialPageRoute(
+              final builder = routes[settings.name];
+              if (builder != null) {
+                return CupertinoPageRoute(
+                  builder: builder,
+                  settings: settings,
+                );
+              }
+
+              // Route not found
+              return CupertinoPageRoute(
                 builder: (context) => const HomeScreen(),
+                settings: settings,
               );
             },
           );

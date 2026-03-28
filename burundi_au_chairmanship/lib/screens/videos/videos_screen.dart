@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
@@ -76,7 +77,7 @@ class _VideosScreenState extends State<VideosScreen> {
     // Navigate to video detail screen
     Navigator.push(
       context,
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (context) => VideoDetailScreen(video: video),
       ),
     );

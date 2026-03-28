@@ -14,11 +14,20 @@ class AppTheme {
     );
   }
 
+  static const _pageTransitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+    },
+  );
+
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
     primaryColor: AppColors.burundiGreen,
     scaffoldBackgroundColor: AppColors.lightBackground,
+    pageTransitionsTheme: _pageTransitions,
     colorScheme: const ColorScheme.light(
       primary: AppColors.burundiGreen,
       secondary: AppColors.burundiRed,
@@ -146,6 +155,7 @@ class AppTheme {
     brightness: Brightness.dark,
     primaryColor: AppColors.burundiGreen,
     scaffoldBackgroundColor: AppColors.darkBackground,
+    pageTransitionsTheme: _pageTransitions,
     colorScheme: const ColorScheme.dark(
       primary: AppColors.burundiGreen,
       secondary: AppColors.burundiRed,

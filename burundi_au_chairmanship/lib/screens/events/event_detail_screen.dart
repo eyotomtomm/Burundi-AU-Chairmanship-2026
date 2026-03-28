@@ -54,6 +54,44 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         _formValues[field.fieldName] = <String>[];
       }
     }
+    // Auto-fill from user profile
+    _autoFillFromProfile();
+  }
+
+  void _autoFillFromProfile() {
+    final auth = context.read<AuthProvider>();
+
+    // Map of common field names/types to profile values
+    final autoFillMap = <String, String?>{
+      'name': auth.userName,
+      'full_name': auth.userName,
+      'fullname': auth.userName,
+      'email': auth.userEmail,
+      'email_address': auth.userEmail,
+      'phone': auth.phoneNumber,
+      'phone_number': auth.phoneNumber,
+      'nationality': auth.nationality,
+    };
+
+    for (final field in _event.formFields) {
+      final key = field.fieldName.toLowerCase();
+      // Auto-fill text controllers
+      if (_formControllers.containsKey(field.fieldName)) {
+        final value = autoFillMap[key];
+        if (value != null && value.isNotEmpty) {
+          _formControllers[field.fieldName]!.text = value;
+        }
+      }
+      // Auto-fill country/select dropdowns for nationality
+      if (field.fieldType == 'country' && auth.nationality != null && auth.nationality!.isNotEmpty) {
+        _formValues[field.fieldName] = auth.nationality;
+      }
+    }
+  }
+
+  bool _hasAutoFilledFields() {
+    return _formControllers.values.any((c) => c.text.isNotEmpty) ||
+        _formValues.values.any((v) => v is String && v.isNotEmpty);
   }
 
   void _startCountdown() {
@@ -939,7 +977,33 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
+
+            // Auto-fill hint
+            if (_hasAutoFilledFields())
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, size: 16, color: AppColors.burundiGreen),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pre-filled from your profile. Review and submit.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.burundiGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Dynamic form fields
             ...(_event.formFields.where((f) => f.isActive).toList()
@@ -1041,49 +1105,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
                     ),
-                  const SizedBox(height: 4),
-                  ...options.map((option) {
-                    final selected = _formValues[field.fieldName] == option;
-                    return InkWell(
-                      onTap: () {
-                        setState(() => _formValues[field.fieldName] = option);
-                        state.didChange(option);
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: selected ? AppColors.burundiGreen : (isDark ? Colors.white38 : Colors.black38),
-                                  width: selected ? 2 : 1.5,
-                                ),
-                              ),
-                              child: selected
-                                  ? Center(
-                                      child: Container(
-                                        width: 10,
-                                        height: 10,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: AppColors.burundiGreen,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(option, style: TextStyle(fontSize: 14, color: textColor))),
-                          ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.map((option) {
+                      final selected = _formValues[field.fieldName] == option;
+                      return ChoiceChip(
+                        label: Text(option),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() => _formValues[field.fieldName] = option);
+                          state.didChange(option);
+                        },
+                        selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+                        labelStyle: TextStyle(
+                          color: selected ? AppColors.burundiGreen : textColor,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                         ),
-                      ),
-                    );
-                  }),
+                        side: BorderSide(
+                          color: selected ? AppColors.burundiGreen : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      );
+                    }).toList(),
+                  ),
                   if (state.hasError)
                     Padding(
                       padding: const EdgeInsets.only(left: 12, top: 4),
@@ -1116,31 +1162,40 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
                     ),
-                  const SizedBox(height: 4),
-                  ...options.map((option) {
-                    final isChecked = selected.contains(option);
-                    return CheckboxListTile(
-                      title: Text(option, style: TextStyle(fontSize: 14, color: textColor)),
-                      value: isChecked,
-                      onChanged: (val) {
-                        setState(() {
-                          final list = List<String>.from(selected);
-                          if (val == true) {
-                            list.add(option);
-                          } else {
-                            list.remove(option);
-                          }
-                          _formValues[field.fieldName] = list;
-                        });
-                        state.didChange(_formValues[field.fieldName] as List<String>);
-                      },
-                      activeColor: AppColors.burundiGreen,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                      controlAffinity: ListTileControlAffinity.leading,
-                    );
-                  }),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.map((option) {
+                      final isChecked = selected.contains(option);
+                      return FilterChip(
+                        label: Text(option),
+                        selected: isChecked,
+                        onSelected: (val) {
+                          setState(() {
+                            final list = List<String>.from(selected);
+                            if (val) {
+                              list.add(option);
+                            } else {
+                              list.remove(option);
+                            }
+                            _formValues[field.fieldName] = list;
+                          });
+                          state.didChange(_formValues[field.fieldName] as List<String>);
+                        },
+                        selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+                        checkmarkColor: AppColors.burundiGreen,
+                        labelStyle: TextStyle(
+                          color: isChecked ? AppColors.burundiGreen : textColor,
+                          fontWeight: isChecked ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: isChecked ? AppColors.burundiGreen : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      );
+                    }).toList(),
+                  ),
                   if (state.hasError)
                     Padding(
                       padding: const EdgeInsets.only(left: 12, top: 4),

@@ -555,20 +555,21 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Delete user account (Firebase + Django)
+  /// Delete user account (soft-delete via Django, 30-day window)
   Future<bool> deleteAccount() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      // 1. Delete from Django backend
+      // Schedule deletion on Django backend (30-day soft delete)
       await _api.deleteAccount();
 
-      // 2. Delete Firebase account
-      await _firebaseAuth.deleteAccount();
+      // Sign out from Firebase (don't delete Firebase account yet —
+      // it gets cleaned up after 30 days when Django purges)
+      await _firebaseAuth.signOut();
 
-      // 3. Clear local data
+      // Clear local data
       await _clearUserData();
 
       _isAuthenticated = false;
@@ -577,11 +578,6 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _errorMessage = e.message;
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } on FirebaseAuthException catch (e) {
-      _errorMessage = _firebaseAuth.getErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;

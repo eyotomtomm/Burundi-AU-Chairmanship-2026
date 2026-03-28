@@ -102,6 +102,12 @@ class UserProfile(models.Model):
         help_text='Date when account will be permanently deleted'
     )
 
+    # Device tracking
+    device_type = models.CharField(max_length=50, blank=True, help_text='e.g. iPhone 15, Samsung Galaxy S24')
+    device_os = models.CharField(max_length=50, blank=True, help_text='e.g. iOS 17.4, Android 14')
+    app_version = models.CharField(max_length=20, blank=True, help_text='App build version')
+    last_active = models.DateTimeField(null=True, blank=True, help_text='Last time user opened the app')
+
     # Additional metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

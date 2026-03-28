@@ -189,6 +189,18 @@ class ApiService {
     }, auth: true);
   }
 
+  Future<void> updateDeviceInfo({
+    required String deviceType,
+    required String deviceOs,
+    required String appVersion,
+  }) async {
+    await _post('auth/update-device-info/', {
+      'device_type': deviceType,
+      'device_os': deviceOs,
+      'app_version': appVersion,
+    }, auth: true);
+  }
+
   Future<Map<String, dynamic>> getProfile() async {
     return await _get('auth/profile/', auth: true);
   }
@@ -601,6 +613,11 @@ class ApiService {
       'rating': rating,
       'comment': comment,
     }, auth: true);
+  }
+
+  Future<int> getUnreadNotificationCount() async {
+    final data = await _get('notifications/unread-count/', auth: true);
+    return data['unread_count'] ?? 0;
   }
 
   Future<int> getUnreadSupportCount() async {

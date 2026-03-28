@@ -28,6 +28,9 @@ dependencies:
   share_plus: ^10.1.2
   in_app_review: ^2.0.9
 
+  # Device Info
+  device_info_plus: ^11.2.0
+
   # Image Picker
   image_picker: ^1.0.7
 

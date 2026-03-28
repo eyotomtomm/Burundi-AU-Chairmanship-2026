@@ -1,5 +1,7 @@
 import logging
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
 from django.db.models import Count, Exists, OuterRef, F, Q
 from django.utils import timezone
 from rest_framework import viewsets, status, mixins
@@ -162,6 +164,25 @@ def deactivate_account(request):
     user.is_active = False
     user.save()
 
+    # Send confirmation email
+    try:
+        send_mail(
+            subject='Burundi4Africa - Account Deactivated',
+            message=(
+                f'Hello {user.first_name or user.username},\n\n'
+                'Your Burundi AU Chairmanship 2026 account has been deactivated.\n\n'
+                'Your data is safe and your account is just paused. '
+                'You can reactivate it anytime by simply logging back in.\n\n'
+                'If you did not request this, please contact us immediately.\n\n'
+                'Best regards,\nBurundi4Africa Team'
+            ),
+            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.warning('Failed to send deactivation email to %s', user.email)
+
     return Response({
         'message': 'Your account has been deactivated.',
         'detail': 'You can reactivate it anytime by logging in again.',
@@ -190,6 +211,27 @@ def delete_account(request):
     # Mark user as inactive
     user.is_active = False
     user.save()
+
+    # Send confirmation email
+    deletion_date = profile.deletion_scheduled_for.strftime('%B %d, %Y')
+    try:
+        send_mail(
+            subject='Burundi4Africa - Account Deletion Scheduled',
+            message=(
+                f'Hello {user.first_name or user.username},\n\n'
+                'Your Burundi AU Chairmanship 2026 account has been scheduled for permanent deletion.\n\n'
+                f'Your data will be permanently removed on {deletion_date}.\n\n'
+                'Changed your mind? Simply log back in before that date to cancel '
+                'the deletion and reactivate your account.\n\n'
+                'If you did not request this, please contact us immediately.\n\n'
+                'Best regards,\nBurundi4Africa Team'
+            ),
+            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.warning('Failed to send deletion email to %s', user.email)
 
     return Response({
         'message': 'Your account has been scheduled for deletion.',
@@ -441,6 +483,22 @@ def update_fcm_token(request):
             {'detail': 'Failed to update notification settings. Please try again.'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_device_info(request):
+    """
+    Update device info and last active timestamp.
+    Called from Flutter on app startup.
+    """
+    profile = request.user.profile
+    profile.device_type = request.data.get('device_type', '')[:50]
+    profile.device_os = request.data.get('device_os', '')[:50]
+    profile.app_version = request.data.get('app_version', '')[:20]
+    profile.last_active = timezone.now()
+    profile.save(update_fields=['device_type', 'device_os', 'app_version', 'last_active'])
+    return Response({'message': 'Device info updated'})
 
 
 @api_view(['GET'])
@@ -814,6 +872,13 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             'message': f'{count} notification(s) marked as read',
             'marked_count': count
         })
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='unread-count')
+    def unread_count(self, request):
+        """Return count of unread notifications for the current user."""
+        notifications = self.get_queryset()
+        count = notifications.exclude(read_by=request.user).count()
+        return Response({'unread_count': count})
 
 
 @api_view(['GET'])

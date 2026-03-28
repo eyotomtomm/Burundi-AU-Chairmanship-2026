@@ -123,7 +123,7 @@ class _HomeTabState extends State<HomeTab> {
     if (!authProvider.isAuthenticated) return;
     try {
       final api = ApiService();
-      final count = await api.getUnreadSupportCount();
+      final count = await api.getUnreadNotificationCount();
       if (mounted) setState(() => _unreadBadgeCount = count);
     } catch (_) {
       // Silently fail - badge is non-critical

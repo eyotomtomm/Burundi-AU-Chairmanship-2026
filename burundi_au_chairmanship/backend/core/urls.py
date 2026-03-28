@@ -44,6 +44,7 @@ urlpatterns = [
     path('auth/firebase-register/', views.firebase_register, name='firebase-register'),
     path('auth/firebase-login/', views.firebase_login, name='firebase-login'),
     path('auth/update-fcm-token/', views.update_fcm_token, name='update-fcm-token'),
+    path('auth/update-device-info/', views.update_device_info, name='update-device-info'),
 
     # Auth - Profile management
     path('auth/profile/', views.profile, name='auth-profile'),

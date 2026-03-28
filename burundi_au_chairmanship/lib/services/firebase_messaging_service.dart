@@ -1,7 +1,10 @@
+import 'dart:io' show Platform;
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import '../config/app_constants.dart';
 import '../services/api_service.dart';
 
 /// Top-level function for handling background messages
@@ -67,6 +70,9 @@ class FirebaseMessagingService {
       _messaging.onTokenRefresh.listen(_sendTokenToBackend);
     }
 
+    // Report device info to backend
+    _reportDeviceInfo();
+
     // Initialize local notifications for foreground messages
     await _initializeLocalNotifications();
 
@@ -131,7 +137,9 @@ class FirebaseMessagingService {
             presentSound: true,
           ),
         ),
-        payload: message.data.toString(),
+        payload: message.data['action_type'] == 'route'
+            ? 'route:${message.data['action_value'] ?? ''}'
+            : '${message.data['type'] ?? 'general'}:${message.data['id'] ?? '0'}',
       );
     }
   }
@@ -144,64 +152,64 @@ class FirebaseMessagingService {
       print('Data: ${message.data}');
     }
 
-    // Navigate based on notification data
     if (_navigatorKey?.currentState == null) return;
 
     final data = message.data;
-    final type = data['type'];
 
-    if (type == 'article') {
-      // Navigate to news screen (article list)
-      _navigatorKey?.currentState?.pushNamed('/news');
-    } else if (type == 'magazine') {
-      // Navigate to magazine screen
-      _navigatorKey?.currentState?.pushNamed('/magazine');
-    } else if (type == 'event') {
-      // Navigate to calendar screen
-      _navigatorKey?.currentState?.pushNamed('/calendar');
-    } else if (type == 'gallery') {
-      // Navigate to gallery screen
-      _navigatorKey?.currentState?.pushNamed('/gallery');
-    } else if (type == 'video') {
-      // Navigate to videos screen
-      _navigatorKey?.currentState?.pushNamed('/videos');
-    } else {
-      // Default: Navigate to home screen
-      _navigatorKey?.currentState?.pushNamed('/home');
+    // Prefer action_type/action_value for precise deep linking
+    final actionType = data['action_type'];
+    final actionValue = data['action_value'];
+    if (actionType == 'route' && actionValue != null && actionValue.isNotEmpty) {
+      _navigatorKey?.currentState?.pushNamed(actionValue);
+      return;
     }
+
+    // Fallback: navigate by notification type
+    final type = data['type'];
+    final routes = {
+      'article': '/news',
+      'magazine': '/magazine',
+      'event': '/calendar',
+      'gallery': '/gallery',
+      'video': '/videos',
+    };
+    _navigatorKey?.currentState?.pushNamed(routes[type] ?? '/notifications');
   }
 
   /// Handle local notification tap
   void _onLocalNotificationTap(NotificationResponse response) {
-    // Security: Only log in debug mode (payload might contain sensitive data)
-    if (kDebugMode) {
-      print('Local notification tapped: ${response.payload}');
-    }
+    if (kDebugMode) print('Local notification tapped: ${response.payload}');
 
-    // Navigate based on payload (if present)
     if (response.payload != null && _navigatorKey?.currentState != null) {
       try {
-        final data = response.payload!.split(':');
-        if (data.length >= 2) {
-          final type = data[0];
-          // final id = data[1]; // Can be used for detail navigation if needed
+        final payload = response.payload!;
 
-          if (type == 'article') {
-            _navigatorKey?.currentState?.pushNamed('/news');
-          } else if (type == 'magazine') {
-            _navigatorKey?.currentState?.pushNamed('/magazine');
-          } else if (type == 'event') {
-            _navigatorKey?.currentState?.pushNamed('/calendar');
-          } else if (type == 'gallery') {
-            _navigatorKey?.currentState?.pushNamed('/gallery');
-          } else if (type == 'video') {
-            _navigatorKey?.currentState?.pushNamed('/videos');
+        // Support action_type:route:/path format
+        if (payload.startsWith('route:')) {
+          final route = payload.substring(6);
+          if (route.startsWith('/')) {
+            _navigatorKey?.currentState?.pushNamed(route);
+            return;
+          }
+        }
+
+        // Legacy format: type:id
+        final data = payload.split(':');
+        if (data.length >= 2) {
+          final routes = {
+            'article': '/news',
+            'magazine': '/magazine',
+            'event': '/calendar',
+            'gallery': '/gallery',
+            'video': '/videos',
+          };
+          final route = routes[data[0]];
+          if (route != null) {
+            _navigatorKey?.currentState?.pushNamed(route);
           }
         }
       } catch (e) {
-        if (kDebugMode) {
-          print('Error parsing notification payload: $e');
-        }
+        if (kDebugMode) print('Error parsing notification payload: $e');
       }
     }
   }
@@ -219,6 +227,33 @@ class FirebaseMessagingService {
         print('Failed to send FCM token to backend: $e');
       }
       // Don't throw - this is not critical for app functionality
+    }
+  }
+
+  /// Report device info to backend for analytics
+  Future<void> _reportDeviceInfo() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      String deviceType = '';
+      String deviceOs = '';
+
+      if (Platform.isAndroid) {
+        final info = await deviceInfo.androidInfo;
+        deviceType = '${info.brand} ${info.model}';
+        deviceOs = 'Android ${info.version.release}';
+      } else if (Platform.isIOS) {
+        final info = await deviceInfo.iosInfo;
+        deviceType = info.utsname.machine;
+        deviceOs = '${info.systemName} ${info.systemVersion}';
+      }
+
+      await ApiService().updateDeviceInfo(
+        deviceType: deviceType,
+        deviceOs: deviceOs,
+        appVersion: AppConstants.appVersion,
+      );
+    } catch (e) {
+      if (kDebugMode) print('Failed to report device info: $e');
     }
   }
 

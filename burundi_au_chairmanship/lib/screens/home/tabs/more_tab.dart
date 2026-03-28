@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../../config/app_colors.dart';
@@ -107,17 +109,35 @@ class MoreTab extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            child: Center(
-                              child: isLoggedIn && authProvider.userName != null
-                                  ? Text(
-                                      authProvider.userName![0].toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: isLoggedIn && authProvider.profilePictureUrl != null && authProvider.profilePictureUrl!.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: Environment.fixMediaUrl(authProvider.profilePictureUrl!),
+                                      width: 64,
+                                      height: 64,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, _) => Center(
+                                        child: Text(
+                                          (authProvider.userName ?? 'U')[0].toUpperCase(),
+                                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      errorWidget: (_, _, _) => Center(
+                                        child: Text(
+                                          (authProvider.userName ?? 'U')[0].toUpperCase(),
+                                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                                        ),
                                       ),
                                     )
-                                  : const Icon(Icons.person_rounded, size: 32, color: Colors.white),
+                                  : Center(
+                                      child: isLoggedIn && authProvider.userName != null
+                                          ? Text(
+                                              authProvider.userName![0].toUpperCase(),
+                                              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                                            )
+                                          : const Icon(Icons.person_rounded, size: 32, color: Colors.white),
+                                    ),
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -437,151 +457,17 @@ class MoreTab extends StatelessWidget {
                               title: 'Export My Data',
                               subtitle: 'Download all your account data',
                               isDark: isDark,
-                              onTap: () async {
-                                // Show loading
-                                showDialog(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (ctx) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-
-                                try {
-                                  final api = ApiService();
-                                  final data = await api.exportUserData();
-
-                                  // Close loading
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-
-                                    // Show data in dialog
-                                    showDialog(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: const Text('Your Data Export'),
-                                        content: SingleChildScrollView(
-                                          child: SelectableText(
-                                            const JsonEncoder.withIndent('  ').convert(data),
-                                            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(ctx),
-                                            child: const Text('Close'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () async {
-                                              // Copy to clipboard
-                                              final jsonString = const JsonEncoder.withIndent('  ').convert(data);
-                                              await Clipboard.setData(ClipboardData(text: jsonString));
-
-                                              if (context.mounted) {
-                                                Navigator.pop(ctx);
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('Data copied! You can paste it into a file.'),
-                                                    backgroundColor: AppColors.success,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                            child: const Text('Copy'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  // Close loading
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Failed to export data: ${e.toString()}'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
+                              onTap: () => _exportUserData(context),
                             ),
                             _buildMenuItem(
                               context: context,
-                              icon: Icons.delete_forever_rounded,
+                              icon: Icons.manage_accounts_rounded,
                               iconBgColor: Colors.red,
-                              title: 'Delete Account',
-                              subtitle: 'Permanently delete your account and data',
+                              title: 'Manage Account',
+                              subtitle: 'Deactivate or delete your account',
                               isDark: isDark,
                               isLast: true,
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (dialogContext) => AlertDialog(
-                                    title: const Text('Delete Account?'),
-                                    content: const Text(
-                                      'This will permanently delete your account and all associated data. '
-                                      'This action cannot be undone.\n\n'
-                                      'Are you sure you want to continue?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(dialogContext),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () async {
-                                          Navigator.pop(dialogContext);
-
-                                          // Show loading indicator
-                                          showDialog(
-                                            context: context,
-                                            barrierDismissible: false,
-                                            builder: (ctx) => const Center(
-                                              child: CircularProgressIndicator(),
-                                            ),
-                                          );
-
-                                          // Delete account
-                                          final success = await authProvider.deleteAccount();
-
-                                          // Close loading
-                                          if (context.mounted) {
-                                            Navigator.pop(context);
-
-                                            if (success) {
-                                              // Show success message
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Your account has been deleted.'),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                              // Navigate to auth screen
-                                              Navigator.pushNamedAndRemoveUntil(
-                                                context,
-                                                '/auth',
-                                                (route) => false,
-                                              );
-                                            } else {
-                                              // Show error
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(authProvider.errorMessage ?? 'Failed to delete account'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        },
-                                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                        child: const Text('Delete'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
+                              onTap: () => _showAccountManageSheet(context, isDark, authProvider),
                             ),
                           ],
                         );
@@ -673,6 +559,242 @@ class MoreTab extends StatelessWidget {
     ));
   }
 
+  void _exportUserData(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final api = ApiService();
+      final data = await api.exportUserData();
+
+      // Add branding to the export
+      final brandedExport = {
+        '______________________________': '______________________________',
+        'app': 'Burundi AU Chairmanship 2026',
+        'brand': 'Burundi4Africa',
+        'website': 'https://burundi4africa.com',
+        'export_type': 'Personal Data Export (GDPR)',
+        '________________________________': '________________________________',
+        ...data,
+      };
+
+      final jsonString = const JsonEncoder.withIndent('  ').convert(brandedExport);
+
+      // Save to temp file and share
+      final dir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final file = File('${dir.path}/burundi4africa_data_export_$timestamp.json');
+      await file.writeAsString(jsonString);
+
+      if (!context.mounted) return;
+      Navigator.pop(context);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Burundi4Africa - My Data Export',
+        text: 'Your personal data export from Burundi AU Chairmanship 2026 app.',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAccountManageSheet(BuildContext context, bool isDark, AuthProvider authProvider) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: isDark ? Colors.grey[900] : Colors.white,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Manage Your Account',
+                style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Deactivate option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.pause_circle_outline, color: Colors.orange, size: 28),
+                ),
+                title: const Text('Take a Break', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                subtitle: const Text('Deactivate temporarily. Log back in anytime to reactivate.'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeactivate(context, isDark, authProvider);
+                },
+              ),
+              const SizedBox(height: 8),
+
+              // Delete option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.delete_forever_rounded, color: Colors.red, size: 28),
+                ),
+                title: const Text('Delete Forever', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
+                subtitle: const Text('Permanently delete your account and all data after 30 days.'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDelete(context, isDark, authProvider);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeactivate(BuildContext context, bool isDark, AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Take a Break?'),
+        content: const Text(
+          'Your account will be deactivated and hidden from others.\n\n'
+          'You can reactivate it anytime by simply logging back in.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const Center(child: CircularProgressIndicator()),
+              );
+              final success = await authProvider.deactivateAccount();
+              if (context.mounted) {
+                Navigator.pop(context);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Account deactivated. Log in anytime to come back!'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(authProvider.errorMessage ?? 'Failed to deactivate'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, bool isDark, AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Colors.red, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Account?'),
+          ],
+        ),
+        content: const Text(
+          'Your account will be scheduled for permanent deletion.\n\n'
+          'You have 30 days to change your mind by logging back in.\n'
+          'After 30 days, all your data will be permanently removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const Center(child: CircularProgressIndicator()),
+              );
+              final success = await authProvider.deleteAccount();
+              if (context.mounted) {
+                Navigator.pop(context);
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Account scheduled for deletion. You have 30 days to cancel by logging in.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(authProvider.errorMessage ?? 'Failed to delete account'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAboutDialog(BuildContext context, AppLocalizations l10n) async {
     // Fetch about info from backend, fallback to hardcoded values
     String description = 'Official application for the Burundi African Union Chairmanship 2026.';
@@ -701,47 +823,65 @@ class MoreTab extends StatelessWidget {
 
     if (!context.mounted) return;
 
-    showAboutDialog(
+    showDialog(
       context: context,
-      applicationName: AppConstants.appName,
-      applicationVersion: AppConstants.appVersion,
-      applicationIcon: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: AppColors.burundiGreen,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.stars, color: Colors.white, size: 28),
-      ),
-      children: [
-        Text(summitTheme),
-        const SizedBox(height: 8),
-        Text(description),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: () => launchUrl(Uri.parse(developerUrl), mode: LaunchMode.externalApplication),
-          child: RichText(
-            text: TextSpan(
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).textTheme.bodyMedium?.color,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.burundiGreen,
+                borderRadius: BorderRadius.circular(16),
               ),
-              children: [
-                TextSpan(text: '${l10n.translate('designed_by')} '),
-                TextSpan(
-                  text: developerName,
-                  style: const TextStyle(
-                    color: AppColors.burundiGreen,
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ],
+              child: const Icon(Icons.stars, color: Colors.white, size: 36),
             ),
-          ),
+            const SizedBox(height: 16),
+            Text(
+              AppConstants.appName,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              'v${AppConstants.appVersion}',
+              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 16),
+            Text(summitTheme, style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 14), textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(description, style: const TextStyle(fontSize: 14), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => launchUrl(Uri.parse(developerUrl), mode: LaunchMode.externalApplication),
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodyMedium?.color),
+                  children: [
+                    TextSpan(text: '${l10n.translate('designed_by')} '),
+                    TextSpan(
+                      text: developerName,
+                      style: const TextStyle(
+                        color: AppColors.burundiGreen,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 

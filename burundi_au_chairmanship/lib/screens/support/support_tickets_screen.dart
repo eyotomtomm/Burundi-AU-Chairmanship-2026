@@ -35,6 +35,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
         _tickets = tickets;
         _isLoading = false;
       });
+      _checkForUnratedResolved();
     } catch (e) {
       if (kDebugMode) debugPrint('Tickets load error: $e');
       setState(() {
@@ -42,6 +43,129 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _checkForUnratedResolved() {
+    final unrated = _tickets.where((t) =>
+        t['status'] == 'resolved' && (t['rating'] == null || t['rating'] == 0));
+    if (unrated.isNotEmpty) {
+      // Show rating dialog for the first unrated resolved ticket
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showRatingDialog(unrated.first);
+      });
+    }
+  }
+
+  Future<void> _showRatingDialog(Map<String, dynamic> ticket) async {
+    int selectedRating = 0;
+    final commentController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text('Rate Your Support'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Your ticket "${ticket['subject']}" has been resolved. How was your experience?',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final star = index + 1;
+                      return IconButton(
+                        onPressed: () {
+                          setDialogState(() => selectedRating = star);
+                        },
+                        icon: Icon(
+                          star <= selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 36,
+                          color: star <= selectedRating
+                              ? Colors.amber
+                              : Colors.grey,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: commentController,
+                    decoration: InputDecoration(
+                      hintText: 'Optional comment...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Skip'),
+                ),
+                ElevatedButton(
+                  onPressed: selectedRating > 0
+                      ? () async {
+                          try {
+                            await _apiService.rateTicket(
+                              ticket['id'],
+                              selectedRating,
+                              comment: commentController.text.trim(),
+                            );
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Thank you for your feedback!'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                              _loadTickets();
+                            }
+                          } catch (e) {
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to submit rating: $e'),
+                                  backgroundColor: AppColors.error,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.burundiGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    commentController.dispose();
   }
 
   Color _statusColor(String status) {
@@ -173,117 +297,77 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
 
   Widget _buildTicketCard(Map<String, dynamic> ticket, bool isDark) {
     final status = ticket['status'] ?? 'open';
-    final unreadCount = ticket['unread_count'] ?? 0;
-    final lastMessage = ticket['last_message'];
+    final hasRating = ticket['rating'] != null && ticket['rating'] > 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: isDark ? Colors.grey[850] : Colors.white,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          await Navigator.pushNamed(
-            context,
-            '/ticket-conversation',
-            arguments: ticket['id'],
-          );
-          _loadTickets();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ticket['subject'] ?? 'No subject',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    ticket['subject'] ?? 'No subject',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _statusColor(status).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _statusLabel(status),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _statusColor(status),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (lastMessage != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    if (lastMessage['is_admin_reply'] == true)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Icon(Icons.reply, size: 14,
-                            color: AppColors.burundiGreen),
-                      ),
-                    Expanded(
-                      child: Text(
-                        lastMessage['message'] ?? '',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark ? Colors.white60 : Colors.black54,
-                          fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
                 ),
-              ],
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _timeAgo(ticket['updated_at']),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _statusColor(status).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _statusLabel(status),
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDark ? Colors.white38 : Colors.black38,
+                      fontWeight: FontWeight.w600,
+                      color: _statusColor(status),
                     ),
                   ),
-                  if (unreadCount > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.burundiRed,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$unreadCount',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _timeAgo(ticket['updated_at']),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+                if (status == 'resolved' && hasRating)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(5, (i) => Icon(
+                      i < (ticket['rating'] as int)
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 16,
+                      color: i < (ticket['rating'] as int)
+                          ? Colors.amber
+                          : Colors.grey,
+                    )),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );

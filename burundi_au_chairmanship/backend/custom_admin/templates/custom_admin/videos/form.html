@@ -60,6 +60,27 @@
                 <p class="text-xs text-on-surface-variant mt-2">YouTube, Vimeo, or direct video URL</p>
             </div>
 
+            <div class="flex items-center gap-4 mb-6">
+                <hr class="flex-1 border-outline-variant">
+                <span class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">OR</span>
+                <hr class="flex-1 border-outline-variant">
+            </div>
+
+            <div class="mb-6">
+                <label for="video_file" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                    Upload Video File
+                </label>
+                {% if video.video_file %}
+                <div class="mb-3 flex items-center gap-2 bg-surface-container-low rounded-lg p-3">
+                    <span class="material-symbols-outlined text-primary">movie</span>
+                    <span class="font-body text-sm text-on-surface">{{ video.video_file.name }}</span>
+                </div>
+                {% endif %}
+                <input type="file" id="video_file" name="video_file" accept="video/*"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                <p class="text-xs text-on-surface-variant mt-2">MP4, MOV, or WebM. Max size: 500 MB. If both URL and file are provided, the uploaded file takes priority.</p>
+            </div>
+
             <div class="mb-6">
                 <label for="thumbnail" class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
                     Thumbnail Image

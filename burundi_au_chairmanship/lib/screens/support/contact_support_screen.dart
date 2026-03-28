@@ -82,25 +82,16 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       final api = ApiService();
 
       // Create a real support ticket
-      final result = await api.createTicket(
+      await api.createTicket(
         _subjectController.text.trim(),
         _messageController.text.trim(),
       );
 
       if (mounted) {
-        // Navigate to the ticket conversation
-        final ticketId = result['id'];
         Navigator.pop(context, true); // Return true to signal ticket created
-        if (ticketId != null) {
-          Navigator.pushNamed(
-            context,
-            '/ticket-conversation',
-            arguments: ticketId,
-          );
-        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Support ticket created! We\'ll get back to you soon.'),
+            content: Text('Support ticket submitted! We\'ll respond via email.'),
             backgroundColor: AppColors.success,
           ),
         );

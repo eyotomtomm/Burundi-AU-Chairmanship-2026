@@ -1532,18 +1532,21 @@ def videos_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def video_create(request):
     if request.method == 'POST':
-        Video.objects.create(
+        video = Video.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
-            video_url=request.POST.get('video_url'),
+            video_url=request.POST.get('video_url', ''),
             thumbnail=request.FILES.get('thumbnail'),
             duration=request.POST.get('duration', ''),
             category=request.POST.get('category', 'highlight'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
             is_featured=request.POST.get('is_featured') == 'on',
         )
+        if request.FILES.get('video_file'):
+            video.video_file = request.FILES['video_file']
+            video.save()
         messages.success(request, 'Video created successfully!')
         return redirect('custom_admin:videos_list')
     category_choices = Video.CATEGORY_CHOICES
@@ -1559,7 +1562,9 @@ def video_edit(request, pk):
         video.title_fr = request.POST.get('title_fr', '')
         video.description = request.POST.get('description', '')
         video.description_fr = request.POST.get('description_fr', '')
-        video.video_url = request.POST.get('video_url')
+        video.video_url = request.POST.get('video_url', '')
+        if request.FILES.get('video_file'):
+            video.video_file = request.FILES['video_file']
         if request.FILES.get('thumbnail'):
             video.thumbnail = request.FILES.get('thumbnail')
         video.duration = request.POST.get('duration', '')

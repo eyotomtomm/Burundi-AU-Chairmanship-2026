@@ -61,6 +61,7 @@ class _HomeTabState extends State<HomeTab> {
   int _unreadBadgeCount = 0;
   Timer? _badgeTimer;
   bool _isLoading = true;
+  bool _hasError = false;
 
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
@@ -220,10 +221,16 @@ class _HomeTabState extends State<HomeTab> {
         _heroTextContent = heroTextMap;
         _quickAccessItems = quickAccessMenu;
         _isLoading = false;
+        _hasError = false;
       });
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to load home feed data: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
   }
 
@@ -266,9 +273,74 @@ class _HomeTabState extends State<HomeTab> {
 
     if (_isLoading) return const ShimmerHomeTabSkeleton();
 
+    // Show error/retry when loading failed and no data loaded
+    if (_hasError && _apiHeroSlides == null && _apiArticles == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 72,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white38 : Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                langCode == 'fr'
+                    ? 'Impossible de charger le contenu'
+                    : 'Unable to load content',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white70 : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                langCode == 'fr'
+                    ? 'Vérifiez votre connexion et réessayez'
+                    : 'Check your connection and try again',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white54 : Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _hasError = false;
+                  });
+                  _loadData();
+                },
+                icon: const Icon(Icons.refresh),
+                label: Text(langCode == 'fr' ? 'Réessayer' : 'Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.burundiGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() => _isLoading = true);
+        setState(() {
+          _isLoading = true;
+          _hasError = false;
+        });
         await _loadData();
       },
       color: AppColors.burundiGreen,
@@ -285,24 +357,26 @@ class _HomeTabState extends State<HomeTab> {
         ),
 
         // Feature Cards Slideshow
-        SliverToBoxAdapter(
-          child: _buildFeatureCardsSection(context),
-        ),
+        if (_featureCards.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _buildFeatureCardsSection(context),
+          ),
 
         // Quick Access Section
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionTitle(context, l10n.translate('quick_access')),
-                const SizedBox(height: 12),
-                _buildQuickAccessGrid(context, l10n),
-              ],
+        if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle(context, l10n.translate('quick_access')),
+                  const SizedBox(height: 12),
+                  _buildQuickAccessGrid(context, l10n),
+                ],
+              ),
             ),
           ),
-        ),
 
         // Upcoming Events Section
         if (_apiEventCards != null && _apiEventCards!.isNotEmpty) ...[
@@ -340,51 +414,55 @@ class _HomeTabState extends State<HomeTab> {
         ],
 
         // Latest News Section
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-            child: _buildSectionTitle(context, l10n.translate('latest_news'), showSeeAll: true),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 260,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _articles.length,
-              itemBuilder: (context, index) {
-                final article = _articles[index];
-                return NewsCard(
-                  article: article,
-                  langCode: langCode,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ArticleDetailScreen(article: article),
-                      ),
-                    );
-                  },
-                );
-              },
+        if (_articles.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+              child: _buildSectionTitle(context, l10n.translate('latest_news'), showSeeAll: true),
             ),
           ),
-        ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _articles.length,
+                itemBuilder: (context, index) {
+                  final article = _articles[index];
+                  return NewsCard(
+                    article: article,
+                    langCode: langCode,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ArticleDetailScreen(article: article),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
 
         // Priority Agendas Section
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-            child: _buildSectionTitle(context, 'Priority Agendas'),
+        if (_apiPriorityAgendas != null && _apiPriorityAgendas!.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+              child: _buildSectionTitle(context, 'Priority Agendas'),
+            ),
           ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _buildPriorityAgendasSection(context),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildPriorityAgendasSection(context),
+            ),
           ),
-        ),
+        ],
 
         // Features Grid
         SliverToBoxAdapter(

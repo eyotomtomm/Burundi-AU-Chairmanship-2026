@@ -21,6 +21,23 @@ import '../../../widgets/verified_badge.dart';
 class MoreTab extends StatelessWidget {
   const MoreTab({super.key});
 
+  /// Build display name: "Title FirstName" for verified users, plain name otherwise.
+  /// Uses the real name from verification instead of the signup name (which may
+  /// be random for Google/Apple sign-in).
+  String _buildDisplayName(AuthProvider auth) {
+    final title = auth.verificationTitle;
+    // Prefer real name from verification over signup name
+    final realName = auth.verificationName;
+    final name = (realName != null && realName.isNotEmpty) ? realName : (auth.userName ?? 'User');
+
+    if (title != null && title.isNotEmpty) {
+      // Use first name only (first word) to keep it short
+      final firstName = name.split(' ').first;
+      return '$title $firstName';
+    }
+    return name;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -149,13 +166,16 @@ class MoreTab extends StatelessWidget {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        isLoggedIn ? (authProvider.userName ?? 'User') : 'Guest User',
+                                        isLoggedIn
+                                            ? _buildDisplayName(authProvider)
+                                            : 'Guest User',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 18,
                                           color: theme.colorScheme.onSurface,
                                         ),
                                         overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
                                     ),
                                     if (isLoggedIn && authProvider.isVerified) ...[
@@ -164,6 +184,20 @@ class MoreTab extends StatelessWidget {
                                     ],
                                   ],
                                 ),
+                                if (isLoggedIn && authProvider.verificationRole != null && authProvider.verificationRole!.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      authProvider.verificationRole!,
+                                      style: TextStyle(
+                                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                                        fontSize: 13,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
                                 const SizedBox(height: 4),
                                 Text(
                                   isLoggedIn ? (authProvider.userEmail ?? '') : l10n.translate('tap_to_sign_in'),

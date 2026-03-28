@@ -16,20 +16,15 @@ class VerifiedBadge extends StatelessWidget {
     if (badgeType == null) return const SizedBox.shrink();
 
     Color badgeColor;
-    IconData icon;
 
     if (badgeType == 'GOLD') {
       badgeColor = const Color(0xFFFFD700); // Gold
-      icon = Icons.verified;
-    } else if (badgeType == 'BLUE') {
-      badgeColor = const Color(0xFF2196F3); // Blue
-      icon = Icons.verified;
     } else {
-      return const SizedBox.shrink();
+      badgeColor = const Color(0xFF2196F3); // Blue (default)
     }
 
     return Icon(
-      icon,
+      Icons.verified,
       color: badgeColor,
       size: size,
     );

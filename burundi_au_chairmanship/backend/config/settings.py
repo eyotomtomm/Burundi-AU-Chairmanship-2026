@@ -232,8 +232,8 @@ REST_FRAMEWORK = {
         'view_count': '1/min',  # 1 view per content item per minute (prevents manipulation)
         'like_toggle': '10/min',  # 10 like toggles per minute (prevents spam)
         'auth': '5/min',  # Strict limit on login/register to prevent brute-force
-        'otp': '1/min',  # Strict: 1 OTP per minute to prevent abuse
-        'otp_verify': '5/min',  # 5 verify attempts per minute before lockout
+        'otp': '3/min',  # 3 OTP sends per minute (allows resends without long waits)
+        'otp_verify': '10/min',  # 10 verify attempts per minute before lockout
         'support': '5/hour',  # 5 support tickets per hour per user
         'search': '30/min',  # 30 search requests per minute per user/IP
     },

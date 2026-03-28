@@ -81,6 +81,20 @@ class UserSerializer(serializers.ModelSerializer):
                 ret['profile_picture'] = instance.profile.profile_picture.url
         else:
             ret['profile_picture'] = None
+
+        # Ensure badge_type is set when user is verified
+        if hasattr(instance, 'profile') and instance.profile.is_verified and not ret.get('badge_type'):
+            ret['badge_type'] = instance.profile.badge_type or 'BLUE'
+
+        # Include verification title/role from approved request
+        ret['verification_title'] = None
+        ret['verification_role'] = None
+        ret['verification_name'] = None
+        approved = instance.verification_requests.filter(status='approved').order_by('-created_at').first()
+        if approved:
+            ret['verification_title'] = approved.get_title_display()
+            ret['verification_role'] = approved.position_role
+            ret['verification_name'] = approved.full_name
         return ret
 
     def update(self, instance, validated_data):

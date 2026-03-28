@@ -620,6 +620,10 @@ class ApiService {
     return data['unread_count'] ?? 0;
   }
 
+  Future<void> markAllNotificationsAsRead() async {
+    await post('notifications/mark-all-as-read/', {}, auth: true);
+  }
+
   Future<int> getUnreadSupportCount() async {
     final data = await _get('support/unread-count/', auth: true);
     return data['unread_count'] ?? 0;

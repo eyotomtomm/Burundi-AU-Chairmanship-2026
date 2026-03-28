@@ -156,33 +156,26 @@ def send_phone_otp_twilio(user, country_code, phone_number, channel='sms'):
         # Use Twilio Verify if Service SID is configured (recommended)
         # Twilio Verify supports both 'sms' and 'whatsapp' channels
         if hasattr(settings, 'TWILIO_VERIFY_SERVICE_SID') and settings.TWILIO_VERIFY_SERVICE_SID:
-            try:
-                verification = client.verify.v2.services(
-                    settings.TWILIO_VERIFY_SERVICE_SID
-                ).verifications.create(
-                    to=full_phone,
-                    channel=channel  # 'sms' or 'whatsapp'
-                )
+            verification = client.verify.v2.services(
+                settings.TWILIO_VERIFY_SERVICE_SID
+            ).verifications.create(
+                to=full_phone,
+                channel=channel  # 'sms' or 'whatsapp'
+            )
 
-                # Create OTP record for tracking (Twilio manages the actual code)
-                otp = OTPVerification.objects.create(
-                    user=user,
-                    type='phone',
-                    contact=full_phone,
-                    otp_code='TWILIO_VERIFY',
-                    expires_at=timezone.now() + timedelta(minutes=10)
-                )
+            # Create OTP record for tracking (Twilio manages the actual code)
+            otp = OTPVerification.objects.create(
+                user=user,
+                type='phone',
+                contact=full_phone,
+                otp_code='TWILIO_VERIFY',
+                expires_at=timezone.now() + timedelta(minutes=10)
+            )
 
-                channel_label = 'WhatsApp' if channel == 'whatsapp' else 'SMS'
-                return True, f'OTP sent via {channel_label}', otp.id
+            channel_label = 'WhatsApp' if channel == 'whatsapp' else 'SMS'
+            return True, f'OTP sent via {channel_label}', otp.id
 
-            except Exception as verify_error:
-                logger.warning('Twilio Verify failed (%s), falling back to manual SMS: %s', channel, verify_error)
-                # WhatsApp only works via Verify — no fallback possible
-                if channel == 'whatsapp':
-                    return False, 'WhatsApp delivery failed. Please try SMS instead.', None
-
-        # Fallback: Manual SMS with Alphanumeric Sender ID or Phone Number
+        # Fallback: Manual SMS only when Twilio Verify Service is NOT configured
         otp_code = generate_otp()
 
         otp = OTPVerification.objects.create(

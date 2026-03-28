@@ -35,6 +35,9 @@ class AuthProvider extends ChangeNotifier {
   bool _isVerified = false;
   String? _badgeType; // 'GOLD' or 'BLUE'
   String? _profilePictureUrl;
+  String? _verificationTitle; // e.g. "H.E. (His/Her Excellency)"
+  String? _verificationRole; // e.g. "Ambassador to the AU"
+  String? _verificationName; // Real name from verification request
   bool _isLoading = false;
   String? _errorMessage;
   bool _requiresEmailVerification = false;
@@ -52,6 +55,9 @@ class AuthProvider extends ChangeNotifier {
   bool get isVerified => _isVerified;
   String? get badgeType => _badgeType;
   String? get profilePictureUrl => _profilePictureUrl;
+  String? get verificationTitle => _verificationTitle;
+  String? get verificationRole => _verificationRole;
+  String? get verificationName => _verificationName;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get requiresEmailVerification => _requiresEmailVerification;
@@ -101,6 +107,9 @@ class AuthProvider extends ChangeNotifier {
         _isVerified = prefs.getBool('user_is_verified') ?? false;
         _badgeType = prefs.getString('user_badge_type');
         _profilePictureUrl = prefs.getString('user_profile_picture');
+        _verificationTitle = prefs.getString('user_verification_title');
+        _verificationRole = prefs.getString('user_verification_role');
+        _verificationName = prefs.getString('user_verification_name');
       } else {
         // Migration: check if token exists in old SharedPreferences and migrate
         final prefs = await SharedPreferences.getInstance();
@@ -128,6 +137,8 @@ class AuthProvider extends ChangeNotifier {
           _isVerified = prefs.getBool('user_is_verified') ?? false;
           _badgeType = prefs.getString('user_badge_type');
           _profilePictureUrl = prefs.getString('user_profile_picture');
+          _verificationTitle = prefs.getString('user_verification_title');
+          _verificationRole = prefs.getString('user_verification_role');
         }
       }
     }
@@ -604,6 +615,9 @@ class AuthProvider extends ChangeNotifier {
     final isOfficial = user['is_government_official'] ?? false;
     final isVerified = user['is_verified'] ?? false;
     final badgeType = user['badge_type'] as String?;
+    final verificationTitle = user['verification_title'] as String?;
+    final verificationRole = user['verification_role'] as String?;
+    final verificationName = user['verification_name'] as String?;
 
     // Profile picture: can be in top-level or nested in profile
     String? profilePic = user['profile_picture'] as String?;
@@ -631,6 +645,21 @@ class AuthProvider extends ChangeNotifier {
     } else {
       await prefs.remove('user_profile_picture');
     }
+    if (verificationTitle != null) {
+      await prefs.setString('user_verification_title', verificationTitle);
+    } else {
+      await prefs.remove('user_verification_title');
+    }
+    if (verificationRole != null) {
+      await prefs.setString('user_verification_role', verificationRole);
+    } else {
+      await prefs.remove('user_verification_role');
+    }
+    if (verificationName != null) {
+      await prefs.setString('user_verification_name', verificationName);
+    } else {
+      await prefs.remove('user_verification_name');
+    }
 
     _userId = uid;
     _userName = name;
@@ -644,6 +673,9 @@ class AuthProvider extends ChangeNotifier {
     _isVerified = isVerified;
     _badgeType = badgeType;
     _profilePictureUrl = profilePic;
+    _verificationTitle = verificationTitle;
+    _verificationRole = verificationRole;
+    _verificationName = verificationName;
   }
 
   /// Clear user data from SharedPreferences and secure storage
@@ -667,6 +699,9 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('user_is_verified');
     await prefs.remove('user_badge_type');
     await prefs.remove('user_profile_picture');
+    await prefs.remove('user_verification_title');
+    await prefs.remove('user_verification_role');
+    await prefs.remove('user_verification_name');
 
     _userId = null;
     _userName = null;
@@ -680,6 +715,9 @@ class AuthProvider extends ChangeNotifier {
     _isVerified = false;
     _badgeType = null;
     _profilePictureUrl = null;
+    _verificationTitle = null;
+    _verificationRole = null;
+    _verificationName = null;
   }
 
   /// Clear error message

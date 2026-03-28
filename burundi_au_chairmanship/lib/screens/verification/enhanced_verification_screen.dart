@@ -637,24 +637,27 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
 
         if (_emailCountdown > 0) ...[
           const SizedBox(height: 24),
-          TextField(
-            controller: _emailOtpController,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            decoration: InputDecoration(
-              labelText: 'Enter 6-Digit Code',
-              hintText: '123456',
-              prefixIcon: const Icon(Icons.pin),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          AutofillGroup(
+            child: TextField(
+              controller: _emailOtpController,
+              keyboardType: TextInputType.number,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              maxLength: 6,
+              decoration: InputDecoration(
+                labelText: 'Enter 6-Digit Code',
+                hintText: '123456',
+                prefixIcon: const Icon(Icons.pin),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.grey[100],
+                counterText: '',
               ),
-              filled: true,
-              fillColor: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.grey[100],
-              counterText: '',
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -835,24 +838,27 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
 
         if (_phoneCountdown > 0) ...[
           const SizedBox(height: 24),
-          TextField(
-            controller: _phoneOtpController,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            decoration: InputDecoration(
-              labelText: 'Enter 6-Digit Code',
-              hintText: '123456',
-              prefixIcon: const Icon(Icons.pin),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          AutofillGroup(
+            child: TextField(
+              controller: _phoneOtpController,
+              keyboardType: TextInputType.number,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              maxLength: 6,
+              decoration: InputDecoration(
+                labelText: 'Enter 6-Digit Code',
+                hintText: '123456',
+                prefixIcon: const Icon(Icons.pin),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.grey[100],
+                counterText: '',
               ),
-              filled: true,
-              fillColor: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.grey[100],
-              counterText: '',
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           SizedBox(

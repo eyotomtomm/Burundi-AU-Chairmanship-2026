@@ -49,12 +49,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _notifications = items;
         _isLoading = false;
       });
+      // Mark all as read on the server so the badge clears when user goes back
+      _markAllAsRead();
     } catch (e) {
       if (kDebugMode) debugPrint('Notifications load error: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    try {
+      await _apiService.markAllNotificationsAsRead();
+      // Update local state so cards look read
+      setState(() {
+        for (final n in _notifications) {
+          n['is_read'] = true;
+        }
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('Failed to mark all notifications as read: $e');
     }
   }
 

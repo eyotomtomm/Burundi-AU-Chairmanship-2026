@@ -245,11 +245,15 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title.toString(),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87)),
                     if (desc.toString().isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(desc.toString(),
-                        style: TextStyle(fontSize: 14, color: Colors.black.withValues(alpha: 0.7))),
+                        style: TextStyle(fontSize: 14,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white70
+                              : Colors.black.withValues(alpha: 0.7))),
                     ],
                   ],
                 ),
@@ -262,32 +266,38 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.bold,
-        color: Color(0xFF1B5E20),
+        color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF1B5E20),
       ));
   }
 
   Widget _buildContentText(String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(text,
-      style: const TextStyle(fontSize: 16, height: 1.6, color: Colors.black87));
+      style: TextStyle(fontSize: 16, height: 1.6,
+        color: isDark ? Colors.white70 : Colors.black87));
   }
 
   Widget _buildBulletPoint(String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Icon(Icons.verified, size: 20, color: Color(0xFF1B5E20)),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Icon(Icons.verified, size: 20,
+              color: isDark ? const Color(0xFF4CAF50) : const Color(0xFF1B5E20)),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 16, height: 1.6)),
+            child: Text(text, style: TextStyle(fontSize: 16, height: 1.6,
+              color: isDark ? Colors.white70 : Colors.black87)),
           ),
         ],
       ),

@@ -607,7 +607,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
           ),
           enabled: !_emailVerified,
         ),
@@ -647,7 +649,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                 borderRadius: BorderRadius.circular(12),
               ),
               filled: true,
-              fillColor: Colors.grey[100],
+              fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
               counterText: '',
             ),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -693,7 +697,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
           ),
         ),
         const SizedBox(height: 16),
@@ -710,7 +716,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
           ),
         ),
       ],
@@ -738,9 +746,15 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.grey[100],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white24
+                        : Colors.grey[300]!,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -761,7 +775,10 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                    Icon(Icons.arrow_drop_down,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white54
+                          : Colors.grey[600]),
                   ],
                 ),
               ),
@@ -784,7 +801,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[100],
+                  fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
                 ),
                 enabled: !_phoneVerified,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -828,7 +847,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                 borderRadius: BorderRadius.circular(12),
               ),
               filled: true,
-              fillColor: Colors.grey[100],
+              fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
               counterText: '',
             ),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -989,7 +1010,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.grey[100],
           ),
         ),
         const SizedBox(height: 16),
@@ -1070,7 +1093,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
           subtitle,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[600],
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white60
+                : Colors.grey[600],
           ),
           textAlign: TextAlign.center,
         ),

@@ -60,6 +60,80 @@
   </div>
 </div>
 
+<!-- Live Users Badge -->
+<div class="mb-6 flex items-center gap-4">
+  <div class="bg-surface-container-lowest px-4 py-2 rounded-lg shadow-sm flex items-center gap-2">
+    <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+    <span class="text-sm font-bold">{{ live_users|default:"0" }}</span>
+    <span class="text-xs text-on-surface-variant">users online now</span>
+  </div>
+</div>
+
+<!-- Account Alerts -->
+{% if deletion_scheduled %}
+<div class="mb-8 bg-red-50 border border-red-200 rounded-xl p-6">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-red-600">warning</span>
+    <h4 class="text-lg font-bold text-red-800">Account Deletion Requests ({{ deletion_scheduled|length }})</h4>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs uppercase tracking-wider text-red-600 border-b border-red-200">
+          <th class="py-2 px-3">User</th>
+          <th class="py-2 px-3">Email</th>
+          <th class="py-2 px-3">Requested</th>
+          <th class="py-2 px-3">Deletes On</th>
+          <th class="py-2 px-3">Device</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in deletion_scheduled %}
+        <tr class="border-b border-red-100 hover:bg-red-100/50">
+          <td class="py-2 px-3 font-medium">{{ p.user.get_full_name|default:p.user.username }}</td>
+          <td class="py-2 px-3"><a href="mailto:{{ p.user.email }}" class="text-blue-600 hover:underline">{{ p.user.email }}</a></td>
+          <td class="py-2 px-3">{{ p.deletion_requested_at|date:"M d, Y" }}</td>
+          <td class="py-2 px-3 font-bold text-red-700">{{ p.deletion_scheduled_for|date:"M d, Y" }}</td>
+          <td class="py-2 px-3 text-xs text-on-surface-variant">{{ p.device_type }} &middot; {{ p.device_os }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if deactivated_users %}
+<div class="mb-8 bg-amber-50 border border-amber-200 rounded-xl p-6">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-amber-600">pause_circle</span>
+    <h4 class="text-lg font-bold text-amber-800">Deactivated Accounts ({{ deactivated_users|length }})</h4>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs uppercase tracking-wider text-amber-600 border-b border-amber-200">
+          <th class="py-2 px-3">User</th>
+          <th class="py-2 px-3">Email</th>
+          <th class="py-2 px-3">Deactivated</th>
+          <th class="py-2 px-3">Last Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in deactivated_users %}
+        <tr class="border-b border-amber-100 hover:bg-amber-100/50">
+          <td class="py-2 px-3 font-medium">{{ p.user.get_full_name|default:p.user.username }}</td>
+          <td class="py-2 px-3"><a href="mailto:{{ p.user.email }}" class="text-blue-600 hover:underline">{{ p.user.email }}</a></td>
+          <td class="py-2 px-3">{{ p.deactivated_at|date:"M d, Y" }}</td>
+          <td class="py-2 px-3">{{ p.last_active|date:"M d, Y H:i"|default:"Never" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <!-- Bento Grid -->
 <div class="grid grid-cols-12 gap-8">
   <!-- Engagement Chart -->

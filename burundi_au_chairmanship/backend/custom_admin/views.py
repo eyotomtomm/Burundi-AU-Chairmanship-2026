@@ -65,6 +65,20 @@ def dashboard(request):
     total_content = articles_count + events_count + magazines_count + hero_slides_count
     active_today = User.objects.filter(last_login__gte=timezone.now() - timedelta(days=1)).count()
 
+    # Account alerts
+    deletion_scheduled = UserProfile.objects.filter(
+        is_scheduled_for_deletion=True
+    ).select_related('user').order_by('-deletion_requested_at')
+    deactivated_users = UserProfile.objects.filter(
+        is_deactivated=True, is_scheduled_for_deletion=False
+    ).select_related('user').order_by('-deactivated_at')
+
+    # Device & activity stats
+    from datetime import timedelta as td
+    live_users = UserProfile.objects.filter(
+        last_active__gte=timezone.now() - td(minutes=5)
+    ).count()
+
     stats = {
         'users': users_count,
         'articles': articles_count,
@@ -77,6 +91,9 @@ def dashboard(request):
         'total_content': total_content or 1,
         'recent_articles': Article.objects.order_by('-created_at')[:5],
         'recent_events': Event.objects.order_by('-event_date')[:5],
+        'deletion_scheduled': deletion_scheduled,
+        'deactivated_users': deactivated_users,
+        'live_users': live_users,
     }
     return render(request, 'custom_admin/dashboard.html', stats)
 

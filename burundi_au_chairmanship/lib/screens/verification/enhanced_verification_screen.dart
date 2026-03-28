@@ -207,9 +207,37 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     });
   }
 
+  static const _blockedDomains = {
+    'gmail.com', 'googlemail.com',
+    'yahoo.com', 'yahoo.co.uk', 'yahoo.fr', 'yahoo.de', 'yahoo.ca', 'yahoo.in',
+    'outlook.com', 'hotmail.com', 'live.com', 'msn.com',
+    'aol.com',
+    'icloud.com', 'me.com', 'mac.com',
+    'protonmail.com', 'proton.me',
+    'mail.com',
+    'zoho.com',
+    'yandex.com', 'yandex.ru',
+    'gmx.com', 'gmx.de',
+    'mail.ru',
+    'qq.com',
+    '163.com',
+    '126.com',
+  };
+
+  bool _isWorkEmail(String email) {
+    final parts = email.split('@');
+    if (parts.length != 2) return false;
+    return !_blockedDomains.contains(parts[1].toLowerCase());
+  }
+
   Future<void> _sendEmailOtp() async {
     if (_emailController.text.isEmpty) {
       _showError('Please enter your email address');
+      return;
+    }
+
+    if (!_isWorkEmail(_emailController.text.trim())) {
+      _showError('Please use a work/organizational email. Personal emails (Gmail, Yahoo, Outlook, etc.) are not accepted for verification.');
       return;
     }
 
@@ -559,8 +587,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
       children: [
         _buildStepHeader(
           icon: Icons.email,
-          title: 'Verify Your Email',
-          subtitle: 'We\'ll send a verification code to your email',
+          title: 'Verify Your Work Email',
+          subtitle: 'Use your professional/organizational email. Personal emails (Gmail, Yahoo, etc.) are not accepted.',
         ),
         const SizedBox(height: 32),
 
@@ -569,8 +597,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
-            labelText: 'Email Address',
-            hintText: 'your.email@example.com',
+            labelText: 'Work Email Address',
+            hintText: 'name@organization.org',
             prefixIcon: const Icon(Icons.email_outlined),
             suffixIcon: _emailVerified
                 ? const Icon(Icons.check_circle, color: AppColors.success)

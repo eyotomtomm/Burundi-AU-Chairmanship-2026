@@ -1293,13 +1293,24 @@ def verify_signup_otp(request):
 @permission_classes([IsAuthenticated])
 @throttle_classes([OTPRateThrottle])
 def send_email_otp(request):
-    """Send OTP to user's email for verification"""
+    """Send OTP to user's email for verification (work email only)"""
     from .otp_utils import send_email_otp
+    from .validators import validate_professional_email
+    from django.core.exceptions import ValidationError as DjangoValidationError
 
     email = request.data.get('email')
     if not email:
         return Response(
             {'detail': 'Email is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Block consumer emails (gmail, yahoo, etc.) — verification requires work email
+    try:
+        validate_professional_email(email)
+    except DjangoValidationError as e:
+        return Response(
+            {'detail': e.message},
             status=status.HTTP_400_BAD_REQUEST
         )
 

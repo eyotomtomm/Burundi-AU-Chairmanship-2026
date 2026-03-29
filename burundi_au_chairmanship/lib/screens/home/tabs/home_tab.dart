@@ -247,7 +247,7 @@ class _HomeTabState extends State<HomeTab> {
 
   void _startHeroAutoSlide() {
     _heroTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted || _heroSlides.isEmpty) return;
+      if (!mounted || _heroSlides.isEmpty || !_heroPageController.hasClients) return;
       _heroPageController.animateToPage(
         _heroRawPage + 1,
         duration: const Duration(milliseconds: 600),
@@ -258,7 +258,7 @@ class _HomeTabState extends State<HomeTab> {
 
   void _startFeatureAutoSlide() {
     _featureTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted || _featureCards.isEmpty) return;
+      if (!mounted || _featureCards.isEmpty || !_featureCardPageController.hasClients) return;
       _featureCardPageController.animateToPage(
         _featureRawPage + 1,
         duration: const Duration(milliseconds: 600),

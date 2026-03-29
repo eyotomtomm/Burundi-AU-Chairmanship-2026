@@ -73,6 +73,8 @@ def verify_firebase_token(id_token):
     Raises:
         ValueError: If token is invalid, expired, or verification fails
     """
+    if not firebase_admin._apps:
+        raise ValueError("Firebase Admin SDK is not initialized. Check server credentials.")
     try:
         decoded_token = auth.verify_id_token(id_token)
         return decoded_token
@@ -111,5 +113,11 @@ def get_firebase_user(uid):
 try:
     initialize_firebase()
 except FileNotFoundError as e:
-    logger.error(f"Firebase credentials missing: {e}")
-    logger.error("Firebase Admin SDK will not be available until credentials are configured.")
+    logger.warning(f"Firebase credentials missing: {e}")
+    logger.warning(
+        "Firebase Admin SDK will not be available until credentials are configured.\n"
+        "Set FIREBASE_CREDENTIALS_JSON env var with the service account key JSON,\n"
+        "or place firebase-adminsdk.json in the config/ directory."
+    )
+except Exception as e:
+    logger.warning(f"Firebase initialization failed: {e}")

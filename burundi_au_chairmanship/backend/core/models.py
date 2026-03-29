@@ -124,10 +124,11 @@ class UserProfile(models.Model):
 def create_or_update_user_profile(sender, instance, created, **kwargs):
     """Automatically create/update profile when user is created/updated"""
     if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.get_or_create(user=instance)
     else:
-        if hasattr(instance, 'profile'):
-            instance.profile.save()
+        # Ensure profile exists (handles legacy users created before this signal)
+        profile, _ = UserProfile.objects.get_or_create(user=instance)
+        profile.save()
 
 
 class HeroSlide(models.Model):

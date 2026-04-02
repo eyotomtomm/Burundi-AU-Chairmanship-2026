@@ -7,7 +7,7 @@ from .models import (
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
-    VerificationRequest, WeatherCity, EventRegistration, RegistrationFormField,
+    VerificationRequest, VerificationSocialMedia, WeatherCity, EventRegistration, RegistrationFormField,
     EventSubmission, FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     SupportTicket, TicketMessage, Popup,
 )
@@ -469,10 +469,18 @@ class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
         return ''
 
 
+class VerificationSocialMediaSerializer(serializers.ModelSerializer):
+    """Serializer for social media profiles in verification requests"""
+    class Meta:
+        model = VerificationSocialMedia
+        fields = ['id', 'platform', 'username_or_url']
+
+
 class VerificationRequestSerializer(serializers.ModelSerializer):
     """Serializer for creating and viewing verification requests"""
     user_name = serializers.CharField(source='user.first_name', read_only=True)
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    social_media_profiles = VerificationSocialMediaSerializer(many=True, required=False)
 
     class Meta:
         model = VerificationRequest
@@ -481,8 +489,7 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
             'title', 'first_name', 'last_name', 'full_name',
             'email', 'country_code', 'phone_number', 'phone_verified',
             'position_role', 'reasoning_message',
-            'twitter_url', 'linkedin_url', 'facebook_url',
-            'instagram_url', 'tiktok_url', 'youtube_url', 'other_social_url',
+            'social_media_profiles',
             'status', 'badge_type', 'rejection_reason',
             'appeal_message', 'appeal_submitted_at',
             'created_at', 'updated_at', 'reviewed_at'
@@ -493,41 +500,19 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
             'appeal_submitted_at', 'created_at', 'updated_at', 'reviewed_at'
         ]
 
-    def validate_twitter_url(self, value):
-        if value:
-            from .validators import validate_social_media_url
-            validate_social_media_url('twitter', value)
-        return value
+    def create(self, validated_data):
+        """Create verification request with nested social media profiles"""
+        social_media_data = validated_data.pop('social_media_profiles', [])
+        verification_request = VerificationRequest.objects.create(**validated_data)
 
-    def validate_facebook_url(self, value):
-        if value:
-            from .validators import validate_social_media_url
-            validate_social_media_url('facebook', value)
-        return value
+        # Create social media profiles
+        for social_media in social_media_data:
+            VerificationSocialMedia.objects.create(
+                verification_request=verification_request,
+                **social_media
+            )
 
-    def validate_linkedin_url(self, value):
-        if value:
-            from .validators import validate_social_media_url
-            validate_social_media_url('linkedin', value)
-        return value
-
-    def validate_instagram_url(self, value):
-        if value:
-            from .validators import validate_social_media_url
-            validate_social_media_url('instagram', value)
-        return value
-
-    def validate_tiktok_url(self, value):
-        if value:
-            from .validators import validate_social_media_url
-            validate_social_media_url('tiktok', value)
-        return value
-
-    def validate_youtube_url(self, value):
-        if value:
-            from .validators import validate_social_media_url
-            validate_social_media_url('youtube', value)
-        return value
+        return verification_request
 
     def validate(self, data):
         """Ensure user only has one pending/approved request"""

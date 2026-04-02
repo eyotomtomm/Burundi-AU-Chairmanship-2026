@@ -1266,13 +1266,6 @@ class VerificationRequest(models.Model):
         blank=True,
         help_text='User explanation for why they deserve the verification badge'
     )
-    twitter_url = models.URLField(blank=True, help_text='Twitter/X profile URL (optional)')
-    linkedin_url = models.URLField(blank=True, help_text='LinkedIn profile URL (optional)')
-    facebook_url = models.URLField(blank=True, help_text='Facebook profile URL (optional)')
-    instagram_url = models.URLField(blank=True, help_text='Instagram profile URL (optional)')
-    tiktok_url = models.URLField(blank=True, help_text='TikTok profile URL (optional)')
-    youtube_url = models.URLField(blank=True, help_text='YouTube channel URL (optional)')
-    other_social_url = models.URLField(blank=True, help_text='Other social media URL (optional)')
 
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -1361,6 +1354,68 @@ class VerificationRequest(models.Model):
         self.appeal_message = message
         self.appeal_submitted_at = timezone.now()
         self.save()
+
+
+class VerificationSocialMedia(models.Model):
+    """
+    Social media profiles for verification requests.
+    Users can add multiple platforms, providing either username or full URL.
+    """
+    PLATFORM_CHOICES = [
+        ('twitter', 'X (Twitter)'),
+        ('facebook', 'Facebook'),
+        ('linkedin', 'LinkedIn'),
+        ('instagram', 'Instagram'),
+        ('tiktok', 'TikTok'),
+        ('youtube', 'YouTube'),
+        ('telegram', 'Telegram'),
+        ('whatsapp', 'WhatsApp'),
+        ('threads', 'Threads'),
+        ('other', 'Other'),
+    ]
+
+    verification_request = models.ForeignKey(
+        VerificationRequest,
+        on_delete=models.CASCADE,
+        related_name='social_media_profiles',
+        help_text='The verification request this social media profile belongs to'
+    )
+    platform = models.CharField(
+        max_length=20,
+        choices=PLATFORM_CHOICES,
+        help_text='Social media platform'
+    )
+    username_or_url = models.CharField(
+        max_length=500,
+        help_text='Username (e.g. @john_doe) or full URL (e.g. https://twitter.com/john_doe)'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['platform']
+        verbose_name = 'Verification Social Media'
+        verbose_name_plural = 'Verification Social Media'
+        unique_together = ['verification_request', 'platform']
+
+    def __str__(self):
+        return f"{self.get_platform_display()}: {self.username_or_url}"
+
+    @property
+    def is_url(self):
+        """Check if the value is a full URL or just a username"""
+        return self.username_or_url.startswith(('http://', 'https://'))
+
+    @property
+    def display_value(self):
+        """Return a clean display value"""
+        if self.is_url:
+            return self.username_or_url
+        else:
+            # If it's a username, prefix with @ if not already present
+            value = self.username_or_url.strip()
+            if not value.startswith('@'):
+                return f"@{value}"
+            return value
 
 
 class WeatherCity(models.Model):

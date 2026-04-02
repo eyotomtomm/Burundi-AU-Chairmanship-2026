@@ -9,7 +9,7 @@ from .models import (
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, Notification, MagazineLike,
-    HeroTextContent, QuickAccessMenuItem, VerificationRequest, WeatherCity,
+    HeroTextContent, QuickAccessMenuItem, VerificationRequest, VerificationSocialMedia, WeatherCity,
     EventRegistration, RegistrationFormField, EventSubmission,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     AuditLogEntry, AdminRole, SupportTicket, TicketMessage, Popup,
@@ -1213,6 +1213,15 @@ class AppSettingsAdmin(admin.ModelAdmin):
 #  VERIFICATION SYSTEM
 # ═══════════════════════════════════════════════════════════════
 
+class VerificationSocialMediaInline(admin.TabularInline):
+    """Inline admin for social media profiles in verification requests"""
+    model = VerificationSocialMedia
+    extra = 0
+    fields = ['platform', 'username_or_url']
+    verbose_name = 'Social Media Profile'
+    verbose_name_plural = 'Social Media Profiles'
+
+
 @admin.register(VerificationRequest)
 class VerificationRequestAdmin(admin.ModelAdmin):
     """
@@ -1233,6 +1242,7 @@ class VerificationRequestAdmin(admin.ModelAdmin):
     search_fields = ['full_name', 'first_name', 'last_name', 'email', 'user__email']
     readonly_fields = ['created_at', 'updated_at', 'reviewed_at', 'appeal_submitted_at']
     date_hierarchy = 'created_at'
+    inlines = [VerificationSocialMediaInline]
 
     fieldsets = (
         ('Applicant', {
@@ -1248,15 +1258,6 @@ class VerificationRequestAdmin(admin.ModelAdmin):
                 ('email', 'email_verified'),
                 ('country_code', 'phone_number', 'phone_verified'),
             ],
-        }),
-        ('Social Media Profiles', {
-            'fields': [
-                ('twitter_url', 'linkedin_url'),
-                ('facebook_url', 'instagram_url'),
-                ('tiktok_url', 'youtube_url'),
-                'other_social_url',
-            ],
-            'description': 'Review the applicant\'s social media presence to help verify identity.',
         }),
         ('Reasoning', {
             'fields': ['reasoning_message'],

@@ -24,14 +24,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
   final _phoneOtpController = TextEditingController();
   final _reasoningController = TextEditingController();
 
-  // Social media controllers
-  final _twitterController = TextEditingController();
-  final _facebookController = TextEditingController();
-  final _linkedinController = TextEditingController();
-  final _instagramController = TextEditingController();
-  final _tiktokController = TextEditingController();
-  final _youtubeController = TextEditingController();
-  final _otherSocialController = TextEditingController();
+  // Social media entries (list of maps with platform and username/URL controllers)
+  final List<Map<String, dynamic>> _socialMediaEntries = [];
 
   // State
   String _selectedCountryCode = '+257'; // Burundi default
@@ -171,13 +165,10 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     _phoneController.dispose();
     _phoneOtpController.dispose();
     _reasoningController.dispose();
-    _twitterController.dispose();
-    _facebookController.dispose();
-    _linkedinController.dispose();
-    _instagramController.dispose();
-    _tiktokController.dispose();
-    _youtubeController.dispose();
-    _otherSocialController.dispose();
+    // Dispose social media controllers
+    for (var entry in _socialMediaEntries) {
+      (entry['controller'] as TextEditingController).dispose();
+    }
     _emailTimer?.cancel();
     _phoneTimer?.cancel();
     super.dispose();
@@ -391,14 +382,18 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
         'reasoning_message': _reasoningController.text,
       };
 
-      // Add social media URLs (only non-empty)
-      if (_twitterController.text.isNotEmpty) body['twitter_url'] = _twitterController.text;
-      if (_facebookController.text.isNotEmpty) body['facebook_url'] = _facebookController.text;
-      if (_linkedinController.text.isNotEmpty) body['linkedin_url'] = _linkedinController.text;
-      if (_instagramController.text.isNotEmpty) body['instagram_url'] = _instagramController.text;
-      if (_tiktokController.text.isNotEmpty) body['tiktok_url'] = _tiktokController.text;
-      if (_youtubeController.text.isNotEmpty) body['youtube_url'] = _youtubeController.text;
-      if (_otherSocialController.text.isNotEmpty) body['other_social_url'] = _otherSocialController.text;
+      // Add social media profiles (only non-empty)
+      final socialMediaProfiles = _socialMediaEntries
+          .where((entry) => (entry['controller'] as TextEditingController).text.trim().isNotEmpty)
+          .map((entry) => {
+                'platform': entry['platform'],
+                'username_or_url': (entry['controller'] as TextEditingController).text.trim(),
+              })
+          .toList();
+
+      if (socialMediaProfiles.isNotEmpty) {
+        body['social_media_profiles'] = socialMediaProfiles;
+      }
 
       await ApiService().post('verification/request/', body, auth: true);
 
@@ -879,20 +874,22 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
   }
 
   Widget _buildSocialMediaStep() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStepHeader(
           icon: Icons.share,
           title: 'Social Media',
-          subtitle: 'Link your social profiles to help verify your identity',
+          subtitle: 'Select your platforms and add your username or profile link',
         ),
         const SizedBox(height: 24),
 
         // Info card
         Container(
           padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(bottom: 24),
+          margin: const EdgeInsets.only(bottom: 20),
           decoration: BoxDecoration(
             color: AppColors.info.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
@@ -904,7 +901,7 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'At least one social media profile is recommended. All fields are optional.',
+                  'Add the social media platforms you have. You can enter just your username or the full profile URL.',
                   style: TextStyle(fontSize: 13, color: AppColors.info, height: 1.4),
                 ),
               ),
@@ -912,85 +909,129 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
           ),
         ),
 
-        _buildSocialField(
-          controller: _twitterController,
-          label: 'X (Twitter)',
-          hint: 'https://x.com/username',
-          icon: Icons.close, // X icon
-        ),
-        const SizedBox(height: 14),
+        // List of added social media entries
+        if (_socialMediaEntries.isNotEmpty) ...[
+          ..._socialMediaEntries.asMap().entries.map((entry) {
+            final index = entry.key;
+            final data = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildSocialMediaEntry(index, data, isDark),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
 
-        _buildSocialField(
-          controller: _facebookController,
-          label: 'Facebook',
-          hint: 'https://facebook.com/username',
-          icon: Icons.facebook,
-        ),
-        const SizedBox(height: 14),
-
-        _buildSocialField(
-          controller: _linkedinController,
-          label: 'LinkedIn',
-          hint: 'https://linkedin.com/in/username',
-          icon: Icons.work_outline,
-        ),
-        const SizedBox(height: 14),
-
-        _buildSocialField(
-          controller: _instagramController,
-          label: 'Instagram',
-          hint: 'https://instagram.com/username',
-          icon: Icons.camera_alt_outlined,
-        ),
-        const SizedBox(height: 14),
-
-        _buildSocialField(
-          controller: _tiktokController,
-          label: 'TikTok',
-          hint: 'https://tiktok.com/@username',
-          icon: Icons.music_note_outlined,
-        ),
-        const SizedBox(height: 14),
-
-        _buildSocialField(
-          controller: _youtubeController,
-          label: 'YouTube',
-          hint: 'https://youtube.com/@channel',
-          icon: Icons.play_circle_outline,
-        ),
-        const SizedBox(height: 14),
-
-        _buildSocialField(
-          controller: _otherSocialController,
-          label: 'Other',
-          hint: 'https://...',
-          icon: Icons.link,
+        // Add social media button
+        OutlinedButton.icon(
+          onPressed: _addSocialMediaEntry,
+          icon: const Icon(Icons.add, size: 20),
+          label: Text(_socialMediaEntries.isEmpty ? 'Add Social Media' : 'Add Another'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            side: BorderSide(color: AppColors.burundiGreen),
+            foregroundColor: AppColors.burundiGreen,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildSocialField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.url,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, size: 20),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+  Widget _buildSocialMediaEntry(int index, Map<String, dynamic> data, bool isDark) {
+    final platforms = [
+      {'value': 'twitter', 'label': 'X (Twitter)', 'icon': Icons.close},
+      {'value': 'facebook', 'label': 'Facebook', 'icon': Icons.facebook},
+      {'value': 'linkedin', 'label': 'LinkedIn', 'icon': Icons.work_outline},
+      {'value': 'instagram', 'label': 'Instagram', 'icon': Icons.camera_alt_outlined},
+      {'value': 'tiktok', 'label': 'TikTok', 'icon': Icons.music_note_outlined},
+      {'value': 'youtube', 'label': 'YouTube', 'icon': Icons.play_circle_outline},
+      {'value': 'telegram', 'label': 'Telegram', 'icon': Icons.send},
+      {'value': 'whatsapp', 'label': 'WhatsApp', 'icon': Icons.phone},
+      {'value': 'threads', 'label': 'Threads', 'icon': Icons.alternate_email},
+      {'value': 'other', 'label': 'Other', 'icon': Icons.link},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[300]!,
         ),
-        filled: true,
-        fillColor: Colors.grey[100],
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: data['platform'],
+                  decoration: InputDecoration(
+                    labelText: 'Platform',
+                    prefixIcon: Icon(
+                      platforms.firstWhere((p) => p['value'] == data['platform'])['icon'] as IconData,
+                      size: 20,
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  items: platforms.map((platform) {
+                    return DropdownMenuItem<String>(
+                      value: platform['value'] as String,
+                      child: Text(platform['label'] as String),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        data['platform'] = value;
+                      });
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                onPressed: () => _removeSocialMediaEntry(index),
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                tooltip: 'Remove',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: data['controller'] as TextEditingController,
+            decoration: InputDecoration(
+              labelText: 'Username or URL',
+              hintText: '@username or https://...',
+              prefixIcon: const Icon(Icons.alternate_email, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  void _addSocialMediaEntry() {
+    setState(() {
+      _socialMediaEntries.add({
+        'platform': 'twitter',
+        'controller': TextEditingController(),
+      });
+    });
+  }
+
+  void _removeSocialMediaEntry(int index) {
+    setState(() {
+      final entry = _socialMediaEntries[index];
+      (entry['controller'] as TextEditingController).dispose();
+      _socialMediaEntries.removeAt(index);
+    });
   }
 
   Widget _buildReasoningStep() {

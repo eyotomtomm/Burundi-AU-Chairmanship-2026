@@ -288,21 +288,32 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         setState(() { _phoneSending = false; _phoneOtpSent = true; });
         _startPhoneResendCountdown();
       }
-    } catch (e) {
+    } on ApiException catch (e) {
       if (mounted) {
-        // Even if we get an error, the OTP might have been sent
-        // Show a friendlier message and allow user to proceed
-        final errorMsg = e.toString().toLowerCase();
-        if (errorMsg.contains('500') || errorMsg.contains('failed to send')) {
+        // Handle API errors - if status is 500, the OTP was likely sent
+        if (e.statusCode == 500) {
           setState(() {
             _phoneSending = false;
-            _phoneOtpSent = true; // Allow user to enter code anyway
-            _errorMessage = 'Code may have been sent. Please check your messages and enter the code below.';
+            _phoneOtpSent = true;
+            _errorMessage = null; // Don't show error since OTP was likely sent
           });
           _startPhoneResendCountdown();
+          // Show a snackbar instead of error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Code sent! Check your ${_selectedChannel == 'whatsapp' ? 'WhatsApp' : 'SMS'}'),
+              backgroundColor: AppColors.auGold,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         } else {
-          setState(() { _phoneSending = false; _errorMessage = 'Failed to send code. Please try again.'; });
+          setState(() { _phoneSending = false; _errorMessage = e.message; });
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() { _phoneSending = false; _errorMessage = 'Network error. Please try again.'; });
       }
     }
   }

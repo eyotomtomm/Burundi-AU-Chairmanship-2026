@@ -62,22 +62,24 @@ class _SplashScreenState extends State<SplashScreen>
     _fadeController.forward();
     _scaleController.forward();
 
+    // Show splash animation
     await Future.delayed(AppConstants.splashDuration);
     if (!mounted) return;
 
-    // Wait for auth provider to finish checking status (max 3 seconds)
-    final authProvider = context.read<AuthProvider>();
-    final deadline = DateTime.now().add(const Duration(seconds: 3));
-    while (DateTime.now().isBefore(deadline)) {
-      await Future.delayed(const Duration(milliseconds: 200));
-      if (!mounted) return;
-      // If provider has finished initializing (authenticated or checked), break
-      if (authProvider.isAuthenticated || authProvider.userId != null) break;
-      // Small safety: always exit loop after deadline
-    }
+    // CRITICAL: Wait for auth provider to fully initialize
+    // Give it enough time to read from secure storage and SharedPreferences
+    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
 
-    if (authProvider.isAuthenticated) {
+    final authProvider = context.read<AuthProvider>();
+
+    // Navigate based on authentication status
+    // Check BOTH isAuthenticated AND userId to ensure data is loaded
+    final isFullyAuthenticated = authProvider.isAuthenticated &&
+                                 authProvider.userId != null &&
+                                 authProvider.userEmail != null;
+
+    if (isFullyAuthenticated) {
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
       Navigator.of(context).pushReplacementNamed('/auth');

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="bg-slate-900 dark:bg-black h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col h-full py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-amber-500" data-icon="account_balance">account_balance</span>
+</div>
+<div>
+<h1 class="text-lg font-bold text-white tracking-tight">AU Chairmanship</h1>
+<p class="text-xs text-slate-400 font-manrope">2026-2027</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Embassy Locations</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Articles</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Magazine</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Events</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv">live_tv</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Live Feeds</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Consular Services</span>
+</a>
+<div class="pt-4 mt-4 border-t border-slate-800/50">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Settings</span>
+</a>
+</div>
+</nav>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest">Diplomatic Portal</span>
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400" data-icon="search">search</span>
+<input class="bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 w-64 focus:ring-2 focus:ring-secondary/20 font-body text-sm" placeholder="Rechercher une ambassade..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<span class="font-manrope text-sm font-bold text-amber-600 dark:text-amber-400">EN / FR</span>
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-colors"><span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span></button>
+</div>
+<div class="flex items-center gap-3 pl-6 border-l border-slate-200/50">
+<div class="text-right">
+<p class="text-xs font-bold text-on-surface">Admin Portal</p>
+<p class="text-[10px] text-slate-500">Superutilisateur</p>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden bg-slate-200">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a diplomatic official in a dark suit with a neutral studio background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0owHZc8kcC4TDMX-DCBk22MfAE4t3F-UNtkgaV6de_93gSp46N-mefN7hMtELfz6buiDb64znbTThUGUdrDa0QIP3Qgcg4ntp4cEKIxJrP8Xcq5Ai0P5KphNZrw---TYgloxXb-4_JjKjgS7IIFK-2Nt8WYe102C6rgwxCzaD78gh7SHFQkhSqaCQe31NpABS9DB2JoobFWJ6erlMJ-tjlvL9pnNZbN74c7HAb7WEBJOazmeoutWZxv50eCSyE7vfU7xE3e61pqqr"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-72 mt-20 p-12 space-y-12">
+<!-- Editorial Header -->
+<header class="space-y-2">
+<span class="label-md font-bold uppercase tracking-[0.2em] text-secondary">Réseau Diplomatique</span>
+<h2 class="display-sm text-4xl font-extrabold text-on-surface">Gestionnaire des Ambassades</h2>
+<p class="body-md text-on-surface-variant max-w-2xl">Visualisez et gérez la présence diplomatique du Burundi à travers le monde. Supervisez les coordonnées, les horaires et le statut opérationnel de chaque mission.</p>
+</header>
+<!-- Bento Layout: Map & Filters -->
+<section class="grid grid-cols-12 gap-8 items-stretch">
+<!-- Map Component -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm relative group">
+<div class="absolute top-6 left-6 z-10 flex gap-2">
+<span class="px-4 py-2 bg-white/90 backdrop-blur text-xs font-bold rounded-full shadow-lg flex items-center gap-2 text-on-surface">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span> 42 Missions Actives
+                    </span>
+</div>
+<div class="h-[500px] w-full bg-slate-100">
+<img class="w-full h-full object-cover grayscale opacity-80 group-hover:grayscale-0 transition-all duration-700" data-alt="abstract stylized world map with glowing pin points indicating global embassy locations, minimalist aesthetic with navy and gold accents" data-location="Bujumbura" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5B4mAwrqtLcoxnpBybedHyGkIR22UaS0qrdG59XkJWnid8EIjGang6QUCF-hkwnYfRUhyaY9BX_PeNJn1s9vSOHEgaTdmbqe3xd8SZ-jH_TjjAij47k3xSTR0sAhEn--86gD7e91XK5qKW4gJbfzGNo-_3MY3rtimOFC0xe6iOD2shXplthgNGCeS4ubyahu17OBFo4CmmjEPwWDVYGF6JRyL20wrKsZxNhJxT_8Jii7NSatvt1Hl8gPbc7g0EyyP48r4HvStsHk-"/>
+</div>
+<!-- Floating Legend -->
+<div class="absolute bottom-6 right-6 bg-primary-container text-white p-6 rounded-xl shadow-2xl max-w-xs border border-white/10">
+<h4 class="font-bold text-sm mb-2 uppercase tracking-wider text-secondary">Détails de Sélection</h4>
+<p class="text-xs text-slate-300 leading-relaxed mb-4">Ambassade du Burundi à Bruxelles. Quartier des ambassades, Zone Europe.</p>
+<div class="flex items-center justify-between text-[10px] font-bold">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> Ouvert</span>
+<span class="text-secondary">09:00 - 17:00</span>
+</div>
+</div>
+</div>
+<!-- Stats & Quick Actions -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-8">
+<div class="bg-surface-container-high p-8 rounded-xl flex-1 flex flex-col justify-between">
+<div>
+<h3 class="font-bold text-lg mb-6 flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="filter_alt">filter_alt</span>
+                            Filtres de Continent
+                        </h3>
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between px-6 py-4 rounded-lg bg-primary-container text-white font-bold transition-all transform hover:scale-[1.02]">
+<span>Afrique</span>
+<span class="bg-secondary/20 text-secondary px-2 py-0.5 rounded text-[10px]">18</span>
+</button>
+<button class="w-full flex items-center justify-between px-6 py-4 rounded-lg bg-surface-container-lowest border border-outline-variant/20 hover:bg-surface-container-high transition-all">
+<span class="text-sm font-medium">Europe</span>
+<span class="text-slate-400 text-[10px]">12</span>
+</button>
+<button class="w-full flex items-center justify-between px-6 py-4 rounded-lg bg-surface-container-lowest border border-outline-variant/20 hover:bg-surface-container-high transition-all">
+<span class="text-sm font-medium">Amériques</span>
+<span class="text-slate-400 text-[10px]">6</span>
+</button>
+<button class="w-full flex items-center justify-between px-6 py-4 rounded-lg bg-surface-container-lowest border border-outline-variant/20 hover:bg-surface-container-high transition-all">
+<span class="text-sm font-medium">Asie</span>
+<span class="text-slate-400 text-[10px]">6</span>
+</button>
+</div>
+</div>
+<button class="mt-8 w-full bg-primary py-4 rounded-lg text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                        Nouvelle Ambassade
+                    </button>
+</div>
+</div>
+</section>
+<!-- Content Section: Table -->
+<section class="space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="text-xl font-bold flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="list_alt">list_alt</span>
+                    Registre des Missions
+                </h3>
+<div class="flex gap-4">
+<button class="px-4 py-2 text-xs font-bold border border-outline-variant/30 rounded-lg hover:bg-surface-container-low transition-colors">Exporter CSV</button>
+<button class="px-4 py-2 text-xs font-bold border border-outline-variant/30 rounded-lg hover:bg-surface-container-low transition-colors">Imprimer Registre</button>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant">
+<th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Nom / Ville</th>
+<th class="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Pays / Continent</th>
+<th class="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Coordonnées</th>
+<th class="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Horaires</th>
+<th class="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-center">Statut</th>
+<th class="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center group-hover:bg-secondary/10 transition-colors">
+<span class="material-symbols-outlined text-secondary" data-icon="apartment">apartment</span>
+</div>
+<div>
+<p class="font-bold text-sm text-on-surface">Ambassade de Belgique</p>
+<p class="text-[10px] text-slate-500">Bruxelles</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="text-sm font-medium">Belgique</div>
+<div class="text-[10px] text-secondary font-bold uppercase tracking-tighter">Europe</div>
+</td>
+<td class="px-6 py-6">
+<p class="text-[11px] text-on-surface-variant font-medium">info@burundiembassy.be</p>
+<p class="text-[11px] text-slate-400">+32 2 230 45 33</p>
+</td>
+<td class="px-6 py-6">
+<p class="text-xs font-medium">Lun - Ven</p>
+<p class="text-[10px] text-slate-400 italic">09:00 - 17:00</p>
+</td>
+<td class="px-6 py-6 text-center">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded-full">OPÉRATIONNEL</span>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="p-2 hover:bg-surface-container-high rounded-full text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-full text-slate-400 hover:text-error transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center group-hover:bg-secondary/10 transition-colors">
+<span class="material-symbols-outlined text-secondary" data-icon="apartment">apartment</span>
+</div>
+<div>
+<p class="font-bold text-sm text-on-surface">Mission Permanente ONU</p>
+<p class="text-[10px] text-slate-500">New York</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="text-sm font-medium">USA</div>
+<div class="text-[10px] text-secondary font-bold uppercase tracking-tighter">Amériques</div>
+</td>
+<td class="px-6 py-6">
+<p class="text-[11px] text-on-surface-variant font-medium">un.mission@burundigov.bi</p>
+<p class="text-[11px] text-slate-400">+1 212-687-1180</p>
+</td>
+<td class="px-6 py-6">
+<p class="text-xs font-medium">Lun - Ven</p>
+<p class="text-[10px] text-slate-400 italic">08:30 - 16:30</p>
+</td>
+<td class="px-6 py-6 text-center">
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded-full">OPÉRATIONNEL</span>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="p-2 hover:bg-surface-container-high rounded-full text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-full text-slate-400 hover:text-error transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors group">
+<td class="px-8 py-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center group-hover:bg-secondary/10 transition-colors">
+<span class="material-symbols-outlined text-secondary" data-icon="apartment">apartment</span>
+</div>
+<div>
+<p class="font-bold text-sm text-on-surface">Ambassade en Chine</p>
+<p class="text-[10px] text-slate-500">Pékin</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="text-sm font-medium">Chine</div>
+<div class="text-[10px] text-secondary font-bold uppercase tracking-tighter">Asie</div>
+</td>
+<td class="px-6 py-6">
+<p class="text-[11px] text-on-surface-variant font-medium">bjm.pekin@diplomatie.bi</p>
+<p class="text-[11px] text-slate-400">+86 10 6532 2328</p>
+</td>
+<td class="px-6 py-6">
+<p class="text-xs font-medium">Lun - Ven</p>
+<p class="text-[10px] text-slate-400 italic">09:00 - 18:00</p>
+</td>
+<td class="px-6 py-6 text-center">
+<span class="px-3 py-1 bg-surface-container text-slate-500 text-[10px] font-bold rounded-full">MAINTENANCE</span>
+</td>
+<td class="px-8 py-6 text-right">
+<button class="p-2 hover:bg-surface-container-high rounded-full text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="edit">edit</span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-full text-slate-400 hover:text-error transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-6 bg-surface-container-low flex items-center justify-between">
+<p class="text-xs text-on-surface-variant font-medium italic">Affichage de 1-3 sur 42 ambassades enregistrées.</p>
+<div class="flex gap-2">
+<button class="p-2 bg-white rounded border border-outline-variant/20"><span class="material-symbols-outlined text-sm" data-icon="chevron_left">chevron_left</span></button>
+<button class="p-2 bg-white rounded border border-outline-variant/20"><span class="material-symbols-outlined text-sm" data-icon="chevron_right">chevron_right</span></button>
+</div>
+</div>
+</div>
+</section>
+<!-- Form Section: Create/Edit -->
+<section class="max-w-5xl">
+<div class="bg-white rounded-2xl shadow-2xl p-10 border border-slate-100 overflow-hidden relative">
+<!-- Header of Form -->
+<div class="flex items-start justify-between mb-12 border-b border-slate-100 pb-8">
+<div>
+<h3 class="text-2xl font-extrabold flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-3xl" data-icon="edit_note">edit_note</span>
+                            Détails de l'Ambassade
+                        </h3>
+<p class="text-sm text-slate-500 mt-2">Mettez à jour les informations de la mission diplomatique sélectionnée.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-6 py-2 rounded-lg text-sm font-bold border border-outline hover:bg-surface transition-colors">Annuler</button>
+<button class="px-6 py-2 rounded-lg text-sm font-bold bg-primary text-white hover:bg-slate-800 transition-colors">Enregistrer les Modifications</button>
+</div>
+</div>
+<form class="space-y-10">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+<!-- Primary Info -->
+<div class="space-y-6">
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Nom de l'Ambassade</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="text" value="Ambassade du Burundi en France"/>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Ville</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="text" value="Paris"/>
+</div>
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Pays</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="text" value="France"/>
+</div>
+</div>
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Continent</label>
+<select class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all">
+<option>Afrique</option>
+<option selected="">Europe</option>
+<option>Amériques</option>
+<option>Asie</option>
+</select>
+</div>
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Adresse Postale</label>
+<textarea class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" rows="3">10-12 Rue de l'Orme, 75019 Paris, France</textarea>
+</div>
+</div>
+<!-- Technical Info & Upload -->
+<div class="space-y-6">
+<div class="grid grid-cols-2 gap-4">
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Téléphone</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="tel" value="+33 1 45 20 60 61"/>
+</div>
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">E-mail</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="email" value="paris@ambassade-burundi.fr"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Latitude GPS</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="text" value="48.8566"/>
+</div>
+<div class="group">
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Longitude GPS</label>
+<input class="w-full bg-surface-container-low border-none border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 font-body text-sm py-3 px-4 transition-all" type="text" value="2.3522"/>
+</div>
+</div>
+<div>
+<label class="block text-[10px] font-black uppercase tracking-widest text-secondary mb-2">Photo de la Mission</label>
+<div class="border-2 border-dashed border-outline-variant/50 rounded-xl p-8 text-center bg-surface-container-low hover:bg-surface-container-high transition-all cursor-pointer">
+<span class="material-symbols-outlined text-4xl text-slate-300 mb-3" data-icon="cloud_upload">cloud_upload</span>
+<p class="text-xs font-bold text-on-surface">Glissez l'image ici ou cliquez pour parcourir</p>
+<p class="text-[10px] text-slate-400 mt-1">PNG, JPG jusqu'à 10MB</p>
+</div>
+</div>
+<div class="flex items-center gap-6 pt-4">
+<div class="flex items-center gap-2">
+<input checked="" class="w-4 h-4 text-secondary rounded focus:ring-secondary border-outline-variant" type="checkbox"/>
+<span class="text-xs font-bold">Actif / Ouvert</span>
+</div>
+<div class="flex items-center gap-2">
+<input class="w-4 h-4 text-secondary rounded focus:ring-secondary border-outline-variant" type="checkbox"/>
+<span class="text-xs font-bold">Section Consulaire</span>
+</div>
+</div>
+</div>
+</div>
+</form>
+</div>
+</section>
+</main>
+<!-- FAB Suppression Rule (Transactional Context) -->
+<!-- Suppressed on form-heavy/listing management screen -->
+</body></html>

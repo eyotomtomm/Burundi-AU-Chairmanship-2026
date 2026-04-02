@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hero Slides Manager | Burundi AU Chairmanship</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .drag-handle:hover { cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="bg-slate-900 dark:bg-black h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-amber-500" data-icon="account_balance">account_balance</span>
+</div>
+<div>
+<h2 class="text-lg font-bold text-white tracking-tight">AU Chairmanship</h2>
+<p class="text-[10px] text-slate-400 font-manrope uppercase tracking-[0.2em]">2026-2027</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold font-manrope text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span>
+<span>Hero Slides</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+<span>Articles</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span>Magazine</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span>
+<span>Events</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv">live_tv</span>
+<span>Live Feeds</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span>
+<span>Embassy Locations</span>
+</a>
+<div class="pt-6 pb-2 px-4">
+<p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Administration</p>
+</div>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span>User Management</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span>Analytics</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 font-manrope text-sm font-medium tracking-wide scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto px-4 pt-6 border-t border-slate-800">
+<div class="flex items-center gap-3">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="portrait of a diplomatic official in a suit with a neutral professional background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVVn8trKWK0TJiOcVjLiMaZ_HRdHNM9eDxjUYB4kdVsVzPHP7mps19HEeaTNc7rOmsxFWGb4gsRgE4MkpfuLjE-soHieDPnSeKcx4CxUIDMgbasogBIFK_PD1REmzhNB8da_WW17TTeQxufdD2H7GbcAl7QuI68_aIaGi_QiLwumXIgKL8z7X5lBtexgbU8NqzaxhCxVZH5tnkNqBYL4q_X_FVXtfgJ5Um0UsXp_5KpRDFhZjgjOp4N9QF2l_u0Diq_MgcUJvoCPqB"/>
+<div class="overflow-hidden">
+<p class="text-xs font-bold text-white truncate">Burundi AU Chairmanship Seal</p>
+<p class="text-[10px] text-slate-500">Administrator</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-72 min-h-screen">
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+<div class="flex items-center gap-8">
+<h1 class="text-xl font-black text-slate-900 tracking-tight">Diplomatic Portal</h1>
+<div class="relative w-80">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" data-icon="search">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-white/50 border-none rounded-lg text-sm focus:ring-2 focus:ring-secondary/20 transition-all" placeholder="Rechercher des diapositives..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-slate-500 font-manrope text-base">
+<button class="font-bold text-amber-600">FR</button>
+<span class="w-px h-4 bg-slate-200"></span>
+<button class="hover:text-amber-600 transition-colors">EN</button>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+</div>
+<button class="flex items-center gap-2 bg-primary-container text-white px-5 py-2.5 rounded-lg hover:bg-black transition-all">
+<span class="text-sm font-semibold">Profile</span>
+<span class="material-symbols-outlined text-sm" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="pt-28 pb-12 px-12 max-w-[1600px] mx-auto">
+<!-- Header Section -->
+<div class="flex justify-between items-end mb-10">
+<div>
+<span class="text-secondary font-label text-xs font-bold uppercase tracking-widest mb-2 block">Gestion du contenu</span>
+<h2 class="text-4xl font-headline font-extrabold text-on-surface">Hero Slides Manager</h2>
+</div>
+<button class="flex items-center gap-2 bg-primary-container text-white px-6 py-3 rounded-lg shadow-lg hover:bg-black transition-all transform active:scale-95">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span class="font-semibold">Nouvelle Diapositive</span>
+</button>
+</div>
+<div class="grid grid-cols-12 gap-8 items-start">
+<!-- Table Section (Asymmetric Left) -->
+<div class="col-span-12 lg:col-span-8">
+<div class="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest w-16">Ordre</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Aperçu</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Titre &amp; Détails</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Statut</th>
+<th class="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<!-- Row 1 -->
+<tr class="group hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-6">
+<div class="drag-handle flex items-center justify-center text-slate-300 group-hover:text-secondary transition-colors">
+<span class="material-symbols-outlined" data-icon="drag_indicator">drag_indicator</span>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="relative w-32 h-20 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
+<img class="w-full h-full object-cover" data-alt="architectural interior of a modern African diplomatic building with sunlight filtering through patterned windows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRV9PztWsd_rotoda9Qc7VztRMl_SCKbUYA3ajiFVgJ_bgWRezz2Leh-hbkY5v5pWpFa7lKP7rCcy7mOT9VR8nIfFOgBUEFtJgO10uTI4EEWPEK6Vo514X2Z3ZoeKRMcYxx1DUJ4EEC3P_pIouxLK7eXKH1JXXIEFNVR0gsBV8-y8UL0ZJq6B91b4x2FT9oJS7W-QLGcULEsakOlpFT4qwNovA-Um5-Qrs_v9j8IghzG9z8HAmmPqCT8LmfVRdAI0VWzt9Xzxw5dO7"/>
+<div class="absolute top-1 right-1 bg-black/50 text-white text-[8px] px-1.5 py-0.5 rounded backdrop-blur-sm">16:9</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="space-y-1">
+<p class="text-sm font-bold text-slate-900">Sommet de la Paix 2026</p>
+<p class="text-[10px] text-slate-400 font-medium">EN: Peace Summit 2026</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-xs text-slate-400" data-icon="calendar_today">calendar_today</span>
+<span class="text-[10px] text-slate-500">Publié le 12 Mars 2026</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+    Active
+                                        </span>
+</td>
+<td class="px-6 py-6 text-right">
+<div class="flex justify-end gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="edit">edit</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-error-container text-slate-400 hover:text-error transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="delete">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="group hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-6">
+<div class="drag-handle flex items-center justify-center text-slate-300 group-hover:text-secondary transition-colors">
+<span class="material-symbols-outlined" data-icon="drag_indicator">drag_indicator</span>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="relative w-32 h-20 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
+<img class="w-full h-full object-cover" data-alt="close up of a golden pen resting on a signed international treaty document with national seals" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcpeSJsKyEEGmZUpVklpT4vgrrz5kluNtf_8sz2B-s0z0FDEMKjuyd14C3yO3PkFw00Zy6LxGqtTzzaZ7kidtGtXZecHAOVSMlzNMPNhfTehDUpSdvtjfqI7IR39iTh3ZoAPtN34NWOe4BetC7L79ZrcLfaEXyjgWmavFvStVQUfN3KB_WqJ7nTjOxO9CmIchj9NWkkWIAVjn8M_2Ct-hnxgFBe5nkTZSkbXI40HmrV5h4ULPUPNclB9nr0SPqFaVTGZsC7EBj-dmx"/>
+<div class="absolute top-1 right-1 bg-black/50 text-white text-[8px] px-1.5 py-0.5 rounded backdrop-blur-sm">16:9</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="space-y-1">
+<p class="text-sm font-bold text-slate-900">Nouveaux Accords Commerciaux</p>
+<p class="text-[10px] text-slate-400 font-medium">EN: New Trade Agreements</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-xs text-slate-400" data-icon="schedule">schedule</span>
+<span class="text-[10px] text-slate-500">Planifié pour le 01 Mai 2026</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+    Scheduled
+                                        </span>
+</td>
+<td class="px-6 py-6 text-right">
+<div class="flex justify-end gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="edit">edit</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-error-container text-slate-400 hover:text-error transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="delete">delete</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="group hover:bg-surface-container-low transition-colors">
+<td class="px-6 py-6">
+<div class="drag-handle flex items-center justify-center text-slate-300 group-hover:text-secondary transition-colors">
+<span class="material-symbols-outlined" data-icon="drag_indicator">drag_indicator</span>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="relative w-32 h-20 rounded-lg overflow-hidden border border-slate-100 shadow-sm grayscale opacity-60">
+<img class="w-full h-full object-cover" data-alt="abstract wide shot of a futuristic boardroom with a large circular table and elegant lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCO8dLs0ukTIQEKXYnq3bH8TqUz7qKA7nelnwlgjVG5qnYUdCqdnY5568jHnjDXpvusZT_NqEzfZ6yas9xpBUtIRENlBKvhKwgRpa9yiN0vq-to20BhHIn9KaGbzfE_EFCOWmhGnKQIC1zaZjaBLjnpUc4DGa8SDYqlBJa2oT9f0eq8oRRkx7abyjpPNd2RuDynom_JmJcmbTQDWyFh2enFyEVXyrsuBWGpyVhj8wPIbjA0cHd_du44JiKM9c04nY85Si35dKVOPCX"/>
+<div class="absolute inset-0 bg-white/40 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-600" data-icon="drafts">drafts</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<div class="space-y-1">
+<p class="text-sm font-bold text-slate-400 italic">Brouillon - Visite d'État</p>
+<p class="text-[10px] text-slate-300 font-medium">EN: Draft - State Visit</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-xs text-slate-300" data-icon="edit_calendar">edit_calendar</span>
+<span class="text-[10px] text-slate-400">Modifié il y a 2 jours</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+    Draft
+                                        </span>
+</td>
+<td class="px-6 py-6 text-right">
+<div class="flex justify-end gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="edit">edit</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-error-container text-slate-400 hover:text-error transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="delete">delete</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Form Section (Asymmetric Right / Sidebar) -->
+<div class="col-span-12 lg:col-span-4 sticky top-28">
+<div class="bg-surface-container-high rounded-xl p-8 shadow-sm">
+<h3 class="text-xl font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="edit_note">edit_note</span>
+                            Éditer la Diapositive
+                        </h3>
+<form class="space-y-6">
+<!-- Image Upload -->
+<div>
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Image de Couverture</label>
+<div class="relative group cursor-pointer border-2 border-dashed border-slate-200 rounded-xl p-2 bg-white/50 hover:border-secondary/50 transition-all">
+<img class="w-full aspect-[2/1] object-cover rounded-lg" data-alt="architectural interior of a modern African diplomatic building with sunlight filtering through patterned windows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsLdBulFni3Sbtx0XxFyX80kLSHRjk5K6SHH_uvyWRBlnDeKFwZDem90u5ZtfeLQWbm-PMGv6VbKZO1Qk76MDuCHDuSRpitOzLKFFzmKUnEfP_tQ8dLe95_eUI9G9T-rWZ3dgaoP49D83_OcG--nb_2WJhZxJFWo-iWhxZ0GJIq7MIxGWigXQPYlyL8qBxfHisp92oy59YbzP_01044_VgV7T15i1rrPC_PzWOIYNXV6yLmwxuuHJRIgXGh4C5f54SUDnU633GkMf5"/>
+<div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white rounded-lg transition-opacity duration-300">
+<span class="material-symbols-outlined text-3xl mb-2" data-icon="upload">upload</span>
+<span class="text-xs font-bold uppercase tracking-wider">Changer l'image</span>
+</div>
+</div>
+</div>
+<!-- Dual Language Inputs -->
+<div class="grid grid-cols-1 gap-4">
+<div>
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Titre (FR)</label>
+<input class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-slate-200 focus:ring-0 focus:border-secondary font-medium transition-all" type="text" value="Sommet de la Paix 2026"/>
+</div>
+<div>
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Titre (EN)</label>
+<input class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-slate-200 focus:ring-0 focus:border-secondary font-medium transition-all" type="text" value="Peace Summit 2026"/>
+</div>
+</div>
+<div>
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Sous-titre / Description</label>
+<textarea class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-slate-200 focus:ring-0 focus:border-secondary font-medium resize-none transition-all" rows="3">Renforcer la coopération régionale pour un avenir prospère.</textarea>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Date de publication</label>
+<input class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-slate-200 focus:ring-0 focus:border-secondary text-sm font-medium transition-all" type="date" value="2026-03-12"/>
+</div>
+<div>
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 ml-1">Destination du lien</label>
+<select class="w-full px-0 py-2 bg-transparent border-0 border-b-2 border-slate-200 focus:ring-0 focus:border-secondary text-sm font-medium transition-all">
+<option>Articles / Sommet</option>
+<option>Événements / Direct</option>
+<option>Lien Externe</option>
+</select>
+</div>
+</div>
+<!-- Toggle Switches -->
+<div class="flex items-center justify-between p-4 bg-white/50 rounded-lg">
+<div>
+<p class="text-sm font-bold text-slate-900">Activer la diapositive</p>
+<p class="text-[10px] text-slate-500 uppercase tracking-tighter">Visible immédiatement sur le portail</p>
+</div>
+<button class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-amber-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2" type="button">
+<span class="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
+</button>
+</div>
+<!-- Form Actions -->
+<div class="flex gap-4 pt-4">
+<button class="flex-1 bg-white text-slate-600 border border-slate-200 px-4 py-3 rounded-lg font-bold hover:bg-slate-50 transition-all" type="button">
+                                    Annuler
+                                </button>
+<button class="flex-1 bg-primary-container text-white px-4 py-3 rounded-lg font-bold shadow-md hover:bg-black transition-all" type="submit">
+                                    Enregistrer
+                                </button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Global Layout Logic (Floating Elements) -->
+<div class="fixed bottom-8 right-8 z-50 md:hidden">
+<button class="w-14 h-14 bg-secondary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+</button>
+</div>
+</body></html>

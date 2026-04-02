@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Consular Services Manager | Burundi AU Chairmanship</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d7e3fc; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="bg-slate-900 dark:bg-black h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-amber-500" data-icon="account_balance">account_balance</span>
+</div>
+<h1 class="text-lg font-bold text-white tracking-tight">AU Chairmanship</h1>
+</div>
+<p class="text-xs text-slate-500 font-manrope font-medium tracking-widest uppercase pl-1">2026-2027</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Dashboard -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Dashboard</span>
+</a>
+<!-- Hero Slides -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Hero Slides</span>
+</a>
+<!-- Articles -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Articles</span>
+</a>
+<!-- Magazine -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Magazine</span>
+</a>
+<!-- Events -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Events</span>
+</a>
+<!-- Live Feeds -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv">live_tv</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Live Feeds</span>
+</a>
+<!-- Embassy Locations -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Embassy Locations</span>
+</a>
+<!-- Consular Services (ACTIVE) -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Consular Services</span>
+</a>
+<!-- Resources -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Resources</span>
+</a>
+<!-- Push Notifications -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Push Notifications</span>
+</a>
+<!-- User Management -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-manrope text-sm font-medium tracking-wide">User Management</span>
+</a>
+<!-- Analytics -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Analytics</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- TopNavBar (Authority: JSON) -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase">Diplomatic Portal</span>
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" data-icon="search">search</span>
+<input class="bg-surface-container-low border-none rounded-full pl-10 pr-4 py-2 w-64 text-sm focus:ring-2 focus:ring-secondary/20 font-body" placeholder="Rechercher des services..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors font-manrope font-bold text-sm tracking-widest uppercase">EN / FR</button>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200/50 transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200/50 transition-all">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+</div>
+<div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+<div class="flex items-center gap-3 cursor-pointer group">
+<img class="w-10 h-10 rounded-full border-2 border-transparent group-hover:border-secondary transition-all" data-alt="close-up portrait of a professional diplomat in a tailored navy suit looking confidently towards the camera in a modern office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnETHCzH_OTX2qKMD1O36MR1FIwN0F_z26qiQ8Zm1bj21AO6fzDBGEbS4Qb1wya8R1TKbuHQGIBIFXr4IjOSGogDQQlQXxlixFgt45p2ZmdTH2bq4mdj3rUkHdu1T4GOFZewE3TSD_l3Ryi2wqH1ax-3t71D_SJASWuk0m4uOc3JXgVF8j_bKj9-pba_kY_tn9Ruc3o9EX95p7MWcHeT4rsU0V7ipHTUTJzeMhNraKY5WUsqoCkS1OkGcZnqTWaQHpn-08Qc5RSZSb"/>
+<span class="font-manrope text-sm font-bold text-slate-900 dark:text-white">Profile</span>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="ml-72 pt-28 pb-12 px-12 min-h-screen">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
+<div>
+<span class="text-secondary font-bold text-[0.7rem] tracking-[0.2em] uppercase mb-2 block font-label">Administration Consulaire</span>
+<h2 class="text-4xl font-headline font-extrabold text-on-surface tracking-tight">Services Consulaires</h2>
+<p class="text-on-surface-variant max-w-xl mt-3 text-body-md">Gérez le catalogue des services diplomatiques officiels, les tarifs et les procédures pour les citoyens Burundais et étrangers.</p>
+</div>
+<div class="flex gap-4">
+<button class="flex items-center gap-2 bg-surface-container-lowest text-on-surface px-6 py-3 rounded-xl border border-outline-variant/30 hover:bg-surface-container-high transition-all font-manrope font-bold text-sm">
+<span class="material-symbols-outlined text-[20px]" data-icon="sort">sort</span>
+                    Réorganiser
+                </button>
+<button class="flex items-center gap-2 bg-primary-container text-on-primary px-8 py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all font-manrope font-bold text-sm shadow-xl shadow-primary-container/20">
+<span class="material-symbols-outlined text-[20px]" data-icon="add">add</span>
+                    Nouveau Service
+                </button>
+</div>
+</div>
+<!-- Dashboard Layout -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Left Column: Services List -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+<div class="bg-surface-container-low rounded-[1.25rem] p-6">
+<h3 class="font-headline font-bold text-lg mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="list">list</span>
+                        Catalogue des Services
+                    </h3>
+<div class="space-y-4">
+<!-- Active Card -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border-l-4 border-secondary shadow-sm flex items-center justify-between group cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="passport">travel</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Passeport</p>
+<p class="text-xs text-on-surface-variant">Passport Services</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-secondary transition-colors" data-icon="drag_indicator">drag_indicator</span>
+</div>
+<!-- Service Item -->
+<div class="bg-surface-container-lowest/50 p-5 rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-container-lowest transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-on-surface/5 rounded-lg flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="vignette">vignette</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Visa</p>
+<p class="text-xs text-on-surface-variant">Visa Services</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant" data-icon="drag_indicator">drag_indicator</span>
+</div>
+<!-- Service Item -->
+<div class="bg-surface-container-lowest/50 p-5 rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-container-lowest transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-on-surface/5 rounded-lg flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="verified">verified</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">Légalisation</p>
+<p class="text-xs text-on-surface-variant">Document Legalization</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant" data-icon="drag_indicator">drag_indicator</span>
+</div>
+<!-- Service Item -->
+<div class="bg-surface-container-lowest/50 p-5 rounded-xl flex items-center justify-between group cursor-pointer hover:bg-surface-container-lowest transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-on-surface/5 rounded-lg flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="family_history">family_history</span>
+</div>
+<div>
+<p class="font-bold text-on-surface">État Civil</p>
+<p class="text-xs text-on-surface-variant">Civil Registry</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant" data-icon="drag_indicator">drag_indicator</span>
+</div>
+</div>
+</div>
+<!-- Emergency Contacts Section -->
+<div class="bg-primary-container text-white rounded-[1.25rem] p-8 shadow-2xl relative overflow-hidden">
+<div class="absolute -right-10 -top-10 w-40 h-40 bg-secondary/20 rounded-full blur-3xl"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline font-bold text-xl flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="e911_emergency" style="font-variation-settings: 'FILL' 1;">e911_emergency</span>
+                                Urgences 24/7
+                            </h3>
+<button class="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="add">add</span>
+</button>
+</div>
+<div class="space-y-6">
+<div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<div>
+<p class="font-bold text-sm">Gaspard Nzeyimana</p>
+<p class="text-xs text-slate-400">Conseiller de Garde</p>
+<p class="text-secondary text-sm font-manrope font-bold mt-1">+257 22 22 22 22</p>
+</div>
+</div>
+<div class="flex flex-col items-end gap-2">
+<div class="flex items-center gap-2 bg-secondary/20 px-2 py-1 rounded-md">
+<span class="text-[10px] font-bold text-secondary uppercase tracking-tighter">Actif 24/7</span>
+<div class="w-8 h-4 bg-secondary rounded-full relative">
+<div class="absolute right-1 top-1 w-2 h-2 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 opacity-70">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-slate-500"></div>
+<div>
+<p class="font-bold text-sm">Claver Gatete</p>
+<p class="text-xs text-slate-400">Directeur Consulaire</p>
+<p class="text-slate-300 text-sm font-manrope font-bold mt-1">+257 22 33 44 55</p>
+</div>
+</div>
+<div class="flex flex-col items-end gap-2">
+<div class="flex items-center gap-2 bg-slate-800 px-2 py-1 rounded-md">
+<span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Off</span>
+<div class="w-8 h-4 bg-slate-700 rounded-full relative">
+<div class="absolute left-1 top-1 w-2 h-2 bg-slate-500 rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Service Editor -->
+<div class="col-span-12 lg:col-span-7">
+<div class="bg-surface-container-lowest rounded-[1.25rem] p-8 shadow-sm border border-outline-variant/10">
+<div class="flex justify-between items-center mb-8 pb-6 border-b border-surface-container">
+<div class="flex items-center gap-4">
+<div class="w-14 h-14 bg-secondary-container rounded-2xl flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-3xl" data-icon="passport" style="font-variation-settings: 'FILL' 1;">travel</span>
+</div>
+<div>
+<h4 class="text-2xl font-headline font-bold">Éditer Service: Passeport</h4>
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                                    En Ligne
+                                </span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="p-3 text-error hover:bg-error/5 rounded-xl transition-all">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+<button class="p-3 text-on-surface-variant hover:bg-surface-container rounded-xl transition-all">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+</button>
+</div>
+</div>
+<form class="space-y-10">
+<!-- Name & Description Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="space-y-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-secondary font-label">Nom du Service (FR)</label>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed-dim focus:ring-0 focus:border-secondary transition-all py-3 px-4 font-body" type="text" value="Passeport Ordinaire"/>
+</div>
+<div class="space-y-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-slate-400 font-label">Service Name (EN)</label>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed-dim focus:ring-0 focus:border-secondary transition-all py-3 px-4 font-body" type="text" value="Ordinary Passport"/>
+</div>
+<div class="space-y-4 md:col-span-2">
+<label class="block text-xs font-bold uppercase tracking-widest text-secondary font-label">Description (FR)</label>
+<textarea class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed-dim focus:ring-0 focus:border-secondary transition-all py-3 px-4 font-body" rows="3">Délivrance de passeports biométriques pour les citoyens burundais résidant à l'étranger ou au pays.</textarea>
+</div>
+</div>
+<!-- Details Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="space-y-3">
+<label class="block text-xs font-bold uppercase tracking-widest text-slate-500 font-label">Frais (USD)</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">$</span>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed-dim focus:ring-0 focus:border-secondary pl-8 py-3 px-4 font-body" type="text" value="100.00"/>
+</div>
+</div>
+<div class="space-y-3">
+<label class="block text-xs font-bold uppercase tracking-widest text-slate-500 font-label">Délai de traitement</label>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed-dim focus:ring-0 focus:border-secondary py-3 px-4 font-body" type="text" value="15 jours ouvrables"/>
+</div>
+<div class="space-y-3">
+<label class="block text-xs font-bold uppercase tracking-widest text-slate-500 font-label">Lien de Réservation</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant material-symbols-outlined text-sm" data-icon="link">link</span>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-primary-fixed-dim focus:ring-0 focus:border-secondary pl-10 py-3 px-4 font-body" type="text" value="consulaire.bi/booking"/>
+</div>
+</div>
+</div>
+<!-- Required Documents -->
+<div class="bg-surface-container-low p-6 rounded-2xl">
+<div class="flex justify-between items-center mb-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-secondary font-label">Documents Requis</label>
+<button class="text-xs font-bold text-primary flex items-center gap-1 hover:underline" type="button">
+<span class="material-symbols-outlined text-xs" data-icon="add_circle">add_circle</span>
+                                    Ajouter un document
+                                </button>
+</div>
+<div class="space-y-2">
+<div class="flex items-center justify-between bg-surface-container-lowest px-4 py-3 rounded-lg group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="description">description</span>
+<span class="text-sm">Copie de la Carte d'Identité Nationale</span>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-error transition-all"><span class="material-symbols-outlined text-sm" data-icon="close">close</span></button>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest px-4 py-3 rounded-lg group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="description">description</span>
+<span class="text-sm">Deux photos d'identité récentes</span>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-error transition-all"><span class="material-symbols-outlined text-sm" data-icon="close">close</span></button>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest px-4 py-3 rounded-lg group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400" data-icon="description">description</span>
+<span class="text-sm">Preuve de paiement des frais</span>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-error transition-all"><span class="material-symbols-outlined text-sm" data-icon="close">close</span></button>
+</div>
+</div>
+</div>
+<!-- Form Actions -->
+<div class="flex items-center justify-between pt-6">
+<label class="flex items-center gap-3 cursor-pointer">
+<div class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</div>
+<span class="text-sm font-bold text-on-surface">Service Visible</span>
+</label>
+<div class="flex gap-4">
+<button class="px-8 py-3 rounded-xl border border-outline-variant text-on-surface font-manrope font-bold text-sm hover:bg-surface-container transition-all" type="button">Annuler</button>
+<button class="px-10 py-3 rounded-xl bg-primary-container text-on-primary font-manrope font-bold text-sm hover:scale-[1.02] shadow-xl shadow-primary-container/20 transition-all" type="submit">Enregistrer</button>
+</div>
+</div>
+</form>
+</div>
+</div>
+</div>
+<!-- System Stats / Activity (Bento style) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-12">
+<div class="bg-surface-container-high p-6 rounded-[1.25rem] flex flex-col justify-between">
+<span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Demandes en attente</span>
+<div class="mt-4 flex items-end justify-between">
+<span class="text-4xl font-headline font-black">142</span>
+<span class="text-green-600 font-bold text-xs flex items-center mb-1"><span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span> 12%</span>
+</div>
+</div>
+<div class="bg-surface-container-high p-6 rounded-[1.25rem] flex flex-col justify-between">
+<span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Services Actifs</span>
+<div class="mt-4 flex items-end justify-between">
+<span class="text-4xl font-headline font-black">28</span>
+<span class="text-slate-500 font-bold text-xs mb-1">Stable</span>
+</div>
+</div>
+<div class="bg-surface-container-high p-6 rounded-[1.25rem] md:col-span-2 relative overflow-hidden group">
+<div class="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity">
+<img class="w-full h-full object-cover" data-alt="abstract flowing gradients of navy blue and deep gold in a silky wave pattern representing diplomatic movement and flow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBylKeK-vd4qn0WhAm42QYXLAkY6jRRXg3MzkZXRiQZlC-mF6F76wf4XesYvg_FKTTAIFvRGYz-0agzb2zvqptMh2by8fhpEHGLsQkg0wgaNtJiK1K27BH1NX5WNqvTcbVhkdZnTy2j6bEwEjta2Az4fge4vBb6HLkSaWtqEhmNIiYxEjslNiVuo4aok8hLBF-HlU84F4giuNLlXsK5g0-cHmMvgjnC8IlxTridnOh6wlpvuQy-uL1lQ2yT_e94_6QHoYkermSfgBCV"/>
+</div>
+<div class="relative z-10">
+<span class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Revenus de la semaine</span>
+<div class="mt-4 flex items-end justify-between">
+<span class="text-4xl font-headline font-black">$12,450</span>
+<div class="h-10 flex items-end gap-1">
+<div class="w-2 h-4 bg-secondary/30 rounded-t"></div>
+<div class="w-2 h-6 bg-secondary/30 rounded-t"></div>
+<div class="w-2 h-3 bg-secondary/30 rounded-t"></div>
+<div class="w-2 h-8 bg-secondary rounded-t"></div>
+<div class="w-2 h-5 bg-secondary/30 rounded-t"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button (Only for relevant contexts) -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-secondary rounded-full flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all group z-50">
+<span class="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform" data-icon="support_agent" style="font-variation-settings: 'FILL' 1;">support_agent</span>
+</button>
+</body></html>

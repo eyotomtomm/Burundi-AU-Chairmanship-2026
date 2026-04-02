@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Articles / News Manager - Diplomatic Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d7e3fc; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface min-h-screen">
+<!-- SideNavBar -->
+<aside class="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-900 flex flex-col py-8 px-4 z-50 shadow-2xl">
+<div class="flex items-center gap-4 mb-10 px-2">
+<div class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+<img alt="Burundi AU Chairmanship Seal" data-alt="Official seal of the Burundi AU Chairmanship featuring national colors and diplomatic crest on a clean white background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvbEUTGjg80Po0kd5BmavsRRSDsZWex2vQ-SbWD8T0HCh3Yg0DvbcYcgIGZP04R8d5UzIlQS_IYB3M-44xIVfr9G5-c989vZ7R6vQ_c7qWxEThtx1rJz_CUtGfig9u4-OvCOH8hYaogIIRUq73OQ3rjzyf-7zWY4j-h5tcVidiUJfUxUOcuWopXZQAIrvtpNa4Unl4-57ysV9WyNAOxSs81tkLJMbKJxTbv25tjUApm-jhW_ZWcEi6FUF6rNZ-tBHjwNzVt7xUQYOH"/>
+</div>
+<div>
+<h1 class="text-lg font-bold text-white tracking-tight font-headline">AU Chairmanship</h1>
+<p class="text-xs text-slate-400 font-medium">2026-2027</p>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span> Hero Slides
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold font-manrope text-sm tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span> Articles
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span> Magazine
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span> Events
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv">live_tv</span> Live Feeds
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span> Embassy Locations
+            </a>
+<div class="pt-6 pb-2">
+<p class="px-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Administration</p>
+</div>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span> Push Notifications
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span> User Management
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span> Settings
+            </a>
+</nav>
+</aside>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl flex justify-between items-center h-20 px-12 border-b border-slate-200/50">
+<div class="flex items-center flex-1 max-w-xl">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 focus:ring-2 focus:ring-secondary/20 font-body text-sm transition-all" placeholder="Rechercher des articles..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-6">
+<button class="text-slate-500 hover:text-amber-600 transition-colors font-semibold text-sm">EN / FR</button>
+<button class="text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+</div>
+<div class="h-8 w-[1px] bg-slate-200"></div>
+<div class="flex items-center gap-3 group cursor-pointer">
+<div class="text-right">
+<p class="text-sm font-bold text-slate-900 leading-tight">Admin Principal</p>
+<p class="text-[10px] text-slate-500 font-medium">Gestionnaire de Portail</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden ring-2 ring-transparent group-hover:ring-amber-500/30 transition-all">
+<img alt="Administrator Profile" data-alt="Professional headshot of a diplomatic official in a formal suit, soft office lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPlUq_txcqA9U30l1pgZFWDJxuzMzIeHRrCgQFh3T8PAJHKupBnzeVVmM8NUKkVagP5c-IvgwAMDHqxLriGMWjwnFY0JPPeWRt7_pcs00LU4w1D2Lw7nHOXZ6vr54pPWOafetLYKj8HerFhv63nujHTPwi3hQHRo8MurBg058-AVhOvkcCSDTlcIG2bzLQ27M0f4gLW91V5SXry5DJysSuTMH-Ol4G_vQXd-Ln_SpsUFqGssHsm4GPzf0L_m-V-30IgnPa_q168yZ_"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-72 pt-28 pb-12 px-12 bg-surface">
+<!-- Header & Action Row -->
+<div class="flex justify-between items-end mb-12">
+<div>
+<p class="label-md uppercase tracking-[0.15em] text-secondary font-bold mb-2">Gestion des Contenus</p>
+<h2 class="display-sm text-4xl font-headline font-extrabold text-on-surface">Articles &amp; Actualités</h2>
+</div>
+<button class="flex items-center gap-2 bg-primary-container text-white px-8 py-4 rounded-xl font-bold hover:bg-black transition-all shadow-xl hover:-translate-y-0.5 active:scale-95">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                Nouvel Article
+            </button>
+</div>
+<!-- Filter Bar -->
+<div class="bg-surface-container-low p-6 rounded-2xl mb-8 flex flex-wrap items-center gap-6">
+<div class="flex-1 min-w-[200px]">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Catégorie</label>
+<select class="w-full bg-white border-none rounded-lg py-2.5 px-4 font-body text-sm focus:ring-2 focus:ring-secondary/20">
+<option>Toutes les catégories</option>
+<option>Diplomatie</option>
+<option>Économie</option>
+<option>Culture</option>
+<option>AU Summit 2026</option>
+</select>
+</div>
+<div class="flex-1 min-w-[200px]">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Statut</label>
+<select class="w-full bg-white border-none rounded-lg py-2.5 px-4 font-body text-sm focus:ring-2 focus:ring-secondary/20">
+<option>Tous les statuts</option>
+<option>Publié</option>
+<option>Brouillon</option>
+<option>Planifié</option>
+<option>Archivé</option>
+</select>
+</div>
+<div class="flex-1 min-w-[200px]">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Période</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">calendar_today</span>
+<input class="w-full bg-white border-none rounded-lg py-2.5 px-4 font-body text-sm focus:ring-2 focus:ring-secondary/20" placeholder="Sélectionner dates" type="text"/>
+</div>
+</div>
+<div class="flex-1 min-w-[200px]">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">Auteur</label>
+<select class="w-full bg-white border-none rounded-lg py-2.5 px-4 font-body text-sm focus:ring-2 focus:ring-secondary/20">
+<option>Tous les auteurs</option>
+<option>Amb. Jean Nkurunziza</option>
+<option>Marie Claire</option>
+</select>
+</div>
+<div class="flex items-end self-end h-full">
+<button class="p-2.5 bg-white text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined" data-icon="filter_list">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Bulk Actions & Table Container -->
+<div class="bg-surface-container-lowest rounded-3xl overflow-hidden">
+<!-- Bulk Actions Bar -->
+<div class="px-8 py-4 bg-primary-container text-white flex items-center justify-between">
+<div class="flex items-center gap-6">
+<span class="text-sm font-medium opacity-80">3 articles sélectionnés</span>
+<div class="h-4 w-[1px] bg-white/20"></div>
+<div class="flex gap-4">
+<button class="flex items-center gap-1.5 text-xs font-bold hover:text-amber-400 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="publish">publish</span> Publier
+                        </button>
+<button class="flex items-center gap-1.5 text-xs font-bold hover:text-amber-400 transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="archive">archive</span> Archiver
+                        </button>
+<button class="flex items-center gap-1.5 text-xs font-bold hover:text-error-container transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="delete">delete</span> Supprimer
+                        </button>
+</div>
+</div>
+<button class="text-xs font-medium opacity-60 hover:opacity-100">Annuler la sélection</button>
+</div>
+<!-- Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="py-5 px-8 w-12">
+<input class="rounded border-slate-300 text-secondary focus:ring-secondary" type="checkbox"/>
+</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Thumbnail</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Titre de l'Article</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Catégorie</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Auteur</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Statut</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Publication</th>
+<th class="py-5 px-4 font-headline text-xs font-bold uppercase tracking-wider text-slate-500">Vues</th>
+<th class="py-5 px-8 text-right"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<!-- Row 1 -->
+<tr class="group hover:bg-surface-container-low/30 transition-colors">
+<td class="py-6 px-8">
+<input checked="" class="rounded border-slate-300 text-secondary focus:ring-secondary" type="checkbox"/>
+</td>
+<td class="py-6 px-4">
+<div class="w-20 h-14 rounded-lg bg-slate-100 overflow-hidden shadow-sm">
+<img alt="Thumbnail" class="w-full h-full object-cover" data-alt="Wide shot of an international conference hall with flags of many nations, focused lighting on the central stage" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaLfYeinu-Ek8kFb7j2lApbUKF_8-clC_8dq35FaukM0x8BOZYk-x94A18EpRQsD7rAHhMYPxanAaCZ178rhlfneK-myyA2b6boVgRZIw-63NU7Lfra156LIldbOBnyg7-HbeHX_UjTp9ZRLu68ujhNdgqJeEnnrSF1Zlq4j0i1qrDF3feEa5Q5Fa-gUaIHj9wec90CA48iQHs_zgj3w0rBBMCTNlY5IFahNRfi1vrePua-B1x0Of1ZFDXx19kxFgeVvGEWaZ2TZzb"/>
+</div>
+</td>
+<td class="py-6 px-4">
+<p class="text-sm font-bold text-on-surface line-clamp-1">Burundi 2026 : Vers une vision panafricaine renforcée</p>
+<p class="text-[10px] text-slate-400 font-medium">Slug: /vision-panafricaine-2026</p>
+</td>
+<td class="py-6 px-4">
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-[10px] font-bold text-slate-700 uppercase tracking-tighter">Diplomatie</span>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-[8px] font-bold text-amber-700">JN</div>
+<span class="text-xs font-medium text-on-surface-variant">Amb. Jean N.</span>
+</div>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-secondary-container rounded-full w-fit">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary"></div>
+<span class="text-[10px] font-bold text-on-secondary-container uppercase">Publié</span>
+</div>
+</td>
+<td class="py-6 px-4">
+<p class="text-xs text-on-surface-variant font-medium">12 Mai 2025</p>
+<p class="text-[10px] text-slate-400">14:30 GMT+2</p>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-1 text-slate-600">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span>
+<span class="text-xs font-bold">12.4k</span>
+</div>
+</td>
+<td class="py-6 px-8 text-right">
+<button class="p-2 text-slate-400 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="group hover:bg-surface-container-low/30 transition-colors">
+<td class="py-6 px-8">
+<input checked="" class="rounded border-slate-300 text-secondary focus:ring-secondary" type="checkbox"/>
+</td>
+<td class="py-6 px-4">
+<div class="w-20 h-14 rounded-lg bg-slate-100 overflow-hidden shadow-sm">
+<img alt="Thumbnail" class="w-full h-full object-cover" data-alt="High-tech cityscape with modern skyscrapers and glowing digital lines representing economic growth and connectivity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGLDEs-LDVm-pfriHT26TqaP-Ydz5pk3s8_YzKR8k4zuYGbQ1D6EZ1dYTiRg1EWTQCpjFwU5FZ42ChsqeXPn7TgPWIb7dkYSOM7fPy9X_RQjPBvAV039r6vaAaYh7hmqqACl5znesGYda_-2EDcWqqz3c3HW_JzYDbkaBeiZ5swmDD0wd0L8rk5hbHjHMNNbWGQ2K3fOtzU4Gp13qEAFTRKaZtT8BtReBKaIH7BC92Q9XoL2oJ6ZkNeF33W9NhzhhJa9vbOxyDdSfr"/>
+</div>
+</td>
+<td class="py-6 px-4">
+<p class="text-sm font-bold text-on-surface line-clamp-1">Sommet économique EAC : Les nouveaux accords commerciaux</p>
+<p class="text-[10px] text-slate-400 font-medium">Slug: /sommet-eco-eac-2025</p>
+</td>
+<td class="py-6 px-4">
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-[10px] font-bold text-slate-700 uppercase tracking-tighter">Économie</span>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-500">MC</div>
+<span class="text-xs font-medium text-on-surface-variant">Marie Claire</span>
+</div>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full w-fit">
+<div class="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
+<span class="text-[10px] font-bold text-slate-500 uppercase">Brouillon</span>
+</div>
+</td>
+<td class="py-6 px-4">
+<p class="text-xs text-on-surface-variant font-medium">—</p>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span>
+<span class="text-xs font-bold">0</span>
+</div>
+</td>
+<td class="py-6 px-8 text-right">
+<button class="p-2 text-slate-400 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="group hover:bg-surface-container-low/30 transition-colors">
+<td class="py-6 px-8">
+<input checked="" class="rounded border-slate-300 text-secondary focus:ring-secondary" type="checkbox"/>
+</td>
+<td class="py-6 px-4">
+<div class="w-20 h-14 rounded-lg bg-slate-100 overflow-hidden shadow-sm">
+<img alt="Thumbnail" class="w-full h-full object-cover" data-alt="Vibrant Burundian cultural dance performers in traditional attire under golden spotlighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJgvgiRF75s_qdbqARXtpr-aH6g58tsEohT903PmWCD-5KzB5XiFaPNIgO6L_nZK2aKq7odz7r7ubA6aVzYQtoOXO8_uhjIZDRL4TfH35Wu4dDXin3DmsxLWCPJoT7YNj5yzCDyZAXrbB4Wm7N54qAPw7vEOEsuRk58BkAmne4vKFO26scArhOQfFDrdq8DrfJ1jgc10GrsgVj7w3riZQWxQ0blreSj18nLODaS0dIBS7gaJlfm-z_S2OfSVp5S06kgOqdbjAq_T4v"/>
+</div>
+</td>
+<td class="py-6 px-4">
+<p class="text-sm font-bold text-on-surface line-clamp-1">Patrimoine National : Ouverture du nouveau Musée Royal</p>
+<p class="text-[10px] text-slate-400 font-medium">Slug: /musee-royal-gitega</p>
+</td>
+<td class="py-6 px-4">
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-[10px] font-bold text-slate-700 uppercase tracking-tighter">Culture</span>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-[8px] font-bold text-amber-700">JN</div>
+<span class="text-xs font-medium text-on-surface-variant">Amb. Jean N.</span>
+</div>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 rounded-full w-fit">
+<div class="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
+<span class="text-[10px] font-bold text-amber-600 uppercase">Planifié</span>
+</div>
+</td>
+<td class="py-6 px-4">
+<p class="text-xs text-on-surface-variant font-medium">20 Mai 2025</p>
+<p class="text-[10px] text-slate-400">08:00 GMT+2</p>
+</td>
+<td class="py-6 px-4">
+<div class="flex items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined text-sm" data-icon="visibility">visibility</span>
+<span class="text-xs font-bold">0</span>
+</div>
+</td>
+<td class="py-6 px-8 text-right">
+<button class="p-2 text-slate-400 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-8 py-6 border-t border-slate-100 flex justify-between items-center">
+<p class="text-xs text-slate-500 font-medium">Affichage de 1-10 sur 156 articles</p>
+<div class="flex gap-2">
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-primary-container text-white text-xs font-bold shadow-md">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-xs font-bold">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-xs font-bold">3</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
+</div>
+</div>
+</div>
+<!-- Editor Modal (Overlay state simulated) -->
+<div class="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-sm">
+<div class="w-full max-w-6xl h-full bg-white shadow-2xl overflow-y-auto animate-in fade-in slide-in-from-right duration-500">
+<div class="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-slate-100 px-10 py-6 flex items-center justify-between">
+<div class="flex items-center gap-6">
+<button class="p-2 hover:bg-slate-100 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<div>
+<p class="text-[10px] font-bold text-secondary uppercase tracking-[0.2em]">Éditeur d'Article</p>
+<h3 class="text-xl font-headline font-bold text-on-surface">Nouvel Article Diplomatique</h3>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-all">Enregistrer Brouillon</button>
+<button class="px-8 py-2.5 bg-primary-container text-white text-sm font-bold rounded-lg hover:bg-black shadow-lg transition-all">Publier Maintenant</button>
+</div>
+</div>
+<div class="px-10 py-12">
+<div class="grid grid-cols-12 gap-12">
+<!-- Main Content Fields (8 cols) -->
+<div class="col-span-8 space-y-10">
+<!-- Bilingual Content Tabs -->
+<div class="bg-surface-container-low rounded-2xl p-1 flex items-center w-fit mb-6">
+<button class="px-8 py-2.5 bg-white rounded-xl text-sm font-bold text-primary shadow-sm">Français</button>
+<button class="px-8 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors">English</button>
+</div>
+<!-- Title & Subtitle -->
+<div class="space-y-6">
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Titre de l'article (Français)</label>
+<input class="w-full text-3xl font-headline font-extrabold border-none focus:ring-0 p-0 placeholder:text-slate-200" placeholder="Entrez le titre impactant ici..." type="text"/>
+</div>
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Accroche / Sous-titre</label>
+<textarea class="w-full text-lg font-medium text-slate-500 border-none focus:ring-0 p-0 resize-none placeholder:text-slate-200" placeholder="Un court résumé pour les listes d'actualités..." rows="2"></textarea>
+</div>
+</div>
+<!-- Rich Text Editor Mockup -->
+<div class="border-y border-slate-100 py-8">
+<div class="bg-slate-50 rounded-xl p-4 flex items-center gap-4 mb-6 sticky top-24 z-10">
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">format_bold</span></button>
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">format_italic</span></button>
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">format_list_bulleted</span></button>
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">format_quote</span></button>
+<div class="h-6 w-[1px] bg-slate-200"></div>
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">image</span></button>
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">link</span></button>
+<button class="p-2 hover:bg-white hover:shadow-sm rounded transition-all text-slate-600"><span class="material-symbols-outlined text-lg">code</span></button>
+</div>
+<div class="prose prose-slate max-w-none">
+<p class="text-slate-700 leading-relaxed mb-6">Commencez à rédiger votre contenu ici...</p>
+<!-- Pull Quote Block Insert -->
+<div class="border-l-4 border-secondary pl-8 py-4 my-10 bg-secondary/5 rounded-r-2xl">
+<p class="text-xl font-headline font-bold text-secondary italic">"Le Burundi est prêt à porter la voix de l'Afrique avec une détermination souveraine et fraternelle."</p>
+<p class="mt-2 text-sm font-bold text-slate-600">— Citation à extraire</p>
+</div>
+<div class="h-40 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-3xl group hover:border-amber-400 transition-colors cursor-pointer bg-slate-50/50">
+<div class="text-center">
+<span class="material-symbols-outlined text-4xl text-slate-300 group-hover:text-amber-500 transition-colors mb-2">add_photo_alternate</span>
+<p class="text-sm font-bold text-slate-500">Insérer une image dans le corps de l'article</p>
+</div>
+</div>
+</div>
+</div>
+<!-- SEO Meta Fields -->
+<div class="space-y-8 pt-10">
+<h4 class="text-sm font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">search_check</span>
+                                    Optimisation SEO
+                                </h4>
+<div class="grid grid-cols-2 gap-8">
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Meta Title</label>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-secondary/20" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Keywords</label>
+<input class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-secondary/20" placeholder="Diplomatie, Burundi, AU 2026..." type="text"/>
+</div>
+<div class="col-span-2 space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Meta Description</label>
+<textarea class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-secondary/20 resize-none" rows="3"></textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Sidebar Settings (4 cols) -->
+<div class="col-span-4 space-y-8">
+<!-- Featured Image -->
+<div class="bg-surface-container-low rounded-3xl p-6">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Image à la une</label>
+<div class="aspect-video bg-white rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer hover:border-amber-400 transition-colors">
+<span class="material-symbols-outlined text-3xl text-slate-300 group-hover:text-amber-500 mb-2">cloud_upload</span>
+<p class="text-xs font-bold text-slate-500">Uploader ou glisser une image</p>
+<p class="text-[10px] text-slate-400 mt-1">Recommandé: 1600x900px</p>
+</div>
+</div>
+<!-- Categorization -->
+<div class="bg-surface-container-low rounded-3xl p-6 space-y-6">
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Catégorie Principale</label>
+<select class="w-full bg-white border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-secondary/20">
+<option>Diplomatie</option>
+<option>Économie</option>
+<option>Culture</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tags de contenu</label>
+<div class="flex flex-wrap gap-2 mt-2">
+<span class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 flex items-center gap-1.5">Politique <button class="hover:text-error">×</button></span>
+<span class="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 flex items-center gap-1.5">AU Summit <button class="hover:text-error">×</button></span>
+<button class="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold">+ Ajouter</button>
+</div>
+</div>
+</div>
+<!-- Scheduling -->
+<div class="bg-surface-container-low rounded-3xl p-6 space-y-6">
+<label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Planification</label>
+<div class="space-y-4">
+<div class="flex items-center gap-3">
+<input checked="" class="text-secondary focus:ring-secondary" name="publish_type" type="radio"/>
+<span class="text-sm font-medium text-slate-700">Publier immédiatement</span>
+</div>
+<div class="flex items-center gap-3">
+<input class="text-secondary focus:ring-secondary" name="publish_type" type="radio"/>
+<span class="text-sm font-medium text-slate-700">Planifier à une date précise</span>
+</div>
+<div class="pt-2 pl-7 space-y-4">
+<input class="w-full bg-white border-none rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-secondary/20" type="date"/>
+<input class="w-full bg-white border-none rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-secondary/20" type="time"/>
+</div>
+</div>
+</div>
+<!-- Visibility -->
+<div class="bg-surface-container-low rounded-3xl p-6">
+<div class="flex items-center justify-between">
+<div>
+<p class="text-sm font-bold text-slate-900">Mettre en avant</p>
+<p class="text-[10px] text-slate-500">Afficher en tête de liste et carrousel</p>
+</div>
+<div class="w-12 h-6 bg-slate-300 rounded-full relative cursor-pointer">
+<div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

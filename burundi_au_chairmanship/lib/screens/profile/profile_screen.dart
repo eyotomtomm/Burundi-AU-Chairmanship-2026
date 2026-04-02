@@ -4,12 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:convert';
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
-import '../../services/api_service.dart';
 import '../../widgets/verified_badge.dart';
 import '../verification/enhanced_verification_screen.dart';
 
@@ -361,16 +359,6 @@ class ProfileScreen extends StatelessWidget {
                           ),
                           const Divider(height: 1, indent: 16, endIndent: 16),
                         ],
-                        // Export Data
-                        ListTile(
-                          leading: const Icon(Icons.download_outlined,
-                              color: AppColors.info),
-                          title: Text(l10n.translate('export_data')),
-                          subtitle: Text(l10n.translate('export_data_desc')),
-                          trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () => _handleExportData(context),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
                         // Sign Out
                         ListTile(
                           leading: const Icon(Icons.logout,
@@ -544,54 +532,6 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  void _handleExportData(BuildContext context) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final api = ApiService();
-      final data = await api.exportUserData();
-
-      if (context.mounted) {
-        Navigator.pop(context);
-
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Your Data Export'),
-            content: SingleChildScrollView(
-              child: SelectableText(
-                const JsonEncoder.withIndent('  ').convert(data),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to export data: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
   }
 
   void _handleSignOut(BuildContext context, AuthProvider authProvider) {

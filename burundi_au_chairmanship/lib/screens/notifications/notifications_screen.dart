@@ -50,7 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _isLoading = false;
       });
       // Mark all as read on the server so the badge clears when user goes back
-      _markAllAsRead();
+      await _markAllAsRead();
     } catch (e) {
       if (kDebugMode) debugPrint('Notifications load error: $e');
       setState(() {

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Diplomatic Portal - Live Feeds Manager</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-effect {
+            backdrop-filter: blur(16px);
+            background: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased">
+<!-- SideNavBar -->
+<aside class="bg-slate-900 dark:bg-black h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col h-full py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-amber-500" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="text-lg font-bold text-white tracking-tight leading-tight">AU Chairmanship</h1>
+<p class="text-xs text-slate-400 font-manrope font-medium tracking-wide uppercase">2026-2027</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span>
+<span>Hero Slides</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+<span>Articles</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span>Magazine</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span>
+<span>Events</span>
+</a>
+<!-- Active State Logic Applied: Live Feeds Manager -->
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out scale-95 active:scale-90 font-manrope text-sm font-semibold tracking-wide bg-amber-500/10 text-amber-500 border-r-4 border-amber-500" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv" style="font-variation-settings: 'FILL' 1;">live_tv</span>
+<span>Live Feeds</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span>
+<span>Embassy Locations</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span>Consular Services</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span>Resources</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span>
+<span>Push Notifications</span>
+</a>
+<div class="mt-auto pt-8 border-t border-slate-800/50">
+<a class="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 scale-95 active:scale-90 font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-72 min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl fixed top-0 right-0 w-[calc(100%-18rem)] z-40 flex justify-between items-center h-20 px-12 border-b border-slate-200/50 dark:border-slate-800/50">
+<div class="flex items-center gap-8">
+<h2 class="text-xl font-black text-slate-900 dark:text-white tracking-tight font-headline">Diplomatic Portal</h2>
+<div class="hidden md:flex items-center bg-surface-container-low px-4 py-2 rounded-full w-96">
+<span class="material-symbols-outlined text-slate-400 mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none text-sm focus:ring-0 w-full placeholder-slate-400" placeholder="Rechercher des flux..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<span class="text-slate-500 dark:text-slate-400 font-manrope text-base font-medium">EN / FR</span>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-800">
+<span class="text-sm font-bold text-slate-900 dark:text-white">Profile</span>
+<img alt="Administrator Profile" class="w-10 h-10 rounded-full object-cover" data-alt="Close-up portrait of a professional African diplomat in a dark suit with neutral studio lighting and a clean background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzsEZBi_ZC7n1GN_p_2N2IQHvbJP3VxxaGqIF8C5-dgRXW4J5rgI3WLfrXBlG75yHy8FiNjJ4BzQ2w70S4k5PtjQadWjLjsuvMcqkVidzbmifTeURm_TZRPvbRLiixjA3DbaVzCLMHR69nY3E-GSUZZUpl_shCUVMTLUB_j8qawstgFzXtLumnsxFExHco9kdpmymmgvWxwNaJFjBkOum-b_zwDuY6nm4UilmGnj2L4iQWU5E-E8IvDbi5TjpUFcBxTCps5WIOSSR6"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Canvas Body -->
+<div class="pt-32 px-12 pb-20 max-w-7xl mx-auto">
+<!-- Page Header -->
+<div class="mb-12 flex justify-between items-end">
+<div>
+<p class="text-secondary font-label font-bold uppercase tracking-widest text-[0.75rem] mb-2">Centre de contrôle</p>
+<h1 class="font-headline font-extrabold text-display-lg text-4xl text-on-surface">Gestion des Directs</h1>
+</div>
+<button class="bg-primary-container text-white px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:bg-primary transition-all duration-300">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+                    Nouveau Flux
+                </button>
+</div>
+<div class="grid grid-cols-12 gap-8">
+<!-- Create/Edit Section (Left Column) -->
+<div class="col-span-12 lg:col-span-5 space-y-8">
+<div class="bg-surface-container-low p-8 rounded-full shadow-sm">
+<h3 class="font-headline font-bold text-xl mb-6 flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="edit_square">edit_square</span>
+                            Détails de la Diffusion
+                        </h3>
+<form class="space-y-6">
+<div>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 block">Titre (Français)</label>
+<input class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim focus:border-secondary transition-colors px-0 py-3 text-lg font-medium focus:ring-0" placeholder="ex: Sommet des Chefs d'État de l'UA 2026" type="text"/>
+</div>
+<div>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 block">Title (English)</label>
+<input class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim focus:border-secondary transition-colors px-0 py-3 text-lg font-medium focus:ring-0" placeholder="e.g., AU Heads of State Summit 2026" type="text"/>
+</div>
+<div>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 block">URL du Flux / Code Embed</label>
+<div class="flex items-center bg-white rounded-lg p-2 gap-2 border border-outline-variant/20">
+<span class="material-symbols-outlined text-slate-400 pl-2" data-icon="link">link</span>
+<input class="w-full bg-transparent border-none focus:ring-0 text-sm" placeholder="https://youtube.com/live/..." type="text"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 block">Date de début</label>
+<input class="w-full bg-white rounded-lg p-3 border border-outline-variant/20 text-sm" type="date"/>
+</div>
+<div>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 block">Heure (GMT)</label>
+<input class="w-full bg-white rounded-lg p-3 border border-outline-variant/20 text-sm" type="time"/>
+</div>
+</div>
+<div>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2 block">Miniature du Flux</label>
+<div class="border-2 border-dashed border-outline-variant/50 rounded-xl p-8 flex flex-col items-center justify-center hover:bg-white/50 transition-colors group cursor-pointer">
+<span class="material-symbols-outlined text-4xl text-slate-300 group-hover:text-secondary mb-2" data-icon="upload_file">upload_file</span>
+<p class="text-sm text-slate-500">Glissez-déposez ou <span class="text-secondary font-bold">parcourez</span></p>
+<p class="text-[10px] text-slate-400 mt-1">JPG, PNG (Max 5MB) - 16:9 recommandé</p>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-white rounded-xl">
+<div>
+<p class="font-bold text-sm">Activer le direct immédiatement</p>
+<p class="text-xs text-slate-500">Ceci passera le statut à 'LIVE'</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+</label>
+</div>
+<button class="w-full py-4 bg-primary-container text-white rounded-xl font-bold shadow-lg hover:bg-black transition-all" type="submit">Enregistrer le Flux</button>
+</form>
+</div>
+</div>
+<!-- Feed List (Right Column) -->
+<div class="col-span-12 lg:col-span-7 space-y-6">
+<!-- Section Legend -->
+<div class="flex items-center gap-6 pb-4 border-b border-surface-container-high">
+<button class="text-sm font-bold text-primary border-b-2 border-secondary pb-4 px-2">Tous les Flux (14)</button>
+<button class="text-sm font-medium text-slate-400 pb-4 px-2 hover:text-on-surface transition-colors">En Direct (2)</button>
+<button class="text-sm font-medium text-slate-400 pb-4 px-2 hover:text-on-surface transition-colors">Planifiés (5)</button>
+<button class="text-sm font-medium text-slate-400 pb-4 px-2 hover:text-on-surface transition-colors">Archives (7)</button>
+</div>
+<!-- Stream Cards -->
+<div class="space-y-4">
+<!-- LIVE CARD -->
+<div class="bg-white p-4 rounded-full flex gap-6 group hover:shadow-lg transition-all duration-500 border border-transparent hover:border-surface-container-high">
+<div class="relative w-48 h-28 rounded-xl overflow-hidden flex-shrink-0">
+<img alt="Thumbnail" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Modern conference room with diplomatic flags and multiple high-definition camera lenses focused on a bright central stage with warm ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoYrVxeopEVCIODhDqKllOEK7HGOCbmMJOHPHNNCDLUV2yPnm_C5jwbciUQKGjhACskSn5GSXamIZMfSxe72359SWImkhNnI51mAz7xrSgGV5t99PuA_emO3fkZJHBOvGAYUXMwfq457Ea4b-VBpTmrx7ASbZR6NCWUkJVeCPb9866p8km0u5G-qJhNO45s4C4N0qJtUBuc3g9w3-iyEURhfbWjrH7TLfKtFO3EWvRbIGqCllZcDwika2vAWBNNgLYDmfDTURdoOok"/>
+<div class="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded flex items-center gap-1 animate-pulse">
+<span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                                    LIVE
+                                </div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" data-icon="visibility">visibility</span>
+                                    1.2k
+                                </div>
+</div>
+<div class="flex-1 py-1 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start">
+<h4 class="font-bold text-lg leading-tight group-hover:text-secondary transition-colors">Discours d'Ouverture : Burundi AU 2026</h4>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-slate-100 rounded-lg transition-colors"><span class="material-symbols-outlined text-slate-400 text-sm" data-icon="settings">settings</span></button>
+<button class="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors"><span class="material-symbols-outlined text-sm" data-icon="stop_circle">stop_circle</span></button>
+</div>
+</div>
+<p class="text-sm text-slate-500 mt-1 line-clamp-1">Diffusion officielle du discours inaugural de son Excellence le Président de la République.</p>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span>
+                                        Débuté à 09:00 GMT
+                                    </span>
+<span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Priorité Haute</span>
+</div>
+</div>
+</div>
+<!-- SCHEDULED CARD -->
+<div class="bg-surface-container-low/40 p-4 rounded-full flex gap-6 group hover:bg-white hover:shadow-md transition-all duration-300">
+<div class="relative w-48 h-28 rounded-xl overflow-hidden flex-shrink-0 opacity-80 group-hover:opacity-100">
+<img alt="Thumbnail" class="w-full h-full object-cover" data-alt="Close-up of hands signing official documents with a high-end fountain pen on a mahogany desk with a blurry national flag in background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwu6cL6PMRTTvYiRlTJGDFqBFWrpuoJF9gx4gd9VtjECHSF0AN8Uzas3b8gZmBsJi8AaZ9faclBp3420ni8F2BrOZKhbfnYLJfNjHGr7MXvK1EfiUD2xr9NFfp3NI4BPHPnZdUSszkWZRuybn4Oy8m5cMpLnM9_XdzYfkkPitoVxIWy2-Fa2ItLw92iGIpOUub_UQ4YgT2cyAum2Vv5vKuuRe2t2tsVU2gAYNJZwZ3C4V_oLyUCLBHbma95-OyaUlyftFUAFrDjo6E"/>
+<div class="absolute top-2 left-2 bg-primary-container text-white text-[10px] font-bold px-2 py-1 rounded">
+                                    PLANIFIÉ
+                                </div>
+</div>
+<div class="flex-1 py-1 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start">
+<h4 class="font-bold text-lg leading-tight">Table Ronde : Sécurité Régionale</h4>
+<div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 hover:bg-slate-100 rounded-lg"><span class="material-symbols-outlined text-slate-400 text-sm" data-icon="edit">edit</span></button>
+<button class="p-2 hover:bg-slate-100 rounded-lg"><span class="material-symbols-outlined text-slate-400 text-sm" data-icon="delete">delete</span></button>
+</div>
+</div>
+<p class="text-sm text-slate-500 mt-1 line-clamp-1">Discussion avec les experts de l'EAC sur les enjeux de paix.</p>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-bold text-slate-600 flex items-center gap-1 uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[14px]" data-icon="calendar_today">calendar_today</span>
+                                        Demain, 14:30 GMT
+                                    </span>
+</div>
+</div>
+</div>
+<!-- ARCHIVED CARD -->
+<div class="bg-white p-4 rounded-full flex gap-6 group border border-slate-100">
+<div class="relative w-48 h-28 rounded-xl overflow-hidden flex-shrink-0 grayscale group-hover:grayscale-0 transition-all duration-500">
+<img alt="Thumbnail" class="w-full h-full object-cover" data-alt="Wide shot of a crowded international assembly hall with delegates seated at desks, brightly lit with architectural spotlights and large display screens" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCohwCN-KGP126v9Su8lizYL5D2wtkPChOKPTHGGBS9FdvNI75_0s-EjdZjKritjm0oUKMVNOtVXsyefqy-hDzCzj8AETGfWCjp5_jcqr1GpFxpFr6ugtDWl-Wt7MlWAmMvlOzpjAKD8YoBp8HsxPBhQtwz2tUxcS2_dSKUMBJx5nUtOgeIQ37IYp467_lIiUgYAA2eCcedPSPPfryZaDGolIaVlpTJe-UHhQihYCtZEf2tjd-ouCHkPdwoC2gGs5tHZ8GWrUKi_QKi"/>
+<div class="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/20 transition-all">
+<span class="material-symbols-outlined text-white text-3xl" data-icon="play_circle" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+<div class="absolute top-2 left-2 bg-slate-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">
+                                    ARCHIVÉ
+                                </div>
+</div>
+<div class="flex-1 py-1 flex flex-col justify-between">
+<div>
+<div class="flex justify-between items-start">
+<h4 class="font-bold text-lg leading-tight text-slate-500">Conférence de Presse de Clôture - Sommet 2025</h4>
+<button class="p-2 hover:bg-slate-100 rounded-lg"><span class="material-symbols-outlined text-slate-400 text-sm" data-icon="history">history</span></button>
+</div>
+<p class="text-sm text-slate-400 mt-1 line-clamp-1">Résumé des résolutions adoptées lors du sommet précédent.</p>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[14px]" data-icon="event_available">event_available</span>
+                                        Diffusé le 12 Oct 2025
+                                    </span>
+<span class="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-tighter">
+<span class="material-symbols-outlined text-[14px]" data-icon="group">group</span>
+                                        4.5k vues
+                                    </span>
+</div>
+</div>
+</div>
+</div>
+<!-- Pagination/Load More -->
+<div class="pt-8 flex justify-center">
+<button class="group flex items-center gap-2 text-slate-500 font-bold hover:text-secondary transition-colors">
+                            Voir plus d'archives
+                            <span class="material-symbols-outlined group-hover:translate-y-1 transition-transform" data-icon="expand_more">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Global Action Button (Suppressed on sub-pages as per rules, but included here for potential main dashboard return) -->
+<!-- Not rendered based on Relevance Check Rule -->
+</body></html>

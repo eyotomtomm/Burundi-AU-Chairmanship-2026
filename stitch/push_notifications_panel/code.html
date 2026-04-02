@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="bg-slate-900 dark:bg-black h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-900" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<div class="text-lg font-bold text-white tracking-tight">AU Chairmanship</div>
+<div class="font-manrope text-sm font-medium tracking-wide text-slate-400">2026-2027</div>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Hero Slides</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Articles</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active" style="font-variation-settings: 'FILL' 1;">notifications_active</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Push Notifications</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Settings</span>
+</a>
+</nav>
+<div class="mt-auto pt-8 px-4 border-t border-slate-800">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-slate-700 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional portrait of a high-ranking diplomatic official in a dark suit with a neutral background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKJFT5rSxknHOe2E4lS4VJLyBmKdZglaWzQGV0U3ao59s1omcAvkVxYdrEVR6pbKXwM7UKO3wqciizMkSneTyt0UOx0Z6y4zZEtpPjqEMzBwEhiW1lk5D9RvPmOYZ_SsQppxaXeA5CY3a_jmtMulI2czeCW-E4u5UP1sQEf3Ac3sanjH4WxuP6ptRYe_AIkxtawDiQPD6ZJCmGPtXy80b7tL_7FPlvObalNnoWyFD8x_mhY1JOGSGe10tycxzGKmuM1tve3U75iYX3"/>
+</div>
+<div class="text-xs">
+<p class="text-white font-semibold">Admin Panel</p>
+<p class="text-slate-500">Bureau de la Présidence</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar (Authority: JSON) -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+<div class="flex items-center gap-8">
+<h2 class="text-xl font-black text-slate-900 dark:text-white tracking-tight">Diplomatic Portal</h2>
+<div class="relative w-96 group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-600 transition-colors">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-2.5 pl-12 pr-4 text-sm focus:ring-2 focus:ring-amber-500/20 transition-all" placeholder="Rechercher des notifications..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-slate-500 dark:text-slate-400 font-manrope text-sm font-bold">
+<span class="text-amber-600 dark:text-amber-400">FR</span>
+<span class="opacity-20">|</span>
+<span class="hover:text-amber-600 transition-colors cursor-pointer">EN</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+<div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+<button class="flex items-center gap-2 bg-primary-container text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-black transition-all">
+<span>Profile</span>
+<span class="material-symbols-outlined text-xs">arrow_forward_ios</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-72 pt-28 pb-12 px-12 max-w-[1600px]">
+<!-- Header Section -->
+<div class="mb-10">
+<p class="font-label text-secondary font-bold uppercase tracking-[0.15em] text-[0.7rem] mb-2">Centre de Communication</p>
+<h1 class="text-display-lg text-primary font-black leading-none mb-4">Push Notifications</h1>
+<p class="text-on-surface-variant max-w-2xl text-lg">Gérez les communications diplomatiques en temps réel. Envoyez des alertes critiques, des mises à jour de sommet et des informations consulaires à votre audience ciblée.</p>
+</div>
+<div class="grid grid-cols-12 gap-8 items-start">
+<!-- Send Form Column -->
+<div class="col-span-12 lg:col-span-7 space-y-8">
+<section class="bg-surface-container-lowest rounded-xl p-8 shadow-[0_4px_24px_rgba(16,28,46,0.04)] border border-slate-100">
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-3">
+<div class="w-1 bg-secondary h-6 rounded-full"></div>
+<h3 class="text-xl font-bold text-on-surface">Nouvelle Notification</h3>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 rounded-md border border-outline-variant/20 text-sm font-bold text-on-surface-variant hover:bg-surface-container transition-all">Enregistrer Brouillon</button>
+</div>
+</div>
+<form class="space-y-8">
+<!-- Bilingual Inputs Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- French Content -->
+<div class="space-y-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-secondary">Contenu Français</label>
+<div class="space-y-1">
+<input class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 transition-all px-0 py-3 text-lg font-semibold placeholder:text-slate-400 placeholder:font-normal" placeholder="Titre de la notification" type="text"/>
+</div>
+<div class="space-y-1">
+<textarea class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 transition-all px-0 py-3 text-sm resize-none placeholder:text-slate-400" placeholder="Corps du message..." rows="3"></textarea>
+</div>
+</div>
+<!-- English Content -->
+<div class="space-y-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-on-primary-container">English Content</label>
+<div class="space-y-1">
+<input class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim/50 focus:border-secondary focus:ring-0 transition-all px-0 py-3 text-lg font-semibold placeholder:text-slate-400 placeholder:font-normal" placeholder="Notification Title" type="text"/>
+</div>
+<div class="space-y-1">
+<textarea class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim/50 focus:border-secondary focus:ring-0 transition-all px-0 py-3 text-sm resize-none placeholder:text-slate-400" placeholder="Message body..." rows="3"></textarea>
+</div>
+</div>
+</div>
+<!-- Targeting & Scheduling -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+<div class="space-y-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">Audience Cible</label>
+<div class="grid grid-cols-1 gap-2">
+<label class="flex items-center gap-3 p-3 rounded-lg bg-surface-container-low border border-transparent hover:border-secondary/20 cursor-pointer transition-all group">
+<input checked="" class="text-secondary focus:ring-secondary w-4 h-4" name="audience" type="radio"/>
+<span class="text-sm font-medium">Tous les utilisateurs</span>
+<span class="ml-auto text-xs text-slate-400">12,450 actifs</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg bg-surface-container-low border border-transparent hover:border-secondary/20 cursor-pointer transition-all">
+<input class="text-secondary focus:ring-secondary w-4 h-4" name="audience" type="radio"/>
+<span class="text-sm font-medium">Par Pays (Burundi, AU Members)</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg bg-surface-container-low border border-transparent hover:border-secondary/20 cursor-pointer transition-all">
+<input class="text-secondary focus:ring-secondary w-4 h-4" name="audience" type="radio"/>
+<span class="text-sm font-medium">Par Rôle (Délégués, Presse, Staff)</span>
+</label>
+</div>
+</div>
+<div class="space-y-4">
+<label class="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">Programmation</label>
+<div class="space-y-3">
+<label class="flex items-center gap-3 p-3 rounded-lg bg-surface-container-low border border-transparent hover:border-secondary/20 cursor-pointer transition-all">
+<input checked="" class="text-secondary focus:ring-secondary w-4 h-4" name="schedule" type="radio"/>
+<span class="text-sm font-medium">Envoyer immédiatement</span>
+</label>
+<div class="relative group">
+<label class="flex items-center gap-3 p-3 rounded-lg bg-surface-container-low border border-transparent hover:border-secondary/20 cursor-pointer transition-all">
+<input class="text-secondary focus:ring-secondary w-4 h-4" name="schedule" type="radio"/>
+<span class="text-sm font-medium">Programmer pour plus tard</span>
+</label>
+<div class="mt-2 flex gap-2">
+<input class="bg-surface border-outline-variant/30 rounded text-xs p-2 flex-1 focus:ring-secondary" type="date"/>
+<input class="bg-surface border-outline-variant/30 rounded text-xs p-2 w-24 focus:ring-secondary" type="time"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- CTA -->
+<div class="pt-6 flex justify-end gap-4">
+<button class="px-8 py-3 text-sm font-bold text-on-surface-variant hover:text-primary transition-all" type="button">Aperçu mobile</button>
+<button class="bg-primary-container text-white px-10 py-3 rounded-md font-bold hover:bg-black transition-all shadow-lg shadow-primary/10" type="submit">Envoyer la Notification</button>
+</div>
+</form>
+</section>
+<!-- Templates Section -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-on-surface">Modèles Prédéfinis</h3>
+<button class="text-secondary text-sm font-bold flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-sm">add</span> Nouveau Modèle
+                        </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="p-4 bg-surface-container-high rounded-xl border border-white hover:shadow-md transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-3">
+<span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded text-[0.65rem] font-black uppercase tracking-wider">Urgent</span>
+<span class="material-symbols-outlined text-slate-400 group-hover:text-secondary">file_copy</span>
+</div>
+<h4 class="font-bold text-sm mb-1">Alerte Sécurité Sommet</h4>
+<p class="text-xs text-on-surface-variant line-clamp-2">"Information importante concernant les accès à la zone verte ce matin..."</p>
+</div>
+<div class="p-4 bg-surface-container-high rounded-xl border border-white hover:shadow-md transition-all cursor-pointer group">
+<div class="flex justify-between items-start mb-3">
+<span class="bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded text-[0.65rem] font-black uppercase tracking-wider">Presse</span>
+<span class="material-symbols-outlined text-slate-400 group-hover:text-secondary">file_copy</span>
+</div>
+<h4 class="font-bold text-sm mb-1">Communiqué de Presse</h4>
+<p class="text-xs text-on-surface-variant line-clamp-2">"Le nouveau communiqué conjoint Burundi-AU est désormais disponible..."</p>
+</div>
+</div>
+</section>
+</div>
+<!-- Stats & History Column -->
+<div class="col-span-12 lg:col-span-5 space-y-8">
+<!-- Quick Stats -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-primary-container p-6 rounded-xl text-white">
+<p class="text-xs font-bold text-on-primary-container uppercase tracking-widest mb-4">Total Envoyés (Mois)</p>
+<div class="flex items-end justify-between">
+<span class="text-3xl font-black">42,8k</span>
+<span class="text-emerald-400 text-xs font-bold flex items-center mb-1">
+<span class="material-symbols-outlined text-sm">trending_up</span> +12%
+                            </span>
+</div>
+</div>
+<div class="bg-secondary-container p-6 rounded-xl text-on-secondary-container">
+<p class="text-xs font-bold uppercase tracking-widest mb-4">Taux d'ouverture Moyen</p>
+<div class="flex items-end justify-between">
+<span class="text-3xl font-black">28.4%</span>
+<span class="text-on-secondary-container/60 text-xs font-bold mb-1">Standard: 18%</span>
+</div>
+</div>
+</div>
+<!-- History Log -->
+<section class="bg-surface-container-low rounded-xl p-6 border border-slate-100">
+<h3 class="text-lg font-black text-on-surface mb-6 flex items-center justify-between">
+                        Historique des Envois
+                        <span class="material-symbols-outlined text-slate-400">history</span>
+</h3>
+<div class="space-y-6">
+<!-- History Item 1 -->
+<div class="relative pl-6 border-l-2 border-primary-fixed">
+<div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-secondary border-4 border-surface-container-low"></div>
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="font-bold text-sm">Sommet Gitega 2026 : Rappel</h4>
+<p class="text-[0.7rem] text-slate-500 font-medium">Il y a 2 heures • Audience: Tous</p>
+</div>
+<span class="text-[0.65rem] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Complété</span>
+</div>
+<!-- Small delivery bar stats -->
+<div class="grid grid-cols-4 gap-2 mt-3">
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">Envoyés</p>
+<p class="text-xs font-bold">12,100</p>
+</div>
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">Délivrés</p>
+<p class="text-xs font-bold">11,940</p>
+</div>
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">Ouverts</p>
+<p class="text-xs font-bold text-secondary">3,420</p>
+</div>
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">CTR</p>
+<p class="text-xs font-bold text-secondary">8.2%</p>
+</div>
+</div>
+</div>
+<!-- History Item 2 -->
+<div class="relative pl-6 border-l-2 border-slate-200">
+<div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-300 border-4 border-surface-container-low"></div>
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="font-bold text-sm">Mise à jour Protocole V4</h4>
+<p class="text-[0.7rem] text-slate-500 font-medium">Hier, 14:30 • Audience: Délégués</p>
+</div>
+<span class="text-[0.65rem] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Complété</span>
+</div>
+<div class="grid grid-cols-4 gap-2 mt-3">
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">Envoyés</p>
+<p class="text-xs font-bold">850</p>
+</div>
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">Délivrés</p>
+<p class="text-xs font-bold">848</p>
+</div>
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">Ouverts</p>
+<p class="text-xs font-bold text-secondary">612</p>
+</div>
+<div class="text-center">
+<p class="text-[0.6rem] uppercase font-bold text-slate-400 mb-1">CTR</p>
+<p class="text-xs font-bold text-secondary">24%</p>
+</div>
+</div>
+</div>
+<!-- History Item 3 -->
+<div class="relative pl-6 border-l-2 border-slate-200">
+<div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-slate-300 border-4 border-surface-container-low"></div>
+<div class="flex justify-between items-start mb-2">
+<div>
+<h4 class="font-bold text-sm">Alerte Météo - Bujumbura</h4>
+<p class="text-[0.7rem] text-slate-500 font-medium">12 Oct, 09:15 • Audience: Burundi</p>
+</div>
+<span class="text-[0.65rem] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">Complété</span>
+</div>
+<div class="grid grid-cols-4 gap-2 mt-3 opacity-60">
+<div class="text-center">
+<p class="text-xs font-bold">4,200</p>
+</div>
+<div class="text-center">
+<p class="text-xs font-bold">4,150</p>
+</div>
+<div class="text-center">
+<p class="text-xs font-bold">1,020</p>
+</div>
+<div class="text-center">
+<p class="text-xs font-bold">4.1%</p>
+</div>
+</div>
+</div>
+</div>
+<button class="w-full mt-8 py-3 rounded-lg border-2 border-dashed border-outline-variant/30 text-sm font-bold text-slate-500 hover:border-secondary/40 hover:text-secondary transition-all">
+                        Voir tout l'historique
+                    </button>
+</section>
+<!-- Help Card -->
+<div class="bg-surface-container-highest rounded-xl p-6 relative overflow-hidden group">
+<div class="relative z-10">
+<h4 class="font-bold mb-2">Directives de Notification</h4>
+<p class="text-xs text-on-surface-variant mb-4 leading-relaxed">Les notifications push doivent être brèves et actionnables. Évitez les majuscules excessives et respectez les fuseaux horaires des destinataires.</p>
+<a class="text-xs font-black text-primary border-b-2 border-secondary inline-block" href="#">Consulter le Guide Editorial</a>
+</div>
+<span class="material-symbols-outlined absolute -right-4 -bottom-4 text-7xl text-primary/5 group-hover:scale-110 transition-transform duration-500">info</span>
+</div>
+</div>
+</div>
+<!-- Footer / Credits -->
+<footer class="mt-20 pt-8 border-t border-slate-200/50 flex flex-col md:flex-row justify-between items-center text-[0.7rem] text-slate-400 font-bold uppercase tracking-widest">
+<p>© 2026 Burundi AU Chairmanship | Strategic Communications Unit</p>
+<div class="flex gap-6 mt-4 md:mt-0">
+<a class="hover:text-amber-600 transition-colors" href="#">Privacy Policy</a>
+<a class="hover:text-amber-600 transition-colors" href="#">Audit Logs</a>
+<a class="hover:text-amber-600 transition-colors" href="#">API Access</a>
+</div>
+</footer>
+</main>
+</body></html>

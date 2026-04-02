@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+        .glass-effect {
+            backdrop-filter: blur(16px);
+            background: rgba(255, 255, 255, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-900 z-50 flex flex-col py-8 px-4 shadow-2xl">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3 mb-2">
+<img alt="Burundi AU Chairmanship Seal" class="w-10 h-10 rounded-full" data-alt="Official seal of the Burundi African Union Chairmanship featuring national emblems in gold and green on a clean white background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4Nag_Avfds44UzSviFnzbPEPwKRHhfdF11Q0DIqKE_5qiH1APUNkJw8AylnXn1t-lAIerN1Srn1mnZEJ1MBaECeqo4lwtNxKLuwz0-Hf7XNR5A26n_AmmUyTmDNjZ6mLkEl4VIoABeFrbFIT4xxqDJmR8uB7Vmsf2hy1fDKQC-sMkY9yn1kgSvcmL9MgG0ZwWXbE-31T8flIiCzWjxSklIOLX-L8nUTgiKmp9AoikNoyx90EX8U8jII7_RWDeQJPx7pz0ymWwa8_J"/>
+<span class="text-lg font-bold text-white tracking-tight">AU Chairmanship</span>
+</div>
+<p class="text-slate-400 font-manrope text-xs tracking-widest uppercase ml-13">2026-2027</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Active Navigation -->
+<a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 ease-in-out bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold scale-95 active:scale-90 rounded-l-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-manrope text-sm tracking-wide">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span>
+<span class="font-manrope text-sm tracking-wide">Hero Slides</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+<span class="font-manrope text-sm tracking-wide">Articles</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+<span class="font-manrope text-sm tracking-wide">Magazine</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span>
+<span class="font-manrope text-sm tracking-wide">Events</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv">live_tv</span>
+<span class="font-manrope text-sm tracking-wide">Live Feeds</span>
+</a>
+<div class="pt-6 pb-2 px-4">
+<p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Services</p>
+</div>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span>
+<span class="font-manrope text-sm tracking-wide">Embassy Locations</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span class="font-manrope text-sm tracking-wide">Consular Services</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out scale-95 active:scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-manrope text-sm tracking-wide">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Shell -->
+<main class="ml-72 min-h-screen relative">
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+<div class="flex items-center gap-8">
+<h2 class="text-xl font-black text-slate-900 font-manrope">Diplomatic Portal</h2>
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-secondary/20" placeholder="Rechercher..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 mr-4">
+<span class="text-xs font-bold text-secondary tracking-widest">EN / FR</span>
+</div>
+<button class="text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-slate-500 hover:text-amber-600 transition-colors">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+<div class="flex items-center gap-3 pl-6 border-l border-slate-200">
+<div class="text-right">
+<p class="text-xs font-bold text-slate-900">Ambassadeur Nzeyimana</p>
+<p class="text-[10px] text-slate-500 uppercase tracking-tighter">Chef de Cabinet</p>
+</div>
+<img alt="Administrator Profile" class="w-10 h-10 rounded-full border-2 border-white shadow-sm" data-alt="Professional studio portrait of a high-ranking diplomat in a dark navy suit with subtle lighting and a neutral grey background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkpqWALf1ZwaExNhYdKQWssLoA6ItwSC6B6qW6TuuRuIdwXKY8zlcWPOqOE24S8Ig1c8afpVHJBzZRsu7fp5KdWE9o_dDyeTg_3PViMgH4_waLh1VlzEP8DAKGKCjs8ECQ0aoB5l5JcSH4CHa_8EXV779zDbw6IORZJ9AngR0CWpPUmlLuRcIuWju1-8u0Ifbgasj_QGz4QT6DAzFuyw8jS1xiNf5xE6n6ngIueNE9dIu9ONbRC1a_07fNkH02K_LzrOZy-LI2ZB3t"/>
+</div>
+</div>
+</header>
+<!-- Canvas Content -->
+<section class="pt-32 px-12 pb-12 bg-surface">
+<!-- Welcome Greeting -->
+<div class="mb-12">
+<span class="label-md uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Vue d'ensemble stratégique</span>
+<h1 class="display-sm text-4xl font-extrabold text-on-surface font-manrope leading-tight">Bonjour, Ambassadeur Nzeyimana</h1>
+<p class="text-on-surface-variant mt-2 max-w-2xl">Bienvenue sur le portail de commandement. Voici l'état actuel de l'engagement numérique pour la présidence de l'UA.</p>
+</div>
+<!-- Key Metrics Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-primary-container/10 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary-container" data-icon="group">group</span>
+</div>
+<span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">+12%</span>
+</div>
+<p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Utilisateurs App</p>
+<h3 class="text-3xl font-extrabold mt-1">45.2k</h3>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-secondary-container/20 p-2 rounded-lg">
+<span class="material-symbols-outlined text-secondary" data-icon="bolt">bolt</span>
+</div>
+<span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Actif</span>
+</div>
+<p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Actifs aujourd'hui</p>
+<h3 class="text-3xl font-extrabold mt-1">3,180</h3>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-primary-container/10 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary-container" data-icon="description">description</span>
+</div>
+</div>
+<p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Articles Publiés</p>
+<h3 class="text-3xl font-extrabold mt-1">210</h3>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-primary-container/10 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary-container" data-icon="broadcast_on_personal">broadcast_on_personal</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
+<span class="text-[10px] font-bold text-red-600 uppercase">Live</span>
+</div>
+</div>
+<p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Directs Actifs</p>
+<h3 class="text-3xl font-extrabold mt-1">01</h3>
+</div>
+</div>
+<!-- Main Analytics Section (Bento Grid) -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Engagement Chart -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h4 class="text-lg font-bold">Engagement de l'Application</h4>
+<p class="text-sm text-on-surface-variant">Évolution des 30 derniers jours</p>
+</div>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-primary rounded-full"></span>
+<span class="text-xs font-medium">Sessions</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-secondary rounded-full"></span>
+<span class="text-xs font-medium">Interactions</span>
+</div>
+</div>
+</div>
+<!-- Chart Placeholder Visual -->
+<div class="h-64 relative flex items-end gap-2 px-2 overflow-hidden">
+<div class="absolute inset-0 flex flex-col justify-between py-2 border-b border-slate-100">
+<div class="border-t border-slate-50 w-full h-px"></div>
+<div class="border-t border-slate-50 w-full h-px"></div>
+<div class="border-t border-slate-50 w-full h-px"></div>
+<div class="border-t border-slate-50 w-full h-px"></div>
+</div>
+<!-- Stylized Path Visualization -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none">
+<path d="M0 160 Q 100 80, 200 120 T 400 60 T 600 100 T 800 40" fill="none" stroke="black" stroke-width="3"></path>
+<path d="M0 180 Q 100 140, 200 160 T 400 120 T 600 150 T 800 100" fill="none" opacity="0.6" stroke="#745b17" stroke-width="3"></path>
+</svg>
+</div>
+<div class="flex justify-between mt-4 px-2">
+<span class="text-[10px] text-slate-400 font-bold uppercase">01 Mai</span>
+<span class="text-[10px] text-slate-400 font-bold uppercase">10 Mai</span>
+<span class="text-[10px] text-slate-400 font-bold uppercase">20 Mai</span>
+<span class="text-[10px] text-slate-400 font-bold uppercase">Aujourd'hui</span>
+</div>
+</div>
+<!-- Downloads & OS Distribution -->
+<div class="col-span-12 lg:col-span-4 space-y-8">
+<div class="bg-primary-container text-white rounded-xl p-8 h-full flex flex-col justify-between">
+<div>
+<h4 class="text-lg font-bold mb-6">Distribution Mobile</h4>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium">iOS</span>
+<span class="text-sm font-bold">55%</span>
+</div>
+<div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 55%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between mb-2">
+<span class="text-sm font-medium">Android</span>
+<span class="text-sm font-bold">45%</span>
+</div>
+<div class="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+<div class="bg-white/60 h-full rounded-full" style="width: 45%"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-white/10">
+<p class="text-[10px] uppercase tracking-widest text-on-primary-container font-bold">Total Téléchargements</p>
+<p class="text-2xl font-black mt-1">128,450</p>
+</div>
+</div>
+</div>
+<!-- Content Distribution & Activities -->
+<div class="col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+<h4 class="text-lg font-bold mb-8">Contenu par Catégorie <span class="text-sm font-normal text-on-surface-variant">(Ce mois)</span></h4>
+<div class="flex items-end gap-6 h-48 justify-around">
+<div class="flex flex-col items-center gap-3 w-16">
+<div class="w-full bg-primary h-32 rounded-t-lg relative group">
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">84</span>
+</div>
+<span class="text-[10px] font-bold uppercase text-slate-400">Actualités</span>
+</div>
+<div class="flex flex-col items-center gap-3 w-16">
+<div class="w-full bg-primary-container/80 h-16 rounded-t-lg relative group">
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">42</span>
+</div>
+<span class="text-[10px] font-bold uppercase text-slate-400">Événements</span>
+</div>
+<div class="flex flex-col items-center gap-3 w-16">
+<div class="w-full bg-secondary h-12 rounded-t-lg relative group">
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">12</span>
+</div>
+<span class="text-[10px] font-bold uppercase text-slate-400">Magazine</span>
+</div>
+<div class="flex flex-col items-center gap-3 w-16">
+<div class="w-full bg-primary-container/40 h-24 rounded-t-lg relative group">
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">65</span>
+</div>
+<span class="text-[10px] font-bold uppercase text-slate-400">Consulaire</span>
+</div>
+</div>
+</div>
+<!-- Demographics (Pie Chart Style) -->
+<div class="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+<h4 class="text-lg font-bold mb-6">Démographie par Pays</h4>
+<div class="flex items-center gap-10">
+<div class="relative w-40 h-40">
+<!-- SVG Donut Chart Representation -->
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 36 36">
+<circle cx="18" cy="18" fill="transparent" r="15.915" stroke="#e2e8f0" stroke-width="3"></circle>
+<circle cx="18" cy="18" fill="transparent" r="15.915" stroke="#000000" stroke-dasharray="65 35" stroke-dashoffset="0" stroke-width="3"></circle>
+<circle cx="18" cy="18" fill="transparent" r="15.915" stroke="#745b17" stroke-dasharray="25 75" stroke-dashoffset="-65" stroke-width="3"></circle>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center flex-col">
+<span class="text-sm font-bold">Top 5</span>
+<span class="text-[10px] uppercase text-slate-400">Régions</span>
+</div>
+</div>
+<div class="flex-1 space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-black"></span>
+<span class="text-xs font-medium">Burundi</span>
+</div>
+<span class="text-xs font-bold">65%</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-xs font-medium">Éthiopie (UA)</span>
+</div>
+<span class="text-xs font-bold">25%</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-slate-200"></span>
+<span class="text-xs font-medium">Belgique / Diaspora</span>
+</div>
+<span class="text-xs font-bold">10%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Activity Feed -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="p-8 border-b border-slate-50 flex justify-between items-center">
+<h4 class="text-lg font-bold">Activités Récentes</h4>
+<button class="text-xs font-bold text-secondary uppercase tracking-widest hover:underline">Voir tout</button>
+</div>
+<div class="p-0">
+<!-- Activity Item 1 -->
+<div class="p-6 flex items-start gap-4 hover:bg-surface-container-low transition-colors">
+<div class="bg-secondary/10 p-2 rounded-full">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="edit">edit</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">Mise à jour de l'article <span class="font-bold">"Allocution de l'UA 2026"</span></p>
+<p class="text-xs text-slate-500 mt-1">Par Jean-Baptiste Ndongo • Il y a 12 min</p>
+</div>
+</div>
+<!-- Activity Item 2 -->
+<div class="p-6 flex items-start gap-4 hover:bg-surface-container-low transition-colors">
+<div class="bg-primary/5 p-2 rounded-full">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="person_add">person_add</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">Nouvel enregistrement diplomatique : <span class="font-bold">Missions ONU Genève</span></p>
+<p class="text-xs text-slate-500 mt-1">Vérification de compte en cours • Il y a 45 min</p>
+</div>
+</div>
+<!-- Activity Item 3 -->
+<div class="p-6 flex items-start gap-4 hover:bg-surface-container-low transition-colors border-t border-slate-50">
+<div class="bg-emerald-100 p-2 rounded-full">
+<span class="material-symbols-outlined text-emerald-700 text-sm" data-icon="check_circle">check_circle</span>
+</div>
+<div class="flex-1">
+<p class="text-sm font-medium text-slate-900">Magazine d'Avril validé pour publication</p>
+<p class="text-xs text-slate-500 mt-1">Système Automatisé • Il y a 2 heures</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Actions -->
+<div class="col-span-12 lg:col-span-4 bg-surface-container-highest rounded-xl p-8 shadow-sm">
+<h4 class="text-lg font-bold mb-6">Actions Rapides</h4>
+<div class="grid grid-cols-1 gap-4">
+<button class="flex items-center justify-between p-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all group">
+<span class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="add_circle">add_circle</span>
+<span class="text-sm font-bold">Nouvel Article</span>
+</span>
+<span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<button class="flex items-center justify-between p-4 bg-white text-primary rounded-lg border border-slate-200 hover:border-secondary transition-all group">
+<span class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="calendar_month">calendar_month</span>
+<span class="text-sm font-bold">Nouvel Événement</span>
+</span>
+<span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<button class="flex items-center justify-between p-4 bg-white text-primary rounded-lg border border-slate-200 hover:border-secondary transition-all group">
+<span class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="sensors">sensors</span>
+<span class="text-sm font-bold">Programmer un Direct</span>
+</span>
+<span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<button class="flex items-center justify-between p-4 bg-white text-primary rounded-lg border border-slate-200 hover:border-secondary transition-all group">
+<span class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="upload_file">upload_file</span>
+<span class="text-sm font-bold">Télécharger Magazine</span>
+</span>
+<span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="mt-8 p-6 bg-secondary-container rounded-xl border border-secondary/20">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-secondary" data-icon="priority_high">priority_high</span>
+<p class="text-xs font-black uppercase text-secondary">Alerte de Sécurité</p>
+</div>
+<p class="text-xs text-on-secondary-container leading-relaxed">3 tentatives de connexion infructueuses détectées depuis la zone diplomatique de Bujumbura.</p>
+<button class="mt-4 text-[10px] font-bold underline text-secondary">VÉRIFIER LE JOURNAL</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Floating Action Button (FAB) Suppressed on Dashboard as per instructions if needed, but the UI calls for strategic actions. Applying the "Suppression" rule selectively as the user asked for Quick Action Buttons in content -->
+</main>
+<!-- Footer Identity -->
+<footer class="ml-72 p-12 bg-surface text-center">
+<div class="h-px bg-slate-200 w-full mb-8"></div>
+<div class="flex flex-col items-center gap-2">
+<img alt="Burundi AU logo footer" class="h-8 opacity-40 grayscale" data-alt="Official logo lockup for the Burundi African Union Chairmanship 2026-2027 in deep navy and elegant gold typography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0nH2f6BlnJ3nLUm_vlhy7F4W35Vpux_kxl1JJl0FSLMgZGDNdhJJ5KfKuuBi013rknl75LTERTiGX6HhrSIrIwSzASDjQkGJfJoKpJ81yTudpOiOdKZJLQgrAyKQmvbiZUXXyameD3dSuPUidtm2UeQPTCV78YFD3GPNvV6peRg7XJ7p6xSCl119DcH2sRb65I9mHi3cWrSsraPpoJiVTHehpWCWlS5-vl_haPtznmz3_TItazhYhM5IUGfD_txSCoTwpFNenZv6Y"/>
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">© 2026 Burundi African Union Chairmanship • Ministère des Affaires Étrangères</p>
+</div>
+</footer>
+</body></html>

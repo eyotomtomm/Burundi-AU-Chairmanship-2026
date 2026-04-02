@@ -291,23 +291,6 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> exportUserData() async {
-    try {
-      final response = await _client
-          .get(
-            Uri.parse('$_baseUrl/auth/export-data/'),
-            headers: await _headers(auth: true),
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-      throw ApiException('Failed to export data', response.statusCode);
-    } on http.ClientException {
-      throw ApiException('Connection failed. Check your network.', 0);
-    }
-  }
-
   // ── Hero Slides ──────────────────────────────────────────
   Future<List<HeroSlide>> getHeroSlides() async {
     final data = await _get('hero-slides/');

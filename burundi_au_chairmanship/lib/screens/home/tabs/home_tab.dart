@@ -787,6 +787,8 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                             onPressed: () async {
                               await Navigator.pushNamed(context, '/notifications');
+                              // Small delay to ensure server has processed mark-as-read
+                              await Future.delayed(const Duration(milliseconds: 300));
                               _loadUnreadCount();
                             },
                           ),

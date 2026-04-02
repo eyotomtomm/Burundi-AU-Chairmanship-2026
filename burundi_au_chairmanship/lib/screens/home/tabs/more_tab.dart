@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:convert';
 import 'dart:io';
 import '../../../config/app_colors.dart';
 import '../../../config/app_constants.dart';
@@ -498,15 +495,6 @@ class MoreTab extends StatelessWidget {
                         if (isLoggedIn) ...[
                           _buildMenuItem(
                             context: context,
-                            icon: Icons.download_rounded,
-                            iconBgColor: const Color(0xFF42A5F5),
-                            title: 'Export My Data',
-                            subtitle: 'Download all your account data',
-                            isDark: isDark,
-                            onTap: () => _exportUserData(context),
-                          ),
-                          _buildMenuItem(
-                            context: context,
                             icon: Icons.manage_accounts_rounded,
                             iconBgColor: Colors.red,
                             title: 'Manage Account',
@@ -602,57 +590,6 @@ class MoreTab extends StatelessWidget {
         ],
       ),
     ));
-  }
-
-  void _exportUserData(BuildContext context) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final api = ApiService();
-      final data = await api.exportUserData();
-
-      // Add branding to the export
-      final brandedExport = {
-        '______________________________': '______________________________',
-        'app': 'Burundi AU Chairmanship 2026',
-        'brand': 'TWveriy',
-        'website': 'https://burundi4africa.com',
-        'export_type': 'Personal Data Export (GDPR)',
-        '________________________________': '________________________________',
-        ...data,
-      };
-
-      final jsonString = const JsonEncoder.withIndent('  ').convert(brandedExport);
-
-      // Save to temp file and share
-      final dir = await getTemporaryDirectory();
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-      final file = File('${dir.path}/twveriy_data_export_$timestamp.json');
-      await file.writeAsString(jsonString);
-
-      if (!context.mounted) return;
-      Navigator.pop(context);
-
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'TWveriy - My Data Export',
-        text: 'Your personal data export from Burundi AU Chairmanship 2026 app.',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to export data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   void _showAccountManageSheet(BuildContext context, bool isDark, AuthProvider authProvider) {

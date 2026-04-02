@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-low": "#f0f3ff",
+                        "error-container": "#ffdad6",
+                        "outline-variant": "#c5c6cd",
+                        "surface-container-highest": "#d7e3fc",
+                        "on-primary-fixed-variant": "#3c475b",
+                        "inverse-primary": "#bbc7df",
+                        "primary-fixed": "#d7e3fc",
+                        "on-tertiary-fixed-variant": "#930015",
+                        "primary-fixed-dim": "#bbc7df",
+                        "outline": "#75777d",
+                        "surface-container": "#e7eeff",
+                        "primary": "#000000",
+                        "on-primary": "#ffffff",
+                        "secondary": "#745b17",
+                        "on-error": "#ffffff",
+                        "tertiary-container": "#410004",
+                        "on-secondary-container": "#795f1b",
+                        "primary-container": "#101c2e",
+                        "on-background": "#101c2e",
+                        "tertiary": "#000000",
+                        "inverse-surface": "#253144",
+                        "surface": "#f9f9ff",
+                        "background": "#f9f9ff",
+                        "surface-dim": "#cfdaf3",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#e5c374",
+                        "on-tertiary-fixed": "#410004",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-container": "#f8373e",
+                        "on-primary-fixed": "#101c2e",
+                        "surface-container-high": "#dfe8ff",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#45474c",
+                        "secondary-fixed": "#ffdf99",
+                        "tertiary-fixed": "#ffdad7",
+                        "surface-variant": "#d7e3fc",
+                        "surface-bright": "#f9f9ff",
+                        "secondary-container": "#ffdc8c",
+                        "on-surface": "#101c2e",
+                        "inverse-on-surface": "#ecf0ff",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#ffb3ae",
+                        "surface-tint": "#535f74",
+                        "on-secondary-fixed-variant": "#5a4300",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#251a00"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen">
+<!-- SideNavBar Shell -->
+<aside class="bg-slate-900 dark:bg-black h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col h-full py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-amber-500" data-icon="account_balance">account_balance</span>
+</div>
+<div>
+<h2 class="text-lg font-bold text-white tracking-tight">AU Chairmanship</h2>
+<p class="text-xs text-slate-400 font-manrope uppercase tracking-widest">2026-2027</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span> Dashboard
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="view_carousel">view_carousel</span> Hero Slides
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="article">article</span> Articles
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span> Magazine
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="event">event</span> Events
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="live_tv">live_tv</span> Live Feeds
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="pin_drop">pin_drop</span> Embassy Locations
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span> Consular Services
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span> Resources
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="notifications_active">notifications_active</span> Push Notifications
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span> User Management
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all duration-300 ease-in-out font-manrope text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span> Analytics
+            </a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold transition-all duration-300 ease-in-out font-manrope text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span> Settings
+            </a>
+</nav>
+<div class="mt-auto pt-8">
+<div class="bg-slate-800/40 rounded-xl p-4 flex items-center gap-3">
+<img class="w-10 h-10 rounded-full border border-slate-700 object-cover" data-alt="portrait of a professional diplomat in a suit with a neutral professional background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD338vF52EFMXm0UH4hSpfbFy6XaZyGLe801sXDfnNe-krt8wzZVOyQOGXPbo2P7pnYu56On1Z3t9-XuclavlZTNJMlvV55anbakDncdjjOlHyrg04WoFN6wGffS5t0O717goST8JGPdZM12Bm4bEj8PeaJErPKPJvwRrLRl1lwFN1f_gCTty38ljdI1leCAlsIugvcDiA-tQgOL2KOczYiWJc5sUqqdvt7EvyS9pnnh4ur0fx4sty4mN4IHYPM4nA7--2t0EtlECYu"/>
+<div class="overflow-hidden">
+<p class="text-white text-xs font-bold truncate">Admin Burundi</p>
+<p class="text-slate-500 text-[10px] truncate">Portal Administrator</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-72 min-h-screen">
+<!-- TopNavBar Shell -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl flex justify-between items-center h-20 px-12 border-b border-slate-200/50 dark:border-slate-800/50">
+<div class="flex items-center gap-8">
+<h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tight">Diplomatic Portal</h1>
+<div class="relative group">
+<span class="absolute inset-y-0 left-3 flex items-center text-slate-400 group-focus-within:text-amber-500 transition-colors">
+<span class="material-symbols-outlined text-xl" data-icon="search">search</span>
+</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full text-sm w-64 focus:ring-2 focus:ring-secondary/20 transition-all" placeholder="Rechercher des paramètres..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-slate-500">
+<button class="hover:text-amber-600 transition-colors duration-200 font-bold text-amber-600">FR</button>
+<span class="text-slate-300">/</span>
+<button class="hover:text-amber-600 transition-colors duration-200">EN</button>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-all"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="p-2 text-slate-500 hover:text-amber-600 transition-all"><span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span></button>
+</div>
+<button class="bg-primary-container text-white px-5 py-2 rounded-lg font-manrope text-sm font-semibold hover:bg-black transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="person">person</span>
+                    Profile
+                </button>
+</div>
+</header>
+<!-- Page Content -->
+<div class="pt-32 px-12 pb-20 max-w-7xl mx-auto space-y-12">
+<!-- Page Header Title -->
+<div class="space-y-2">
+<span class="text-secondary font-manrope text-[10px] uppercase tracking-[0.2em] font-bold">Système de Gestion</span>
+<h2 class="text-4xl font-extrabold text-on-surface tracking-tight">Paramètres de la Plateforme</h2>
+<p class="text-on-surface-variant max-w-2xl font-body">Configurez les variables d'environnement, gérez les clés d'accès diplomatiques et surveillez l'activité du système.</p>
+</div>
+<!-- Bento Grid Layout for Settings -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Configuration Générale (Bento Large) -->
+<section class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 space-y-8 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+<div class="flex justify-between items-end">
+<div class="space-y-1">
+<h3 class="text-xl font-bold">Configuration de l'Application</h3>
+<p class="text-sm text-on-surface-variant">Paramètres globaux du portail burundais.</p>
+</div>
+<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase italic">v2.4.0 stable</span>
+</div>
+<div class="grid md:grid-cols-2 gap-8 pt-4">
+<div class="space-y-4">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest">Langue par Défaut</label>
+<div class="relative">
+<select class="w-full bg-surface-container-low border-b-2 border-primary-fixed-dim focus:border-secondary focus:ring-0 text-sm py-3 transition-all appearance-none">
+<option value="fr">Français (Primaire)</option>
+<option value="rn">Kirundi (Officiel)</option>
+<option value="en">English (International)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<label class="block text-xs font-bold text-on-surface-variant uppercase tracking-widest">Mode Maintenance</label>
+<div class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</div>
+</div>
+<p class="text-xs text-on-surface-variant leading-relaxed">Activez ce mode pour suspendre l'accès public lors des mises à jour diplomatiques critiques.</p>
+</div>
+</div>
+<div class="pt-6 border-t border-slate-100">
+<h4 class="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-4">Notes de Version</h4>
+<div class="bg-surface-container p-6 rounded-lg text-sm text-on-surface-variant leading-relaxed font-body italic">
+                            "Mise à jour v2.4.0 : Intégration des nouveaux protocoles de sécurité pour le sommet de l'Union Africaine 2026. Optimisation des temps de réponse pour les flux vidéo en direct."
+                        </div>
+</div>
+</section>
+<!-- API Keys Management (Bento Small) -->
+<section class="col-span-12 lg:col-span-4 bg-primary-container text-white rounded-xl p-8 flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-3 mb-6">
+<div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary-fixed" data-icon="key">key</span>
+</div>
+<h3 class="text-xl font-bold">Gestion des API</h3>
+</div>
+<p class="text-slate-400 text-sm mb-8 leading-relaxed">Gérez les jetons d'accès pour les services consulaires et les ambassades.</p>
+<div class="space-y-4">
+<div class="bg-white/5 p-4 rounded-lg border border-white/10 group cursor-pointer hover:bg-white/10 transition-all">
+<p class="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Production Portal Key</p>
+<div class="flex justify-between items-center">
+<code class="text-amber-400 font-mono text-xs">••••••••••••4F92</code>
+<span class="material-symbols-outlined text-sm text-slate-400 opacity-0 group-hover:opacity-100" data-icon="content_copy">content_copy</span>
+</div>
+</div>
+</div>
+</div>
+<button class="mt-8 w-full border border-secondary/40 text-secondary-fixed py-3 rounded-lg text-sm font-bold hover:bg-secondary/10 transition-all">
+                        Générer une Nouvelle Clé
+                    </button>
+</section>
+<!-- Notifications (Bento Medium) -->
+<section class="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 space-y-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" data-icon="notifications_active">notifications_active</span>
+<h3 class="text-xl font-bold">Paramètres de Notification</h3>
+</div>
+<div class="space-y-6">
+<div class="flex items-center justify-between group">
+<div>
+<p class="font-bold text-sm">Alertes Diplomatiques</p>
+<p class="text-xs text-on-surface-variant">Communications urgentes de l'UA.</p>
+</div>
+<input checked="" class="h-4 w-4 text-secondary border-slate-300 rounded focus:ring-secondary" type="checkbox"/>
+</div>
+<div class="flex items-center justify-between group">
+<div>
+<p class="font-bold text-sm">Mises à jour des Articles</p>
+<p class="text-xs text-on-surface-variant">Nouveaux contenus publiés au journal.</p>
+</div>
+<input checked="" class="h-4 w-4 text-secondary border-slate-300 rounded focus:ring-secondary" type="checkbox"/>
+</div>
+<div class="flex items-center justify-between group">
+<div>
+<p class="font-bold text-sm">Activité du Système</p>
+<p class="text-xs text-on-surface-variant">Maintenance et logs techniques.</p>
+</div>
+<input class="h-4 w-4 text-secondary border-slate-300 rounded focus:ring-secondary" type="checkbox"/>
+</div>
+</div>
+<div class="pt-4">
+<button class="text-secondary text-xs font-bold underline decoration-secondary/30 underline-offset-4">Voir tous les canaux (12)</button>
+</div>
+</section>
+<!-- Backup & Export (Bento Medium) -->
+<section class="col-span-12 lg:col-span-7 bg-surface-container-high rounded-xl p-8 overflow-hidden relative">
+<div class="relative z-10">
+<h3 class="text-xl font-bold mb-6">Sauvegarde &amp; Exportation</h3>
+<div class="grid grid-cols-2 gap-6">
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20 hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-primary mb-4" data-icon="database">database</span>
+<p class="font-bold text-sm mb-1">Base de Données</p>
+<p class="text-[10px] text-on-surface-variant mb-4 uppercase">Dernier export: Il y a 2h</p>
+<button class="bg-primary text-white text-[10px] font-bold py-2 px-4 rounded-full uppercase tracking-tighter">Exporter SQL</button>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20 hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-primary mb-4" data-icon="perm_media">perm_media</span>
+<p class="font-bold text-sm mb-1">Bibliothèque Média</p>
+<p class="text-[10px] text-on-surface-variant mb-4 uppercase">Volume total: 12.4 GB</p>
+<button class="bg-primary text-white text-[10px] font-bold py-2 px-4 rounded-full uppercase tracking-tighter">Exporter .TAR</button>
+</div>
+</div>
+</div>
+<img class="absolute right-[-100px] bottom-[-50px] opacity-10 w-80 rotate-12 pointer-events-none" data-alt="minimalist server room blue glowing lights abstract networking background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYB7e9BkCJnmqrLcFUkwjdZQVzyLOYrKIteSGZ6FdjS-IG3oZWuLYX-THHq-bU9h1hPJjxZSDPsvA7NdTfXZlIg0krq1szM0i2NHgdceIy3TfY5_Joqha6Mmw_v8Dwvi6XDLcFr6tN1XWMGNESKPT4vB_bJn_WfO4xRFvmHYQcO_s7afTEIFnyX8DbnFKjASmdz8Vu9ziP0bft0EtZ4UJpCwN-GbFWvatuN3H22WJGhEToRgnl23VdYkCO8iuKTZCfleZ0kL_u77uJ"/>
+</section>
+<!-- Audit Log (Full Width) -->
+<section class="col-span-12 bg-surface-container-lowest rounded-xl p-8 border border-slate-100">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="text-xl font-bold">Journal d'Audit</h3>
+<p class="text-sm text-on-surface-variant">Surveillance en temps réel des actions administrateur.</p>
+</div>
+<button class="flex items-center gap-2 text-xs font-bold border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span> Filtrer les actions
+                        </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm">
+<thead>
+<tr class="text-xs text-on-surface-variant uppercase tracking-widest border-b border-slate-50">
+<th class="py-4 font-bold">Horodatage</th>
+<th class="py-4 font-bold">Utilisateur</th>
+<th class="py-4 font-bold">Action</th>
+<th class="py-4 font-bold">Entité</th>
+<th class="py-4 font-bold">Statut</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-50">
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-4 font-mono text-[11px] text-slate-500">24 OCT 2023 · 14:32:11</td>
+<td class="py-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 bg-slate-200 rounded-full"></div>
+<span class="font-medium">Jean-Pierre N.</span>
+</div>
+</td>
+<td class="py-4"><span class="bg-secondary-container/30 text-secondary text-[10px] font-bold px-2 py-1 rounded">MISE À JOUR</span></td>
+<td class="py-4">Configuration maintenance</td>
+<td class="py-4">
+<div class="flex items-center gap-1.5 text-green-600 font-bold text-xs">
+<span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Succès
+                                        </div>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-4 font-mono text-[11px] text-slate-500">24 OCT 2023 · 12:15:04</td>
+<td class="py-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 bg-slate-200 rounded-full"></div>
+<span class="font-medium">Admin Burundi</span>
+</div>
+</td>
+<td class="py-4"><span class="bg-primary-container/10 text-primary text-[10px] font-bold px-2 py-1 rounded">EXPORTATION</span></td>
+<td class="py-4">Base de données SQL</td>
+<td class="py-4">
+<div class="flex items-center gap-1.5 text-green-600 font-bold text-xs">
+<span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Succès
+                                        </div>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 transition-colors">
+<td class="py-4 font-mono text-[11px] text-slate-500">23 OCT 2023 · 18:44:29</td>
+<td class="py-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 bg-slate-200 rounded-full"></div>
+<span class="font-medium">Claver M.</span>
+</div>
+</td>
+<td class="py-4"><span class="bg-error-container/40 text-error text-[10px] font-bold px-2 py-1 rounded">ALERTE</span></td>
+<td class="py-4">Accès API rejeté</td>
+<td class="py-4">
+<div class="flex items-center gap-1.5 text-error font-bold text-xs">
+<span class="w-1.5 h-1.5 bg-error rounded-full"></span> Échec
+                                        </div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Global Action Bar -->
+<div class="flex justify-end items-center gap-4 pt-8">
+<button class="px-8 py-3 text-sm font-bold text-slate-500 hover:text-primary transition-all">Réinitialiser</button>
+<button class="bg-primary text-white px-10 py-3 rounded-lg font-manrope font-bold hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/10">Sauvegarder les Paramètres</button>
+</div>
+</div>
+</main>
+</body></html>

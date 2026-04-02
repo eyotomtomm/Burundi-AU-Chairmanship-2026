@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+
+<html class="light" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Diplomatic Portal - User Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container-low": "#f0f3ff",
+              "error-container": "#ffdad6",
+              "outline-variant": "#c5c6cd",
+              "surface-container-highest": "#d7e3fc",
+              "on-primary-fixed-variant": "#3c475b",
+              "inverse-primary": "#bbc7df",
+              "primary-fixed": "#d7e3fc",
+              "on-tertiary-fixed-variant": "#930015",
+              "primary-fixed-dim": "#bbc7df",
+              "outline": "#75777d",
+              "surface-container": "#e7eeff",
+              "primary": "#000000",
+              "on-primary": "#ffffff",
+              "secondary": "#745b17",
+              "on-error": "#ffffff",
+              "tertiary-container": "#410004",
+              "on-secondary-container": "#795f1b",
+              "primary-container": "#101c2e",
+              "on-background": "#101c2e",
+              "tertiary": "#000000",
+              "inverse-surface": "#253144",
+              "surface": "#f9f9ff",
+              "background": "#f9f9ff",
+              "surface-dim": "#cfdaf3",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#e5c374",
+              "on-tertiary-fixed": "#410004",
+              "surface-container-lowest": "#ffffff",
+              "on-tertiary-container": "#f8373e",
+              "on-primary-container": "#79849b",
+              "on-primary-fixed": "#101c2e",
+              "surface-container-high": "#dfe8ff",
+              "on-tertiary": "#ffffff",
+              "on-surface-variant": "#45474c",
+              "secondary-fixed": "#ffdf99",
+              "tertiary-fixed": "#ffdad7",
+              "surface-variant": "#d7e3fc",
+              "surface-bright": "#f9f9ff",
+              "secondary-container": "#ffdc8c",
+              "on-surface": "#101c2e",
+              "inverse-on-surface": "#ecf0ff",
+              "error": "#ba1a1a",
+              "tertiary-fixed-dim": "#ffb3ae",
+              "surface-tint": "#535f74",
+              "on-secondary-fixed-variant": "#5a4300",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#251a00"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .font-headline { font-family: 'Manrope', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d7e3fc; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface min-h-screen">
+<!-- SideNavBar (rail_drawer) -->
+<aside class="bg-slate-900 h-screen w-72 fixed left-0 top-0 overflow-y-auto shadow-2xl flex flex-col py-8 px-4 z-50">
+<div class="mb-10 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+<img alt="Burundi AU Chairmanship Seal" class="w-8 h-8 object-contain" data-alt="Official seal of the Republic of Burundi for the African Union Chairmanship, featuring national colors and diplomatic crest" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQLg6xYmeYInRL4UZSTA_DuiT8Vxv1-o9cKK4Cj_O5sbmASL-aAhspgl2UmSjpMQBSbCpHHSB1l-dbUBaGB65hav2LbtgTu6kTdFyir7YcfSVvmlJMY3_16ggeX8ICYIvz7I5h2JqZgRsh6inkzRBgGrOT4uacI8KuIuZmMnxFrJl14sZBlgfo1lbR3J0jpBmnkS6DQLEZatu2wUkrmtmTKuUpooKoEjRh-XOZDODh_e_aQT-zExN9PCD7-VmBp4FKb5_99penbvLU"/>
+</div>
+<div>
+<h2 class="text-lg font-bold text-white tracking-tight leading-tight">AU Chairmanship</h2>
+<p class="text-xs text-slate-400 font-manrope">2026-2027</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="dashboard">dashboard</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="view_carousel">view_carousel</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Hero Slides</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="article">article</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Articles</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="menu_book">menu_book</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Magazine</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="event">event</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Events</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="live_tv">live_tv</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Live Feeds</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="pin_drop">pin_drop</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Embassy Locations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="account_balance">account_balance</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Consular Services</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="folder_open">folder_open</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Resources</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="notifications_active">notifications_active</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Push Notifications</span>
+</a>
+<!-- Active Tab: User Management -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="group">group</span>
+<span class="font-manrope text-sm tracking-wide">User Management</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="analytics">analytics</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 ease-in-out text-slate-400 hover:text-white hover:bg-slate-800/50 group" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+<span class="font-manrope text-sm font-medium tracking-wide">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-72 min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+<div class="flex items-center gap-8">
+<h1 class="text-xl font-black text-slate-900 tracking-tight">Diplomatic Portal</h1>
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400">search</span>
+<input class="bg-surface-container-low border-none rounded-full py-2 pl-10 pr-6 w-80 text-sm focus:ring-2 focus:ring-secondary transition-all" placeholder="Rechercher un utilisateur..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-slate-500">
+<button class="hover:text-amber-600 transition-colors">EN / FR</button>
+<button class="hover:text-amber-600 transition-colors"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="hover:text-amber-600 transition-colors"><span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span></button>
+</div>
+<div class="h-8 w-[1px] bg-slate-200"></div>
+<div class="flex items-center gap-3">
+<span class="text-sm font-medium text-slate-900">Admin Burundi</span>
+<img alt="Administrator Profile" class="w-10 h-10 rounded-full object-cover" data-alt="Professional headshot of a middle-aged male diplomat in a navy suit, clean corporate background, soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdnSDlc3Tw9YsZfVcM1rscrFHVQhCgwXAzdJd9Baf_Ym-LLDzDWKNTgCsOc5UaL6RJMYGvrfnk--z71uPpDX94CLp6pBKAmPn10VW2AoN8csC3e2bGx40oHiYKw4_dw-x7QyImQVCIVP0MFb1lMyJmymCD6z_qDvfisixrw_3OG29UZOmFQW-H859buJGIkvXezOcAafAm7UclBZIOQVcy9DW-phpKlSUQ2QitNQQu1CG_HGglNyCGQ9Z2rLFn831US2vc_kIzIbXL"/>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="pt-28 pb-12 px-12 max-w-7xl mx-auto space-y-12">
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+<div>
+<span class="text-secondary font-bold text-xs tracking-widest uppercase mb-2 block">Administration Centrale</span>
+<h2 class="text-4xl font-extrabold text-on-surface leading-tight">Gestion des Utilisateurs</h2>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-3 border border-outline-variant text-primary font-semibold rounded-lg hover:bg-surface-container-low transition-all">Exporter PDF</button>
+<button class="px-6 py-3 bg-primary-container text-white font-semibold rounded-lg hover:bg-primary transition-all flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="person_add">person_add</span>
+                        Ajouter un Admin
+                    </button>
+</div>
+</div>
+<!-- Stats Overview -->
+<div class="grid grid-cols-4 gap-6">
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-slate-100/50 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Total Utilisateurs</p>
+<h3 class="text-3xl font-black text-primary">12,482</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+<span class="material-symbols-outlined text-3xl" data-icon="group">group</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-slate-100/50 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Nouveaux (7j)</p>
+<h3 class="text-3xl font-black text-primary">+342</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+<span class="material-symbols-outlined text-3xl" data-icon="trending_up">trending_up</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-slate-100/50 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Utilisateurs Actifs</p>
+<h3 class="text-3xl font-black text-primary">8,104</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+<span class="material-symbols-outlined text-3xl" data-icon="bolt">bolt</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-slate-100/50 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">Comptes Suspendus</p>
+<h3 class="text-3xl font-black text-primary">45</h3>
+</div>
+<div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+<span class="material-symbols-outlined text-3xl" data-icon="block">block</span>
+</div>
+</div>
+</div>
+<!-- Table Section -->
+<div class="bg-surface-container-lowest rounded-2xl overflow-hidden border border-slate-100/50 shadow-sm">
+<div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+<div class="flex gap-4">
+<select class="text-sm border-none bg-surface-container-low rounded-lg focus:ring-secondary py-2 px-4 cursor-pointer">
+<option>Filtrer par Pays</option>
+<option>Burundi</option>
+<option>Éthiopie</option>
+<option>Rwanda</option>
+</select>
+<select class="text-sm border-none bg-surface-container-low rounded-lg focus:ring-secondary py-2 px-4 cursor-pointer">
+<option>Statut</option>
+<option>Actif</option>
+<option>Inactif</option>
+<option>Suspendu</option>
+</select>
+<input class="text-sm border-none bg-surface-container-low rounded-lg focus:ring-secondary py-2 px-4" type="date"/>
+</div>
+<p class="text-sm text-slate-400">Affichage de 1-10 sur 12,482 utilisateurs</p>
+</div>
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-8 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Utilisateur</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Pays</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Date d'inscription</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Dernière activité</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Statut</th>
+<th class="px-8 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Portrait of a young East African woman with a professional expression, neutral studio lighting, high resolution" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8OdefNw0nt00YyHpe_SDyn-4Lllt2SVt-wa2TGeJCQfoXEpd2McWxkWduUTqUtFW-7L1tao_Q3w8sZuN2ylqvmBzr23NbWY_EGCmr0ASIqSiq4LGKQqxtzwrdcnsGVm29YyOeb6J3JmAPTnMB47qmDLE5ekt0ZAahyPiGdigbEAXWxz0_FOMr6aqbrDSdQpSjSDzeOeWiq2in9PxjGnPqLmcUr3ylGezTAUGbzq7ZKV-vm9oZmGcCS6BKE0OFa4uPJPNBHRvWUX6l"/>
+<div>
+<p class="font-bold text-primary">Nshimirimana Clémence</p>
+<p class="text-sm text-slate-500">c.nshimi@diplomacy.bi</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-700">Burundi</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">12 Jan 2026</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">Il y a 2h</span>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></span>
+                                    ACTIF
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-primary"><span class="material-symbols-outlined" data-icon="visibility">visibility</span></button>
+<button class="p-2 hover:bg-red-50 rounded-lg transition-colors text-slate-400 hover:text-red-600"><span class="material-symbols-outlined" data-icon="block">block</span></button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Portrait of an Ethiopian man in a white shirt, soft natural lighting, warm skin tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWH7qGtJEGsOtd38oUJG-tt1LZlvyFaOJqb4dld6RihyxvHQpxKql-OYu0euWZO5idfLcdDtMZX9L-x5emFgK5yGGiG8KDndx_Tm3G9u45K6qsREMvHAyUK5Ko94yT50h677cVjVtD_sX-2O_PoEsexotl4IbS6faLiQ0UJwxdNr677Z09VDb89Wow-VN-SVVcckfDD2s4nNPClJp5uoLnReYq9FrJk_VEndNPgwLgqE5gmE-qSwaW2JcpSvfGsfU6dGDXAVc0r2CO"/>
+<div>
+<p class="font-bold text-primary">Abebe Ketema</p>
+<p class="text-sm text-slate-500">ketema.abebe@au.int</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-700">Éthiopie</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">05 Feb 2026</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">Hier, 18:45</span>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-2"></span>
+                                    ACTIF
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-primary"><span class="material-symbols-outlined" data-icon="visibility">visibility</span></button>
+<button class="p-2 hover:bg-red-50 rounded-lg transition-colors text-slate-400 hover:text-red-600"><span class="material-symbols-outlined" data-icon="block">block</span></button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Professional woman in business attire, modern office background, soft depth of field" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-nJNfwhjx2td4z1uN-dEIauZLsLuWk6T7L1rwcLJrxQG2nlWqrvDc8dq1JbOky_nVR0-5J1wIOEwhMwl4EUtUULSQ7ugV2NOxEm2KF552QEVRje0tuIxciUsTf2ea7rqN55GUaNRjjDZjo87I_cFOu-LLSng7g3yMOKg2HPQAFU0aaQSvCe4mE9jr1lJuV89F44j9QRwjOGCWcYX2xA6C7KNvgH5EebrdOZw_9KHigNJgCjo0JymYCsxkAy-Kl4XJxGG-Dl-TnV4b"/>
+<div>
+<p class="font-bold text-primary">Iradukunda Marie</p>
+<p class="text-sm text-slate-500">marie.ira@gov.bi</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-700">Burundi</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">20 Dec 2025</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">Il y a 3 mois</span>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-2"></span>
+                                    INACTIF
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-primary"><span class="material-symbols-outlined" data-icon="visibility">visibility</span></button>
+<button class="p-2 hover:bg-red-50 rounded-lg transition-colors text-slate-400 hover:text-red-600"><span class="material-symbols-outlined" data-icon="block">block</span></button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" data-alt="Confident man with short hair, high-end studio lighting, minimalist dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJObNaXfOKJLBgEl4F2lM3cpcP24XJ6vVzeZeYY0c5iAjYpSWS3GjM_KYkfNlM0SLw8iuwhWOff-c4A9JyX0E5wdbdWaoRE4duf77TFZNHRKu0mBODaD5pMdYhky1o2Y_mA_a-XjrnoLPuU1QrBiruLg5Y7fxYu5rYQmiJiI4T_u1zBahin7SrtqWhO92KwCCSaiPpamD2qddSARkyLQte3rdUl6tHAU_b8DXqr0xU8fiB-z25sbd-6_JLodQsPwsaRf0el_vv_h-3"/>
+<div>
+<p class="font-bold text-primary">Jean-Pierre Ndereya</p>
+<p class="text-sm text-slate-500">jp.ndereya@external.bi</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-700">Burundi</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">01 Jan 2026</span>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-slate-500">Il y a 2 jours</span>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+<span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span>
+                                    SUSPENDU
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-primary"><span class="material-symbols-outlined" data-icon="visibility">visibility</span></button>
+<button class="p-2 hover:bg-green-50 rounded-lg transition-colors text-slate-400 hover:text-green-600"><span class="material-symbols-outlined" data-icon="settings_backup_restore">settings_backup_restore</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-6 flex justify-center bg-white">
+<div class="flex gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container-low text-primary"><span class="material-symbols-outlined">chevron_left</span></button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-white font-bold">1</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container-low hover:bg-slate-100 text-slate-600">2</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container-low hover:bg-slate-100 text-slate-600">3</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container-low text-primary"><span class="material-symbols-outlined">chevron_right</span></button>
+</div>
+</div>
+</div>
+<!-- Admin Team & Roles Matrix (Asymmetric Layout) -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Team Section -->
+<div class="col-span-12 lg:col-span-5 space-y-6">
+<div class="bg-primary-container p-8 rounded-2xl text-white shadow-xl relative overflow-hidden">
+<div class="relative z-10">
+<h3 class="text-2xl font-black mb-2">Équipe Admin</h3>
+<p class="text-blue-100/60 text-sm mb-8">Gérez le personnel et attribuez les responsabilités critiques.</p>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all">
+<div class="flex items-center gap-3">
+<img alt="Admin" class="w-12 h-12 rounded-full border-2 border-amber-500/50" data-alt="Close-up of a smiling male professional with short hair, clean shaven, professional attire, soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZNc1dRmSKeIbyqtFXeZYwBX1aZ1l4-YOHAU3uBe_TqYFY-yNms3iPS2KfQcyTe-8NSHkNUdjKX6JAojgaRBZl5hXYjsF5eSMDCc6VcEvsw671094cpXcdJtZTlbzmu9rxvq2OMVIiat3O0AOSh-ECEonAOkQZNp-7Gs5D6cY7hFktaMD5d3cj95_O9vFikhES8hd_DDSLpRCJDxy1IKl9UD0s5TLjusHKbLVKm5fawK40lvh1tP-_rzA3Ldguu7ZNC7mLpoqrt67J"/>
+<div>
+<p class="font-bold text-sm">Fabrice Hakizimana</p>
+<p class="text-xs text-amber-400 uppercase font-black tracking-tighter">Super Admin</p>
+</div>
+</div>
+<button class="text-white/40 hover:text-white"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+<div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all">
+<div class="flex items-center gap-3">
+<img alt="Admin" class="w-12 h-12 rounded-full border-2 border-blue-500/50" data-alt="Portrait of a young woman with curly hair, natural expression, professional headshot on grey background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDu3b0biO-HGiGzihYp79Xaz8QqgaBBBcicksEZZg5HKBrymbMwDsu-T0avg6VwCAmqb2-yF5eZBrTmtCktPFC97cKQ69zXvodSuD7iVSObCVnV_7xS-I7rtOI4ym4r9Io0h1grgT0M8FHHWJkRbmIWxQiUFbPaAFp9wSzVi5zDD_zyh7Im-p_H0kDHNozodiTJX3Yh5Tx3hOcSy2_baPfQFdHxMOABFtxWTuIbuXzsFCqWaPqdVnir61zsSf_0PYwBe0t-acgaZpps"/>
+<div>
+<p class="font-bold text-sm">Diane Bucumi</p>
+<p class="text-xs text-blue-400 uppercase font-black tracking-tighter text-on-tertiary-container">Content Manager</p>
+</div>
+</div>
+<button class="text-white/40 hover:text-white"><span class="material-symbols-outlined">more_vert</span></button>
+</div>
+</div>
+<button class="mt-8 w-full py-4 bg-secondary text-primary-container font-black rounded-xl hover:bg-secondary-fixed transition-all active:scale-95">
+                                + INVITER UN NOUVEL ADMIN
+                            </button>
+</div>
+<!-- Background Pattern -->
+<div class="absolute top-0 right-0 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-[200px]" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+</div>
+</div>
+<!-- Roles Permissions Matrix -->
+<div class="col-span-12 lg:col-span-7">
+<div class="bg-surface-container-low p-8 rounded-2xl">
+<h3 class="text-xl font-black text-primary mb-6">Matrice des Permissions</h3>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr>
+<th class="py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Permission</th>
+<th class="py-4 px-4 text-center text-[10px] font-black text-amber-600 uppercase">Super Admin</th>
+<th class="py-4 px-4 text-center text-[10px] font-black text-slate-700 uppercase">Manager</th>
+<th class="py-4 px-4 text-center text-[10px] font-black text-slate-700 uppercase">Editor</th>
+<th class="py-4 px-4 text-center text-[10px] font-black text-slate-700 uppercase">Viewer</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200">
+<tr>
+<td class="py-4 text-sm font-medium text-slate-700">Gestion Utilisateurs</td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+</tr>
+<tr>
+<td class="py-4 text-sm font-medium text-slate-700">Modification Contenu</td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+</tr>
+<tr>
+<td class="py-4 text-sm font-medium text-slate-700">Paramètres Système</td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+</tr>
+<tr>
+<td class="py-4 text-sm font-medium text-slate-700">Exports Data</td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-slate-300">cancel</span></td>
+<td class="py-4 text-center"><span class="material-symbols-outlined text-green-600" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button (FAB) - Suppressed as per context "User Management" usually doesn't need a persistent primary action besides the header ones, but for task alignment: -->
+<!-- Context check: User management is a primary dashboard area, keeping but tailored. -->
+<button class="fixed bottom-10 right-10 w-16 h-16 bg-primary shadow-2xl rounded-full flex items-center justify-center text-secondary transition-all hover:scale-110 active:scale-90 group z-50">
+<span class="material-symbols-outlined text-3xl" data-icon="support_agent">support_agent</span>
+<span class="absolute right-20 bg-primary-container text-white px-4 py-2 rounded-lg text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Aide Administrative</span>
+</button>
+</body></html>

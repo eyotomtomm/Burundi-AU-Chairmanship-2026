@@ -248,22 +248,30 @@ class _HomeTabState extends State<HomeTab> {
   void _startHeroAutoSlide() {
     _heroTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || _heroSlides.isEmpty || !_heroPageController.hasClients) return;
-      _heroPageController.animateToPage(
-        _heroRawPage + 1,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
+      try {
+        _heroPageController.animateToPage(
+          _heroRawPage + 1,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      } catch (e) {
+        // Ignore animation errors during page transitions
+      }
     });
   }
 
   void _startFeatureAutoSlide() {
     _featureTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || _featureCards.isEmpty || !_featureCardPageController.hasClients) return;
-      _featureCardPageController.animateToPage(
-        _featureRawPage + 1,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      );
+      try {
+        _featureCardPageController.animateToPage(
+          _featureRawPage + 1,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOut,
+        );
+      } catch (e) {
+        // Ignore animation errors during page transitions
+      }
     });
   }
 

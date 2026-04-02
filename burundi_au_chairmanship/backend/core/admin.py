@@ -12,7 +12,7 @@ from .models import (
     HeroTextContent, QuickAccessMenuItem, VerificationRequest, WeatherCity,
     EventRegistration, RegistrationFormField, EventSubmission,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
-    AuditLogEntry, AdminRole, SupportTicket, TicketMessage,
+    AuditLogEntry, AdminRole, SupportTicket, TicketMessage, Popup,
 )
 
 
@@ -1333,3 +1333,52 @@ class SupportTicketAdmin(admin.ModelAdmin):
     search_fields = ('subject', 'user__username', 'user__email')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [TicketMessageInline]
+
+
+@admin.register(Popup)
+class PopupAdmin(admin.ModelAdmin):
+    """Admin interface for Popup/Announcement system"""
+    list_display = ('title', 'popup_type', 'is_active', 'priority', 'show_once', 'expires_at', 'created_at')
+    list_filter = ('is_active', 'popup_type', 'show_once')
+    search_fields = ('title', 'title_fr', 'message', 'message_fr')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Content (English)', {
+            'fields': ('title', 'message', 'action_text')
+        }),
+        ('Content (French)', {
+            'fields': ('title_fr', 'message_fr', 'action_text_fr'),
+            'classes': ('collapse',)
+        }),
+        ('Media & Action', {
+            'fields': ('image', 'action_url')
+        }),
+        ('Settings', {
+            'fields': ('popup_type', 'is_active', 'priority', 'show_once', 'expires_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    list_editable = ('is_active', 'priority')
+    ordering = ('-priority', '-created_at')
+
+    def get_fieldsets(self, request, obj=None):
+        """Simplify fieldsets for add form"""
+        if obj is None:
+            return (
+                ('Content (English)', {
+                    'fields': ('title', 'message', 'action_text')
+                }),
+                ('Content (French)', {
+                    'fields': ('title_fr', 'message_fr', 'action_text_fr')
+                }),
+                ('Media & Action', {
+                    'fields': ('image', 'action_url')
+                }),
+                ('Settings', {
+                    'fields': ('popup_type', 'is_active', 'priority', 'show_once', 'expires_at')
+                }),
+            )
+        return super().get_fieldsets(request, obj)

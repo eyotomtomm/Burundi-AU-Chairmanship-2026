@@ -24,6 +24,7 @@ router.register('quick-access-menu', views.QuickAccessMenuViewSet)
 router.register('event-registrations', views.EventRegistrationViewSet, basename='event-registration')
 router.register('event-submissions', views.EventSubmissionViewSet, basename='event-submission')
 router.register('support/tickets', views.SupportTicketViewSet, basename='support-ticket')
+router.register('popups', views.PopupViewSet, basename='popup')
 
 urlpatterns = [
     path('', include(router.urls)),

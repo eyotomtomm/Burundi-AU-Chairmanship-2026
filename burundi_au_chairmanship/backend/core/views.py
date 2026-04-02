@@ -21,7 +21,7 @@ from .models import (
     PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
     Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
     WeatherCity, EventRegistration, RegistrationFormField, EventSubmission,
-    SupportTicket, TicketMessage,
+    SupportTicket, TicketMessage, Popup,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -36,6 +36,7 @@ from .serializers import (
     WeatherCitySerializer, EventRegistrationSerializer, EventSubmissionSerializer,
     RegistrationFormFieldSerializer, ProxyRegistrationSerializer,
     SupportTicketListSerializer, SupportTicketDetailSerializer, TicketMessageSerializer,
+    PopupSerializer,
 )
 
 
@@ -1636,3 +1637,34 @@ def support_unread_count(request):
         is_read=False,
     ).count()
     return Response({'unread_count': count})
+
+
+# ── Popup/Announcement System ────────────────────────────────────────────
+
+class PopupViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for Popup/Announcement system.
+    GET /api/popups/active/ - returns active popups for current user
+    """
+    serializer_class = PopupSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter active and non-expired popups"""
+        # Base filter: active and not expired
+        queryset = Popup.objects.filter(is_active=True)
+
+        # Filter by expiry
+        from django.utils import timezone
+        now = timezone.now()
+        queryset = queryset.filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+
+        # Order by priority (highest first), then by creation date
+        return queryset.order_by('-priority', '-created_at')
+
+    @action(detail=False, methods=['get'], url_path='active')
+    def active(self, request):
+        """Get all active popups for the current user"""
+        popups = self.get_queryset()
+        serializer = self.get_serializer(popups, many=True)
+        return Response(serializer.data)

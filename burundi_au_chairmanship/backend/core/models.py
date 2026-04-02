@@ -1458,3 +1458,46 @@ class AuditLogEntry(models.Model):
 
     def __str__(self):
         return f"{self.action} {self.entity_type}: {self.entity_label}"
+
+
+class Popup(models.Model):
+    """Popup/Announcement system for displaying messages to users on app launch"""
+    POPUP_TYPE_CHOICES = [
+        ('general', 'General Announcement'),
+        ('event', 'Event Promotion'),
+        ('verification', 'Verification Reminder'),
+        ('project', 'Project Update'),
+    ]
+
+    title = models.CharField(max_length=200, help_text='Popup title')
+    title_fr = models.CharField(max_length=200, blank=True, help_text='French title')
+    message = models.TextField(help_text='Main message content')
+    message_fr = models.TextField(blank=True, help_text='French message')
+    image = models.ImageField(upload_to='popups/', blank=True, null=True, validators=[validate_image_file],
+                              help_text='Optional image displayed at top of popup')
+    action_text = models.CharField(max_length=100, blank=True, help_text='Button text (e.g., "Click here", "Sign up now")')
+    action_text_fr = models.CharField(max_length=100, blank=True, help_text='French button text')
+    action_url = models.CharField(max_length=500, blank=True,
+                                   help_text='URL or app route (e.g., "/events" or "https://external.com")')
+    popup_type = models.CharField(max_length=20, choices=POPUP_TYPE_CHOICES, default='general')
+    is_active = models.BooleanField(default=True, help_text='Only active popups are shown to users')
+    priority = models.IntegerField(default=0, help_text='Higher priority = shown first (0-100)')
+    show_once = models.BooleanField(default=True, help_text='If true, user sees this popup only once')
+    expires_at = models.DateTimeField(null=True, blank=True, help_text='Popup will not show after this date/time')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-priority', '-created_at']
+        verbose_name = 'Popup/Announcement'
+        verbose_name_plural = 'Popups/Announcements'
+
+    def __str__(self):
+        return f"{self.title} ({self.get_popup_type_display()})"
+
+    def is_expired(self):
+        """Check if popup has expired"""
+        if not self.expires_at:
+            return False
+        from django.utils import timezone
+        return timezone.now() > self.expires_at

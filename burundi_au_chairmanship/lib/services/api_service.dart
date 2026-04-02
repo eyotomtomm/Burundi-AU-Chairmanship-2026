@@ -638,6 +638,15 @@ class ApiService {
       'appeal_message': appealMessage,
     }, auth: true);
   }
+
+  // ── Popups/Announcements ────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getActivePopups() async {
+    final data = await _get('popups/active/', auth: true);
+    if (data is List) {
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
 }
 
 class ApiException implements Exception {

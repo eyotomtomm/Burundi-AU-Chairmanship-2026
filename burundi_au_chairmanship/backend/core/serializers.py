@@ -9,7 +9,7 @@ from .models import (
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
     VerificationRequest, WeatherCity, EventRegistration, RegistrationFormField,
     EventSubmission, FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
-    SupportTicket, TicketMessage,
+    SupportTicket, TicketMessage, Popup,
 )
 
 
@@ -732,3 +732,25 @@ class SupportTicketDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'subject', 'status', 'priority', 'is_live_chat',
                   'created_at', 'updated_at', 'resolved_at',
                   'rating', 'rating_comment', 'messages']
+
+
+class PopupSerializer(serializers.ModelSerializer):
+    """Serializer for Popup/Announcement model"""
+    class Meta:
+        model = Popup
+        fields = [
+            'id', 'title', 'title_fr', 'message', 'message_fr',
+            'image', 'action_text', 'action_text_fr', 'action_url',
+            'popup_type', 'priority', 'show_once', 'created_at'
+        ]
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Ensure image is a full URL
+        if instance.image:
+            request = self.context.get('request')
+            if request:
+                ret['image'] = request.build_absolute_uri(instance.image.url)
+            else:
+                ret['image'] = instance.image.url
+        return ret

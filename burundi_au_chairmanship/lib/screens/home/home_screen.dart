@@ -3,7 +3,10 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
+import '../../providers/language_provider.dart';
 import '../../widgets/verification_dialogs.dart';
+import '../../widgets/popup_dialog.dart';
+import '../../services/popup_service.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/magazine_tab.dart';
 import 'tabs/agenda_tab.dart';
@@ -22,9 +25,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Check verification status after screen loads
+    // Check verification status and show popups after screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkVerificationStatus();
+      _checkAndShowPopups();
     });
   }
 
@@ -94,6 +98,47 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  /// Check and show popup announcements
+  Future<void> _checkAndShowPopups() async {
+    final authProvider = context.read<AuthProvider>();
+
+    // Only show popups if user is authenticated
+    if (!authProvider.isAuthenticated) return;
+
+    try {
+      final popupService = PopupService();
+      final languageProvider = context.read<LanguageProvider>();
+      final languageCode = languageProvider.locale.languageCode;
+
+      // Get popups that should be shown
+      final popups = await popupService.getPopupsToShow();
+
+      if (popups.isEmpty || !mounted) return;
+
+      // Show popups one by one (highest priority first)
+      for (final popup in popups) {
+        if (!mounted) break;
+
+        // Show popup dialog
+        await PopupDialog.show(
+          context: context,
+          popup: popup,
+          languageCode: languageCode,
+        );
+
+        // Mark as seen
+        await popupService.markPopupAsSeen(popup.id);
+
+        // Small delay between popups if there are multiple
+        if (popups.length > 1 && popup != popups.last) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+    } catch (e) {
+      // Silently fail - don't disrupt user experience
+    }
   }
 
   @override

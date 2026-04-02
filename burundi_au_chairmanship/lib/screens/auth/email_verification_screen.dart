@@ -290,7 +290,19 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() { _phoneSending = false; _errorMessage = 'Failed to send code: $e'; });
+        // Even if we get an error, the OTP might have been sent
+        // Show a friendlier message and allow user to proceed
+        final errorMsg = e.toString().toLowerCase();
+        if (errorMsg.contains('500') || errorMsg.contains('failed to send')) {
+          setState(() {
+            _phoneSending = false;
+            _phoneOtpSent = true; // Allow user to enter code anyway
+            _errorMessage = 'Code may have been sent. Please check your messages and enter the code below.';
+          });
+          _startPhoneResendCountdown();
+        } else {
+          setState(() { _phoneSending = false; _errorMessage = 'Failed to send code. Please try again.'; });
+        }
       }
     }
   }
@@ -635,9 +647,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         color: isDark ? Colors.white : AppColors.lightText,
       ),
       decoration: InputDecoration(
-        hintText: '000000',
+        hintText: '• • • • • •',
         hintStyle: TextStyle(
-          color: isDark ? AppColors.darkTextSecondary.withValues(alpha: 0.3) : Colors.grey[300],
+          color: isDark ? AppColors.darkTextSecondary.withValues(alpha: 0.5) : Colors.grey[400],
           fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: 12,
         ),
         counterText: '',

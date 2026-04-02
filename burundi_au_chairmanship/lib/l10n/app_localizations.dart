@@ -109,6 +109,8 @@ class AppLocalizations {
       'terms_of_service': 'Terms of Service',
       'version': 'Version',
       'contact_us': 'Contact Us',
+      'get_verified': 'Get Verified',
+      'get_verified_desc': 'Request a verified badge for your account',
 
       // Splash
       'republic_of_burundi': 'Republic of Burundi',
@@ -269,6 +271,8 @@ class AppLocalizations {
       'terms_of_service': "Conditions d'utilisation",
       'version': 'Version',
       'contact_us': 'Nous contacter',
+      'get_verified': 'Obtenir la vérification',
+      'get_verified_desc': 'Demander un badge vérifié pour votre compte',
 
       // Splash
       'republic_of_burundi': 'République du Burundi',

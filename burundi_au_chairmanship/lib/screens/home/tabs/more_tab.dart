@@ -381,18 +381,36 @@ class MoreTab extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Column(
-                  children: [
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.info_outline_rounded,
-                      iconBgColor: const Color(0xFF5C6BC0),
-                      title: l10n.translate('about'),
-                      subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
-                      isDark: isDark,
-                      isFirst: true,
-                      onTap: () => _showAboutDialog(context, l10n),
-                    ),
+                child: Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
+                    final isLoggedIn = authProvider.isAuthenticated;
+                    final isVerified = authProvider.isVerified;
+                    final showGetVerified = isLoggedIn && !isVerified;
+
+                    return Column(
+                      children: [
+                        // Get Verified - Only show if logged in and NOT verified
+                        if (showGetVerified)
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.verified_rounded,
+                            iconBgColor: const Color(0xFF42A5F5),
+                            title: l10n.translate('get_verified'),
+                            subtitle: l10n.translate('get_verified_desc'),
+                            isDark: isDark,
+                            isFirst: true,
+                            onTap: () => Navigator.pushNamed(context, '/verification-request'),
+                          ),
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.info_outline_rounded,
+                          iconBgColor: const Color(0xFF5C6BC0),
+                          title: l10n.translate('about'),
+                          subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
+                          isDark: isDark,
+                          isFirst: !showGetVerified,
+                          onTap: () => _showAboutDialog(context, l10n),
+                        ),
                     _buildMenuItem(
                       context: context,
                       icon: Icons.privacy_tip_outlined,
@@ -476,38 +494,31 @@ class MoreTab extends StatelessWidget {
                       isDark: isDark,
                       onTap: () => _showSupportOptions(context, isDark),
                     ),
-                    // Export Data & Delete Account - Only show if logged in
-                    Consumer<AuthProvider>(
-                      builder: (context, authProvider, _) {
-                        final isLoggedIn = authProvider.isAuthenticated;
-                        if (!isLoggedIn) return const SizedBox.shrink();
-
-                        return Column(
-                          children: [
-                            _buildMenuItem(
-                              context: context,
-                              icon: Icons.download_rounded,
-                              iconBgColor: const Color(0xFF42A5F5),
-                              title: 'Export My Data',
-                              subtitle: 'Download all your account data',
-                              isDark: isDark,
-                              onTap: () => _exportUserData(context),
-                            ),
-                            _buildMenuItem(
-                              context: context,
-                              icon: Icons.manage_accounts_rounded,
-                              iconBgColor: Colors.red,
-                              title: 'Manage Account',
-                              subtitle: 'Deactivate or delete your account',
-                              isDark: isDark,
-                              isLast: true,
-                              onTap: () => _showAccountManageSheet(context, isDark, authProvider),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
+                        // Export Data & Delete Account - Only show if logged in
+                        if (isLoggedIn) ...[
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.download_rounded,
+                            iconBgColor: const Color(0xFF42A5F5),
+                            title: 'Export My Data',
+                            subtitle: 'Download all your account data',
+                            isDark: isDark,
+                            onTap: () => _exportUserData(context),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.manage_accounts_rounded,
+                            iconBgColor: Colors.red,
+                            title: 'Manage Account',
+                            subtitle: 'Deactivate or delete your account',
+                            isDark: isDark,
+                            isLast: true,
+                            onTap: () => _showAccountManageSheet(context, isDark, authProvider),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -608,7 +619,7 @@ class MoreTab extends StatelessWidget {
       final brandedExport = {
         '______________________________': '______________________________',
         'app': 'Burundi AU Chairmanship 2026',
-        'brand': 'Burundi4Africa',
+        'brand': 'TWveriy',
         'website': 'https://burundi4africa.com',
         'export_type': 'Personal Data Export (GDPR)',
         '________________________________': '________________________________',
@@ -620,7 +631,7 @@ class MoreTab extends StatelessWidget {
       // Save to temp file and share
       final dir = await getTemporaryDirectory();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-      final file = File('${dir.path}/burundi4africa_data_export_$timestamp.json');
+      final file = File('${dir.path}/twveriy_data_export_$timestamp.json');
       await file.writeAsString(jsonString);
 
       if (!context.mounted) return;
@@ -628,7 +639,7 @@ class MoreTab extends StatelessWidget {
 
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Burundi4Africa - My Data Export',
+        subject: 'TWveriy - My Data Export',
         text: 'Your personal data export from Burundi AU Chairmanship 2026 app.',
       );
     } catch (e) {

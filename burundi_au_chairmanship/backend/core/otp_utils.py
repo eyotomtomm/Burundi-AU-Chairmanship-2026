@@ -129,9 +129,11 @@ def send_phone_otp_twilio(user, country_code, phone_number, channel='sms'):
     channel: 'sms' or 'whatsapp'
     Returns (success, message, otp_id)
     """
-    try:
-        full_phone = f"{country_code}{phone_number}"
+    full_phone = f"{country_code}{phone_number}"
+    otp = None
+    twilio_sent = False
 
+    try:
         # Invalidate all previous unverified OTPs for this user+phone
         OTPVerification.objects.filter(
             user=user, type='phone', contact=full_phone, is_verified=False
@@ -156,28 +158,36 @@ def send_phone_otp_twilio(user, country_code, phone_number, channel='sms'):
         # Use Twilio Verify if Service SID is configured (recommended)
         # Twilio Verify supports both 'sms' and 'whatsapp' channels
         if hasattr(settings, 'TWILIO_VERIFY_SERVICE_SID') and settings.TWILIO_VERIFY_SERVICE_SID:
+            # Send via Twilio first
             verification = client.verify.v2.services(
                 settings.TWILIO_VERIFY_SERVICE_SID
             ).verifications.create(
                 to=full_phone,
                 channel=channel  # 'sms' or 'whatsapp'
             )
+            twilio_sent = True
 
-            # Create OTP record for tracking (Twilio manages the actual code)
-            otp = OTPVerification.objects.create(
-                user=user,
-                type='phone',
-                contact=full_phone,
-                otp_code='TWILIO_VERIFY',
-                expires_at=timezone.now() + timedelta(minutes=10)
-            )
+            # Try to create OTP record for tracking
+            try:
+                otp = OTPVerification.objects.create(
+                    user=user,
+                    type='phone',
+                    contact=full_phone,
+                    otp_code='TWILIO_VERIFY',
+                    expires_at=timezone.now() + timedelta(minutes=10)
+                )
+            except Exception as db_error:
+                logger.warning(f'OTP sent via Twilio but failed to save record: {db_error}')
+                # OTP was sent, so still return success even if DB save failed
+                pass
 
             channel_label = 'WhatsApp' if channel == 'whatsapp' else 'SMS'
-            return True, f'OTP sent via {channel_label}', otp.id
+            return True, f'OTP sent via {channel_label}', otp.id if otp else None
 
         # Fallback: Manual SMS only when Twilio Verify Service is NOT configured
         otp_code = generate_otp()
 
+        # Create OTP record first
         otp = OTPVerification.objects.create(
             user=user,
             type='phone',
@@ -195,16 +205,22 @@ def send_phone_otp_twilio(user, country_code, phone_number, channel='sms'):
         else:
             return False, 'No sender configured. Please set TWILIO_SENDER_ID or TWILIO_PHONE_NUMBER in settings.', None
 
+        # Send SMS
         client.messages.create(
             body=f'Your Burundi AU Chairmanship verification code is: {otp_code}. Valid for 10 minutes.',
             from_=sender,
             to=full_phone
         )
+        twilio_sent = True
 
         return True, 'OTP sent via SMS', otp.id
 
     except Exception as e:
         logger.exception('Failed to send phone OTP')
+        # If Twilio succeeded but something else failed, still return success
+        if twilio_sent:
+            logger.warning('OTP was sent via Twilio but error occurred after')
+            return True, 'OTP sent successfully', otp.id if otp else None
         return False, 'Failed to send verification code. Please try again.', None
 
 

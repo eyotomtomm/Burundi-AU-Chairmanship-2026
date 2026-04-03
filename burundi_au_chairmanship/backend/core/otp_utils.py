@@ -270,15 +270,25 @@ def verify_phone_otp(user, country_code, phone_number, otp_code):
                     otp.save()
                     _mark_phone_verified(user, country_code, phone_number)
                     return True, 'Phone number verified successfully'
+                elif verification_check.status == 'pending':
+                    OTPVerification.objects.filter(pk=otp.pk).update(
+                        attempts=models_F('attempts') + 1
+                    )
+                    return False, 'Invalid OTP code. Please check the code and try again.'
                 else:
                     OTPVerification.objects.filter(pk=otp.pk).update(
                         attempts=models_F('attempts') + 1
                     )
-                    return False, 'Invalid OTP code'
+                    return False, f'Verification failed: {verification_check.status}. Please request a new code.'
 
             except Exception as e:
-                logger.exception('Twilio verification failed')
-                return False, 'Verification failed. Please try again.'
+                logger.exception(f'Twilio verification failed: {str(e)}')
+                error_msg = str(e)
+                if 'expired' in error_msg.lower():
+                    return False, 'OTP code has expired. Please request a new one.'
+                elif 'max check attempts reached' in error_msg.lower():
+                    return False, 'Too many attempts. Please request a new code.'
+                return False, 'Verification failed. Please request a new code and try again.'
 
         # Manual verification
         if otp.is_expired():

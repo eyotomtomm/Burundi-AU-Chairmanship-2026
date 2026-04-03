@@ -43,8 +43,6 @@ class UserProfile(models.Model):
     GENDER_CHOICES = [
         ('male', 'Male'),
         ('female', 'Female'),
-        ('other', 'Other'),
-        ('prefer_not_to_say', 'Prefer not to say'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -831,7 +829,7 @@ class Notification(models.Model):
     target_gender = models.CharField(
         max_length=20,
         blank=True,
-        choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+        choices=[('male', 'Male'), ('female', 'Female')],
         help_text='Filter by gender (leave blank for all)'
     )
     target_nationalities = models.JSONField(

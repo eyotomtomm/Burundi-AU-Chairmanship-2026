@@ -441,9 +441,16 @@ class MoreTab extends StatelessWidget {
                             ? 'https://apps.apple.com/app/burundi-au-chairmanship/id123456789'
                             : 'https://play.google.com/store/apps/details?id=com.burundi.au.chairmanship';
 
+                        // Get the RenderBox for positioning the share sheet on iOS
+                        final box = context.findRenderObject() as RenderBox?;
+                        final sharePositionOrigin = box != null
+                            ? box.localToGlobal(Offset.zero) & box.size
+                            : null;
+
                         await Share.share(
                           'Check out the Burundi AU Chairmanship 2026 app! 🇧🇮\n\n$appLink',
                           subject: 'Burundi AU Chairmanship 2026 App',
+                          sharePositionOrigin: sharePositionOrigin,
                         );
                       },
                     ),

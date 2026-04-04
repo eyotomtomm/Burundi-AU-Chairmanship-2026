@@ -333,7 +333,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           // PDF Viewer - Use local file if downloaded, otherwise network
           if (_localFilePath != null && _isDownloaded)
             SfPdfViewer.file(
-              File(_localFilePath!),
+              File(_localFilePath),
               key: _pdfViewerKey,
               controller: _pdfViewerController,
               canShowScrollHead: true,

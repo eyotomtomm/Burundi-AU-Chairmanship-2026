@@ -332,11 +332,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         children: [
           // PDF Viewer - Use local file if downloaded, otherwise network
           if (_localFilePath != null && _isDownloaded)
-            SfPdfViewer.file(
-              File(_localFilePath),
-              key: _pdfViewerKey,
-              controller: _pdfViewerController,
-              canShowScrollHead: true,
+            Builder(
+              builder: (context) {
+                final localPath = _localFilePath!; // Safe due to null check above
+                return SfPdfViewer.file(
+                  File(localPath),
+                  key: _pdfViewerKey,
+                  controller: _pdfViewerController,
+                  canShowScrollHead: true,
               canShowPaginationDialog: true,
               onDocumentLoaded: (details) {
                 setState(() {
@@ -364,6 +367,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 setState(() {
                   _currentZoom = details.newZoomLevel;
                 });
+              },
+                );
               },
             )
           else

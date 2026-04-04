@@ -175,8 +175,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       _event.getTitle(langCode),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        height: 1.3,
                         shadows: [
                           Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2)),
                         ],
@@ -873,7 +874,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           const Text(
             "You're Registered!",
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.burundiGreen,
             ),
@@ -936,8 +937,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           Text(
             isFull ? 'Event Full' : 'Registration Closed',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: isDark ? Colors.white54 : Colors.black45,
             ),
           ),
@@ -970,7 +971,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 Text(
                   'Register for this Event',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87,
                   ),

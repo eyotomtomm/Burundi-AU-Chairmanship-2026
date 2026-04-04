@@ -9,7 +9,6 @@ import '../../config/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/verified_badge.dart';
-import '../verification/enhanced_verification_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -340,25 +339,6 @@ class ProfileScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        // Request Verification (only show if not verified)
-                        if (!authProvider.isVerified) ...[
-                          ListTile(
-                            leading: const Icon(Icons.verified_outlined,
-                                color: AppColors.info),
-                            title: const Text('Request Verification'),
-                            subtitle: const Text('Get verified with a blue or gold badge'),
-                            trailing: const Icon(Icons.chevron_right, size: 20),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                CupertinoPageRoute(
-                                  builder: (context) => const EnhancedVerificationScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                          const Divider(height: 1, indent: 16, endIndent: 16),
-                        ],
                         // Sign Out
                         ListTile(
                           leading: const Icon(Icons.logout,

@@ -943,17 +943,71 @@ def home_feed(request):
     categories = Category.objects.all()
     settings = AppSettings.objects.first()
 
-    # Standalone event cards
-    event_cards = EventRegistration.objects.filter(
+    # Combine both event types: EventRegistration (with forms) and Event (informational)
+    from django.utils import timezone
+
+    # Get events with registration
+    event_registrations = EventRegistration.objects.filter(
         is_active=True
     ).prefetch_related('form_fields')
+
+    # Get regular informational events (upcoming only)
+    now = timezone.now()
+    informational_events = Event.objects.filter(
+        is_active=True,
+        event_date__gte=now  # Only future events
+    )
+
+    # Serialize both types
+    event_reg_data = EventRegistrationSerializer(event_registrations, many=True, context={'request': request}).data
+    info_event_data = EventSerializer(informational_events, many=True, context={'request': request}).data
+
+    # Mark which events have registration
+    for event in event_reg_data:
+        event['has_registration'] = True
+        event['card_type'] = event.get('card_type', 'event')
+
+    # Transform Event fields to match EventRegistration format for frontend compatibility
+    for event in info_event_data:
+        event['has_registration'] = False
+        event['card_type'] = 'event'
+        # Map Event fields to EventRegistration field names
+        event['event_title'] = event.pop('name', '')
+        event['event_title_fr'] = event.pop('name_fr', '')
+        event['event_description'] = event.pop('description', '')
+        event['event_description_fr'] = event.pop('description_fr', '')
+        event['event_poster'] = event.pop('image', None)
+        event['venue'] = event.pop('address', '')
+        event['venue_fr'] = ''
+        event['venue_address'] = event.get('venue', '')
+        # Add default values for fields that Event doesn't have
+        event['contact_email'] = ''
+        event['contact_phone'] = ''
+        event['is_registration_enabled'] = False
+        event['registration_deadline'] = None
+        event['max_registrations'] = 0
+        event['allow_proxy_registration'] = False
+        event['confirmation_message'] = ''
+        event['confirmation_message_fr'] = ''
+        event['is_active'] = True
+        event['order'] = 0
+        event['form_fields'] = []
+        event['has_registered'] = False
+        event['user_submission_status'] = None
+        event['is_registration_open'] = False
+        event['current_registration_count'] = 0
+        event['event_end_date'] = None
+
+    # Combine and sort by date
+    all_event_cards = list(event_reg_data) + list(info_event_data)
+    all_event_cards.sort(key=lambda x: x.get('event_date', ''))
 
     data = {
         'hero_slides': HeroSlideSerializer(hero_slides, many=True, context={'request': request}).data,
         'featured_articles': ArticleSerializer(featured_articles, many=True, context={'request': request}).data,
         'articles': ArticleSerializer(articles, many=True, context={'request': request}).data,
         'feature_cards': FeatureCardSerializer(feature_cards, many=True, context={'request': request}).data,
-        'event_cards': EventRegistrationSerializer(event_cards, many=True, context={'request': request}).data,
+        'event_cards': all_event_cards,
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
     }

@@ -6,7 +6,7 @@
 <!-- Welcome -->
 <div class="mb-12">
   <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Strategic Overview</span>
-  <h1 class="text-4xl font-extrabold text-on-surface font-headline leading-tight">Welcome, {{ user.get_full_name|default:user.username }}</h1>
+  <h1 class="text-3xl font-bold text-on-surface font-headline leading-tight">Welcome, {{ user.get_full_name|default:user.username }}</h1>
   <p class="text-on-surface-variant mt-2 max-w-2xl">Welcome to the command portal. Here is the current state of digital engagement for the AU Chairmanship.</p>
 </div>
 
@@ -19,7 +19,7 @@
       </div>
     </div>
     <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">App Users</p>
-    <h3 class="text-3xl font-extrabold mt-1">{{ users|default:"0" }}</h3>
+    <h3 class="text-2xl font-bold mt-1">{{ users|default:"0" }}</h3>
   </div>
 
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
@@ -30,7 +30,7 @@
       <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Active</span>
     </div>
     <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Active Today</p>
-    <h3 class="text-3xl font-extrabold mt-1">{{ active_today|default:"0" }}</h3>
+    <h3 class="text-2xl font-bold mt-1">{{ active_today|default:"0" }}</h3>
   </div>
 
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
@@ -40,7 +40,7 @@
       </div>
     </div>
     <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Published Articles</p>
-    <h3 class="text-3xl font-extrabold mt-1">{{ articles|default:"0" }}</h3>
+    <h3 class="text-2xl font-bold mt-1">{{ articles|default:"0" }}</h3>
   </div>
 
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
@@ -56,7 +56,7 @@
       {% endif %}
     </div>
     <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Live Broadcasts</p>
-    <h3 class="text-3xl font-extrabold mt-1">{{ live_feeds_active|default:"0" }}</h3>
+    <h3 class="text-2xl font-bold mt-1">{{ live_feeds_active|default:"0" }}</h3>
   </div>
 </div>
 
@@ -140,7 +140,7 @@
   <div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
     <div class="flex justify-between items-center mb-8">
       <div>
-        <h4 class="text-lg font-bold">App Engagement</h4>
+        <h4 class="text-base font-semibold">App Engagement</h4>
         <p class="text-sm text-on-surface-variant">Last 30 days overview</p>
       </div>
       <div class="flex gap-4">
@@ -155,7 +155,7 @@
   <div class="col-span-12 lg:col-span-4">
     <div class="bg-primary-container text-white rounded-xl p-8 h-full flex flex-col justify-between">
       <div>
-        <h4 class="text-lg font-bold mb-6">Content Summary</h4>
+        <h4 class="text-base font-semibold mb-6">Content Summary</h4>
         <div class="space-y-6">
           <div>
             <div class="flex justify-between mb-2"><span class="text-sm font-medium">Events</span><span class="text-sm font-bold">{{ events|default:"0" }}</span></div>
@@ -173,7 +173,7 @@
       </div>
       <div class="mt-8 pt-6 border-t border-white/10">
         <p class="text-[10px] uppercase tracking-widest text-on-primary-container font-bold">Total Content Items</p>
-        <p class="text-2xl font-black mt-1">{{ total_content|default:"0" }}</p>
+        <p class="text-xl font-bold mt-1">{{ total_content|default:"0" }}</p>
       </div>
     </div>
   </div>

@@ -176,8 +176,18 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Create Firebase user
-      final credential = await _firebaseAuth.signUpWithEmail(email, password);
+      // 1. Create Firebase user (or sign in if already exists from a previous attempt)
+      UserCredential credential;
+      try {
+        credential = await _firebaseAuth.signUpWithEmail(email, password);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          // Firebase user exists from a previous attempt — sign in to continue
+          credential = await _firebaseAuth.signInWithEmail(email, password);
+        } else {
+          rethrow;
+        }
+      }
 
       // 2. Send email verification
       await _firebaseAuth.sendEmailVerification();
@@ -188,7 +198,7 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Failed to get Firebase ID token');
       }
 
-      // 4. Register with Django backend
+      // 4. Register with Django backend (idempotent — safe to retry)
       final data = await _api.firebaseRegister(
         idToken: idToken,
         name: name,

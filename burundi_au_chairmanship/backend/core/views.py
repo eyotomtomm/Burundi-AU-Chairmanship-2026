@@ -330,12 +330,28 @@ def firebase_register(request):
         firebase_uid = decoded_token['uid']
         email = decoded_token.get('email', '')
 
-        # Check if user already exists
-        if User.objects.filter(username=firebase_uid).exists():
-            return Response(
-                {'detail': 'User already registered'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Check if user already exists — return success (idempotent)
+        try:
+            existing_user = User.objects.get(username=firebase_uid)
+            # Update name if provided
+            if name and not existing_user.first_name:
+                existing_user.first_name = name
+                existing_user.save()
+            profile = existing_user.profile
+            profile.is_email_verified = decoded_token.get('email_verified', False)
+            if phone_number and not profile.phone_number:
+                profile.phone_number = phone_number
+            if gender and not profile.gender:
+                profile.gender = gender
+            profile.save()
+            return Response({
+                'user': UserSerializer(existing_user, context={'request': request}).data,
+                'message': 'User registered successfully',
+                'email_verified': profile.is_email_verified,
+                'requires_email_verification': not profile.is_email_verified,
+            }, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            pass
 
         # Create Django user with Firebase UID as username
         user = User.objects.create(

@@ -251,11 +251,22 @@ class _GalleryScreenState extends State<GalleryScreen> {
                             const Icon(Icons.photo, color: Colors.white70, size: 16),
                             const SizedBox(width: 4),
                             Text(
-                              '${album['photo_count'] ?? 0} photos',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
+                              '${album['photo_count'] ?? 0}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.visibility, color: Colors.white70, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${album['view_count'] ?? 0}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.favorite, color: Colors.white70, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${album['like_count'] ?? 0}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 14),
                             ),
                           ],
                         ),
@@ -346,12 +357,29 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${album['photo_count'] ?? 0} photos',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
+                    Row(
+                      children: [
+                        const Icon(Icons.photo, color: Colors.white70, size: 12),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${album['photo_count'] ?? 0}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.visibility, color: Colors.white70, size: 12),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${album['view_count'] ?? 0}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.favorite, color: Colors.white70, size: 12),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${album['like_count'] ?? 0}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                      ],
                     ),
                   ],
                 ),

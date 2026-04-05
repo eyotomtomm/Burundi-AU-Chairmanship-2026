@@ -1031,6 +1031,8 @@ class GalleryAlbum(models.Model):
     description_fr = models.TextField(blank=True)
     cover_image = models.ImageField(upload_to='gallery/covers/', validators=[validate_image_file])
     photo_count = models.IntegerField(default=0)
+    view_count = models.PositiveIntegerField(default=0)
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     is_featured = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0)
@@ -1101,6 +1103,19 @@ post_save.connect(_update_album_photo_count, sender=GalleryPhoto)
 post_delete.connect(_update_album_photo_count, sender=GalleryPhoto)
 
 
+class GalleryAlbumLike(models.Model):
+    """Tracks which users liked which gallery albums."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='gallery_album_likes')
+    album = models.ForeignKey(GalleryAlbum, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'album')
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.album.title[:30]}"
+
+
 class Video(models.Model):
     """Video content library"""
     CATEGORY_CHOICES = [
@@ -1125,6 +1140,7 @@ class Video(models.Model):
     duration = models.CharField(max_length=20, help_text='e.g. 5:30')
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='highlight')
     view_count = models.PositiveIntegerField(default=0)
+    like_count = models.PositiveIntegerField(default=0)
     publish_date = models.DateTimeField()
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1136,6 +1152,19 @@ class Video(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class VideoLike(models.Model):
+    """Tracks which users liked which videos."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_likes')
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'video')
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.video.title[:30]}"
 
 
 class SocialMediaLink(models.Model):

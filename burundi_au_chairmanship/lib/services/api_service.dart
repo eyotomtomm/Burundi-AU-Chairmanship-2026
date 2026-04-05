@@ -407,20 +407,32 @@ class ApiService {
 
   // ── Gallery ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getGalleryAlbums() async {
-    final data = await _get('gallery/');
+    final data = await _get('gallery/', auth: true);
     return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> recordGalleryAlbumView(String albumId) async {
+    return await _post('gallery/$albumId/record-view/', {});
+  }
+
+  Future<Map<String, dynamic>> toggleGalleryAlbumLike(String albumId) async {
+    return await _post('gallery/$albumId/toggle-like/', {}, auth: true);
   }
 
   // ── Videos ───────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getVideos({String? category}) async {
     String endpoint = 'videos/';
     if (category != null) endpoint += '?category=$category';
-    final data = await _get(endpoint);
+    final data = await _get(endpoint, auth: true);
     return _extractResults(data).cast<Map<String, dynamic>>();
   }
 
   Future<Map<String, dynamic>> recordVideoView(String videoId) async {
     return await _post('videos/$videoId/record-view/', {});
+  }
+
+  Future<Map<String, dynamic>> toggleVideoLike(String videoId) async {
+    return await _post('videos/$videoId/toggle-like/', {}, auth: true);
   }
 
   // ── Social Media ─────────────────────────────────────────

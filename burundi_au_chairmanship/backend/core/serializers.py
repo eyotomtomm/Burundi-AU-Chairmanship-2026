@@ -373,23 +373,25 @@ class GalleryPhotoSerializer(serializers.ModelSerializer):
 
 class GalleryAlbumSerializer(serializers.ModelSerializer):
     photos = GalleryPhotoSerializer(many=True, read_only=True)
+    is_liked = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = GalleryAlbum
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'cover_image', 'photo_count', 'created_at', 'is_featured',
-                  'display_order', 'photos']
+                  'cover_image', 'photo_count', 'view_count', 'like_count',
+                  'created_at', 'is_featured', 'display_order', 'photos', 'is_liked']
 
 
 class VideoSerializer(serializers.ModelSerializer):
     # Return either the uploaded file URL or the external video_url
     video_url = serializers.SerializerMethodField()
+    is_liked = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = Video
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'video_url', 'thumbnail', 'duration', 'category', 'view_count',
-                  'publish_date', 'is_featured']
+                  'like_count', 'publish_date', 'is_featured', 'is_liked']
 
     def get_video_url(self, obj):
         """Return video_file URL if exists, otherwise return video_url"""

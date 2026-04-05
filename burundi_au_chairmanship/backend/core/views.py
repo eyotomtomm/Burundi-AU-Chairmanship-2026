@@ -18,7 +18,7 @@ from .models import (
     HeroSlide, MagazineEdition, MagazineLike, Article, EmbassyLocation,
     Event, LiveFeed, Resource, AppSettings,
     FeatureCard, ArticleComment, ArticleLike, Category, UserProfile,
-    PriorityAgenda, GalleryAlbum, GalleryPhoto, Video, SocialMediaLink,
+    PriorityAgenda, GalleryAlbum, GalleryAlbumLike, GalleryPhoto, Video, VideoLike, SocialMediaLink,
     Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
     WeatherCity, EventRegistration, RegistrationFormField, EventSubmission,
     SupportTicket, TicketMessage, Popup,
@@ -786,30 +786,84 @@ class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view gallery albums"""
+    """Public endpoint: Anyone can view gallery albums, authentication required to like"""
     permission_classes = [AllowAny]
-    queryset = GalleryAlbum.objects.prefetch_related('photos').all()
     serializer_class = GalleryAlbumSerializer
 
-
-class VideoViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view videos"""
-    permission_classes = [AllowAny]
-    queryset = Video.objects.all().order_by('-is_featured', '-publish_date')  # Featured first, then newest
-    serializer_class = VideoSerializer
-    filterset_fields = ['category', 'is_featured']
+    def get_queryset(self):
+        qs = GalleryAlbum.objects.prefetch_related('photos').all()
+        user = self.request.user
+        if user.is_authenticated:
+            qs = qs.annotate(
+                is_liked=Exists(GalleryAlbumLike.objects.filter(user=user, album=OuterRef('pk')))
+            )
+        else:
+            from django.db.models import Value, BooleanField
+            qs = qs.annotate(is_liked=Value(False, output_field=BooleanField()))
+        return qs
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """
-        Record a view for this video.
+        """Record a view for this gallery album. Throttled to prevent manipulation."""
+        GalleryAlbum.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        album = self.get_object()
+        return Response({'view_count': album.view_count})
 
-        Throttled to 1 view per content per minute per user/IP
-        to prevent view count manipulation.
-        """
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_like(self, request, pk=None):
+        """Toggle like on gallery album. Requires authentication."""
+        album = self.get_object()
+        like, created = GalleryAlbumLike.objects.get_or_create(user=request.user, album=album)
+        if not created:
+            like.delete()
+            GalleryAlbum.objects.filter(pk=album.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            GalleryAlbum.objects.filter(pk=album.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        album.refresh_from_db()
+        return Response({'like_count': album.like_count, 'is_liked': is_liked})
+
+
+class VideoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: Anyone can view videos, authentication required to like"""
+    permission_classes = [AllowAny]
+    serializer_class = VideoSerializer
+    filterset_fields = ['category', 'is_featured']
+
+    def get_queryset(self):
+        qs = Video.objects.all().order_by('-is_featured', '-publish_date')
+        user = self.request.user
+        if user.is_authenticated:
+            qs = qs.annotate(
+                is_liked=Exists(VideoLike.objects.filter(user=user, video=OuterRef('pk')))
+            )
+        else:
+            from django.db.models import Value, BooleanField
+            qs = qs.annotate(is_liked=Value(False, output_field=BooleanField()))
+        return qs
+
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    def record_view(self, request, pk=None):
+        """Record a view for this video. Throttled to prevent manipulation."""
         Video.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
         video = self.get_object()
         return Response({'view_count': video.view_count})
+
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_like(self, request, pk=None):
+        """Toggle like on video. Requires authentication."""
+        video = self.get_object()
+        like, created = VideoLike.objects.get_or_create(user=request.user, video=video)
+        if not created:
+            like.delete()
+            Video.objects.filter(pk=video.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            Video.objects.filter(pk=video.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        video.refresh_from_db()
+        return Response({'like_count': video.like_count, 'is_liked': is_liked})
 
 
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):

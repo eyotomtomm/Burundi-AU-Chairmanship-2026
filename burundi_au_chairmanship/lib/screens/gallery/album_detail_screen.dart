@@ -2,12 +2,16 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:screen_protector/screen_protector.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -26,12 +30,56 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   List<String> _localPhotoPaths = [];
+  bool _isLiked = false;
+  int _likeCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _isLiked = widget.album['is_liked'] == true;
+    _likeCount = widget.album['like_count'] ?? 0;
     _enableScreenProtection();
     _checkIfDownloaded();
+    _recordView();
+  }
+
+  void _recordView() {
+    final id = widget.album['id'];
+    if (id != null) {
+      ApiService().recordGalleryAlbumView(id.toString()).catchError((_) => <String, dynamic>{});
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('login_to_like'))),
+      );
+      return;
+    }
+    final wasLiked = _isLiked;
+    final prevCount = _likeCount;
+    setState(() {
+      _isLiked = !wasLiked;
+      _likeCount = prevCount + (wasLiked ? -1 : 1);
+    });
+    try {
+      final result = await ApiService().toggleGalleryAlbumLike(widget.album['id'].toString());
+      if (mounted) {
+        setState(() {
+          _isLiked = result['is_liked'] == true;
+          _likeCount = result['like_count'] ?? _likeCount;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLiked = wasLiked;
+        _likeCount = prevCount;
+      });
+    }
   }
 
   /// Enable screenshot and screen recording prevention
@@ -233,6 +281,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         actions: [
+          // Like button
+          IconButton(
+            icon: Icon(
+              _isLiked ? Icons.favorite : Icons.favorite_border,
+              color: _isLiked ? Colors.red : Colors.white,
+            ),
+            tooltip: _isLiked ? 'Unlike' : 'Like',
+            onPressed: _toggleLike,
+          ),
           // Download button
           if (!_isDownloaded && !_isDownloading)
             IconButton(

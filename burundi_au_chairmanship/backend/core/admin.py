@@ -700,7 +700,7 @@ class VideoAdmin(admin.ModelAdmin):
     Can be YouTube, Vimeo, or direct video file URL.
     The app will automatically detect the type and play it correctly.
     """
-    list_display = ['title', 'thumbnail_preview', 'category', 'duration', 'view_count']
+    list_display = ['title', 'thumbnail_preview', 'category', 'duration', 'view_count', 'like_count']
     list_filter = ['category', 'created_at']
     search_fields = ['title', 'title_fr', 'description']
     date_hierarchy = 'created_at'
@@ -760,7 +760,7 @@ class GalleryAlbumAdmin(admin.ModelAdmin):
     - Captions support bilingual text
     """
     inlines = [GalleryPhotoInline]
-    list_display = ['title', 'cover_preview', 'is_featured', 'photo_count', 'created_at']
+    list_display = ['title', 'cover_preview', 'is_featured', 'photo_count', 'view_count', 'like_count', 'created_at']
     list_filter = ['is_featured', 'created_at']
     list_editable = ['is_featured']
     search_fields = ['title', 'title_fr', 'description']

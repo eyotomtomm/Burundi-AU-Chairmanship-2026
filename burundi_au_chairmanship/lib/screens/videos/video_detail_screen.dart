@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class VideoDetailScreen extends StatefulWidget {
   final Map<String, dynamic> video;
@@ -26,11 +30,47 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   bool _hasError = false;
   String _errorMessage = '';
   bool _isLoading = true;
+  bool _isLiked = false;
+  int _likeCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _isLiked = widget.video['is_liked'] == true;
+    _likeCount = widget.video['like_count'] ?? 0;
     _initPlayer();
+  }
+
+  Future<void> _toggleLike() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('login_to_like'))),
+      );
+      return;
+    }
+    final wasLiked = _isLiked;
+    final prevCount = _likeCount;
+    setState(() {
+      _isLiked = !wasLiked;
+      _likeCount = prevCount + (wasLiked ? -1 : 1);
+    });
+    try {
+      final result = await ApiService().toggleVideoLike(widget.video['id'].toString());
+      if (mounted) {
+        setState(() {
+          _isLiked = result['is_liked'] == true;
+          _likeCount = result['like_count'] ?? _likeCount;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLiked = wasLiked;
+        _likeCount = prevCount;
+      });
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -278,6 +318,27 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                           style: TextStyle(
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                             fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: _toggleLike,
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isLiked ? Icons.favorite : Icons.favorite_border,
+                                size: 16,
+                                color: _isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$_likeCount',
+                                style: TextStyle(
+                                  color: _isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 16),

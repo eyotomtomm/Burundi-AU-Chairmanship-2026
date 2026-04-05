@@ -316,6 +316,13 @@ class _VideosScreenState extends State<VideosScreen> {
                           color: Colors.grey[600],
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Icon(Icons.favorite, size: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatViewCount(video['like_count']),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
                       const SizedBox(width: 16),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

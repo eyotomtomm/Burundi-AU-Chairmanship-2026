@@ -4,8 +4,9 @@ import logging
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from PIL import Image as PILImage
 
 from .validators import validate_image_file, validate_document_file, validate_fcm_token, validate_professional_email
 
@@ -1061,6 +1062,43 @@ class GalleryPhoto(models.Model):
 
     def __str__(self):
         return f"{self.album.title} - Photo {self.id}"
+
+    def save(self, *args, **kwargs):
+        if self.image and hasattr(self.image, 'file'):
+            self.image = self._compress_image(self.image)
+        super().save(*args, **kwargs)
+
+    def _compress_image(self, image_field):
+        """Resize and compress image to max 1920px wide, JPEG quality 80."""
+        try:
+            img = PILImage.open(image_field)
+            img = img.convert('RGB')
+            max_width = 1920
+            if img.width > max_width:
+                ratio = max_width / img.width
+                new_size = (max_width, int(img.height * ratio))
+                img = img.resize(new_size, PILImage.LANCZOS)
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=80, optimize=True)
+            buffer.seek(0)
+            name = image_field.name.rsplit('.', 1)[0] + '.jpg'
+            return ContentFile(buffer.read(), name=name)
+        except Exception:
+            return image_field
+
+
+def _update_album_photo_count(instance, **kwargs):
+    """Update the album's photo_count after adding/removing photos."""
+    try:
+        album = instance.album
+        album.photo_count = album.photos.count()
+        album.save(update_fields=['photo_count'])
+    except GalleryAlbum.DoesNotExist:
+        pass
+
+
+post_save.connect(_update_album_photo_count, sender=GalleryPhoto)
+post_delete.connect(_update_album_photo_count, sender=GalleryPhoto)
 
 
 class Video(models.Model):

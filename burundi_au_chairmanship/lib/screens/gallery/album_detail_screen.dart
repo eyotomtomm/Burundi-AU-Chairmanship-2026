@@ -369,9 +369,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       imageWidget = CachedNetworkImage(
         imageUrl: imageUrl,
         fit: BoxFit.cover,
+        memCacheWidth: 400,
         placeholder: (context, url) => Container(
           color: Colors.grey[300],
-          child: const Center(child: CircularProgressIndicator()),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
         errorWidget: (context, url, error) => Container(
           color: Colors.grey[300],

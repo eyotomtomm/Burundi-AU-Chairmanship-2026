@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import 'album_detail_screen.dart';
@@ -155,15 +157,19 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   Widget _buildCoverImage(String? coverUrl, {double iconSize = 50}) {
     if (coverUrl != null && coverUrl.isNotEmpty) {
-      return Image.network(
-        coverUrl,
+      final fixedUrl = Environment.fixMediaUrl(coverUrl);
+      return CachedNetworkImage(
+        imageUrl: fixedUrl,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            color: Colors.grey[300],
-            child: Icon(Icons.photo_library, size: iconSize, color: Colors.grey),
-          );
-        },
+        memCacheWidth: 600,
+        placeholder: (context, url) => Container(
+          color: Colors.grey[300],
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: Colors.grey[300],
+          child: Icon(Icons.photo_library, size: iconSize, color: Colors.grey),
+        ),
       );
     }
     return Container(

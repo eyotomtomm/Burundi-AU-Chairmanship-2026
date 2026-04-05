@@ -736,7 +736,7 @@ class VideoAdmin(admin.ModelAdmin):
 class GalleryPhotoInline(admin.TabularInline):
     model = GalleryPhoto
     extra = 3
-    fields = ['image', 'caption', 'caption_fr', 'order']
+    fields = ['image', 'caption', 'caption_fr', 'display_order']
 
 
 @admin.register(GalleryAlbum)

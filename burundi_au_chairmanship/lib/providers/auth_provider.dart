@@ -82,34 +82,44 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  /// Load cached user profile data locally so app does not block on startup
+  Future<void> _loadLocalUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    _userId = prefs.getInt('user_id');
+    _userName = prefs.getString('user_name');
+    _userEmail = prefs.getString('user_email');
+    _phoneNumber = prefs.getString('user_phone');
+    _gender = prefs.getString('user_gender');
+    _nationality = prefs.getString('user_nationality');
+    _dateOfBirth = prefs.getString('user_date_of_birth');
+    _isEmailVerified = prefs.getBool('user_email_verified') ?? false;
+    _isGovernmentOfficial = prefs.getBool('user_is_official') ?? false;
+    _isVerified = prefs.getBool('user_is_verified') ?? false;
+    _badgeType = prefs.getString('user_badge_type');
+    _profilePictureUrl = prefs.getString('user_profile_picture');
+    _verificationTitle = prefs.getString('user_verification_title');
+    _verificationRole = prefs.getString('user_verification_role');
+    _verificationName = prefs.getString('user_verification_name');
+  }
+
   /// Check if user is already authenticated
   Future<void> _checkAuthStatus() async {
     final firebaseUser = _firebaseAuth.currentUser;
     if (firebaseUser != null) {
-      // User is signed in with Firebase - sync with backend
-      await _syncWithBackend();
+      // User is signed in with Firebase - load cached profile first
+      _isAuthenticated = true;
+      await _loadLocalUserData();
+      notifyListeners();
+      
+      // Then sync with backend in the background
+      _syncWithBackend();
     } else {
       // Check for legacy JWT auth (for backward compatibility)
       // Tokens stored in encrypted secure storage (Android Keystore / iOS Keychain)
       final token = await _secureStorage.read(key: AppConstants.userTokenKey);
       if (token != null && token.isNotEmpty) {
         _isAuthenticated = true;
-        final prefs = await SharedPreferences.getInstance();
-        _userId = prefs.getInt('user_id');
-        _userName = prefs.getString('user_name');
-        _userEmail = prefs.getString('user_email');
-        _phoneNumber = prefs.getString('user_phone');
-        _gender = prefs.getString('user_gender');
-        _nationality = prefs.getString('user_nationality');
-        _dateOfBirth = prefs.getString('user_date_of_birth');
-        _isEmailVerified = prefs.getBool('user_email_verified') ?? false;
-        _isGovernmentOfficial = prefs.getBool('user_is_official') ?? false;
-        _isVerified = prefs.getBool('user_is_verified') ?? false;
-        _badgeType = prefs.getString('user_badge_type');
-        _profilePictureUrl = prefs.getString('user_profile_picture');
-        _verificationTitle = prefs.getString('user_verification_title');
-        _verificationRole = prefs.getString('user_verification_role');
-        _verificationName = prefs.getString('user_verification_name');
+        await _loadLocalUserData();
       } else {
         // Migration: check if token exists in old SharedPreferences and migrate
         final prefs = await SharedPreferences.getInstance();
@@ -125,20 +135,7 @@ class AuthProvider extends ChangeNotifier {
           await prefs.remove(AppConstants.userTokenKey);
           await prefs.remove('refresh_token');
           _isAuthenticated = true;
-          _userId = prefs.getInt('user_id');
-          _userName = prefs.getString('user_name');
-          _userEmail = prefs.getString('user_email');
-          _phoneNumber = prefs.getString('user_phone');
-          _gender = prefs.getString('user_gender');
-          _nationality = prefs.getString('user_nationality');
-          _dateOfBirth = prefs.getString('user_date_of_birth');
-          _isEmailVerified = prefs.getBool('user_email_verified') ?? false;
-          _isGovernmentOfficial = prefs.getBool('user_is_official') ?? false;
-          _isVerified = prefs.getBool('user_is_verified') ?? false;
-          _badgeType = prefs.getString('user_badge_type');
-          _profilePictureUrl = prefs.getString('user_profile_picture');
-          _verificationTitle = prefs.getString('user_verification_title');
-          _verificationRole = prefs.getString('user_verification_role');
+          await _loadLocalUserData();
         }
       }
     }

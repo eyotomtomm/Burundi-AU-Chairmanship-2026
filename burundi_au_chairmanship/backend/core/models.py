@@ -1257,7 +1257,7 @@ class OTPVerification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otp_verifications')
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     contact = models.CharField(max_length=200, help_text='Email or phone number')
-    otp_code = models.CharField(max_length=6)
+    otp_code = models.CharField(max_length=20)
     is_verified = models.BooleanField(default=False)
     attempts = models.IntegerField(default=0, help_text='Number of failed verification attempts')
     expires_at = models.DateTimeField()

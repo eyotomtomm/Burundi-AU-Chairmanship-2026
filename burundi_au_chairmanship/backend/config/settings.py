@@ -290,7 +290,7 @@ TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 TWILIO_VERIFY_SERVICE_SID = os.environ.get('TWILIO_VERIFY_SERVICE_SID', '')
 TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
-TWILIO_SENDER_ID = os.environ.get('TWILIO_SENDER_ID', 'TWveriy')
+TWILIO_SENDER_ID = os.environ.get('TWILIO_SENDER_ID', 'TWverify')
 
 # ─── Email Configuration ──────────────────────────────────────
 # For email OTP verification

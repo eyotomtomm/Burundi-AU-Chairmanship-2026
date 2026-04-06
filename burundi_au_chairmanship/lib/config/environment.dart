@@ -1,14 +1,16 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kReleaseMode;
 
 /// Environment configuration for the app
 ///
 /// Supports multiple environments: development, staging, production
-/// Can be configured via --dart-define at build time or defaults to development
+/// Can be configured via --dart-define at build time.
+/// Safety net: release builds default to production even without the flag.
 class Environment {
   /// Current environment name
   static const String _environment = String.fromEnvironment(
     'ENVIRONMENT',
-    defaultValue: 'development',
+    defaultValue: '',
   );
 
   /// API base URL configured via --dart-define
@@ -18,8 +20,14 @@ class Environment {
   );
 
   /// Get current environment type
+  /// If no ENVIRONMENT flag is set, release builds default to production
+  /// and debug builds default to development.
   static EnvironmentType get current {
-    switch (_environment.toLowerCase()) {
+    final env = _environment.toLowerCase();
+    if (env.isEmpty) {
+      return kReleaseMode ? EnvironmentType.production : EnvironmentType.development;
+    }
+    switch (env) {
       case 'production':
       case 'prod':
         return EnvironmentType.production;

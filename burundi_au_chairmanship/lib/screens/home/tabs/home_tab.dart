@@ -249,7 +249,7 @@ class _HomeTabState extends State<HomeTab> {
     _heroTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || _heroSlides.isEmpty || !_heroPageController.hasClients) return;
       try {
-        // Additional safety check: ensure position is valid before animating
+        if (_heroPageController.positions.isEmpty) return;
         if (_heroPageController.position.haveDimensions) {
           _heroPageController.animateToPage(
             _heroRawPage + 1,
@@ -267,7 +267,7 @@ class _HomeTabState extends State<HomeTab> {
     _featureTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || _featureCards.isEmpty || !_featureCardPageController.hasClients) return;
       try {
-        // Additional safety check: ensure position is valid before animating
+        if (_featureCardPageController.positions.isEmpty) return;
         if (_featureCardPageController.position.haveDimensions) {
           _featureCardPageController.animateToPage(
             _featureRawPage + 1,

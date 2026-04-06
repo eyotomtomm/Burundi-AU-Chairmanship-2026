@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 
@@ -13,13 +15,35 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _emailOtpController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _phoneOtpController = TextEditingController();
   final _positionController = TextEditingController();
-  final _twitterController = TextEditingController();
-  final _linkedinController = TextEditingController();
 
   String? _selectedTitle;
+  String? _selectedNationality;
   bool _isLoading = false;
+
+  // Email OTP state
+  bool _emailVerified = false;
+  bool _emailOtpSent = false;
+  bool _sendingEmailOtp = false;
+  bool _verifyingEmailOtp = false;
+  Timer? _emailTimer;
+  int _emailCountdown = 0;
+
+  // Phone OTP state
+  bool _phoneVerified = false;
+  bool _phoneOtpSent = false;
+  bool _sendingPhoneOtp = false;
+  bool _verifyingPhoneOtp = false;
+  Timer? _phoneTimer;
+  int _phoneCountdown = 0;
+  String _selectedCountryCode = '+257';
+
+  // Social media state — which platforms are toggled on
+  final Map<String, bool> _socialMediaActive = {};
+  final Map<String, TextEditingController> _socialMediaControllers = {};
 
   final List<Map<String, String>> _titles = [
     {'value': 'mr', 'label': 'Mr.'},
@@ -33,15 +57,402 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     {'value': 'other', 'label': 'Other'},
   ];
 
+  final List<Map<String, String>> _nationalities = [
+    {'code': 'BI', 'name': 'Burundi'},
+    {'code': 'DZ', 'name': 'Algeria'},
+    {'code': 'AO', 'name': 'Angola'},
+    {'code': 'BJ', 'name': 'Benin'},
+    {'code': 'BW', 'name': 'Botswana'},
+    {'code': 'BF', 'name': 'Burkina Faso'},
+    {'code': 'CV', 'name': 'Cabo Verde'},
+    {'code': 'CM', 'name': 'Cameroon'},
+    {'code': 'CF', 'name': 'Central African Republic'},
+    {'code': 'TD', 'name': 'Chad'},
+    {'code': 'KM', 'name': 'Comoros'},
+    {'code': 'CG', 'name': 'Congo (Brazzaville)'},
+    {'code': 'CD', 'name': 'Congo (DRC)'},
+    {'code': 'CI', 'name': "Côte d'Ivoire"},
+    {'code': 'DJ', 'name': 'Djibouti'},
+    {'code': 'EG', 'name': 'Egypt'},
+    {'code': 'GQ', 'name': 'Equatorial Guinea'},
+    {'code': 'ER', 'name': 'Eritrea'},
+    {'code': 'SZ', 'name': 'Eswatini'},
+    {'code': 'ET', 'name': 'Ethiopia'},
+    {'code': 'GA', 'name': 'Gabon'},
+    {'code': 'GM', 'name': 'Gambia'},
+    {'code': 'GH', 'name': 'Ghana'},
+    {'code': 'GN', 'name': 'Guinea'},
+    {'code': 'GW', 'name': 'Guinea-Bissau'},
+    {'code': 'KE', 'name': 'Kenya'},
+    {'code': 'LS', 'name': 'Lesotho'},
+    {'code': 'LR', 'name': 'Liberia'},
+    {'code': 'LY', 'name': 'Libya'},
+    {'code': 'MG', 'name': 'Madagascar'},
+    {'code': 'MW', 'name': 'Malawi'},
+    {'code': 'ML', 'name': 'Mali'},
+    {'code': 'MR', 'name': 'Mauritania'},
+    {'code': 'MU', 'name': 'Mauritius'},
+    {'code': 'MA', 'name': 'Morocco'},
+    {'code': 'MZ', 'name': 'Mozambique'},
+    {'code': 'NA', 'name': 'Namibia'},
+    {'code': 'NE', 'name': 'Niger'},
+    {'code': 'NG', 'name': 'Nigeria'},
+    {'code': 'RW', 'name': 'Rwanda'},
+    {'code': 'ST', 'name': 'São Tomé and Príncipe'},
+    {'code': 'SN', 'name': 'Senegal'},
+    {'code': 'SC', 'name': 'Seychelles'},
+    {'code': 'SL', 'name': 'Sierra Leone'},
+    {'code': 'SO', 'name': 'Somalia'},
+    {'code': 'ZA', 'name': 'South Africa'},
+    {'code': 'SS', 'name': 'South Sudan'},
+    {'code': 'SD', 'name': 'Sudan'},
+    {'code': 'TZ', 'name': 'Tanzania'},
+    {'code': 'TG', 'name': 'Togo'},
+    {'code': 'TN', 'name': 'Tunisia'},
+    {'code': 'UG', 'name': 'Uganda'},
+    {'code': 'ZM', 'name': 'Zambia'},
+    {'code': 'ZW', 'name': 'Zimbabwe'},
+    // International
+    {'code': 'US', 'name': 'United States'},
+    {'code': 'GB', 'name': 'United Kingdom'},
+    {'code': 'FR', 'name': 'France'},
+    {'code': 'DE', 'name': 'Germany'},
+    {'code': 'CN', 'name': 'China'},
+    {'code': 'IN', 'name': 'India'},
+    {'code': 'BR', 'name': 'Brazil'},
+    {'code': 'CA', 'name': 'Canada'},
+    {'code': 'AU', 'name': 'Australia'},
+    {'code': 'JP', 'name': 'Japan'},
+    {'code': 'BE', 'name': 'Belgium'},
+    {'code': 'IT', 'name': 'Italy'},
+    {'code': 'ES', 'name': 'Spain'},
+    {'code': 'NL', 'name': 'Netherlands'},
+    {'code': 'SE', 'name': 'Sweden'},
+    {'code': 'CH', 'name': 'Switzerland'},
+    {'code': 'AE', 'name': 'UAE'},
+    {'code': 'SA', 'name': 'Saudi Arabia'},
+    {'code': 'TR', 'name': 'Turkey'},
+    {'code': 'RU', 'name': 'Russia'},
+    {'code': 'KR', 'name': 'South Korea'},
+    {'code': 'OTHER', 'name': 'Other'},
+  ];
+
+  final List<Map<String, String>> _countryCodes = [
+    {'name': 'Burundi', 'code': '+257'},
+    {'name': 'Algeria', 'code': '+213'},
+    {'name': 'Angola', 'code': '+244'},
+    {'name': 'Benin', 'code': '+229'},
+    {'name': 'Botswana', 'code': '+267'},
+    {'name': 'Burkina Faso', 'code': '+226'},
+    {'name': 'Cabo Verde', 'code': '+238'},
+    {'name': 'Cameroon', 'code': '+237'},
+    {'name': 'Central African Republic', 'code': '+236'},
+    {'name': 'Chad', 'code': '+235'},
+    {'name': 'Comoros', 'code': '+269'},
+    {'name': 'Congo (Brazzaville)', 'code': '+242'},
+    {'name': 'Congo (DRC)', 'code': '+243'},
+    {'name': "Côte d'Ivoire", 'code': '+225'},
+    {'name': 'Djibouti', 'code': '+253'},
+    {'name': 'Egypt', 'code': '+20'},
+    {'name': 'Equatorial Guinea', 'code': '+240'},
+    {'name': 'Eritrea', 'code': '+291'},
+    {'name': 'Eswatini', 'code': '+268'},
+    {'name': 'Ethiopia', 'code': '+251'},
+    {'name': 'Gabon', 'code': '+241'},
+    {'name': 'Gambia', 'code': '+220'},
+    {'name': 'Ghana', 'code': '+233'},
+    {'name': 'Guinea', 'code': '+224'},
+    {'name': 'Guinea-Bissau', 'code': '+245'},
+    {'name': 'Kenya', 'code': '+254'},
+    {'name': 'Lesotho', 'code': '+266'},
+    {'name': 'Liberia', 'code': '+231'},
+    {'name': 'Libya', 'code': '+218'},
+    {'name': 'Madagascar', 'code': '+261'},
+    {'name': 'Malawi', 'code': '+265'},
+    {'name': 'Mali', 'code': '+223'},
+    {'name': 'Mauritania', 'code': '+222'},
+    {'name': 'Mauritius', 'code': '+230'},
+    {'name': 'Morocco', 'code': '+212'},
+    {'name': 'Mozambique', 'code': '+258'},
+    {'name': 'Namibia', 'code': '+264'},
+    {'name': 'Niger', 'code': '+227'},
+    {'name': 'Nigeria', 'code': '+234'},
+    {'name': 'Rwanda', 'code': '+250'},
+    {'name': 'São Tomé and Príncipe', 'code': '+239'},
+    {'name': 'Senegal', 'code': '+221'},
+    {'name': 'Seychelles', 'code': '+248'},
+    {'name': 'Sierra Leone', 'code': '+232'},
+    {'name': 'Somalia', 'code': '+252'},
+    {'name': 'South Africa', 'code': '+27'},
+    {'name': 'South Sudan', 'code': '+211'},
+    {'name': 'Sudan', 'code': '+249'},
+    {'name': 'Tanzania', 'code': '+255'},
+    {'name': 'Togo', 'code': '+228'},
+    {'name': 'Tunisia', 'code': '+216'},
+    {'name': 'Uganda', 'code': '+256'},
+    {'name': 'Zambia', 'code': '+260'},
+    {'name': 'Zimbabwe', 'code': '+263'},
+    {'name': 'United States', 'code': '+1'},
+    {'name': 'United Kingdom', 'code': '+44'},
+    {'name': 'France', 'code': '+33'},
+    {'name': 'Germany', 'code': '+49'},
+    {'name': 'China', 'code': '+86'},
+    {'name': 'India', 'code': '+91'},
+    {'name': 'Brazil', 'code': '+55'},
+    {'name': 'Canada', 'code': '+1'},
+    {'name': 'Australia', 'code': '+61'},
+    {'name': 'Japan', 'code': '+81'},
+    {'name': 'Belgium', 'code': '+32'},
+    {'name': 'Italy', 'code': '+39'},
+    {'name': 'Spain', 'code': '+34'},
+    {'name': 'Netherlands', 'code': '+31'},
+    {'name': 'Sweden', 'code': '+46'},
+    {'name': 'Switzerland', 'code': '+41'},
+    {'name': 'UAE', 'code': '+971'},
+    {'name': 'Saudi Arabia', 'code': '+966'},
+    {'name': 'Turkey', 'code': '+90'},
+    {'name': 'Russia', 'code': '+7'},
+    {'name': 'South Korea', 'code': '+82'},
+  ];
+
+  // Social media platforms with icons
+  static const List<Map<String, dynamic>> _socialPlatforms = [
+    {'key': 'twitter', 'label': 'X', 'icon': Icons.close, 'hint': '@username or https://x.com/...'},
+    {'key': 'facebook', 'label': 'Facebook', 'icon': Icons.facebook, 'hint': 'https://facebook.com/...'},
+    {'key': 'linkedin', 'label': 'LinkedIn', 'icon': Icons.work_outline, 'hint': 'https://linkedin.com/in/...'},
+    {'key': 'instagram', 'label': 'Instagram', 'icon': Icons.camera_alt_outlined, 'hint': '@username or https://instagram.com/...'},
+    {'key': 'tiktok', 'label': 'TikTok', 'icon': Icons.music_note_outlined, 'hint': '@username or https://tiktok.com/@...'},
+    {'key': 'youtube', 'label': 'YouTube', 'icon': Icons.play_circle_outline, 'hint': 'https://youtube.com/@...'},
+    {'key': 'telegram', 'label': 'Telegram', 'icon': Icons.send, 'hint': '@username or https://t.me/...'},
+    {'key': 'whatsapp', 'label': 'WhatsApp', 'icon': Icons.phone, 'hint': 'Phone number or link'},
+    {'key': 'threads', 'label': 'Threads', 'icon': Icons.alternate_email, 'hint': '@username'},
+    {'key': 'other', 'label': 'Other', 'icon': Icons.link, 'hint': 'URL or username'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize social media controllers
+    for (final platform in _socialPlatforms) {
+      final key = platform['key'] as String;
+      _socialMediaActive[key] = false;
+      _socialMediaControllers[key] = TextEditingController();
+    }
+  }
+
   @override
   void dispose() {
     _fullNameController.dispose();
     _emailController.dispose();
+    _emailOtpController.dispose();
     _phoneController.dispose();
+    _phoneOtpController.dispose();
     _positionController.dispose();
-    _twitterController.dispose();
-    _linkedinController.dispose();
+    _emailTimer?.cancel();
+    _phoneTimer?.cancel();
+    for (final c in _socialMediaControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _startEmailCountdown() {
+    _emailCountdown = 60;
+    _emailTimer?.cancel();
+    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_emailCountdown > 0) {
+        setState(() => _emailCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _startPhoneCountdown() {
+    _phoneCountdown = 60;
+    _phoneTimer?.cancel();
+    _phoneTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_phoneCountdown > 0) {
+        setState(() => _phoneCountdown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _sendEmailOtp() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _showError('Please enter your email address');
+      return;
+    }
+    final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      _showError('Please enter a valid email address');
+      return;
+    }
+
+    setState(() => _sendingEmailOtp = true);
+    try {
+      await ApiService().post('otp/send-email/', {'email': email}, auth: true);
+      if (mounted) {
+        setState(() {
+          _emailOtpSent = true;
+          _sendingEmailOtp = false;
+        });
+        _startEmailCountdown();
+        _showSuccess('Verification code sent to your email!');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sendingEmailOtp = false);
+        _showError('Failed to send code: $e');
+      }
+    }
+  }
+
+  Future<void> _verifyEmailOtp() async {
+    final code = _emailOtpController.text.trim();
+    if (code.isEmpty || code.length < 6) {
+      _showError('Please enter the 6-digit code');
+      return;
+    }
+
+    setState(() => _verifyingEmailOtp = true);
+    try {
+      await ApiService().post('otp/verify-email/', {
+        'email': _emailController.text.trim(),
+        'otp_code': code,
+      }, auth: true);
+      if (mounted) {
+        setState(() {
+          _emailVerified = true;
+          _verifyingEmailOtp = false;
+        });
+        _showSuccess('Email verified!');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _verifyingEmailOtp = false);
+        _showError('Invalid code. Please try again.');
+      }
+    }
+  }
+
+  Future<void> _sendPhoneOtp() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      _showError('Please enter your phone number');
+      return;
+    }
+    if (phone.length < 6) {
+      _showError('Please enter a valid phone number');
+      return;
+    }
+
+    setState(() => _sendingPhoneOtp = true);
+    try {
+      await ApiService().sendPhoneOtp(_selectedCountryCode, phone);
+      if (mounted) {
+        setState(() {
+          _phoneOtpSent = true;
+          _sendingPhoneOtp = false;
+        });
+        _startPhoneCountdown();
+        _showSuccess('Verification code sent via SMS!');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sendingPhoneOtp = false);
+        _showError('Failed to send code: $e');
+      }
+    }
+  }
+
+  Future<void> _verifyPhoneOtp() async {
+    final code = _phoneOtpController.text.trim();
+    if (code.isEmpty || code.length < 6) {
+      _showError('Please enter the 6-digit code');
+      return;
+    }
+
+    setState(() => _verifyingPhoneOtp = true);
+    try {
+      await ApiService().verifyPhoneOtp(
+        _selectedCountryCode,
+        _phoneController.text.trim(),
+        code,
+      );
+      if (mounted) {
+        setState(() {
+          _phoneVerified = true;
+          _verifyingPhoneOtp = false;
+        });
+        _showSuccess('Phone verified!');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _verifyingPhoneOtp = false);
+        _showError('Invalid code. Please try again.');
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.burundiRed,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required bool isDark,
+    required String hint,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: AppColors.burundiRed),
+      ),
+    );
   }
 
   @override
@@ -74,15 +485,12 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 _buildHeader(isDark),
                 const SizedBox(height: 32),
-
-                // Badge Type Info
                 _buildBadgeTypeInfo(isDark),
                 const SizedBox(height: 32),
 
-                // Title Dropdown
+                // Title
                 _buildTitleField(isDark),
                 const SizedBox(height: 20),
 
@@ -90,42 +498,31 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 _buildFullNameField(isDark),
                 const SizedBox(height: 20),
 
-                // Professional Email
-                _buildEmailField(isDark),
+                // Nationality
+                _buildNationalityField(isDark),
                 const SizedBox(height: 20),
 
-                // Phone Number
-                _buildPhoneField(isDark),
+                // Email with OTP
+                _buildEmailSection(isDark),
+                const SizedBox(height: 20),
+
+                // Phone with OTP
+                _buildPhoneSection(isDark),
                 const SizedBox(height: 20),
 
                 // Position/Role
                 _buildPositionField(isDark),
                 const SizedBox(height: 32),
 
-                // Social Media Links (Optional)
-                Text(
-                  'Social Media (Optional)',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Twitter
-                _buildTwitterField(isDark),
-                const SizedBox(height: 20),
-
-                // LinkedIn
-                _buildLinkedInField(isDark),
+                // Social Media
+                _buildSocialMediaSection(isDark),
                 const SizedBox(height: 32),
 
-                // Important Notice
+                // Notice
                 _buildNotice(isDark),
                 const SizedBox(height: 32),
 
-                // Submit Button
+                // Submit
                 _buildSubmitButton(isDark),
                 const SizedBox(height: 16),
               ],
@@ -146,11 +543,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             color: AppColors.auGold.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Icon(
-            Icons.workspace_premium_rounded,
-            size: 48,
-            color: AppColors.auGold,
-          ),
+          child: Icon(Icons.workspace_premium_rounded, size: 48, color: AppColors.auGold),
         ),
         const SizedBox(height: 20),
         Text(
@@ -164,11 +557,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         const SizedBox(height: 8),
         Text(
           'Apply for a verified badge to stand out as an official representative or notable figure.',
-          style: TextStyle(
-            fontSize: 15,
-            height: 1.5,
-            color: isDark ? Colors.white60 : Colors.black54,
-          ),
+          style: TextStyle(fontSize: 15, height: 1.5, color: isDark ? Colors.white60 : Colors.black54),
         ),
       ],
     );
@@ -180,62 +569,27 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-        ),
+        border: Border.all(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Badge Types',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
+          Text('Badge Types', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.verified, color: const Color(0xFFFFD700), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Gold Badge - VIPs, Government Officials, Ambassadors',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          Row(children: [
+            const Icon(Icons.verified, color: Color(0xFFFFD700), size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Gold Badge - VIPs, Government Officials, Ambassadors', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87))),
+          ]),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.verified, color: const Color(0xFF2196F3), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Blue Badge - Verified professionals and notable individuals',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          Row(children: [
+            const Icon(Icons.verified, color: Color(0xFF2196F3), size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Blue Badge - Verified professionals and notable individuals', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87))),
+          ]),
           const SizedBox(height: 12),
-          Text(
-            'Our team will review your application and assign the appropriate badge.',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.white38 : Colors.black45,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
+          Text('Our team will review your application and assign the appropriate badge.',
+            style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black45, fontStyle: FontStyle.italic)),
         ],
       ),
     );
@@ -245,56 +599,14 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Title *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
+        Text('Title *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: _selectedTitle,
-          decoration: InputDecoration(
-            hintText: 'Select your title',
-            prefixIcon: Icon(Icons.person_outline),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiRed),
-            ),
-          ),
-          items: _titles.map((title) {
-            return DropdownMenuItem<String>(
-              value: title['value'],
-              child: Text(title['label']!),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedTitle = value;
-            });
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please select your title';
-            }
-            return null;
-          },
+          value: _selectedTitle,
+          decoration: _inputDecoration(isDark: isDark, hint: 'Select your title', prefixIcon: const Icon(Icons.person_outline)),
+          items: _titles.map((t) => DropdownMenuItem(value: t['value'], child: Text(t['label']!))).toList(),
+          onChanged: (v) => setState(() => _selectedTitle = v),
+          validator: (v) => (v == null || v.isEmpty) ? 'Please select your title' : null,
         ),
       ],
     );
@@ -304,46 +616,14 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Full Legal Name *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
+        Text('Full Legal Name *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _fullNameController,
-          decoration: InputDecoration(
-            hintText: 'Enter your full legal name',
-            prefixIcon: Icon(Icons.badge_outlined),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiRed),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter your full name';
-            }
-            if (value.trim().length < 3) {
-              return 'Name must be at least 3 characters';
-            }
+          decoration: _inputDecoration(isDark: isDark, hint: 'Enter your full legal name', prefixIcon: const Icon(Icons.badge_outlined)),
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Please enter your full name';
+            if (v.trim().length < 3) return 'Name must be at least 3 characters';
             return null;
           },
         ),
@@ -351,123 +631,327 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     );
   }
 
-  Widget _buildEmailField(bool isDark) {
+  Widget _buildNationalityField(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Professional Email *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'No Gmail, Yahoo, or Outlook addresses',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.burundiRed.withValues(alpha: 0.8),
-          ),
-        ),
+        Text('Nationality *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            hintText: 'name@organization.com',
-            prefixIcon: Icon(Icons.email_outlined),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiRed),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter your professional email';
-            }
-            // Basic email validation
-            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-            if (!emailRegex.hasMatch(value)) {
-              return 'Please enter a valid email address';
-            }
-            // Check for consumer email domains
-            final blockedDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'aol.com', 'icloud.com'];
-            final domain = value.split('@').last.toLowerCase();
-            if (blockedDomains.contains(domain)) {
-              return 'Please use a professional email (no $domain)';
-            }
-            return null;
-          },
+        DropdownButtonFormField<String>(
+          value: _selectedNationality,
+          decoration: _inputDecoration(isDark: isDark, hint: 'Select your nationality', prefixIcon: const Icon(Icons.public)),
+          isExpanded: true,
+          items: _nationalities.map((n) => DropdownMenuItem(value: n['code'], child: Text(n['name']!))).toList(),
+          onChanged: (v) => setState(() => _selectedNationality = v),
+          validator: (v) => (v == null || v.isEmpty) ? 'Please select your nationality' : null,
         ),
       ],
     );
   }
 
-  Widget _buildPhoneField(bool isDark) {
+  // ── Email with inline OTP ──────────────────────────────────
+
+  Widget _buildEmailSection(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Phone Number *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
+        Text('Email *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          decoration: InputDecoration(
-            hintText: '+257 XX XXX XXX',
-            prefixIcon: Icon(Icons.phone_outlined),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+
+        // Email input + Get Code button
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_emailVerified,
+                decoration: _inputDecoration(
+                  isDark: isDark,
+                  hint: 'your@email.com',
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  suffixIcon: _emailVerified
+                      ? const Icon(Icons.check_circle, color: AppColors.success)
+                      : null,
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Please enter your email';
+                  final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
+                  if (!emailRegex.hasMatch(v)) return 'Please enter a valid email';
+                  return null;
+                },
+              ),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiRed),
+            if (!_emailVerified) ...[
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: (_sendingEmailOtp || _emailCountdown > 0) ? null : _sendEmailOtp,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.burundiGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: _sendingEmailOtp
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(
+                          _emailCountdown > 0 ? '${_emailCountdown}s' : 'Get Code',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                ),
+              ),
+            ],
+          ],
+        ),
+
+        // OTP input after code sent
+        if (_emailOtpSent && !_emailVerified) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _emailOtpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: _inputDecoration(
+                    isDark: isDark,
+                    hint: 'Enter 6-digit code',
+                    prefixIcon: const Icon(Icons.pin, size: 20),
+                  ).copyWith(counterText: ''),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _verifyingEmailOtp ? null : _verifyEmailOtp,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: _verifyingEmailOtp
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Verify', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        // Verified badge
+        if (_emailVerified)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, color: AppColors.success, size: 16),
+                const SizedBox(width: 6),
+                Text('Email verified', style: TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.w600)),
+              ],
             ),
           ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter your phone number';
-            }
-            if (value.trim().length < 8) {
-              return 'Please enter a valid phone number';
-            }
-            return null;
-          },
-        ),
       ],
+    );
+  }
+
+  // ── Phone with inline OTP ──────────────────────────────────
+
+  Widget _buildPhoneSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Phone Number *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 8),
+
+        // Country code + phone + Get Code
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Country code picker
+            InkWell(
+              onTap: _phoneVerified ? null : _showCountryCodePicker,
+              child: Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_selectedCountryCode, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 2),
+                    Icon(Icons.arrow_drop_down, size: 20, color: isDark ? Colors.white54 : Colors.grey[600]),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Phone input
+            Expanded(
+              child: TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                enabled: !_phoneVerified,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: _inputDecoration(
+                  isDark: isDark,
+                  hint: 'Phone number',
+                  suffixIcon: _phoneVerified
+                      ? const Icon(Icons.check_circle, color: AppColors.success)
+                      : null,
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Enter phone number';
+                  if (v.trim().length < 6) return 'Invalid number';
+                  return null;
+                },
+              ),
+            ),
+
+            if (!_phoneVerified) ...[
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: (_sendingPhoneOtp || _phoneCountdown > 0) ? null : _sendPhoneOtp,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.burundiGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: _sendingPhoneOtp
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(
+                          _phoneCountdown > 0 ? '${_phoneCountdown}s' : 'Get Code',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                ),
+              ),
+            ],
+          ],
+        ),
+
+        // OTP input after code sent
+        if (_phoneOtpSent && !_phoneVerified) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _phoneOtpController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: _inputDecoration(
+                    isDark: isDark,
+                    hint: 'Enter 6-digit code',
+                    prefixIcon: const Icon(Icons.pin, size: 20),
+                  ).copyWith(counterText: ''),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _verifyingPhoneOtp ? null : _verifyPhoneOtp,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: _verifyingPhoneOtp
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Verify', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        ],
+
+        // Verified badge
+        if (_phoneVerified)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, color: AppColors.success, size: 16),
+                const SizedBox(width: 6),
+                Text('Phone verified', style: TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showCountryCodePicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Text('Select Country Code', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _countryCodes.length,
+                    itemBuilder: (context, index) {
+                      final country = _countryCodes[index];
+                      final isSelected = country['code'] == _selectedCountryCode;
+                      return ListTile(
+                        title: Text(country['name']!),
+                        trailing: Text(
+                          country['code']!,
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? AppColors.burundiGreen : null,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedTileColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+                        onTap: () {
+                          setState(() => _selectedCountryCode = country['code']!);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -475,99 +959,100 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Current Position/Role *',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
+        Text('Current Position/Role *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _positionController,
-          decoration: InputDecoration(
-            hintText: 'e.g., Ambassador, Director, Minister',
-            prefixIcon: Icon(Icons.work_outline),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.burundiRed),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Please enter your current position';
-            }
-            return null;
-          },
+          decoration: _inputDecoration(isDark: isDark, hint: 'e.g., Ambassador, Director, Minister', prefixIcon: const Icon(Icons.work_outline)),
+          validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your current position' : null,
         ),
       ],
     );
   }
 
-  Widget _buildTwitterField(bool isDark) {
-    return TextFormField(
-      controller: _twitterController,
-      keyboardType: TextInputType.url,
-      decoration: InputDecoration(
-        labelText: 'Twitter Profile (Optional)',
-        hintText: 'https://twitter.com/username',
-        prefixIcon: Icon(Icons.alternate_email),
-        filled: true,
-        fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-        ),
-      ),
-    );
-  }
+  // ── Social Media Section ──────────────────────────────────
 
-  Widget _buildLinkedInField(bool isDark) {
-    return TextFormField(
-      controller: _linkedinController,
-      keyboardType: TextInputType.url,
-      decoration: InputDecoration(
-        labelText: 'LinkedIn Profile (Optional)',
-        hintText: 'https://linkedin.com/in/username',
-        prefixIcon: Icon(Icons.business_center_outlined),
-        filled: true,
-        fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+  Widget _buildSocialMediaSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Social Media (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 8),
+        Text('Tap a platform to add your profile', style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45)),
+        const SizedBox(height: 16),
+
+        // Platform toggle buttons
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _socialPlatforms.map((platform) {
+            final key = platform['key'] as String;
+            final isActive = _socialMediaActive[key] ?? false;
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _socialMediaActive[key] = !isActive;
+                  if (!_socialMediaActive[key]!) {
+                    _socialMediaControllers[key]!.clear();
+                  }
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.burundiGreen.withValues(alpha: 0.15)
+                      : (isDark ? AppColors.darkSurface : Colors.grey[100]),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isActive ? AppColors.burundiGreen : (isDark ? AppColors.darkDivider : Colors.grey[300]!),
+                    width: isActive ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      platform['icon'] as IconData,
+                      size: 16,
+                      color: isActive ? AppColors.burundiGreen : (isDark ? Colors.white54 : Colors.grey[600]),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      platform['label'] as String,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        color: isActive ? AppColors.burundiGreen : (isDark ? Colors.white70 : Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.burundiGreen, width: 2),
-        ),
-      ),
+
+        // Input fields for active platforms
+        ..._socialPlatforms.where((p) => _socialMediaActive[p['key'] as String] == true).map((platform) {
+          final key = platform['key'] as String;
+          return Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: TextFormField(
+              controller: _socialMediaControllers[key],
+              decoration: _inputDecoration(
+                isDark: isDark,
+                hint: platform['hint'] as String,
+                prefixIcon: Icon(platform['icon'] as IconData, size: 20),
+              ).copyWith(
+                labelText: platform['label'] as String,
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 
@@ -587,11 +1072,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           Expanded(
             child: Text(
               'Review typically takes up to 24 hours. You\'ll be notified once your request is reviewed.',
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? Colors.white70 : Colors.black87,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87, height: 1.4),
             ),
           ),
         ],
@@ -600,62 +1081,104 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildSubmitButton(bool isDark) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _submitRequest,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.burundiGreen,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          elevation: 0,
-        ),
-        child: _isLoading
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Text(
-                    'Submit Request',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
+    final canSubmit = _emailVerified && _phoneVerified;
+
+    return Column(
+      children: [
+        if (!canSubmit)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.auGold),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    !_emailVerified && !_phoneVerified
+                        ? 'Please verify your email and phone number to submit'
+                        : !_emailVerified
+                            ? 'Please verify your email to submit'
+                            : 'Please verify your phone number to submit',
+                    style: TextStyle(fontSize: 13, color: AppColors.auGold, fontWeight: FontWeight.w500),
                   ),
-                  SizedBox(width: 8),
-                  Icon(Icons.send_rounded, size: 20),
-                ],
-              ),
-      ),
+                ),
+              ],
+            ),
+          ),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: (canSubmit && !_isLoading) ? _submitRequest : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.burundiGreen,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 0,
+            ),
+            child: _isLoading
+                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Submit Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                      SizedBox(width: 8),
+                      Icon(Icons.send_rounded, size: 20),
+                    ],
+                  ),
+          ),
+        ),
+      ],
     );
   }
 
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_emailVerified || !_phoneVerified) return;
 
     setState(() => _isLoading = true);
 
     try {
       final api = ApiService();
 
+      // Collect active social media
+      String? twitterUrl, linkedinUrl, facebookUrl, instagramUrl, tiktokUrl, youtubeUrl, otherSocialUrl;
+      for (final platform in _socialPlatforms) {
+        final key = platform['key'] as String;
+        if (_socialMediaActive[key] == true) {
+          final value = _socialMediaControllers[key]!.text.trim();
+          if (value.isNotEmpty) {
+            switch (key) {
+              case 'twitter': twitterUrl = value; break;
+              case 'linkedin': linkedinUrl = value; break;
+              case 'facebook': facebookUrl = value; break;
+              case 'instagram': instagramUrl = value; break;
+              case 'tiktok': tiktokUrl = value; break;
+              case 'youtube': youtubeUrl = value; break;
+              default: otherSocialUrl = value; break;
+            }
+          }
+        }
+      }
+
       await api.submitVerificationRequest(
         title: _selectedTitle!,
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber: '$_selectedCountryCode${_phoneController.text.trim()}',
         positionRole: _positionController.text.trim(),
-        twitterUrl: _twitterController.text.isNotEmpty ? _twitterController.text.trim() : null,
-        linkedinUrl: _linkedinController.text.isNotEmpty ? _linkedinController.text.trim() : null,
+        countryCode: _selectedNationality,
+        twitterUrl: twitterUrl,
+        linkedinUrl: linkedinUrl,
+        facebookUrl: facebookUrl,
+        instagramUrl: instagramUrl,
+        tiktokUrl: tiktokUrl,
+        youtubeUrl: youtubeUrl,
+        otherSocialUrl: otherSocialUrl,
       );
 
       if (mounted) {
-        // Show success dialog
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -682,8 +1205,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             actions: [
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pop(); // Close form screen
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.burundiGreen,
@@ -698,16 +1221,11 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: AppColors.burundiRed,
-          ),
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.burundiRed),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

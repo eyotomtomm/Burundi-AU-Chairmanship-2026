@@ -2127,11 +2127,23 @@ def support_ticket_update_status(request, pk):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def analytics_dashboard(request):
     from datetime import timedelta
+    from django.db.models import Sum
     from django.db.models.functions import TruncMonth
+    from core.models import UserSession, Video, GalleryAlbum
 
-    # User growth by month
+    now = timezone.now()
+
+    # User metrics
+    total_users = User.objects.count()
+    new_7d = User.objects.filter(date_joined__gte=now - timedelta(days=7)).count()
+    new_30d = User.objects.filter(date_joined__gte=now - timedelta(days=30)).count()
+    active_7d = User.objects.filter(last_login__gte=now - timedelta(days=7)).count()
+    active_30d = User.objects.filter(last_login__gte=now - timedelta(days=30)).count()
+    active_today = User.objects.filter(last_login__date=now.date()).count()
+
+    # User growth (12 months)
     user_growth = (
-        User.objects.filter(date_joined__gte=timezone.now() - timedelta(days=180))
+        User.objects.filter(date_joined__gte=now - timedelta(days=365))
         .annotate(month=TruncMonth('date_joined'))
         .values('month')
         .annotate(count=Count('id'))
@@ -2140,23 +2152,126 @@ def analytics_dashboard(request):
     months = [g['month'].strftime('%b %Y') for g in user_growth]
     month_counts = [g['count'] for g in user_growth]
 
-    # Top articles
-    top_articles = Article.objects.order_by('-view_count')[:5] if hasattr(Article, 'view_count') else Article.objects.order_by('-created_at')[:5]
+    # Country analytics — nationality
+    nationality_data = list(
+        UserProfile.objects.exclude(nationality='')
+        .values('nationality')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:20]
+    )
+    nat_labels = [d['nationality'] for d in nationality_data]
+    nat_counts = [d['count'] for d in nationality_data]
 
-    # Top events
-    top_events = Event.objects.filter(is_active=True).order_by('-event_date')[:5]
+    # Country analytics — IP geolocation
+    ip_country_data = list(
+        UserSession.objects.exclude(country_code='')
+        .values('country_code', 'country_name')
+        .annotate(session_count=Count('id'))
+        .order_by('-session_count')[:20]
+    )
+    ip_labels = [d['country_name'] or d['country_code'] for d in ip_country_data]
+    ip_counts = [d['session_count'] for d in ip_country_data]
+
+    # Content engagement
+    article_views = Article.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    article_likes = Article.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    magazine_views = MagazineEdition.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    magazine_likes = MagazineEdition.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    video_views = Video.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    video_likes = Video.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    album_views = GalleryAlbum.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    album_likes = GalleryAlbum.objects.aggregate(s=Sum('like_count'))['s'] or 0
+
+    # Top content
+    top_articles = Article.objects.order_by('-view_count')[:5]
+    top_magazines = MagazineEdition.objects.order_by('-view_count')[:5]
+    top_videos = Video.objects.order_by('-view_count')[:5]
+
+    # Device OS distribution
+    os_data = list(
+        UserProfile.objects.exclude(device_os='')
+        .values('device_os')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:10]
+    )
+    os_labels = [d['device_os'] for d in os_data]
+    os_counts = [d['count'] for d in os_data]
 
     context = {
-        'total_users': User.objects.count(),
-        'total_articles': Article.objects.count(),
-        'total_events': Event.objects.count(),
-        'total_magazines': MagazineEdition.objects.count(),
-        'total_resources': Resource.objects.count(),
+        # User metrics
+        'total_users': total_users,
+        'new_7d': new_7d,
+        'new_30d': new_30d,
+        'active_7d': active_7d,
+        'active_30d': active_30d,
+        'active_today': active_today,
+
+        # User growth chart
         'months_json': months,
         'month_counts_json': month_counts,
+
+        # Country data
+        'nat_labels_json': nat_labels,
+        'nat_counts_json': nat_counts,
+        'ip_labels_json': ip_labels,
+        'ip_counts_json': ip_counts,
+
+        # Content engagement
+        'total_articles': Article.objects.count(),
+        'article_views': article_views,
+        'article_likes': article_likes,
+        'total_magazines': MagazineEdition.objects.count(),
+        'magazine_views': magazine_views,
+        'magazine_likes': magazine_likes,
+        'total_videos': Video.objects.count(),
+        'video_views': video_views,
+        'video_likes': video_likes,
+        'total_albums': GalleryAlbum.objects.count(),
+        'album_views': album_views,
+        'album_likes': album_likes,
+
+        # Top content
         'top_articles': top_articles,
-        'top_events': top_events,
-        'new_users_7d': User.objects.filter(date_joined__gte=timezone.now() - timedelta(days=7)).count(),
-        'active_users': User.objects.filter(last_login__gte=timezone.now() - timedelta(days=30)).count(),
+        'top_magazines': top_magazines,
+        'top_videos': top_videos,
+
+        # Device stats
+        'os_labels_json': os_labels,
+        'os_counts_json': os_counts,
     }
     return render(request, 'custom_admin/analytics/dashboard.html', context)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def analytics_export_pdf(request):
+    """Admin dashboard PDF export route."""
+    from core.analytics_views import generate_analytics_pdf
+    from core.models import AuditLogEntry
+
+    report_type = request.GET.get('report_type', 'marketing')
+    month_str = request.GET.get('month', '')
+
+    if report_type not in ('marketing', 'technical', 'diplomacy'):
+        from django.http import HttpResponseBadRequest
+        return HttpResponseBadRequest('Invalid report type')
+
+    try:
+        pdf_bytes = generate_analytics_pdf(report_type, month_str, request.user)
+    except Exception as e:
+        from django.http import HttpResponseServerError
+        return HttpResponseServerError(f'Export failed: {e}')
+
+    AuditLogEntry.objects.create(
+        user=request.user,
+        action='EXPORT',
+        entity_type='AnalyticsReport',
+        entity_label=f'{report_type.title()} report ({month_str or "current"})',
+        status='success',
+    )
+
+    from django.http import HttpResponse
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    filename = f'burundi_au_{report_type}_report_{month_str or "current"}.pdf'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from . import analytics_views
 
 router = DefaultRouter()
 router.register('hero-slides', views.HeroSlideViewSet)
@@ -76,4 +77,11 @@ urlpatterns = [
     path('verification/status/', views.check_verification_status, name='verification-status'),
     path('verification/appeal/', views.submit_verification_appeal, name='verification-appeal'),
     path('verification/admin/<int:request_id>/action/', views.admin_verification_action, name='verification-admin-action'),
+
+    # Analytics API (admin only)
+    path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),
+    path('analytics/user-growth/', analytics_views.analytics_user_growth, name='analytics-user-growth'),
+    path('analytics/countries/', analytics_views.analytics_countries, name='analytics-countries'),
+    path('analytics/content-engagement/', analytics_views.analytics_content_engagement, name='analytics-content-engagement'),
+    path('analytics/export-pdf/', analytics_views.analytics_export_pdf, name='analytics-export-pdf'),
 ]

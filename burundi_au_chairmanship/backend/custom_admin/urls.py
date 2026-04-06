@@ -145,4 +145,5 @@ urlpatterns = [
 
     # Analytics
     path('analytics/', views.analytics_dashboard, name='analytics'),
+    path('analytics/export-pdf/', views.analytics_export_pdf, name='analytics_export_pdf'),
 ]

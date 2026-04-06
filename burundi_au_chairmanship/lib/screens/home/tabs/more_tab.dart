@@ -15,8 +15,15 @@ import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../widgets/verified_badge.dart';
 
-class MoreTab extends StatelessWidget {
+class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
+
+  @override
+  State<MoreTab> createState() => _MoreTabState();
+}
+
+class _MoreTabState extends State<MoreTab> {
+  final GlobalKey _shareMenuKey = GlobalKey();
 
   /// Build display name: "Title FirstName" for verified users, plain name otherwise.
   /// Uses the real name from verification instead of the signup name (which may
@@ -436,16 +443,18 @@ class MoreTab extends StatelessWidget {
                       iconBgColor: const Color(0xFF66BB6A),
                       title: l10n.translate('share_app'),
                       isDark: isDark,
+                      itemKey: _shareMenuKey,
                       onTap: () async {
                         final appLink = Platform.isIOS
                             ? 'https://apps.apple.com/app/burundi-au-chairmanship/id123456789'
                             : 'https://play.google.com/store/apps/details?id=com.burundi.au.chairmanship';
 
-                        // Get the RenderBox for positioning the share sheet on iOS
-                        final box = context.findRenderObject() as RenderBox?;
-                        final sharePositionOrigin = box != null
-                            ? box.localToGlobal(Offset.zero) & box.size
-                            : null;
+                        Rect? sharePositionOrigin;
+                        final renderObject = _shareMenuKey.currentContext?.findRenderObject();
+                        if (renderObject is RenderBox) {
+                          final offset = renderObject.localToGlobal(Offset.zero);
+                          sharePositionOrigin = offset & renderObject.size;
+                        }
 
                         await Share.share(
                           'Check out the Burundi AU Chairmanship 2026 app! 🇧🇮\n\n$appLink',
@@ -1032,8 +1041,10 @@ class MoreTab extends StatelessWidget {
     required VoidCallback onTap,
     bool isFirst = false,
     bool isLast = false,
+    Key? itemKey,
   }) {
     return Column(
+      key: itemKey,
       children: [
         if (!isFirst) Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
         ListTile(

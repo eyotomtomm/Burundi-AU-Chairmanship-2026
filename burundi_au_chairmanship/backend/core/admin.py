@@ -13,6 +13,7 @@ from .models import (
     EventRegistration, RegistrationFormField, EventSubmission,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     AuditLogEntry, AdminRole, SupportTicket, TicketMessage, Popup,
+    UserSession,
 )
 
 
@@ -597,7 +598,7 @@ class ArticleAdmin(admin.ModelAdmin):
     Articles marked as "featured" appear in a special section on the home screen.
     """
     inlines = [ArticleMediaInline]
-    list_display = ['title', 'category', 'is_featured', 'publish_date', 'view_count']
+    list_display = ['title', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
     list_filter = ['is_featured', 'category', 'publish_date']
     list_editable = ['is_featured']
     search_fields = ['title', 'title_fr', 'content']
@@ -652,7 +653,7 @@ class MagazineAdmin(admin.ModelAdmin):
     - Screenshot protection (DRM)
     """
     inlines = [MagazineImageInline]
-    list_display = ['title', 'publish_date', 'is_featured', 'page_count', 'view_count']
+    list_display = ['title', 'publish_date', 'is_featured', 'page_count', 'view_count', 'like_count']
     list_filter = ['is_featured', 'publish_date']
     list_editable = ['is_featured']
     search_fields = ['title', 'title_fr', 'description']
@@ -1383,3 +1384,12 @@ class PopupAdmin(admin.ModelAdmin):
                 }),
             )
         return super().get_fieldsets(request, obj)
+
+
+@admin.register(UserSession)
+class UserSessionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'ip_address', 'country_name', 'city', 'user_nationality', 'device_os', 'created_at')
+    list_filter = ('country_code', 'device_os', 'created_at')
+    search_fields = ('ip_address', 'country_name', 'city', 'user__username')
+    readonly_fields = ('created_at',)
+    date_hierarchy = 'created_at'

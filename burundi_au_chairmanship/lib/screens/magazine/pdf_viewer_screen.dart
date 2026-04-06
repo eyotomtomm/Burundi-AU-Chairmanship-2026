@@ -33,31 +33,118 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isLoading = true;
   double _currentZoom = 1.0;
 
-  // Download management
+  // Download management (permanent offline save)
   bool _isDownloaded = false;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
   String? _localFilePath;
+
+  // Temp-cache management (fast re-open)
+  bool _isCaching = false;
+  double _cacheProgress = 0.0;
+  String? _cachedFilePath;
+  String? _cacheError;
 
   @override
   void initState() {
     super.initState();
     _pdfViewerController = PdfViewerController();
     _enableScreenProtection();
-    _checkIfDownloaded();
+    _loadPdf();
     _recordView();
+  }
+
+  /// Load PDF: check permanent download first, then temp cache, then download to cache.
+  Future<void> _loadPdf() async {
+    // 1. Check if permanently downloaded
+    if (widget.magazineId != null) {
+      try {
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath = '${directory.path}/magazines/${widget.magazineId}.pdf';
+        final file = File(filePath);
+        if (await file.exists()) {
+          setState(() {
+            _isDownloaded = true;
+            _localFilePath = filePath;
+            _cachedFilePath = filePath;
+          });
+          return;
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('Check download error: $e');
+      }
+    }
+
+    // 2. Check if temp-cached version exists
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheKey = widget.magazineId ?? widget.pdfUrl.hashCode.toString();
+      final cachePath = '${tempDir.path}/pdf_cache/$cacheKey.pdf';
+      final cacheFile = File(cachePath);
+      if (await cacheFile.exists()) {
+        setState(() {
+          _cachedFilePath = cachePath;
+        });
+        return;
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Check cache error: $e');
+    }
+
+    // 3. Download to temp cache with progress
+    setState(() {
+      _isCaching = true;
+      _cacheProgress = 0.0;
+      _cacheError = null;
+    });
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final cacheDir = Directory('${tempDir.path}/pdf_cache');
+      if (!await cacheDir.exists()) {
+        await cacheDir.create(recursive: true);
+      }
+
+      final cacheKey = widget.magazineId ?? widget.pdfUrl.hashCode.toString();
+      final cachePath = '${cacheDir.path}/$cacheKey.pdf';
+      final url = Environment.fixMediaUrl(widget.pdfUrl);
+
+      final dio = Dio();
+      await dio.download(
+        url,
+        cachePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1 && mounted) {
+            setState(() {
+              _cacheProgress = received / total;
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _cachedFilePath = cachePath;
+          _isCaching = false;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('PDF cache download error: $e');
+      if (mounted) {
+        setState(() {
+          _isCaching = false;
+          _cacheError = 'Failed to load PDF. Please check your connection.';
+        });
+      }
+    }
   }
 
   /// Enable screenshot and screen recording prevention
   Future<void> _enableScreenProtection() async {
     try {
-      // Prevent screenshots (works on both Android and iOS)
       await ScreenProtector.protectDataLeakageOn();
-
-      // Prevent screen recording (works on both Android and iOS)
       await ScreenProtector.preventScreenshotOn();
     } catch (e) {
-      // Screen protection might not work on all devices/emulators
       if (kDebugMode) debugPrint('Screen protection error: $e');
     }
   }
@@ -72,27 +159,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  /// Check if magazine is already downloaded
-  Future<void> _checkIfDownloaded() async {
-    if (widget.magazineId == null) return;
-
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/magazines/${widget.magazineId}.pdf';
-      final file = File(filePath);
-
-      if (await file.exists()) {
-        setState(() {
-          _isDownloaded = true;
-          _localFilePath = filePath;
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('Check download error: $e');
-    }
-  }
-
-  /// Download magazine for offline viewing
+  /// Download magazine for offline viewing (permanent)
   Future<void> _downloadMagazine() async {
     if (widget.magazineId == null) return;
 
@@ -105,15 +172,43 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final directory = await getApplicationDocumentsDirectory();
       final magazinesDir = Directory('${directory.path}/magazines');
 
-      // Create magazines directory if it doesn't exist
       if (!await magazinesDir.exists()) {
         await magazinesDir.create(recursive: true);
       }
 
       final filePath = '${magazinesDir.path}/${widget.magazineId}.pdf';
-      final url = Environment.fixMediaUrl(widget.pdfUrl);
 
-      // Download with progress
+      // If we already have a cached copy, just copy it
+      if (_cachedFilePath != null) {
+        final cachedFile = File(_cachedFilePath!);
+        if (await cachedFile.exists()) {
+          await cachedFile.copy(filePath);
+          setState(() {
+            _isDownloaded = true;
+            _isDownloading = false;
+            _localFilePath = filePath;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('Magazine downloaded! Available offline.'),
+                  ],
+                ),
+                backgroundColor: AppColors.success,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Otherwise download fresh
+      final url = Environment.fixMediaUrl(widget.pdfUrl);
       final dio = Dio();
       await dio.download(
         url,
@@ -233,14 +328,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void dispose() {
     _pdfViewerController.dispose();
-    _disableScreenProtection(); // Re-enable screenshots when leaving
+    _disableScreenProtection();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final url = Environment.fixMediaUrl(widget.pdfUrl);
-
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -330,50 +423,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ),
       body: Stack(
         children: [
-          // PDF Viewer - Use local file if downloaded, otherwise network
-          if (_localFilePath != null && _isDownloaded)
-            Builder(
-              builder: (context) {
-                final localPath = _localFilePath!; // Safe due to null check above
-                return SfPdfViewer.file(
-                  File(localPath),
-                  key: _pdfViewerKey,
-                  controller: _pdfViewerController,
-                  canShowScrollHead: true,
-              canShowPaginationDialog: true,
-              onDocumentLoaded: (details) {
-                setState(() {
-                  _totalPages = details.document.pages.count;
-                  _isLoading = false;
-                });
-              },
-              onDocumentLoadFailed: (details) {
-                setState(() => _isLoading = false);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to load PDF: ${details.description}'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              onPageChanged: (details) {
-                setState(() {
-                  _currentPage = details.newPageNumber - 1;
-                });
-              },
-              onZoomLevelChanged: (details) {
-                setState(() {
-                  _currentZoom = details.newZoomLevel;
-                });
-              },
-                );
-              },
-            )
-          else
-            SfPdfViewer.network(
-              url,
+          // PDF Viewer - only show when we have a cached/downloaded file
+          if (_cachedFilePath != null)
+            SfPdfViewer.file(
+              File(_cachedFilePath!),
               key: _pdfViewerKey,
               controller: _pdfViewerController,
               canShowScrollHead: true,
@@ -407,20 +460,110 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               },
             ),
 
-          // Loading indicator
-          if (_isLoading)
+          // Caching progress indicator (replaces old generic spinner)
+          if (_isCaching)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                margin: const EdgeInsets.symmetric(horizontal: 48),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.picture_as_pdf, size: 48, color: AppColors.burundiGreen),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Loading PDF...',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 200,
+                      child: LinearProgressIndicator(
+                        value: _cacheProgress,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.burundiGreen),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${(_cacheProgress * 100).toInt()}%',
+                      style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Cache error with retry
+          if (_cacheError != null && !_isCaching)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                margin: const EdgeInsets.symmetric(horizontal: 48),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                    const SizedBox(height: 16),
+                    Text(
+                      _cacheError!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _cacheError = null;
+                        });
+                        _loadPdf();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.burundiGreen,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Loading indicator for SfPdfViewer document parsing
+          if (_isLoading && _cachedFilePath != null && !_isCaching)
             const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(color: AppColors.burundiGreen),
                   SizedBox(height: 16),
-                  Text('Loading PDF...', style: TextStyle(color: Colors.grey)),
+                  Text('Rendering PDF...', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             ),
 
-          // Download progress overlay
+          // Download progress overlay (permanent save)
           if (_isDownloading)
             Container(
               color: Colors.black.withValues(alpha: 0.7),
@@ -437,7 +580,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       const Icon(Icons.download, size: 48, color: AppColors.burundiGreen),
                       const SizedBox(height: 16),
                       const Text(
-                        'Downloading magazine...',
+                        'Saving for offline...',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
@@ -460,7 +603,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
             ),
 
-          // Screenshot protection warning (optional - shows when viewing)
+          // Screenshot protection warning
           Positioned(
             bottom: 16,
             left: 16,

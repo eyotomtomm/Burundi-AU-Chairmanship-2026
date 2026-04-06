@@ -73,6 +73,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.middleware.firebase_auth.FirebaseAuthenticationMiddleware',  # Firebase auth
+    'core.middleware.session_tracking.SessionTrackingMiddleware',  # Analytics session tracking
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -330,3 +331,8 @@ if SENTRY_DSN:
         environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
         release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
     )
+
+# ─── GeoIP2 Configuration ────────────────────────────────────
+# Download GeoLite2-City.mmdb from MaxMind and place in backend/geoip/
+GEOIP_PATH = os.path.join(BASE_DIR, 'geoip')
+GEOIP_CITY = 'GeoLite2-City.mmdb'

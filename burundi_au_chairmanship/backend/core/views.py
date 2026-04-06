@@ -643,7 +643,6 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = Article.objects.select_related('category').prefetch_related('media').annotate(
             comment_count=Count('comments', distinct=True),
-            like_count=Count('likes', distinct=True),
         ).order_by('-publish_date')  # Explicitly order by newest first
         user = self.request.user
         if user.is_authenticated:
@@ -730,9 +729,15 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         like, created = ArticleLike.objects.get_or_create(user=request.user, article=article)
         if not created:
             like.delete()
+            Article.objects.filter(pk=article.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            Article.objects.filter(pk=article.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        article.refresh_from_db()
         return Response({
-            'is_liked': created,
-            'like_count': article.likes.count(),
+            'is_liked': is_liked,
+            'like_count': article.like_count,
         })
 
 
@@ -787,6 +792,7 @@ class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
 
 class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view gallery albums, authentication required to like"""
+    queryset = GalleryAlbum.objects.all()
     permission_classes = [AllowAny]
     serializer_class = GalleryAlbumSerializer
 
@@ -995,7 +1001,6 @@ def home_feed(request):
 
     base_articles = Article.objects.select_related('category').prefetch_related('media').annotate(
         comment_count=Count('comments', distinct=True),
-        like_count=Count('likes', distinct=True),
     ).order_by('-publish_date')  # Explicitly order by newest first
     if request.user.is_authenticated:
         base_articles = base_articles.annotate(
@@ -1108,7 +1113,6 @@ def search_articles(request):
         Q(title_fr__icontains=query) | Q(content_fr__icontains=query)
     ).select_related('category').prefetch_related('media').annotate(
         comment_count=Count('comments', distinct=True),
-        like_count=Count('likes', distinct=True),
     )
 
     # Add is_liked annotation if authenticated

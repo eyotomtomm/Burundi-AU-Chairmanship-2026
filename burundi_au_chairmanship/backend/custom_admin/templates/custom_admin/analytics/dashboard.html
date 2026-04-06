@@ -3,12 +3,45 @@
 {% block title %}Analytics - Diplomatic Portal{% endblock %}
 
 {% block content %}
-<div class="mb-8">
-  <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Data Intelligence</span>
-  <h1 class="text-3xl font-extrabold text-on-surface font-headline">Analytics &amp; Reports</h1>
+<div class="mb-8 flex items-center justify-between">
+  <div>
+    <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Data Intelligence</span>
+    <h1 class="text-3xl font-extrabold text-on-surface font-headline">Analytics &amp; Reports</h1>
+  </div>
+  <!-- PDF Export Dropdown -->
+  <div class="relative" id="exportDropdown">
+    <button onclick="document.getElementById('exportMenu').classList.toggle('hidden')" class="flex items-center gap-2 bg-primary-container text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+      <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+      Export PDF
+      <span class="material-symbols-outlined text-[16px]">expand_more</span>
+    </button>
+    <div id="exportMenu" class="hidden absolute right-0 mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 z-50 py-2">
+      <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=marketing" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
+        <span class="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
+        <div>
+          <p class="text-sm font-medium">Marketing Report</p>
+          <p class="text-xs text-on-surface-variant">Engagement &amp; growth</p>
+        </div>
+      </a>
+      <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=technical" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
+        <span class="material-symbols-outlined text-primary-container text-[18px]">devices</span>
+        <div>
+          <p class="text-sm font-medium">Technical Report</p>
+          <p class="text-xs text-on-surface-variant">Devices &amp; sessions</p>
+        </div>
+      </a>
+      <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=diplomacy" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
+        <span class="material-symbols-outlined text-amber-600 text-[18px]">public</span>
+        <div>
+          <p class="text-sm font-medium">Diplomacy Report</p>
+          <p class="text-xs text-on-surface-variant">Countries &amp; geography</p>
+        </div>
+      </a>
+    </div>
+  </div>
 </div>
 
-<!-- Stats Cards -->
+<!-- Summary Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
     <div class="flex items-center gap-3 mb-3">
@@ -16,53 +49,109 @@
       <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Users</span>
     </div>
     <h3 class="text-3xl font-extrabold">{{ total_users }}</h3>
-    <p class="text-xs text-emerald-600 font-medium mt-1">+{{ new_users_7d }} this week</p>
+    <p class="text-xs text-emerald-600 font-medium mt-1">+{{ new_7d }} this week</p>
   </div>
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
     <div class="flex items-center gap-3 mb-3">
-      <div class="bg-secondary/10 p-2 rounded-lg"><span class="material-symbols-outlined text-secondary">article</span></div>
-      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Articles</span>
+      <div class="bg-secondary/10 p-2 rounded-lg"><span class="material-symbols-outlined text-secondary">person_add</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">New This Month</span>
     </div>
-    <h3 class="text-3xl font-extrabold">{{ total_articles }}</h3>
-  </div>
-  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
-    <div class="flex items-center gap-3 mb-3">
-      <div class="bg-primary-container/10 p-2 rounded-lg"><span class="material-symbols-outlined text-primary-container">event</span></div>
-      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Events</span>
-    </div>
-    <h3 class="text-3xl font-extrabold">{{ total_events }}</h3>
+    <h3 class="text-3xl font-extrabold">{{ new_30d }}</h3>
+    <p class="text-xs text-on-surface-variant font-medium mt-1">Last 30 days</p>
   </div>
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
     <div class="flex items-center gap-3 mb-3">
       <div class="bg-primary-container/10 p-2 rounded-lg"><span class="material-symbols-outlined text-primary-container">people</span></div>
       <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Active (30d)</span>
     </div>
-    <h3 class="text-3xl font-extrabold">{{ active_users }}</h3>
+    <h3 class="text-3xl font-extrabold">{{ active_30d }}</h3>
+    <p class="text-xs text-on-surface-variant font-medium mt-1">{{ active_7d }} active this week</p>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-emerald-100 p-2 rounded-lg"><span class="material-symbols-outlined text-emerald-600">bolt</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Active Today</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ active_today }}</h3>
+    <p class="text-xs text-emerald-600 font-medium mt-1">Online now</p>
   </div>
 </div>
 
-<div class="grid grid-cols-12 gap-8">
-  <!-- User Growth Chart -->
-  <div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+<!-- User Growth Chart -->
+<div class="grid grid-cols-12 gap-8 mb-10">
+  <div class="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
     <h4 class="text-lg font-bold mb-2">User Growth</h4>
-    <p class="text-sm text-on-surface-variant mb-6">New registrations over the last 6 months</p>
-    <canvas id="userGrowthChart" height="200"></canvas>
+    <p class="text-sm text-on-surface-variant mb-6">New registrations over the last 12 months</p>
+    <canvas id="userGrowthChart" height="100"></canvas>
   </div>
+</div>
 
-  <!-- Content Distribution -->
-  <div class="col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
-    <h4 class="text-lg font-bold mb-6">Content Distribution</h4>
-    <canvas id="contentPieChart" height="200"></canvas>
-    <div class="mt-6 space-y-3">
-      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-black rounded-full"></span><span class="text-xs font-medium">Articles</span></div><span class="text-xs font-bold">{{ total_articles }}</span></div>
-      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-secondary rounded-full"></span><span class="text-xs font-medium">Events</span></div><span class="text-xs font-bold">{{ total_events }}</span></div>
-      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-slate-300 rounded-full"></span><span class="text-xs font-medium">Magazines</span></div><span class="text-xs font-bold">{{ total_magazines }}</span></div>
-      <div class="flex items-center justify-between"><div class="flex items-center gap-2"><span class="w-2 h-2 bg-amber-400 rounded-full"></span><span class="text-xs font-medium">Resources</span></div><span class="text-xs font-bold">{{ total_resources }}</span></div>
+<!-- Country Analytics -->
+<div class="grid grid-cols-12 gap-8 mb-10">
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-2">Users by Nationality</h4>
+    <p class="text-sm text-on-surface-variant mb-6">Top 20 countries from user profiles</p>
+    <canvas id="nationalityChart" height="200"></canvas>
+  </div>
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-2">Sessions by IP Geolocation</h4>
+    <p class="text-sm text-on-surface-variant mb-6">Top 20 countries from session tracking</p>
+    <canvas id="ipGeoChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- Content Engagement Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="bg-slate-100 p-2 rounded-lg"><span class="material-symbols-outlined text-slate-600">article</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Articles</span>
+    </div>
+    <h3 class="text-2xl font-extrabold mb-3">{{ total_articles }}</h3>
+    <div class="space-y-1">
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Views</span><span class="font-bold">{{ article_views }}</span></div>
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Likes</span><span class="font-bold">{{ article_likes }}</span></div>
     </div>
   </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="bg-amber-50 p-2 rounded-lg"><span class="material-symbols-outlined text-amber-600">menu_book</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Magazines</span>
+    </div>
+    <h3 class="text-2xl font-extrabold mb-3">{{ total_magazines }}</h3>
+    <div class="space-y-1">
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Views</span><span class="font-bold">{{ magazine_views }}</span></div>
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Likes</span><span class="font-bold">{{ magazine_likes }}</span></div>
+    </div>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="bg-red-50 p-2 rounded-lg"><span class="material-symbols-outlined text-red-600">play_circle</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Videos</span>
+    </div>
+    <h3 class="text-2xl font-extrabold mb-3">{{ total_videos }}</h3>
+    <div class="space-y-1">
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Views</span><span class="font-bold">{{ video_views }}</span></div>
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Likes</span><span class="font-bold">{{ video_likes }}</span></div>
+    </div>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="bg-violet-50 p-2 rounded-lg"><span class="material-symbols-outlined text-violet-600">photo_library</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Gallery</span>
+    </div>
+    <h3 class="text-2xl font-extrabold mb-3">{{ total_albums }}</h3>
+    <div class="space-y-1">
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Views</span><span class="font-bold">{{ album_views }}</span></div>
+      <div class="flex justify-between text-xs"><span class="text-on-surface-variant">Likes</span><span class="font-bold">{{ album_likes }}</span></div>
+    </div>
+  </div>
+</div>
 
+<!-- Top Content Tables -->
+<div class="grid grid-cols-12 gap-8 mb-10">
   <!-- Top Articles -->
-  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+  <div class="col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
     <h4 class="text-lg font-bold mb-6">Top Articles</h4>
     <div class="space-y-4">
       {% for article in top_articles %}
@@ -70,29 +159,75 @@
         <span class="text-lg font-black text-slate-300 w-8">{{ forloop.counter }}</span>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium truncate">{{ article.title }}</p>
-          <p class="text-xs text-on-surface-variant">{{ article.author|default:"Admin" }} &bull; {{ article.created_at|date:"M d, Y" }}</p>
+          <p class="text-xs text-on-surface-variant">
+            <span class="material-symbols-outlined text-[12px] align-middle">visibility</span> {{ article.view_count }}
+            &bull;
+            <span class="material-symbols-outlined text-[12px] align-middle">favorite</span> {{ article.like_count }}
+          </p>
         </div>
       </div>
+      {% empty %}
+      <p class="text-sm text-on-surface-variant">No articles yet</p>
       {% endfor %}
     </div>
   </div>
 
-  <!-- Top Events -->
-  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
-    <h4 class="text-lg font-bold mb-6">Upcoming Events</h4>
+  <!-- Top Magazines -->
+  <div class="col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Top Magazines</h4>
     <div class="space-y-4">
-      {% for event in top_events %}
+      {% for mag in top_magazines %}
       <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
-        <div class="bg-primary-container text-white rounded-lg p-2 text-center min-w-[50px]">
-          <p class="text-[10px] uppercase font-bold">{{ event.event_date|date:"M" }}</p>
-          <p class="text-lg font-black leading-none">{{ event.event_date|date:"d" }}</p>
-        </div>
+        <span class="text-lg font-black text-slate-300 w-8">{{ forloop.counter }}</span>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium truncate">{{ event.name }}</p>
-          <p class="text-xs text-on-surface-variant">{{ event.address|truncatewords:5 }}</p>
+          <p class="text-sm font-medium truncate">{{ mag.title }}</p>
+          <p class="text-xs text-on-surface-variant">
+            <span class="material-symbols-outlined text-[12px] align-middle">visibility</span> {{ mag.view_count }}
+            &bull;
+            <span class="material-symbols-outlined text-[12px] align-middle">favorite</span> {{ mag.like_count }}
+          </p>
         </div>
       </div>
+      {% empty %}
+      <p class="text-sm text-on-surface-variant">No magazines yet</p>
       {% endfor %}
+    </div>
+  </div>
+
+  <!-- Top Videos -->
+  <div class="col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Top Videos</h4>
+    <div class="space-y-4">
+      {% for vid in top_videos %}
+      <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+        <span class="text-lg font-black text-slate-300 w-8">{{ forloop.counter }}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate">{{ vid.title }}</p>
+          <p class="text-xs text-on-surface-variant">
+            <span class="material-symbols-outlined text-[12px] align-middle">visibility</span> {{ vid.view_count }}
+            &bull;
+            <span class="material-symbols-outlined text-[12px] align-middle">favorite</span> {{ vid.like_count }}
+          </p>
+        </div>
+      </div>
+      {% empty %}
+      <p class="text-sm text-on-surface-variant">No videos yet</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Device OS Pie Chart -->
+<div class="grid grid-cols-12 gap-8 mb-10">
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Device OS Distribution</h4>
+    <canvas id="osChart" height="200"></canvas>
+  </div>
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm flex items-center justify-center">
+    <div class="text-center">
+      <span class="material-symbols-outlined text-6xl text-secondary/30">analytics</span>
+      <h4 class="text-lg font-bold mt-4 text-on-surface-variant">Session Tracking Active</h4>
+      <p class="text-sm text-on-surface-variant mt-2 max-w-xs">Geographic and device data is being collected from API sessions. Data appears here as users interact with the app.</p>
     </div>
   </div>
 </div>
@@ -101,19 +236,133 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
+// Close export dropdown on outside click
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('exportDropdown');
+  const menu = document.getElementById('exportMenu');
+  if (dd && menu && !dd.contains(e.target)) {
+    menu.classList.add('hidden');
+  }
+});
+
+// User Growth Line Chart
 const months = {{ months_json|safe }};
 const counts = {{ month_counts_json|safe }};
 
 new Chart(document.getElementById('userGrowthChart'), {
   type: 'line',
-  data: { labels: months, datasets: [{ label: 'New Users', data: counts, borderColor: '#000', backgroundColor: 'rgba(0,0,0,0.05)', tension: 0.4, fill: true, pointBackgroundColor: '#745b17' }] },
-  options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+  data: {
+    labels: months,
+    datasets: [{
+      label: 'New Users',
+      data: counts,
+      borderColor: '#000',
+      backgroundColor: 'rgba(0,0,0,0.05)',
+      tension: 0.4,
+      fill: true,
+      pointBackgroundColor: '#745b17',
+      pointRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+      x: { grid: { display: false } }
+    }
+  }
 });
 
-new Chart(document.getElementById('contentPieChart'), {
-  type: 'doughnut',
-  data: { labels: ['Articles', 'Events', 'Magazines', 'Resources'], datasets: [{ data: [{{ total_articles }}, {{ total_events }}, {{ total_magazines }}, {{ total_resources }}], backgroundColor: ['#000', '#745b17', '#c5c6cd', '#e5c374'] }] },
-  options: { responsive: true, plugins: { legend: { display: false } }, cutout: '70%' }
-});
+// Nationality Bar Chart
+const natLabels = {{ nat_labels_json|safe }};
+const natCounts = {{ nat_counts_json|safe }};
+
+if (natLabels.length > 0) {
+  new Chart(document.getElementById('nationalityChart'), {
+    type: 'bar',
+    data: {
+      labels: natLabels,
+      datasets: [{
+        label: 'Users',
+        data: natCounts,
+        backgroundColor: '#1EB53A',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('nationalityChart').parentElement.innerHTML += '<p class="text-sm text-center text-on-surface-variant mt-4">No nationality data yet</p>';
+}
+
+// IP Geolocation Bar Chart
+const ipLabels = {{ ip_labels_json|safe }};
+const ipCounts = {{ ip_counts_json|safe }};
+
+if (ipLabels.length > 0) {
+  new Chart(document.getElementById('ipGeoChart'), {
+    type: 'bar',
+    data: {
+      labels: ipLabels,
+      datasets: [{
+        label: 'Sessions',
+        data: ipCounts,
+        backgroundColor: '#745B17',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+} else {
+  document.getElementById('ipGeoChart').parentElement.innerHTML += '<p class="text-sm text-center text-on-surface-variant mt-4">No geolocation data yet. Sessions will appear as users interact with the API.</p>';
+}
+
+// Device OS Pie Chart
+const osLabels = {{ os_labels_json|safe }};
+const osCounts = {{ os_counts_json|safe }};
+
+const osColors = ['#000000', '#745B17', '#1EB53A', '#e5c374', '#c5c6cd', '#64748b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+if (osLabels.length > 0) {
+  new Chart(document.getElementById('osChart'), {
+    type: 'doughnut',
+    data: {
+      labels: osLabels,
+      datasets: [{
+        data: osCounts,
+        backgroundColor: osColors.slice(0, osLabels.length),
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 12 }
+        }
+      },
+      cutout: '65%'
+    }
+  });
+} else {
+  document.getElementById('osChart').parentElement.innerHTML += '<p class="text-sm text-center text-on-surface-variant mt-4">No device data yet</p>';
+}
 </script>
 {% endblock %}

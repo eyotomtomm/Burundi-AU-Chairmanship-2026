@@ -72,3 +72,6 @@ credentials/
 
 #markdown
 *.md/
+
+# GeoIP database files
+geoip/*.mmdb

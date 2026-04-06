@@ -271,6 +271,7 @@ class Article(models.Model):
     publish_date = models.DateTimeField()
     is_featured = models.BooleanField(default=False)
     view_count = models.PositiveIntegerField(default=0)
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1621,3 +1622,30 @@ class Popup(models.Model):
             return False
         from django.utils import timezone
         return timezone.now() > self.expires_at
+
+
+class UserSession(models.Model):
+    """Tracks user sessions with geolocation data for analytics."""
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sessions')
+    ip_address = models.GenericIPAddressField()
+    country_code = models.CharField(max_length=5, blank=True, db_index=True)
+    country_name = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    user_nationality = models.CharField(max_length=5, blank=True, db_index=True, help_text='Snapshot from UserProfile at session time')
+    device_type = models.CharField(max_length=50, blank=True)
+    device_os = models.CharField(max_length=50, blank=True)
+    app_version = models.CharField(max_length=20, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'User Session'
+        verbose_name_plural = 'User Sessions'
+        indexes = [
+            models.Index(fields=['country_code', 'created_at']),
+            models.Index(fields=['user_nationality', 'created_at']),
+        ]
+
+    def __str__(self):
+        user_str = self.user.username if self.user else 'anonymous'
+        return f"{user_str} from {self.country_name or self.ip_address} at {self.created_at}"

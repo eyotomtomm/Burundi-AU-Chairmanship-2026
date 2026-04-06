@@ -9,6 +9,8 @@ import '../../services/api_service.dart';
 import 'package:provider/provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/events/event_countdown.dart';
+import '../../widgets/events/event_info_card.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -208,11 +210,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Countdown timer
-                  _buildCountdownSection(context, isDark),
+                  EventCountdown(
+                    event: _event,
+                    timeLeft: _timeLeft,
+                    isDark: isDark,
+                  ),
                   const SizedBox(height: 20),
 
                   // Event info card
-                  _buildEventInfoCard(context, langCode, isDark),
+                  EventInfoCard(
+                    event: _event,
+                    langCode: langCode,
+                    isDark: isDark,
+                  ),
                   const SizedBox(height: 20),
 
                   // Registration section
@@ -608,223 +618,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
-  // ── Countdown Section ─────────────────────────────────────
 
-  Widget _buildCountdownSection(BuildContext context, bool isDark) {
-    if (_event.eventDate == null) return const SizedBox.shrink();
-
-    final isPast = _event.isEventPast;
-
-    if (isPast) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_busy, color: Colors.grey.shade600),
-            const SizedBox(width: 8),
-            Text(
-              'Event Ended',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_timeLeft == null) return const SizedBox.shrink();
-
-    final days = _timeLeft!.inDays;
-    final hours = _timeLeft!.inHours % 24;
-    final minutes = _timeLeft!.inMinutes % 60;
-    final seconds = _timeLeft!.inSeconds % 60;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'Event Starts In',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _countdownBox('$days', 'Days'),
-              _countdownDivider(),
-              _countdownBox(hours.toString().padLeft(2, '0'), 'Hours'),
-              _countdownDivider(),
-              _countdownBox(minutes.toString().padLeft(2, '0'), 'Min'),
-              _countdownDivider(),
-              _countdownBox(seconds.toString().padLeft(2, '0'), 'Sec'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _countdownBox(String value, String label) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
-        ),
-      ],
-    );
-  }
-
-  Widget _countdownDivider() {
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 16),
-      child: Text(
-        ':',
-        style: TextStyle(
-          color: Colors.white70,
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  // ── Event Info Card ───────────────────────────────────────
-
-  Widget _buildEventInfoCard(BuildContext context, String langCode, bool isDark) {
-    final description = _event.getDescription(langCode);
-    final venue = _event.getVenue(langCode);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (description.isNotEmpty) ...[
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: isDark ? Colors.white70 : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Date
-          if (_event.eventDate != null)
-            _infoRow(
-              Icons.calendar_today,
-              _formatFullDate(_event.eventDate!),
-              isDark,
-            ),
-
-          // End date
-          if (_event.eventEndDate != null) ...[
-            const SizedBox(height: 10),
-            _infoRow(
-              Icons.event_available,
-              'Until ${_formatFullDate(_event.eventEndDate!)}',
-              isDark,
-            ),
-          ],
-
-          // Venue
-          if (venue.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _infoRow(Icons.location_on, venue, isDark),
-          ],
-
-          // Directions button
-          if (_event.venueAddress.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _openDirections,
-                icon: const Icon(Icons.directions, size: 18),
-                label: const Text('Get Directions'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.burundiGreen,
-                  side: const BorderSide(color: AppColors.burundiGreen),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String text, bool isDark) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: AppColors.burundiGreen),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? Colors.white70 : Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   // ── Registration Section ──────────────────────────────────
 
@@ -1510,14 +1304,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   // ── Actions ───────────────────────────────────────────────
-
-  void _openDirections() {
-    final address = Uri.encodeComponent(_event.venueAddress);
-    launchUrl(
-      Uri.parse('https://www.google.com/maps/search/?api=1&query=$address'),
-      mode: LaunchMode.externalApplication,
-    );
-  }
 
   Future<void> _submitRegistration(String langCode) async {
     if (!_formKey.currentState!.validate()) return;

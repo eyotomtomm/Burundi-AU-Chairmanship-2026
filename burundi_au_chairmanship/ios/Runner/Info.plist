@@ -53,8 +53,6 @@
 	<string>We need permission to save photos from the app to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to allow you to select photos for your profile.</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>This app does not track you across other companies' apps or websites. We only collect data necessary for app functionality.</string>
 	<!-- Certificate pinning for API domain (iOS 14+) -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

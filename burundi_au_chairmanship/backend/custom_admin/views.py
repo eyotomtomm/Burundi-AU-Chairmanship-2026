@@ -1,10 +1,11 @@
+import csv
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.db.models import Count, Q, Sum
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -24,6 +25,7 @@ from core.models import (
     Poll, PollOption, Discussion, ContactDirectory, AnnouncementBanner,
     EmailTemplate, EventSpeaker, OnboardingStep, Webhook,
     ScheduledMaintenance, LoginHistory, Bookmark, Reaction,
+    TranslationEntry,
 )
 
 
@@ -59,6 +61,7 @@ def admin_logout(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def dashboard(request):
+    import json
     from datetime import timedelta
     users_count = User.objects.count()
     articles_count = Article.objects.count()
@@ -83,6 +86,36 @@ def dashboard(request):
         last_active__gte=timezone.now() - td(minutes=5)
     ).count()
 
+    # --- User growth (last 30 days) ---
+    now = timezone.now()
+    growth_labels = []
+    growth_data = []
+    for i in range(29, -1, -1):
+        day = (now - timedelta(days=i)).date()
+        growth_labels.append(day.strftime('%b %d'))
+        growth_data.append(User.objects.filter(date_joined__date=day).count())
+
+    # --- Content engagement ---
+    article_views = Article.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    article_likes = Article.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    magazine_views = MagazineEdition.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    video_count = Video.objects.count()
+
+    # --- Top countries ---
+    nationality_data = list(
+        UserProfile.objects.exclude(nationality='')
+        .values('nationality')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:8]
+    )
+    country_labels = [d['nationality'] for d in nationality_data]
+    country_counts = [d['count'] for d in nationality_data]
+
+    # --- Verification status ---
+    verified_count = UserProfile.objects.filter(is_verified=True).count()
+    pending_verif = VerificationRequest.objects.filter(status='pending').count()
+    unverified_count = users_count - verified_count
+
     stats = {
         'users': users_count,
         'articles': articles_count,
@@ -98,6 +131,18 @@ def dashboard(request):
         'deletion_scheduled': deletion_scheduled,
         'deactivated_users': deactivated_users,
         'live_users': live_users,
+        # Chart data (JSON-serialized)
+        'growth_labels_json': json.dumps(growth_labels),
+        'growth_data_json': json.dumps(growth_data),
+        'article_views': article_views,
+        'article_likes': article_likes,
+        'magazine_views': magazine_views,
+        'video_count': video_count,
+        'country_labels_json': json.dumps(country_labels),
+        'country_counts_json': json.dumps(country_counts),
+        'verified_count': verified_count,
+        'pending_verif': pending_verif,
+        'unverified_count': unverified_count,
     }
     return render(request, 'custom_admin/dashboard.html', stats)
 
@@ -2824,3 +2869,325 @@ def maintenance_delete(request, pk):
     window.delete()
     messages.success(request, 'Maintenance window deleted successfully!')
     return redirect('custom_admin:maintenance_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  AUDIT LOG
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def admin_audit_log(request):
+    logs = AuditLogEntry.objects.all().select_related('user').order_by('-timestamp')
+
+    # Filters
+    user_filter = request.GET.get('user')
+    action_filter = request.GET.get('action')
+    model_filter = request.GET.get('model')
+
+    if user_filter:
+        logs = logs.filter(
+            Q(user__username__icontains=user_filter) |
+            Q(user__email__icontains=user_filter)
+        )
+    if action_filter:
+        logs = logs.filter(action=action_filter)
+    if model_filter:
+        logs = logs.filter(entity_type__icontains=model_filter)
+
+    # Get distinct values for filter dropdowns
+    action_choices = AuditLogEntry.ACTION_CHOICES
+    entity_types = (
+        AuditLogEntry.objects.values_list('entity_type', flat=True)
+        .distinct()
+        .order_by('entity_type')
+    )
+
+    paginator = Paginator(logs, 30)
+    page = request.GET.get('page')
+    logs = paginator.get_page(page)
+
+    return render(request, 'custom_admin/audit_log/list.html', {
+        'logs': logs,
+        'action_choices': action_choices,
+        'entity_types': entity_types,
+        'current_user_filter': user_filter or '',
+        'current_action_filter': action_filter or '',
+        'current_model_filter': model_filter or '',
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  BULK ACTIONS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def bulk_user_action(request):
+    action = request.POST.get('bulk_action')
+    user_ids = request.POST.getlist('selected_ids')
+
+    if not user_ids:
+        messages.warning(request, 'No users selected.')
+        return redirect('custom_admin:users_list')
+
+    users = User.objects.filter(pk__in=user_ids)
+    # Prevent bulk actions on superusers
+    users = users.filter(is_superuser=False)
+    count = users.count()
+
+    if action == 'activate':
+        users.update(is_active=True)
+        messages.success(request, f'{count} user(s) activated successfully.')
+    elif action == 'deactivate':
+        users.update(is_active=False)
+        messages.success(request, f'{count} user(s) deactivated successfully.')
+    elif action == 'delete':
+        if not request.user.is_superuser:
+            messages.error(request, 'Only superusers can bulk delete users.')
+            return redirect('custom_admin:users_list')
+        users.delete()
+        messages.success(request, f'{count} user(s) deleted successfully.')
+    else:
+        messages.error(request, 'Invalid action.')
+
+    return redirect('custom_admin:users_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def bulk_content_action(request):
+    action = request.POST.get('bulk_action')
+    article_ids = request.POST.getlist('selected_ids')
+
+    if not article_ids:
+        messages.warning(request, 'No articles selected.')
+        return redirect('custom_admin:articles_list')
+
+    articles = Article.objects.filter(pk__in=article_ids)
+    count = articles.count()
+
+    if action == 'activate':
+        articles.update(is_featured=True)
+        messages.success(request, f'{count} article(s) set to featured.')
+    elif action == 'deactivate':
+        articles.update(is_featured=False)
+        messages.success(request, f'{count} article(s) unfeatured.')
+    elif action == 'delete':
+        articles.delete()
+        messages.success(request, f'{count} article(s) deleted successfully.')
+    else:
+        messages.error(request, 'Invalid action.')
+
+    return redirect('custom_admin:articles_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  GLOBAL SEARCH
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def admin_global_search(request):
+    query = request.GET.get('q', '').strip()
+    results = {
+        'users': [],
+        'articles': [],
+        'events': [],
+        'tickets': [],
+    }
+
+    if query and len(query) >= 2:
+        results['users'] = User.objects.filter(
+            Q(username__icontains=query) |
+            Q(email__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query)
+        ).select_related('profile')[:20]
+
+        results['articles'] = Article.objects.filter(
+            Q(title__icontains=query) |
+            Q(title_fr__icontains=query) |
+            Q(content__icontains=query) |
+            Q(author__icontains=query)
+        )[:20]
+
+        results['events'] = Event.objects.filter(
+            Q(name__icontains=query) |
+            Q(name_fr__icontains=query) |
+            Q(description__icontains=query) |
+            Q(address__icontains=query)
+        )[:20]
+
+        results['tickets'] = SupportTicket.objects.filter(
+            Q(subject__icontains=query) |
+            Q(user__username__icontains=query) |
+            Q(user__email__icontains=query)
+        ).select_related('user')[:20]
+
+    total_results = sum(len(v) for v in results.values())
+
+    return render(request, 'custom_admin/search_results.html', {
+        'query': query,
+        'results': results,
+        'total_results': total_results,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EXPORT REPORTS (CSV)
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def export_users_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'ID', 'Username', 'Email', 'First Name', 'Last Name',
+        'Is Active', 'Is Staff', 'Is Superuser', 'Date Joined',
+        'Last Login', 'Nationality', 'Gender', 'Is Verified',
+    ])
+
+    users = User.objects.all().select_related('profile').order_by('-date_joined')
+    for user in users:
+        profile = getattr(user, 'profile', None)
+        writer.writerow([
+            user.id,
+            user.username,
+            user.email,
+            user.first_name,
+            user.last_name,
+            user.is_active,
+            user.is_staff,
+            user.is_superuser,
+            user.date_joined.strftime('%Y-%m-%d %H:%M:%S') if user.date_joined else '',
+            user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '',
+            profile.nationality if profile else '',
+            profile.gender if profile else '',
+            profile.is_verified if profile else False,
+        ])
+
+    # Log the export
+    AuditLogEntry.objects.create(
+        user=request.user,
+        action='EXPORT',
+        entity_type='User',
+        entity_label=f'CSV export of {users.count()} users',
+        status='success',
+    )
+
+    return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def export_analytics_csv(request):
+    from datetime import timedelta
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="analytics_export.csv"'
+
+    writer = csv.writer(response)
+    now = timezone.now()
+
+    # Summary section
+    writer.writerow(['=== ANALYTICS SUMMARY ==='])
+    writer.writerow(['Metric', 'Value'])
+    writer.writerow(['Total Users', User.objects.count()])
+    writer.writerow(['Active Users (30 days)', User.objects.filter(last_login__gte=now - timedelta(days=30)).count()])
+    writer.writerow(['Active Users (7 days)', User.objects.filter(last_login__gte=now - timedelta(days=7)).count()])
+    writer.writerow(['Total Articles', Article.objects.count()])
+    writer.writerow(['Total Events', Event.objects.count()])
+    writer.writerow(['Total Magazines', MagazineEdition.objects.count()])
+    writer.writerow(['Total Videos', Video.objects.count()])
+    writer.writerow(['Active Live Feeds', LiveFeed.objects.filter(status='live').count()])
+    writer.writerow(['Open Support Tickets', SupportTicket.objects.filter(status='open').count()])
+    writer.writerow([])
+
+    # User growth (last 30 days)
+    writer.writerow(['=== USER GROWTH (Last 30 Days) ==='])
+    writer.writerow(['Date', 'New Users'])
+    for i in range(30, -1, -1):
+        day = (now - timedelta(days=i)).date()
+        count = User.objects.filter(date_joined__date=day).count()
+        writer.writerow([day.strftime('%Y-%m-%d'), count])
+    writer.writerow([])
+
+    # Top countries
+    writer.writerow(['=== TOP COUNTRIES BY NATIONALITY ==='])
+    writer.writerow(['Country', 'User Count'])
+    nationality_data = (
+        UserProfile.objects.exclude(nationality='')
+        .values('nationality')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:20]
+    )
+    for entry in nationality_data:
+        writer.writerow([entry['nationality'], entry['count']])
+    writer.writerow([])
+
+    # Content engagement
+    writer.writerow(['=== CONTENT ENGAGEMENT ==='])
+    writer.writerow(['Content Type', 'Total Views', 'Total Likes'])
+    article_views = Article.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    article_likes = Article.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    magazine_views = MagazineEdition.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    writer.writerow(['Articles', article_views, article_likes])
+    writer.writerow(['Magazines', magazine_views, 'N/A'])
+
+    # Log the export
+    AuditLogEntry.objects.create(
+        user=request.user,
+        action='EXPORT',
+        entity_type='AnalyticsReport',
+        entity_label='CSV analytics export',
+        status='success',
+    )
+
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TRANSLATION MANAGER
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def translation_manager(request):
+    translations = TranslationEntry.objects.all().order_by('-updated_at')
+
+    status_filter = request.GET.get('status')
+    if status_filter:
+        translations = translations.filter(status=status_filter)
+
+    search = request.GET.get('search')
+    if search:
+        translations = translations.filter(
+            Q(key__icontains=search) |
+            Q(source_text__icontains=search) |
+            Q(translated_text__icontains=search)
+        )
+
+    total_count = TranslationEntry.objects.count()
+    pending_count = TranslationEntry.objects.filter(status='pending').count()
+    completed_count = TranslationEntry.objects.filter(status='completed').count()
+    reviewed_count = TranslationEntry.objects.filter(status='reviewed').count()
+
+    paginator = Paginator(translations, 20)
+    page = request.GET.get('page')
+    translations = paginator.get_page(page)
+
+    return render(request, 'custom_admin/translations/manager.html', {
+        'translations': translations,
+        'total_count': total_count,
+        'pending_count': pending_count,
+        'completed_count': completed_count,
+        'reviewed_count': reviewed_count,
+        'current_status': status_filter or '',
+        'current_search': search or '',
+    })

@@ -96,6 +96,19 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     <p class="text-slate-400 text-xs tracking-widest uppercase ml-13 font-label">2026-2027</p>
   </div>
 
+  <!-- Search Bar -->
+  <div class="px-4 mb-6">
+    <form method="get" action="{% url 'custom_admin:global_search' %}" class="relative">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+      <input
+        type="text"
+        name="q"
+        placeholder="Search everything..."
+        class="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-transparent focus:outline-none"
+      />
+    </form>
+  </div>
+
   <nav class="flex-1 space-y-1">
     {% with url_name=request.resolver_match.url_name %}
 
@@ -201,6 +214,16 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics' %}">
       <span class="material-symbols-outlined">analytics</span>
       <span class="text-sm tracking-wide font-headline">Analytics</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'audit_log' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:audit_log' %}">
+      <span class="material-symbols-outlined">history</span>
+      <span class="text-sm tracking-wide font-headline">Audit Log</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'translation_manager' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:translation_manager' %}">
+      <span class="material-symbols-outlined">translate</span>
+      <span class="text-sm tracking-wide font-headline">Translations</span>
     </a>
 
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'app_settings' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:app_settings' %}">

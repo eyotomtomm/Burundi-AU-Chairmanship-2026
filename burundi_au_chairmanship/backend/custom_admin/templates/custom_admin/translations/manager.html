@@ -1,0 +1,320 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Translation Manager - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-on-surface font-headline flex items-center gap-3">
+          <span class="material-symbols-outlined text-4xl text-purple-600">translate</span>
+          Translation Manager
+        </h1>
+        <p class="mt-2 text-sm text-on-surface-variant">Manage multilingual content with auto-translation support</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
+      <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total</p>
+      <p class="text-2xl font-bold mt-1">{{ total_count }}</p>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 border-l-4 border-amber-500">
+      <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Pending</p>
+      <p class="text-2xl font-bold mt-1">{{ pending_count }}</p>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 border-l-4 border-emerald-500">
+      <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Completed</p>
+      <p class="text-2xl font-bold mt-1">{{ completed_count }}</p>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
+      <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Reviewed</p>
+      <p class="text-2xl font-bold mt-1">{{ reviewed_count }}</p>
+    </div>
+  </div>
+
+  <!-- Auto-Translation Tool -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mb-8 border border-purple-100">
+    <div class="flex items-center gap-2 mb-6">
+      <span class="material-symbols-outlined text-purple-600">auto_awesome</span>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Auto-Translate with AI</h2>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Source -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Source Language</label>
+          <select id="sourceLang" class="bg-surface-container-low border-0 rounded-lg py-1.5 px-3 focus:ring-2 focus:ring-secondary text-sm font-medium">
+            <option value="en">English</option>
+            <option value="fr">French</option>
+            <option value="rn">Kirundi</option>
+          </select>
+        </div>
+        <textarea
+          id="sourceText"
+          rows="8"
+          placeholder="Enter text to translate..."
+          class="w-full bg-surface-container-low border-0 rounded-xl py-4 px-5 focus:ring-2 focus:ring-secondary text-sm resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Target -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">Target Language</label>
+          <select id="targetLang" class="bg-surface-container-low border-0 rounded-lg py-1.5 px-3 focus:ring-2 focus:ring-secondary text-sm font-medium">
+            <option value="fr">French</option>
+            <option value="en">English</option>
+            <option value="rn">Kirundi</option>
+          </select>
+        </div>
+        <textarea
+          id="targetText"
+          rows="8"
+          placeholder="Translation will appear here..."
+          class="w-full bg-surface-container-low border-0 rounded-xl py-4 px-5 focus:ring-2 focus:ring-secondary text-sm resize-none"
+          readonly
+        ></textarea>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mt-6">
+      <p id="translateStatus" class="text-sm text-on-surface-variant"></p>
+      <div class="flex gap-3">
+        <button onclick="swapLanguages()" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-2.5 px-5 font-medium transition-colors text-sm inline-flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">swap_horiz</span>
+          Swap
+        </button>
+        <button onclick="copyTranslation()" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-2.5 px-5 font-medium transition-colors text-sm inline-flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">content_copy</span>
+          Copy
+        </button>
+        <button id="translateBtn" onclick="autoTranslate()" class="bg-purple-600 text-white hover:bg-purple-700 rounded-lg py-2.5 px-6 font-medium transition-colors text-sm inline-flex items-center gap-2 shadow-sm">
+          <span class="material-symbols-outlined text-sm">auto_awesome</span>
+          Auto-Translate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter and Search -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="flex flex-col md:flex-row gap-4">
+      <div class="flex-1 relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+        <input
+          type="text"
+          name="search"
+          value="{{ current_search }}"
+          placeholder="Search by key, source text, or translation..."
+          class="w-full bg-surface-container-low border-0 rounded-lg py-3 pl-12 pr-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+      <select name="status" class="bg-surface-container-low border-0 rounded-lg py-3 px-4 focus:ring-2 focus:ring-secondary text-sm">
+        <option value="">All Statuses</option>
+        <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+        <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>In Progress</option>
+        <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Completed</option>
+        <option value="reviewed" {% if current_status == 'reviewed' %}selected{% endif %}>Reviewed</option>
+      </select>
+      <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium transition-colors text-sm">
+        Filter
+      </button>
+      {% if current_search or current_status %}
+      <a href="{% url 'custom_admin:translation_manager' %}" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-3 px-4 font-medium transition-colors text-sm text-center">
+        Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Translations Table -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if translations %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Key</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Source (EN)</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Translation (FR)</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Context</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Status</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Updated</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for t in translations %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-4 px-6">
+              <code class="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded font-mono">{{ t.key }}</code>
+            </td>
+            <td class="py-4 px-6 text-sm text-on-surface max-w-xs">
+              <p class="truncate">{{ t.source_text }}</p>
+            </td>
+            <td class="py-4 px-6 text-sm text-on-surface-variant max-w-xs">
+              {% if t.translated_text %}
+              <p class="truncate">{{ t.translated_text }}</p>
+              {% if t.auto_translated %}
+              <span class="inline-flex items-center gap-1 mt-1 text-xs text-purple-600">
+                <span class="material-symbols-outlined text-xs">auto_awesome</span>
+                Auto-translated
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="text-xs text-slate-400 italic">Not translated</span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6 text-sm text-on-surface-variant">{{ t.context|default:"-" }}</td>
+            <td class="py-4 px-6">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                {% if t.status == 'pending' %}bg-amber-50 text-amber-600
+                {% elif t.status == 'in_progress' %}bg-blue-50 text-blue-600
+                {% elif t.status == 'completed' %}bg-emerald-50 text-emerald-600
+                {% elif t.status == 'reviewed' %}bg-purple-50 text-purple-600
+                {% endif %}">
+                {{ t.get_status_display }}
+              </span>
+            </td>
+            <td class="py-4 px-6 text-xs text-on-surface-variant whitespace-nowrap">{{ t.updated_at|date:"M d, Y" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+      <span class="material-symbols-outlined text-6xl text-on-surface-variant mb-4">translate</span>
+      <p class="text-on-surface-variant text-lg">No translation entries found</p>
+      <p class="text-sm text-slate-400 mt-2">Translation entries are created when content needs multilingual support</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Pagination -->
+  {% if translations.has_other_pages %}
+  <div class="flex items-center justify-center gap-2 mt-8">
+    {% if translations.has_previous %}
+    <a href="?page={{ translations.previous_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Previous</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm font-bold text-on-surface-variant">Page {{ translations.number }} of {{ translations.paginator.num_pages }}</span>
+    {% if translations.has_next %}
+    <a href="?page={{ translations.next_page_number }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function autoTranslate() {
+  const sourceText = document.getElementById('sourceText').value.trim();
+  const sourceLang = document.getElementById('sourceLang').value;
+  const targetLang = document.getElementById('targetLang').value;
+  const statusEl = document.getElementById('translateStatus');
+  const btn = document.getElementById('translateBtn');
+
+  if (!sourceText) {
+    statusEl.textContent = 'Please enter text to translate.';
+    statusEl.className = 'text-sm text-red-600';
+    return;
+  }
+
+  if (sourceLang === targetLang) {
+    statusEl.textContent = 'Source and target languages must be different.';
+    statusEl.className = 'text-sm text-red-600';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Translating...';
+  statusEl.textContent = 'Sending request...';
+  statusEl.className = 'text-sm text-blue-600';
+
+  fetch('/api/admin/auto-translate/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken'),
+    },
+    body: JSON.stringify({
+      text: sourceText,
+      source_language: sourceLang,
+      target_language: targetLang,
+    }),
+  })
+  .then(function(response) {
+    if (!response.ok) throw new Error('Translation request failed (status ' + response.status + ')');
+    return response.json();
+  })
+  .then(function(data) {
+    if (data.translated_text) {
+      document.getElementById('targetText').value = data.translated_text;
+      statusEl.textContent = 'Translation completed successfully.';
+      statusEl.className = 'text-sm text-emerald-600';
+    } else if (data.error) {
+      statusEl.textContent = 'Error: ' + data.error;
+      statusEl.className = 'text-sm text-red-600';
+    } else {
+      statusEl.textContent = 'Unexpected response format.';
+      statusEl.className = 'text-sm text-amber-600';
+    }
+  })
+  .catch(function(err) {
+    statusEl.textContent = 'Error: ' + err.message;
+    statusEl.className = 'text-sm text-red-600';
+  })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm">auto_awesome</span> Auto-Translate';
+  });
+}
+
+function swapLanguages() {
+  const srcLang = document.getElementById('sourceLang');
+  const tgtLang = document.getElementById('targetLang');
+  const srcText = document.getElementById('sourceText');
+  const tgtText = document.getElementById('targetText');
+
+  const tmpLang = srcLang.value;
+  srcLang.value = tgtLang.value;
+  tgtLang.value = tmpLang;
+
+  const tmpText = srcText.value;
+  srcText.value = tgtText.value;
+  tgtText.value = tmpText;
+}
+
+function copyTranslation() {
+  const text = document.getElementById('targetText').value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() {
+    const statusEl = document.getElementById('translateStatus');
+    statusEl.textContent = 'Copied to clipboard!';
+    statusEl.className = 'text-sm text-emerald-600';
+    setTimeout(function() { statusEl.textContent = ''; }, 2000);
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>
+{% endblock %}

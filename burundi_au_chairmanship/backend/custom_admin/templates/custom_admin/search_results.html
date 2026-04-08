@@ -1,0 +1,218 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Search Results - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-on-surface font-headline flex items-center gap-3">
+      <span class="material-symbols-outlined text-4xl text-blue-600">search</span>
+      Search Results
+    </h1>
+    {% if query %}
+    <p class="mt-2 text-sm text-on-surface-variant">
+      Found <strong>{{ total_results }}</strong> result{{ total_results|pluralize }} for "<strong>{{ query }}</strong>"
+    </p>
+    {% endif %}
+  </div>
+
+  <!-- Search Bar -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 mb-8">
+    <form method="get" action="{% url 'custom_admin:global_search' %}" class="flex gap-4">
+      <div class="flex-1 relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+        <input
+          type="text"
+          name="q"
+          value="{{ query }}"
+          placeholder="Search across users, articles, events, tickets..."
+          class="w-full bg-surface-container-low border-0 rounded-lg py-3 pl-12 pr-4 focus:ring-2 focus:ring-secondary text-sm"
+          autofocus
+        />
+      </div>
+      <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium transition-colors">
+        Search
+      </button>
+    </form>
+  </div>
+
+  {% if query and total_results == 0 %}
+  <div class="text-center py-16 bg-surface-container-lowest rounded-xl shadow-sm">
+    <span class="material-symbols-outlined text-6xl text-slate-300 mb-4">search_off</span>
+    <p class="text-lg text-slate-500">No results found for "{{ query }}"</p>
+    <p class="text-sm text-slate-400 mt-2">Try different keywords or check spelling</p>
+  </div>
+  {% endif %}
+
+  {% if results.users %}
+  <!-- Users Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-blue-600">group</span>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Users ({{ results.users|length }})</h2>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">User</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Email</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Status</th>
+            <th class="text-right py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for user in results.users %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-6">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">{{ user.username|first|upper }}</div>
+                <div>
+                  <p class="text-sm font-medium text-on-surface">{{ user.username }}</p>
+                  <p class="text-xs text-slate-400">{{ user.first_name }} {{ user.last_name }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ user.email }}</td>
+            <td class="py-3 px-6">
+              {% if user.is_active %}
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">Active</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">Blocked</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-6 text-right">
+              <a href="{% url 'custom_admin:user_edit' user.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.articles %}
+  <!-- Articles Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-amber-600">article</span>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Articles ({{ results.articles|length }})</h2>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Title</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Author</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Created</th>
+            <th class="text-right py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for article in results.articles %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-6">
+              <p class="text-sm font-medium text-on-surface">{{ article.title }}</p>
+              {% if article.title_fr %}<p class="text-xs text-slate-400">{{ article.title_fr }}</p>{% endif %}
+            </td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ article.author|default:"Admin" }}</td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ article.created_at|date:"M d, Y" }}</td>
+            <td class="py-3 px-6 text-right">
+              <a href="{% url 'custom_admin:article_edit' article.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.events %}
+  <!-- Events Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-purple-600">event</span>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Events ({{ results.events|length }})</h2>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Name</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Date</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Status</th>
+            <th class="text-right py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for event in results.events %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-6">
+              <p class="text-sm font-medium text-on-surface">{{ event.name }}</p>
+              <p class="text-xs text-slate-400">{{ event.address|truncatewords:6 }}</p>
+            </td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ event.event_date|date:"M d, Y" }}</td>
+            <td class="py-3 px-6">
+              {% if event.is_active %}
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">Active</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">Draft</span>
+              {% endif %}
+            </td>
+            <td class="py-3 px-6 text-right">
+              <a href="{% url 'custom_admin:event_edit' event.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.tickets %}
+  <!-- Tickets Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-red-600">support_agent</span>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Support Tickets ({{ results.tickets|length }})</h2>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Subject</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">User</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Status</th>
+            <th class="text-right py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for ticket in results.tickets %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-6 text-sm font-medium text-on-surface">{{ ticket.subject }}</td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ ticket.user.username }}</td>
+            <td class="py-3 px-6">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold
+                {% if ticket.status == 'open' %}bg-blue-50 text-blue-600
+                {% elif ticket.status == 'in_progress' %}bg-amber-50 text-amber-600
+                {% elif ticket.status == 'resolved' %}bg-emerald-50 text-emerald-600
+                {% else %}bg-slate-100 text-slate-500{% endif %}">
+                {{ ticket.status|title }}
+              </span>
+            </td>
+            <td class="py-3 px-6 text-right">
+              <a href="{% url 'custom_admin:support_ticket_detail' ticket.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

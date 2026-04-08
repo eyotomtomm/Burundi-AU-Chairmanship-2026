@@ -40,6 +40,32 @@
     </form>
   </div>
 
+  <!-- Bulk Action Bar -->
+  <form id="bulkArticleForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
+    {% csrf_token %}
+    <div id="bulkArticleBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-blue-600">checklist</span>
+        <span class="text-sm font-medium text-blue-800">
+          <span id="articleSelectedCount">0</span> article(s) selected
+        </span>
+      </div>
+      <div class="flex items-center gap-3">
+        <select name="bulk_action" class="bg-white border border-slate-300 rounded-lg py-2 px-4 text-sm focus:ring-2 focus:ring-blue-500">
+          <option value="">Choose action...</option>
+          <option value="activate">Set Featured</option>
+          <option value="deactivate">Remove Featured</option>
+          <option value="delete">Delete Selected</option>
+        </select>
+        <button type="submit" onclick="return confirmArticleBulkAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2 px-5 text-sm transition-colors">
+          Apply
+        </button>
+        <button type="button" onclick="clearArticleSelection()" class="text-slate-500 hover:text-slate-700 text-sm font-medium">
+          Cancel
+        </button>
+      </div>
+    </div>
+
   <!-- Articles List -->
   <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
     {% if articles %}
@@ -47,6 +73,9 @@
       <table class="w-full">
         <thead class="bg-surface-container-low border-b border-outline-variant">
           <tr>
+            <th class="text-left py-4 px-4">
+              <input type="checkbox" id="selectAllArticles" onchange="toggleAllArticles(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            </th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Image</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Title</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Category</th>
@@ -59,6 +88,9 @@
         <tbody class="divide-y divide-outline-variant">
           {% for article in articles %}
           <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-4 px-4">
+              <input type="checkbox" name="selected_ids" value="{{ article.pk }}" class="article-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" onchange="updateArticleBulkBar()" />
+            </td>
             <td class="py-4 px-6">
               {% if article.image %}
               <img src="{{ article.image.url }}" alt="{{ article.title }}" class="w-16 h-16 object-cover rounded-lg shadow-sm" />
@@ -146,5 +178,48 @@
     {% endif %}
   </div>
   {% endif %}
+  </form><!-- end bulk action form -->
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllArticles(el) {
+    var checkboxes = document.querySelectorAll('.article-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+    updateArticleBulkBar();
+}
+
+function updateArticleBulkBar() {
+    var checked = document.querySelectorAll('.article-checkbox:checked');
+    var bar = document.getElementById('bulkArticleBar');
+    var count = document.getElementById('articleSelectedCount');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearArticleSelection() {
+    var checkboxes = document.querySelectorAll('.article-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAllArticles').checked = false;
+    updateArticleBulkBar();
+}
+
+function confirmArticleBulkAction() {
+    var action = document.querySelector('#bulkArticleForm select[name="bulk_action"]').value;
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    var count = document.querySelectorAll('.article-checkbox:checked').length;
+    if (action === 'delete') {
+        return confirm('Are you sure you want to permanently delete ' + count + ' article(s)? This cannot be undone.');
+    }
+    return confirm('Apply "' + action + '" to ' + count + ' article(s)?');
+}
+</script>
 {% endblock %}

@@ -333,25 +333,49 @@ class _EventCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // Set Reminder button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: onAddToCalendar,
-                        icon: const Icon(Icons.notifications_outlined, size: 16),
-                        label: Text(
-                          langCode == 'fr' ? 'Définir un rappel' : 'Set Reminder',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.burundiGreen,
-                          side: const BorderSide(color: AppColors.burundiGreen),
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                    // Action buttons row
+                    Row(
+                      children: [
+                        // Add to Calendar button
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: onAddToCalendar,
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: Text(
+                              langCode == 'fr' ? 'Ajouter au calendrier' : 'Add to Calendar',
+                              style: const TextStyle(fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.burundiGreen,
+                              side: const BorderSide(color: AppColors.burundiGreen),
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        // Set Reminder button
+                        OutlinedButton.icon(
+                          onPressed: onAddToCalendar,
+                          icon: const Icon(Icons.notifications_outlined, size: 16),
+                          label: Text(
+                            langCode == 'fr' ? 'Rappel' : 'Remind',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.auGold,
+                            side: const BorderSide(color: AppColors.auGold),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

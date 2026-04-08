@@ -66,6 +66,10 @@ class _HomeTabState extends State<HomeTab> {
   bool _isLoading = true;
   bool _hasError = false;
 
+  // Announcement banner
+  Map<String, dynamic>? _announcementBanner;
+  bool _announcementDismissed = false;
+
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
     if (_apiHeroSlides != null && _apiHeroSlides!.isNotEmpty) {
@@ -115,6 +119,7 @@ class _HomeTabState extends State<HomeTab> {
     super.initState();
     _loadData();
     _loadUnreadCount();
+    _loadAnnouncementBanner();
     _startHeroAutoSlide();
     _startFeatureAutoSlide();
     // Poll unread count every 60 seconds
@@ -130,6 +135,18 @@ class _HomeTabState extends State<HomeTab> {
       if (mounted) setState(() => _unreadBadgeCount = count);
     } catch (_) {
       // Silently fail - badge is non-critical
+    }
+  }
+
+  Future<void> _loadAnnouncementBanner() async {
+    try {
+      final api = ApiService();
+      final banners = await api.getAnnouncementBanners();
+      if (banners.isNotEmpty && mounted) {
+        setState(() => _announcementBanner = banners.first);
+      }
+    } catch (_) {
+      // Silently fail - announcements are non-critical
     }
   }
 
@@ -428,6 +445,12 @@ class _HomeTabState extends State<HomeTab> {
           child: _buildHeroSlideshow(context, l10n),
         ),
 
+        // Announcement Banner
+        if (_announcementBanner != null && !_announcementDismissed)
+          SliverToBoxAdapter(
+            child: _buildAnnouncementBanner(context, langCode),
+          ),
+
         // Welcome Banner
         SliverToBoxAdapter(
           child: _buildWelcomeBanner(context),
@@ -588,6 +611,49 @@ class _HomeTabState extends State<HomeTab> {
         ),
       ],
     ),
+    );
+  }
+
+  Widget _buildAnnouncementBanner(BuildContext context, String langCode) {
+    final banner = _announcementBanner!;
+    final text = langCode == 'fr'
+        ? (banner['text_fr'] ?? banner['text'] ?? '')
+        : (banner['text'] ?? '');
+    final bgColorHex = banner['background_color'] as String? ?? '#1EB53A';
+    final bgColor = _hexToColor(bgColorHex);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.campaign, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                text.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _announcementDismissed = true),
+              child: const Icon(Icons.close, color: Colors.white, size: 18),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

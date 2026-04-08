@@ -120,6 +120,23 @@ urlpatterns = [
     path('maintenance/', views.maintenance_status, name='maintenance-status'),
     path('app-update/', views.check_app_update, name='check-app-update'),
 
+    # Admin Audit & Management (NEW)
+    path('admin/audit-log/', views.admin_audit_log, name='admin-audit-log'),
+    path('admin/translations/', views.translation_entries, name='translation-entries'),
+    path('admin/translations/<int:pk>/', views.translation_entry_detail, name='translation-entry-detail'),
+    path('admin/auto-translate/', views.auto_translate, name='auto-translate'),
+    path('admin/drafts/', views.article_drafts, name='article-drafts'),
+    path('admin/drafts/<int:pk>/', views.article_draft_detail, name='article-draft-detail'),
+    path('admin/content-versions/', views.content_versions, name='content-versions'),
+    path('admin/generate-report/', views.generate_weekly_report, name='generate-weekly-report'),
+
+    # User Features (NEW)
+    path('auth/merge-account/', views.request_account_merge, name='request-account-merge'),
+    path('password-strength/', views.validate_password_strength, name='password-strength'),
+    path('profile-completion/', views.profile_completion, name='profile-completion'),
+    path('whats-new/', views.whats_new, name='whats-new'),
+    path('events/<int:event_id>/comments/', views.event_comments, name='event-comments'),
+
     # Analytics API (admin only)
     path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),
     path('analytics/user-growth/', analytics_views.analytics_user_growth, name='analytics-user-growth'),

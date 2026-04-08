@@ -19,6 +19,7 @@ from .models import (
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
     EmailTemplate, Webhook, ScheduledMaintenance, ABTest,
     ContentAnalytics, EngagementHeatmap, WeeklyReport, TranslationEntry, AppRelease,
+    AuditLogEntry, AccountMergeRequest, FunnelStep,
 )
 
 
@@ -1195,3 +1196,53 @@ class WeeklyReportSerializer(serializers.ModelSerializer):
         model = WeeklyReport
         fields = ['id', 'week_start', 'week_end', 'new_users', 'active_users',
                   'total_views', 'total_engagements', 'top_content', 'generated_at']
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — Admin Audit, Translations, Drafts, Versioning, etc.
+# ══════════════════════════════════════════════════════════════
+
+class AuditLogEntrySerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    class Meta:
+        model = AuditLogEntry
+        fields = ['id', 'user', 'user_email', 'action', 'model_name', 'object_id', 'object_repr', 'changes', 'ip_address', 'created_at']
+
+
+class TranslationEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TranslationEntry
+        fields = ['id', 'key', 'language', 'value', 'context', 'is_approved', 'updated_at']
+
+
+class FunnelStepSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FunnelStep
+        fields = ['id', 'funnel_name', 'step_name', 'step_order']
+
+
+class EngagementHeatmapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EngagementHeatmap
+        fields = ['screen_name', 'date', 'hour', 'event_count']
+
+
+class AccountMergeRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AccountMergeRequest
+        fields = ['id', 'primary_user', 'secondary_user', 'status', 'created_at', 'processed_at']
+
+
+class EventCommentSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    class Meta:
+        model = ArticleComment  # reusing for events too
+        fields = ['id', 'user', 'user_name', 'content', 'created_at']
+    def get_user_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+
+class PasswordChangeHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PasswordChangeHistory
+        fields = ['id', 'changed_at', 'ip_address']

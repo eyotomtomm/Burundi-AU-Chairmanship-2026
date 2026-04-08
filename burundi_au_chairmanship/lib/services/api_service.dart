@@ -908,6 +908,27 @@ class ApiService {
   Future<Map<String, dynamic>> exportUserData() async {
     return await _get('auth/export-data/', auth: true);
   }
+
+  // ── Profile Completion ───────────────────────────────────
+  Future<Map<String, dynamic>> getProfileCompletion() async {
+    return await _get('profile-completion/', auth: true);
+  }
+
+  // ── Password Strength ────────────────────────────────────
+  Future<Map<String, dynamic>> validatePasswordStrength(String password) async {
+    return await _post('password-strength/', {'password': password});
+  }
+
+  // ── What's New ───────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getWhatsNew() async {
+    final data = await _get('whats-new/');
+    return (data is List) ? List<Map<String, dynamic>>.from(data) : _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Auto Translate ───────────────────────────────────────
+  Future<Map<String, dynamic>> autoTranslate(String text, String source, String target) async {
+    return await _post('admin/auto-translate/', {'text': text, 'source': source, 'target': target}, auth: true);
+  }
 }
 
 class ApiException implements Exception {

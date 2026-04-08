@@ -190,4 +190,21 @@ urlpatterns = [
     path('maintenance/create/', views.maintenance_create, name='maintenance_create'),
     path('maintenance/<int:pk>/edit/', views.maintenance_edit, name='maintenance_edit'),
     path('maintenance/<int:pk>/delete/', views.maintenance_delete, name='maintenance_delete'),
+
+    # Audit Log
+    path('audit-log/', views.admin_audit_log, name='audit_log'),
+
+    # Bulk Actions
+    path('bulk/users/', views.bulk_user_action, name='bulk_user_action'),
+    path('bulk/content/', views.bulk_content_action, name='bulk_content_action'),
+
+    # Global Search
+    path('search/', views.admin_global_search, name='global_search'),
+
+    # Export Reports
+    path('export/users-csv/', views.export_users_csv, name='export_users_csv'),
+    path('export/analytics-csv/', views.export_analytics_csv, name='export_analytics_csv'),
+
+    # Translation Manager
+    path('translations/', views.translation_manager, name='translation_manager'),
 ]

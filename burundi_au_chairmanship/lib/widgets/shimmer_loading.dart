@@ -567,6 +567,92 @@ class ShimmerLiveFeedsSkeleton extends StatelessWidget {
   }
 }
 
+/// Event list skeleton (vertical list with date/time indicator)
+class ShimmerEventListSkeleton extends StatelessWidget {
+  final int count;
+
+  const ShimmerEventListSkeleton({super.key, this.count = 4});
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerLoading(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: List.generate(
+            count,
+            (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.grey,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.grey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShimmerBox(height: 14, radius: 4),
+                          SizedBox(height: 8),
+                          ShimmerBox(height: 10, width: 160, radius: 4),
+                          SizedBox(height: 6),
+                          ShimmerBox(height: 10, width: 100, radius: 4),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Generic card skeleton for reuse in various screens
+class ShimmerGenericCardSkeleton extends StatelessWidget {
+  final int count;
+  final double cardHeight;
+
+  const ShimmerGenericCardSkeleton({
+    super.key,
+    this.count = 3,
+    this.cardHeight = 120,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerLoading(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: List.generate(
+            count,
+            (_) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ShimmerBox(height: cardHeight, radius: 16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Home tab full-page shimmer (hero + features + quick access + news)
 class ShimmerHomeTabSkeleton extends StatelessWidget {
   const ShimmerHomeTabSkeleton({super.key});

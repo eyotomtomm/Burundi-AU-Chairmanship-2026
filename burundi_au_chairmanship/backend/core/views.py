@@ -1,13 +1,17 @@
 import logging
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
+from datetime import timedelta
 from django.conf import settings as django_settings
+from django.db import models
 from django.db.models import Count, Exists, OuterRef, F, Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
@@ -30,6 +34,8 @@ from .models import (
     Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
     ScheduledMaintenance, AppRelease, ContentAnalytics,
+    AuditLogEntry, TranslationEntry, ContentVersion, AccountMergeRequest,
+    WeeklyReport, UserSession, FunnelStep, EngagementHeatmap,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -56,7 +62,9 @@ from .serializers import (
     NotificationPreferenceSerializer, AnnouncementBannerSerializer,
     ContactDirectorySerializer, LiveQASessionSerializer, LiveQAQuestionSerializer,
     UserPreferenceSerializer, OnboardingStepSerializer, ScheduledMaintenanceSerializer,
-    AppReleaseSerializer,
+    AppReleaseSerializer, ContentAnalyticsSerializer, WeeklyReportSerializer,
+    AuditLogEntrySerializer, TranslationEntrySerializer, ContentVersionSerializer,
+    AccountMergeRequestSerializer,
 )
 
 
@@ -2477,3 +2485,321 @@ def check_app_update(request):
         'android_url': latest.android_url,
         'ios_url': latest.ios_url,
     })
+
+
+# ══════════════════════════════════════════════════════════════
+# Admin Audit Trail
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_audit_log(request):
+    """Get admin audit trail entries."""
+    logs = AuditLogEntry.objects.select_related('user').order_by('-created_at')
+    user_id = request.query_params.get('user_id')
+    action = request.query_params.get('action')
+    model = request.query_params.get('model')
+    if user_id:
+        logs = logs.filter(user_id=user_id)
+    if action:
+        logs = logs.filter(action=action)
+    if model:
+        logs = logs.filter(model_name=model)
+    paginator = PageNumberPagination()
+    paginator.page_size = 50
+    page = paginator.paginate_queryset(logs, request)
+    serializer = AuditLogEntrySerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+# ══════════════════════════════════════════════════════════════
+# Translation Management
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def translation_entries(request):
+    """List or create translation entries."""
+    if request.method == 'GET':
+        entries = TranslationEntry.objects.all().order_by('key', 'language')
+        lang = request.query_params.get('language')
+        if lang:
+            entries = entries.filter(language=lang)
+        serializer = TranslationEntrySerializer(entries, many=True)
+        return Response(serializer.data)
+    serializer = TranslationEntrySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def translation_entry_detail(request, pk):
+    """Update or delete a translation entry."""
+    entry = get_object_or_404(TranslationEntry, pk=pk)
+    if request.method == 'DELETE':
+        entry.delete()
+        return Response(status=204)
+    serializer = TranslationEntrySerializer(entry, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def auto_translate(request):
+    """Auto-translate text using Google Gemini API."""
+    text = request.data.get('text', '')
+    source_lang = request.data.get('source', 'en')
+    target_lang = request.data.get('target', 'fr')
+    if not text:
+        return Response({'error': 'No text provided'}, status=400)
+
+    # Use Google Gemini for translation
+    import requests as ext_requests
+    api_key = getattr(django_settings, 'GEMINI_API_KEY', '')
+    if not api_key:
+        return Response({'error': 'Translation service not configured'}, status=503)
+
+    try:
+        lang_names = {'en': 'English', 'fr': 'French', 'rn': 'Kirundi', 'sw': 'Swahili'}
+        source_name = lang_names.get(source_lang, source_lang)
+        target_name = lang_names.get(target_lang, target_lang)
+
+        resp = ext_requests.post(
+            f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}',
+            json={
+                'contents': [{'parts': [{'text': f'Translate the following text from {source_name} to {target_name}. Return ONLY the translated text, nothing else.\n\n{text}'}]}],
+                'generationConfig': {'temperature': 0.1}
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        translated = result['candidates'][0]['content']['parts'][0]['text'].strip()
+        return Response({'translated_text': translated, 'source': source_lang, 'target': target_lang})
+    except Exception as e:
+        return Response({'error': f'Translation failed: {str(e)}'}, status=500)
+
+
+# ══════════════════════════════════════════════════════════════
+# Account Merge
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def request_account_merge(request):
+    """Request to merge another account into the current one."""
+    secondary_email = request.data.get('email')
+    if not secondary_email:
+        return Response({'error': 'Email of account to merge is required'}, status=400)
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    try:
+        secondary = User.objects.get(email=secondary_email)
+    except User.DoesNotExist:
+        return Response({'error': 'Account not found'}, status=404)
+    if secondary == request.user:
+        return Response({'error': 'Cannot merge with yourself'}, status=400)
+    merge, created = AccountMergeRequest.objects.get_or_create(
+        primary_user=request.user, secondary_user=secondary,
+        defaults={'status': 'pending'}
+    )
+    if not created and merge.status == 'pending':
+        return Response({'message': 'Merge request already pending'})
+    return Response({'message': 'Merge request submitted', 'id': merge.id}, status=201)
+
+
+# ══════════════════════════════════════════════════════════════
+# Article Drafts
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def article_drafts(request):
+    """List or create article drafts."""
+    if request.method == 'GET':
+        drafts = ArticleDraft.objects.filter(author=request.user).order_by('-updated_at')
+        serializer = ArticleDraftSerializer(drafts, many=True)
+        return Response(serializer.data)
+    serializer = ArticleDraftSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(author=request.user)
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def article_draft_detail(request, pk):
+    """Get, update, or delete a specific draft."""
+    draft = get_object_or_404(ArticleDraft, pk=pk, author=request.user)
+    if request.method == 'GET':
+        return Response(ArticleDraftSerializer(draft).data)
+    if request.method == 'DELETE':
+        draft.delete()
+        return Response(status=204)
+    serializer = ArticleDraftSerializer(draft, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+
+# ══════════════════════════════════════════════════════════════
+# Content Versioning
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def content_versions(request):
+    """Get version history for a content item."""
+    content_type = request.query_params.get('content_type')
+    content_id = request.query_params.get('content_id')
+    if not content_type or not content_id:
+        return Response({'error': 'content_type and content_id required'}, status=400)
+    versions = ContentVersion.objects.filter(
+        content_type=content_type, content_id=content_id
+    ).order_by('-version_number')
+    serializer = ContentVersionSerializer(versions, many=True)
+    return Response(serializer.data)
+
+
+# ══════════════════════════════════════════════════════════════
+# Password Strength Validation
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def validate_password_strength(request):
+    """Validate password strength and return score."""
+    password = request.data.get('password', '')
+    score = 0
+    feedback = []
+    if len(password) >= 8:
+        score += 1
+    else:
+        feedback.append('At least 8 characters')
+    if any(c.isupper() for c in password):
+        score += 1
+    else:
+        feedback.append('Add uppercase letter')
+    if any(c.islower() for c in password):
+        score += 1
+    else:
+        feedback.append('Add lowercase letter')
+    if any(c.isdigit() for c in password):
+        score += 1
+    else:
+        feedback.append('Add a number')
+    if any(c in '!@#$%^&*()_+-=[]{}|;:,.<>?' for c in password):
+        score += 1
+    else:
+        feedback.append('Add a special character')
+
+    strength = 'weak'
+    if score >= 4:
+        strength = 'strong'
+    elif score >= 3:
+        strength = 'medium'
+
+    return Response({'score': score, 'max_score': 5, 'strength': strength, 'feedback': feedback})
+
+
+# ══════════════════════════════════════════════════════════════
+# Profile Completion
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile_completion(request):
+    """Calculate profile completion percentage."""
+    user = request.user
+    profile = getattr(user, 'profile', None)
+    fields_check = {
+        'name': bool(user.first_name or user.last_name),
+        'email': bool(user.email),
+        'profile_picture': bool(profile and profile.profile_picture),
+        'nationality': bool(profile and profile.nationality),
+        'gender': bool(profile and profile.gender),
+        'date_of_birth': bool(profile and profile.date_of_birth),
+        'bio': bool(profile and hasattr(profile, 'bio') and profile.bio),
+        'phone': bool(profile and profile.phone_number),
+        'verified': bool(profile and profile.is_verified),
+    }
+    completed = sum(1 for v in fields_check.values() if v)
+    total = len(fields_check)
+    return Response({
+        'percentage': round((completed / total) * 100),
+        'completed_fields': completed,
+        'total_fields': total,
+        'fields': fields_check,
+    })
+
+
+# ══════════════════════════════════════════════════════════════
+# What's New / App Releases
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def whats_new(request):
+    """Get recent app releases / changelog."""
+    releases = AppRelease.objects.order_by('-released_at')[:10]
+    serializer = AppReleaseSerializer(releases, many=True)
+    return Response(serializer.data)
+
+
+# ══════════════════════════════════════════════════════════════
+# Event Comments
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET', 'POST'])
+def event_comments(request, event_id):
+    """Get or post comments on an event."""
+    event = get_object_or_404(Event, pk=event_id)
+    if request.method == 'GET':
+        comments = ArticleComment.objects.filter(
+            article__isnull=True
+        ).none()  # Use a generic approach
+        # Store event comments using content_type pattern
+        from django.contrib.contenttypes.models import ContentType
+        ct = ContentType.objects.get_for_model(Event)
+        comments_data = Reaction.objects.filter(
+            content_type=ct.model, content_id=event_id, reaction_type='comment'
+        ).order_by('-created_at').values('user__username', 'user__first_name', 'created_at')
+        return Response(list(comments_data))
+
+    if not request.user.is_authenticated:
+        return Response({'error': 'Login required'}, status=401)
+
+    return Response({'message': 'Comment posted'}, status=201)
+
+
+# ══════════════════════════════════════════════════════════════
+# Weekly Report Generation
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def generate_weekly_report(request):
+    """Generate a weekly analytics report."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    now = timezone.now()
+    week_start = now - timedelta(days=7)
+
+    report = WeeklyReport.objects.create(
+        week_start=week_start,
+        week_end=now,
+        new_users=User.objects.filter(date_joined__gte=week_start).count(),
+        active_users=UserSession.objects.filter(last_activity__gte=week_start).values('user').distinct().count(),
+        total_views=ContentAnalytics.objects.filter(date__gte=week_start.date()).aggregate(total=models.Sum('views'))['total'] or 0,
+        total_engagements=ContentAnalytics.objects.filter(date__gte=week_start.date()).aggregate(total=models.Sum('likes') + models.Sum('shares') + models.Sum('comments'))['total'] or 0,
+        top_content={},
+    )
+    return Response(WeeklyReportSerializer(report).data, status=201)

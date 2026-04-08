@@ -147,6 +147,7 @@ class AppLocalizations {
       'personal_info': 'Personal Information',
       'data_privacy': 'Data & Privacy',
       'danger_zone': 'Danger Zone',
+      'complete_your_profile': 'Complete your profile',
 
       // News / Articles engagement
       'news': 'News',
@@ -310,6 +311,7 @@ class AppLocalizations {
       'personal_info': 'Informations personnelles',
       'data_privacy': 'Données et confidentialité',
       'danger_zone': 'Zone de danger',
+      'complete_your_profile': 'Completez votre profil',
 
       // News / Articles engagement
       'news': 'Actualités',

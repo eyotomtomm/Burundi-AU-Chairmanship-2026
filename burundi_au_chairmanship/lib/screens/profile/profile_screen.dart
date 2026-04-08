@@ -9,9 +9,41 @@ import '../../config/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/verified_badge.dart';
+import '../../services/api_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  double _completionPercent = 0.0;
+  String _completionMessage = '';
+  bool _completionLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileCompletion();
+  }
+
+  Future<void> _loadProfileCompletion() async {
+    try {
+      final api = ApiService();
+      final data = await api.getProfileCompletion();
+      if (mounted) {
+        setState(() {
+          _completionPercent = (data['completion_percentage'] as num?)?.toDouble() ?? 0.0;
+          _completionMessage = data['message'] as String? ?? '';
+          _completionLoaded = true;
+        });
+      }
+    } catch (_) {
+      // Silently fail - completion is non-critical
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +222,85 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // Profile Completion Progress
+              if (_completionLoaded && _completionPercent < 100)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.burundiGreen.withValues(alpha: 0.3),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: _completionPercent / 100.0,
+                                  strokeWidth: 5,
+                                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                                  valueColor: const AlwaysStoppedAnimation(AppColors.burundiGreen),
+                                ),
+                                Center(
+                                  child: Text(
+                                    '${_completionPercent.toInt()}%',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.burundiGreen,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.translate('complete_your_profile'),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (_completionMessage.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _completionMessage,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
               // Personal Information Section
               SliverToBoxAdapter(

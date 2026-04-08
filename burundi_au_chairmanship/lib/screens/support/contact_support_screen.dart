@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -171,6 +172,38 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Quick email option
+            OutlinedButton.icon(
+              onPressed: () async {
+                final uri = Uri(
+                  scheme: 'mailto',
+                  path: 'support@burundi4africa.com',
+                  queryParameters: {
+                    'subject': 'Support Request - Burundi AU Chairmanship App',
+                    'body': 'Hello Support Team,\n\n'
+                        'I need help with:\n\n'
+                        'Email: ${_emailController.text}\n',
+                  },
+                );
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              icon: const Icon(Icons.email_outlined, size: 18),
+              label: const Text('Or send us an email directly'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.burundiGreen,
+                side: BorderSide(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.3),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
             const SizedBox(height: 24),

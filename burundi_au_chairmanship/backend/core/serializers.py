@@ -1182,7 +1182,8 @@ class ScheduledMaintenanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScheduledMaintenance
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'starts_at', 'ends_at', 'is_active', 'show_banner']
+                  'starts_at', 'ends_at', 'is_active', 'show_banner',
+                  'contact_email', 'severity', 'affected_services']
 
 
 class AppReleaseSerializer(serializers.ModelSerializer):

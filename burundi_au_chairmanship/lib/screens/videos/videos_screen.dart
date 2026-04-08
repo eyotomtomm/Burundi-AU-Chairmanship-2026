@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -85,6 +86,8 @@ class _VideosScreenState extends State<VideosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: _isLoading
           ? const ShimmerVideoGridSkeleton()
@@ -141,7 +144,9 @@ class _VideosScreenState extends State<VideosScreen> {
                                 },
                                 selectedColor: AppColors.burundiRed,
                                 labelStyle: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.black87,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark ? Colors.white70 : Colors.black87),
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -160,7 +165,7 @@ class _VideosScreenState extends State<VideosScreen> {
                         (context, index) {
                           if (index >= filteredVideos.length) return null;
                           final video = filteredVideos[index];
-                          return _buildVideoCard(video);
+                          return _buildVideoCard(video, isDark);
                         },
                       ),
                     ),
@@ -173,17 +178,20 @@ class _VideosScreenState extends State<VideosScreen> {
     );
   }
 
-  Widget _buildVideoCard(Map<String, dynamic> video) {
+  Widget _buildVideoCard(Map<String, dynamic> video, bool isDark) {
     final thumbnailUrl = video['thumbnail'] as String?;
+    final cardColor = isDark ? AppColors.darkSurface : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subtextColor = isDark ? Colors.white54 : Colors.grey[600]!;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -203,20 +211,13 @@ class _VideosScreenState extends State<VideosScreen> {
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: thumbnailUrl != null && thumbnailUrl.isNotEmpty
-                        ? Image.network(
-                            thumbnailUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: thumbnailUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.play_circle_outline, size: 60, color: Colors.grey),
-                              );
-                            },
+                            placeholder: (context, url) => _videoThumbnailPlaceholder(),
+                            errorWidget: (context, url, error) => _videoThumbnailPlaceholder(),
                           )
-                        : Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.play_circle_outline, size: 60, color: Colors.grey),
-                          ),
+                        : _videoThumbnailPlaceholder(),
                   ),
                 ),
 
@@ -297,9 +298,10 @@ class _VideosScreenState extends State<VideosScreen> {
                 children: [
                   Text(
                     video['title'] ?? '',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
+                      color: textColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -307,21 +309,21 @@ class _VideosScreenState extends State<VideosScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.remove_red_eye, size: 14, color: Colors.grey[600]),
+                      Icon(Icons.remove_red_eye, size: 14, color: subtextColor),
                       const SizedBox(width: 4),
                       Text(
                         '${_formatViewCount(video['view_count'])} views',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: subtextColor,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.favorite, size: 14, color: Colors.grey[600]),
+                      Icon(Icons.favorite, size: 14, color: subtextColor),
                       const SizedBox(width: 4),
                       Text(
                         _formatViewCount(video['like_count']),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 12, color: subtextColor),
                       ),
                       const SizedBox(width: 16),
                       Container(
@@ -346,6 +348,21 @@ class _VideosScreenState extends State<VideosScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _videoThumbnailPlaceholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.play_circle_outline, size: 60, color: Colors.white38),
       ),
     );
   }

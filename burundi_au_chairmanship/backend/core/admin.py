@@ -54,7 +54,7 @@ class CustomUserAdmin(BaseUserAdmin):
                    'profile__is_deactivated', 'profile__is_scheduled_for_deletion']
     search_fields = ['username', 'email', 'first_name', 'last_name']
     ordering = ['-date_joined']
-    actions = ['make_staff', 'remove_staff', 'reactivate_accounts']
+    actions = ['make_staff', 'remove_staff', 'reactivate_accounts', 'terminate_all_sessions']
 
     add_fieldsets = (
         ('Account Information', {
@@ -134,6 +134,17 @@ class CustomUserAdmin(BaseUserAdmin):
                 count += 1
         self.message_user(request, f'{count} account(s) reactivated.')
     reactivate_accounts.short_description = 'Reactivate selected accounts'
+
+    def terminate_all_sessions(self, request, queryset):
+        from .models import UserSession
+        count = 0
+        for user in queryset:
+            terminated = UserSession.objects.filter(user=user, is_active=True).update(
+                is_active=False, terminated_at=timezone.now()
+            )
+            count += terminated
+        self.message_user(request, f'{count} session(s) terminated across {queryset.count()} user(s).')
+    terminate_all_sessions.short_description = 'Terminate all user sessions'
 
 
 admin.site.unregister(User)
@@ -820,7 +831,7 @@ class NotificationAdmin(admin.ModelAdmin):
     Users can tap them to navigate to the related content.
     """
     list_display = ['title', 'notification_type', 'targeting_info', 'is_active', 'created_at']
-    list_filter = ['notification_type', 'is_active', 'is_global', 'created_at']
+    list_filter = ['notification_type', 'is_active', 'is_global', 'target_language', 'created_at']
     search_fields = ['title', 'title_fr', 'message']
     filter_horizontal = ['target_users']
     date_hierarchy = 'created_at'
@@ -837,6 +848,7 @@ class NotificationAdmin(admin.ModelAdmin):
             'fields': [
                 'is_global',
                 'target_gender',
+                'target_language',
                 'target_nationality',
                 ('target_age_min', 'target_age_max'),
                 'target_users',
@@ -1232,29 +1244,46 @@ class VerificationRequestAdmin(admin.ModelAdmin):
     Users submit verification requests to receive Gold or Blue badges.
     Review their professional email, phone, social media, and reasoning.
 
+    HOW TO APPROVE/REJECT:
+    1. Click on a verification request to open it
+    2. Review the applicant's information, documents, and social media
+    3. In the "Admin Review" section:
+       - Set Status to "Approved" and choose a Badge Type (Gold or Blue)
+       - OR set Status to "Rejected" and write a rejection reason
+    4. Click Save — the user's profile will be updated automatically
+
     STATUS:
     - Pending: Waiting for your review
-    - Approved: Badge granted
+    - Approved: Badge granted (user profile updated automatically)
     - Rejected: Request denied (user can appeal)
     - Appealed: User submitted appeal after rejection
     """
-    list_display = ['full_name', 'user', 'status_badge', 'email', 'phone_number', 'created_at']
+    list_display = ['full_name', 'user', 'status_badge', 'badge_type_display', 'email',
+                    'phone_number', 'position_role', 'created_at']
     list_filter = ['status', 'badge_type', 'created_at']
-    search_fields = ['full_name', 'first_name', 'last_name', 'email', 'user__email']
-    readonly_fields = ['created_at', 'updated_at', 'reviewed_at', 'appeal_submitted_at']
+    search_fields = ['full_name', 'first_name', 'last_name', 'email', 'user__email',
+                     'user__username', 'position_role']
+    readonly_fields = ['user', 'title', 'first_name', 'last_name', 'full_name', 'gender',
+                       'email', 'email_verified', 'country_code', 'phone_number', 'phone_verified',
+                       'position_role', 'reasoning_message', 'supporting_document',
+                       'created_at', 'updated_at', 'reviewed_at', 'appeal_submitted_at',
+                       'appeal_message', 'user_verification_status']
     date_hierarchy = 'created_at'
     inlines = [VerificationSocialMediaInline]
+    actions = ['approve_with_blue_badge', 'approve_with_gold_badge', 'reject_selected']
 
     fieldsets = (
-        ('Applicant', {
+        ('Personal Information', {
             'fields': [
                 'user',
                 ('title', 'first_name', 'last_name'),
                 'full_name',
+                'gender',
                 'position_role',
+                'supporting_document',
             ],
         }),
-        ('Contact Verification', {
+        ('Contact Information', {
             'fields': [
                 ('email', 'email_verified'),
                 ('country_code', 'phone_number', 'phone_verified'),
@@ -1265,10 +1294,13 @@ class VerificationRequestAdmin(admin.ModelAdmin):
         }),
         ('Admin Review', {
             'fields': [
+                'user_verification_status',
                 ('status', 'badge_type'),
                 'rejection_reason',
                 ('reviewed_by', 'reviewed_at'),
             ],
+            'description': 'Set status to Approved + choose badge type, OR set to Rejected + write reason. '
+                           'The user profile is updated automatically on save.',
         }),
         ('Appeal', {
             'fields': ['appeal_message', 'appeal_submitted_at'],
@@ -1294,11 +1326,93 @@ class VerificationRequestAdmin(admin.ModelAdmin):
         )
     status_badge.short_description = 'Status'
 
+    def badge_type_display(self, obj):
+        if not obj.badge_type:
+            return '-'
+        colors = {'GOLD': '#DAA520', 'BLUE': '#1E88E5'}
+        return format_html(
+            '<span style="background:{}; color:white; padding:3px 10px; border-radius:3px; font-size:11px; font-weight:600;">{}</span>',
+            colors.get(obj.badge_type, '#666'),
+            obj.badge_type
+        )
+    badge_type_display.short_description = 'Badge'
+
+    def user_verification_status(self, obj):
+        """Show current user profile verification state for context."""
+        if not hasattr(obj.user, 'profile'):
+            return format_html('<span style="color:gray;">No profile found</span>')
+        profile = obj.user.profile
+        if profile.is_verified:
+            badge = profile.badge_type or 'BLUE'
+            return format_html(
+                '<span style="color:green; font-weight:bold;">Verified ({} badge since {})</span>',
+                badge, profile.verified_at.strftime('%Y-%m-%d') if profile.verified_at else 'unknown'
+            )
+        return format_html('<span style="color:orange;">Not verified</span>')
+    user_verification_status.short_description = 'Current Profile Status'
+
     def save_model(self, request, obj, form, change):
+        """
+        When admin changes status to approved/rejected, automatically:
+        - Call approve() to update user profile with badge
+        - Call reject() to record rejection
+        - Set reviewed_by and reviewed_at
+        """
+        if change and 'status' in form.changed_data:
+            if obj.status == 'approved':
+                # Use the model's approve() method to properly update user profile
+                badge_type = obj.badge_type or 'BLUE'
+                obj.approve(admin_user=request.user, badge_type=badge_type)
+                self.message_user(
+                    request,
+                    format_html(
+                        'Verification <strong>approved</strong> for {} with <strong>{}</strong> badge. '
+                        'User profile has been updated.',
+                        obj.full_name, badge_type
+                    )
+                )
+                return  # approve() already saves the object
+            elif obj.status == 'rejected':
+                reason = obj.rejection_reason or 'No reason provided'
+                obj.reject(admin_user=request.user, reason=reason)
+                self.message_user(
+                    request,
+                    format_html(
+                        'Verification <strong>rejected</strong> for {}.',
+                        obj.full_name
+                    )
+                )
+                return  # reject() already saves the object
+
+        # For other changes (e.g., editing notes), just save normally
         if obj.status in ['approved', 'rejected'] and not obj.reviewed_at:
             obj.reviewed_at = timezone.now()
             obj.reviewed_by = request.user
         super().save_model(request, obj, form, change)
+
+    def approve_with_blue_badge(self, request, queryset):
+        count = 0
+        for obj in queryset.filter(status__in=['pending', 'appealed']):
+            obj.approve(admin_user=request.user, badge_type='BLUE')
+            count += 1
+        self.message_user(request, f'{count} request(s) approved with Blue badge.')
+    approve_with_blue_badge.short_description = 'Approve selected with Blue badge'
+
+    def approve_with_gold_badge(self, request, queryset):
+        count = 0
+        for obj in queryset.filter(status__in=['pending', 'appealed']):
+            obj.approve(admin_user=request.user, badge_type='GOLD')
+            count += 1
+        self.message_user(request, f'{count} request(s) approved with Gold badge.')
+    approve_with_gold_badge.short_description = 'Approve selected with Gold badge'
+
+    def reject_selected(self, request, queryset):
+        count = 0
+        for obj in queryset.filter(status__in=['pending', 'appealed']):
+            obj.reject(admin_user=request.user, reason='Rejected via bulk action. Please resubmit with additional documentation.')
+            count += 1
+        self.message_user(request, f'{count} request(s) rejected.')
+    reject_selected.short_description = 'Reject selected requests'
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1388,8 +1502,14 @@ class PopupAdmin(admin.ModelAdmin):
 
 @admin.register(UserSession)
 class UserSessionAdmin(admin.ModelAdmin):
-    list_display = ('user', 'ip_address', 'country_name', 'city', 'user_nationality', 'device_os', 'created_at')
-    list_filter = ('country_code', 'device_os', 'created_at')
+    list_display = ('user', 'ip_address', 'country_name', 'city', 'user_nationality', 'device_os', 'is_active', 'terminated_at', 'created_at')
+    list_filter = ('country_code', 'device_os', 'is_active', 'created_at')
     search_fields = ('ip_address', 'country_name', 'city', 'user__username')
     readonly_fields = ('created_at',)
     date_hierarchy = 'created_at'
+    actions = ['terminate_selected_sessions']
+
+    def terminate_selected_sessions(self, request, queryset):
+        count = queryset.filter(is_active=True).update(is_active=False, terminated_at=timezone.now())
+        self.message_user(request, f'{count} session(s) terminated.')
+    terminate_selected_sessions.short_description = 'Terminate selected sessions'

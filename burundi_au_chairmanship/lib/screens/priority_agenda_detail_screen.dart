@@ -17,9 +17,15 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final title = langCode == 'fr'
-        ? (agenda['title_fr'] ?? agenda['title'])
-        : agenda['title'];
+    // Format title: replace underscores/hyphens with spaces and capitalize properly
+    String rawTitle = langCode == 'fr'
+        ? (agenda['title_fr'] ?? agenda['title'] ?? '')
+        : (agenda['title'] ?? '');
+    if (rawTitle.contains('_') || rawTitle.contains('-')) {
+      rawTitle = rawTitle.replaceAll('_', ' ').replaceAll('-', ' ');
+      rawTitle = rawTitle.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
+    }
+    final title = rawTitle;
     final description = langCode == 'fr'
         ? (agenda['description_fr'] ?? agenda['description'])
         : agenda['description'];
@@ -50,7 +56,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                title ?? 'Priority Agenda',
+                title.isNotEmpty ? title : 'Priority Agenda',
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -142,7 +148,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
 
                 // Overview Section
                 if (overview != null && overview.isNotEmpty) ...[
-                  _buildSectionTitle('Overview', isDark),
+                  _buildSectionTitle(langCode == 'fr' ? 'Aperçu' : 'Overview', isDark),
                   const SizedBox(height: 12),
                   Text(
                     overview,
@@ -157,7 +163,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
 
                 // Key Objectives Section
                 if (objectives != null && objectives is List && objectives.isNotEmpty) ...[
-                  _buildSectionTitle('Key Objectives', isDark),
+                  _buildSectionTitle(langCode == 'fr' ? 'Objectifs Clés' : 'Key Objectives', isDark),
                   const SizedBox(height: 12),
                   ...objectives.map<Widget>((objective) {
                     return Padding(
@@ -194,7 +200,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
 
                 // Impact Areas Section
                 if (impactAreas != null && impactAreas is List && impactAreas.isNotEmpty) ...[
-                  _buildSectionTitle('Impact Areas', isDark),
+                  _buildSectionTitle(langCode == 'fr' ? 'Domaines d\'Impact' : 'Impact Areas', isDark),
                   const SizedBox(height: 12),
                   ...impactAreas.map<Widget>((area) {
                     if (area is! Map) return const SizedBox.shrink();
@@ -210,7 +216,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
 
                 // Current Initiatives Section
                 if (currentInitiatives != null && currentInitiatives.toString().isNotEmpty) ...[
-                  _buildSectionTitle('Current Initiatives', isDark),
+                  _buildSectionTitle(langCode == 'fr' ? 'Initiatives en Cours' : 'Current Initiatives', isDark),
                   const SizedBox(height: 12),
                   Text(
                     currentInitiatives.toString(),

@@ -52,14 +52,14 @@ class ApiService {
     return headers;
   }
 
-  Future<dynamic> _get(String endpoint, {bool auth = false}) async {
+  Future<dynamic> _get(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
     try {
       final response = await _client
           .get(
             Uri.parse('$_baseUrl/$endpoint'),
             headers: await _headers(auth: auth),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(Duration(seconds: timeoutSeconds));
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -67,7 +67,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException('Connection failed: $e', 0);
     }
   }
 
@@ -87,7 +87,7 @@ class ApiService {
             headers: await _headers(auth: auth),
             body: json.encode(body),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 20));
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
@@ -125,7 +125,7 @@ class ApiService {
             Uri.parse('$_baseUrl/$endpoint'),
             headers: await _headers(auth: auth),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 20));
       if (response.statusCode >= 200 && response.statusCode < 300) {
         if (response.body.isEmpty) return {};
         return json.decode(response.body);
@@ -479,8 +479,21 @@ class ApiService {
 
   // ── Home Feed (combined) ─────────────────────────────────
   Future<Map<String, dynamic>> getHomeFeed() async {
-    final data = await _get('home-feed/');
-    return data as Map<String, dynamic>;
+    // Retry up to 2 times with exponential backoff (handles transient network/Cloudflare issues)
+    Exception? lastError;
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        final data = await _get('home-feed/', timeoutSeconds: 25);
+        return data as Map<String, dynamic>;
+      } catch (e) {
+        lastError = e is Exception ? e : Exception(e.toString());
+        if (attempt < 2) {
+          // Exponential backoff: 1s, then 3s
+          await Future.delayed(Duration(seconds: attempt == 0 ? 1 : 3));
+        }
+      }
+    }
+    throw lastError ?? ApiException('Failed to load content', 0);
   }
 
   // ── Hero Text Content ────────────────────────────────────
@@ -520,6 +533,7 @@ class ApiService {
     String? firstName,
     String? lastName,
     String? countryCode,
+    String? gender,
     String? reasoningMessage,
     String? twitterUrl,
     String? linkedinUrl,
@@ -539,6 +553,7 @@ class ApiService {
     if (firstName != null) body['first_name'] = firstName;
     if (lastName != null) body['last_name'] = lastName;
     if (countryCode != null) body['country_code'] = countryCode;
+    if (gender != null && gender.isNotEmpty) body['gender'] = gender;
     if (reasoningMessage != null) body['reasoning_message'] = reasoningMessage;
     if (twitterUrl != null && twitterUrl.isNotEmpty) body['twitter_url'] = twitterUrl;
     if (linkedinUrl != null && linkedinUrl.isNotEmpty) body['linkedin_url'] = linkedinUrl;

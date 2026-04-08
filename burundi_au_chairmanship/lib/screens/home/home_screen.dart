@@ -43,11 +43,17 @@ class _HomeScreenState extends State<HomeScreen> {
     // Check status from backend
     await verificationProvider.checkVerificationStatus(silent: true);
 
+    final status = verificationProvider.requestStatus;
+
+    // If verification was approved, always refresh auth profile to sync badge state
+    // This ensures isVerified + badgeType are up to date even if popup was already shown
+    if (status == 'approved' && !authProvider.isVerified) {
+      await authProvider.refreshProfile();
+    }
+
     // Check if we should show popup
     final shouldShow = await verificationProvider.shouldShowStatusPopup();
     if (!shouldShow || !mounted) return;
-
-    final status = verificationProvider.requestStatus;
 
     if (status == 'approved') {
       // Show approval dialog

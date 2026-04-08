@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
+import '../services/api_service.dart';
 
 class LanguageProvider extends ChangeNotifier {
   Locale _locale = const Locale('en');
@@ -29,11 +31,25 @@ class LanguageProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppConstants.languageKey, languageCode);
       notifyListeners();
+
+      // Sync language preference with backend for push notification targeting
+      _syncLanguageWithBackend(languageCode);
     }
   }
 
   Future<void> toggleLanguage() async {
     final newLang = _locale.languageCode == 'en' ? 'fr' : 'en';
     await setLanguage(newLang);
+  }
+
+  /// Sync language preference to backend so push notifications are language-targeted
+  Future<void> _syncLanguageWithBackend(String languageCode) async {
+    try {
+      await ApiService().post('auth/update-language/', {
+        'preferred_language': languageCode,
+      }, auth: true);
+    } catch (e) {
+      if (kDebugMode) print('Failed to sync language preference: $e');
+    }
   }
 }

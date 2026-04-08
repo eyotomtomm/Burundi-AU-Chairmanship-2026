@@ -127,6 +127,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -148,7 +150,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                         ),
                       ),
                       background: Container(
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -180,7 +182,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.info.withValues(alpha: 0.1),
+                          color: AppColors.info.withValues(alpha: isDark ? 0.15 : 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                         ),
@@ -193,7 +195,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                                 'Stay connected with us on social media for the latest updates, news, and events.',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey[800],
+                                  color: isDark ? Colors.white70 : Colors.black87,
                                 ),
                               ),
                             ),
@@ -210,7 +212,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           if (index >= socialMedia.length) return null;
-                          return _buildSocialMediaCard(socialMedia[index]);
+                          return _buildSocialMediaCard(socialMedia[index], isDark);
                         },
                       ),
                     ),
@@ -223,18 +225,22 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     );
   }
 
-  Widget _buildSocialMediaCard(Map<String, dynamic> social) {
+  Widget _buildSocialMediaCard(Map<String, dynamic> social, bool isDark) {
     final color = _parseHexColor(social['icon_color'] as String?);
     final icon = _platformIcon(social['platform'] as String?);
+    final cardColor = isDark ? AppColors.darkSurface : Colors.white;
+    final titleColor = isDark ? Colors.white : Colors.black87;
+    final handleColor = isDark ? Colors.white54 : Colors.grey[600]!;
+    final descriptionColor = isDark ? Colors.white60 : Colors.grey[700]!;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -276,9 +282,10 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                           Expanded(
                             child: Text(
                               social['display_name'] ?? social['name'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                color: titleColor,
                               ),
                             ),
                           ),
@@ -304,7 +311,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                         social['handle'] ?? '',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: handleColor,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -312,7 +319,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                         social['description'] ?? '',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.grey[700],
+                          color: descriptionColor,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

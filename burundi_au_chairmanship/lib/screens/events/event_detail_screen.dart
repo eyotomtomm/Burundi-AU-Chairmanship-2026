@@ -623,22 +623,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   // ── Registration Section ──────────────────────────────────
 
   Widget _buildRegistrationSection(BuildContext context, String langCode, bool isDark) {
-    // Already registered
+    // Already registered → show confirmation (takes priority regardless of status)
     if (_event.hasRegistered) {
       return _buildRegisteredConfirmation(langCode, isDark);
     }
 
-    // Registration closed or event past
-    if (!_event.isRegistrationOpen || _event.isEventPast) {
-      return _buildRegistrationClosed(isDark);
-    }
-
-    // Registration not enabled
+    // Registration not enabled for this event type → hide everything quietly
     if (!_event.isRegistrationEnabled) {
       return const SizedBox.shrink();
     }
 
-    // Show registration form
+    // Registration IS enabled but closed/past → show "Registration Closed" banner
+    if (!_event.isRegistrationOpen || _event.isEventPast) {
+      return _buildRegistrationClosed(isDark);
+    }
+
+    // Registration is open → show registration form
     return _buildRegistrationForm(langCode, isDark);
   }
 

@@ -16,7 +16,7 @@ class LocationsTab extends StatefulWidget {
 }
 
 class _LocationsTabState extends State<LocationsTab> {
-  List<EmbassyLocation>? _embassies;
+  List<EmbassyLocation>? _locations;
   List<EventLocation>? _events;
   bool _isLoading = true;
 
@@ -34,8 +34,13 @@ class _LocationsTabState extends State<LocationsTab> {
         api.getEvents(),
       ]);
       if (!mounted) return;
+      // Filter out embassy and consulate types — only show event venues and offices
+      final allLocations = results[0] as List<EmbassyLocation>;
+      final filteredLocations = allLocations
+          .where((loc) => loc.type != LocationType.embassy && loc.type != LocationType.consulate)
+          .toList();
       setState(() {
-        _embassies = results[0] as List<EmbassyLocation>;
+        _locations = filteredLocations;
         _events = results[1] as List<EventLocation>;
         _isLoading = false;
       });
@@ -51,23 +56,23 @@ class _LocationsTabState extends State<LocationsTab> {
     final langCode = context.watch<LanguageProvider>().languageCode;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final embassies = _embassies ?? [];
+    final locations = _locations ?? [];
     final events = _events ?? [];
 
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(l10n.embassyLocations),
+          title: Text(l10n.translate('locations')),
           backgroundColor: AppColors.info,
         ),
         body: const ShimmerLocationListSkeleton(),
       );
     }
 
-    if (embassies.isEmpty && events.isEmpty) {
+    if (locations.isEmpty && events.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: Text(l10n.embassyLocations),
+          title: Text(l10n.translate('locations')),
           backgroundColor: AppColors.info,
         ),
         body: Center(
@@ -97,7 +102,7 @@ class _LocationsTabState extends State<LocationsTab> {
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                l10n.embassyLocations,
+                l10n.translate('locations'),
                 style: const TextStyle(fontFamily: 'HeatherGreen', fontSize: 20),
               ),
               background: Container(
@@ -113,181 +118,188 @@ class _LocationsTabState extends State<LocationsTab> {
           ),
 
           // Map placeholder - tap to open Google Maps
-          SliverToBoxAdapter(
-            child: GestureDetector(
-              onTap: () {
-                if (embassies.isNotEmpty) {
-                  final first = embassies.first;
+          if (locations.isNotEmpty)
+            SliverToBoxAdapter(
+              child: GestureDetector(
+                onTap: () {
+                  final first = locations.first;
                   launchUrl(
-                    Uri.parse('https://www.google.com/maps/search/Burundi+Embassy/@${first.latitude},${first.longitude},4z'),
+                    Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${first.latitude},${first.longitude}'),
                     mode: LaunchMode.externalApplication,
                   );
-                }
-              },
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                height: 160,
-                decoration: BoxDecoration(
-                  color: AppColors.burundiGreen.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.3)),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.map, size: 48, color: AppColors.burundiGreen.withValues(alpha: 0.6)),
-                      const SizedBox(height: 8),
-                      Text(
-                        l10n.translate('view_on_map'),
-                        style: TextStyle(color: AppColors.burundiGreen.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap to open in Maps',
-                        style: TextStyle(color: AppColors.burundiGreen.withValues(alpha: 0.5), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Embassies & Consulates
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Text(
-                l10n.translate('embassies_consulates'),
-                style: theme.textTheme.headlineMedium,
-              ),
-            ),
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final embassy = embassies[index];
-                final isEmbassy = embassy.type == LocationType.embassy;
-                final typeColor = isEmbassy ? AppColors.burundiGreen : AppColors.auGold;
-                return Container(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  padding: const EdgeInsets.all(16),
+                },
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  height: 160,
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurface : Colors.white,
+                    color: AppColors.burundiGreen.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.3)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              embassy.getName(langCode),
-                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: typeColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              isEmbassy ? 'Embassy' : 'Consulate',
-                              style: TextStyle(color: typeColor, fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, size: 14, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${embassy.address}, ${embassy.city}, ${embassy.country}',
-                              style: theme.textTheme.bodySmall?.copyWith(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.phone, size: 14, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            embassy.phoneNumber,
-                            style: theme.textTheme.bodySmall?.copyWith(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => launchUrl(Uri.parse('tel:${embassy.phoneNumber}')),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.phone, size: 16, color: AppColors.burundiGreen),
-                                    SizedBox(width: 6),
-                                    Text('Call', style: TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600, fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => launchUrl(
-                                Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${embassy.latitude},${embassy.longitude}'),
-                                mode: LaunchMode.externalApplication,
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.info.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.directions, size: 16, color: AppColors.info),
-                                    SizedBox(width: 6),
-                                    Text('Directions', style: TextStyle(color: AppColors.info, fontWeight: FontWeight.w600, fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.map, size: 48, color: AppColors.burundiGreen.withValues(alpha: 0.6)),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.translate('view_on_map'),
+                          style: TextStyle(color: AppColors.burundiGreen.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tap to open in Maps',
+                          style: TextStyle(color: AppColors.burundiGreen.withValues(alpha: 0.5), fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
-              childCount: embassies.length,
+                ),
+              ),
             ),
-          ),
+
+          // Event Venues & Offices
+          if (locations.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Text(
+                  langCode == 'fr' ? 'Lieux & Bureaux' : 'Venues & Offices',
+                  style: theme.textTheme.headlineMedium,
+                ),
+              ),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final location = locations[index];
+                  final isVenue = location.type == LocationType.eventVenue;
+                  final typeColor = isVenue ? AppColors.burundiGreen : AppColors.auGold;
+                  final typeLabel = isVenue
+                      ? (langCode == 'fr' ? 'Lieu' : 'Venue')
+                      : (langCode == 'fr' ? 'Bureau' : 'Office');
+                  return Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                location.getName(langCode),
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: typeColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                typeLabel,
+                                style: TextStyle(color: typeColor, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on, size: 14, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${location.address}, ${location.city}, ${location.country}',
+                                style: theme.textTheme.bodySmall?.copyWith(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (location.phoneNumber.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.phone, size: 14, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                location.phoneNumber,
+                                style: theme.textTheme.bodySmall?.copyWith(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            if (location.phoneNumber.isNotEmpty)
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => launchUrl(Uri.parse('tel:${location.phoneNumber}')),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.phone, size: 16, color: AppColors.burundiGreen),
+                                        SizedBox(width: 6),
+                                        Text('Call', style: TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600, fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (location.phoneNumber.isNotEmpty) const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => launchUrl(
+                                  Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}'),
+                                  mode: LaunchMode.externalApplication,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.info.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.directions, size: 16, color: AppColors.info),
+                                      SizedBox(width: 6),
+                                      Text('Directions', style: TextStyle(color: AppColors.info, fontWeight: FontWeight.w600, fontSize: 13)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                childCount: locations.length,
+              ),
+            ),
+          ],
 
           // Upcoming Events
           SliverToBoxAdapter(

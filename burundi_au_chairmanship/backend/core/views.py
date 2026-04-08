@@ -504,6 +504,18 @@ def update_fcm_token(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def update_language_preference(request):
+    """Update user's preferred language for push notifications."""
+    language = request.data.get('preferred_language', 'en')
+    if language not in ('en', 'fr'):
+        return Response({'error': 'Invalid language'}, status=status.HTTP_400_BAD_REQUEST)
+    request.user.profile.preferred_language = language
+    request.user.profile.save(update_fields=['preferred_language'])
+    return Response({'preferred_language': language})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_device_info(request):
     """
     Update device info and last active timestamp.
@@ -744,7 +756,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 class EmbassyLocationViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view embassy locations"""
     permission_classes = [AllowAny]
-    queryset = EmbassyLocation.objects.all()
+    queryset = EmbassyLocation.objects.exclude(type__in=['embassy', 'consulate'])
     serializer_class = EmbassyLocationSerializer
     filterset_fields = ['type', 'country']
 
@@ -1234,11 +1246,13 @@ def check_verification_status(request):
     )
 
     response_data = {
+        'id': latest_request.id if latest_request else None,
         'is_verified': is_verified,
         'badge_type': badge_type,
         'has_verification_request': latest_request is not None,
         'status': latest_request.status if latest_request else None,
         'rejection_reason': latest_request.rejection_reason if latest_request else None,
+        'appealed_at': latest_request.appeal_submitted_at.isoformat() if latest_request and latest_request.appeal_submitted_at else None,
         'can_appeal': can_appeal,
         'request_details': VerificationRequestSerializer(latest_request).data if latest_request else None,
     }

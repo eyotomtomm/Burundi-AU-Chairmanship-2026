@@ -109,7 +109,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final cachePath = '${cacheDir.path}/$cacheKey.pdf';
       final url = Environment.fixMediaUrl(widget.pdfUrl);
 
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 120),
+        headers: {'Accept-Encoding': 'gzip'},
+      ));
       await dio.download(
         url,
         cachePath,
@@ -209,7 +213,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
       // Otherwise download fresh
       final url = Environment.fixMediaUrl(widget.pdfUrl);
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 120),
+        headers: {'Accept-Encoding': 'gzip'},
+      ));
       await dio.download(
         url,
         filePath,

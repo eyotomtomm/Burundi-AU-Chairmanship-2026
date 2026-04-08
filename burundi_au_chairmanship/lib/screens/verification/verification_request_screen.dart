@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 
@@ -22,6 +24,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
   String? _selectedTitle;
   String? _selectedNationality;
+  String? _selectedGender;
+  File? _supportingDocument;
   bool _isLoading = false;
 
   // Email OTP state
@@ -40,6 +44,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   Timer? _phoneTimer;
   int _phoneCountdown = 0;
   String _selectedCountryCode = '+257';
+  String _phoneOtpChannel = 'sms'; // 'sms' or 'whatsapp'
 
   // Social media state — which platforms are toggled on
   final Map<String, bool> _socialMediaActive = {};
@@ -269,7 +274,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   void _startPhoneCountdown() {
-    _phoneCountdown = 60;
+    _phoneCountdown = 30;
     _phoneTimer?.cancel();
     _phoneTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_phoneCountdown > 0) {
@@ -352,19 +357,31 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
     setState(() => _sendingPhoneOtp = true);
     try {
-      await ApiService().sendPhoneOtp(_selectedCountryCode, phone);
+      await ApiService().sendPhoneOtp(_selectedCountryCode, phone, channel: _phoneOtpChannel);
       if (mounted) {
         setState(() {
           _phoneOtpSent = true;
           _sendingPhoneOtp = false;
         });
         _startPhoneCountdown();
-        _showSuccess('Verification code sent via SMS!');
+        final channelLabel = _phoneOtpChannel == 'whatsapp' ? 'WhatsApp' : 'SMS';
+        _showSuccess('Verification code sent via $channelLabel!');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _sendingPhoneOtp = false);
-        _showError('Failed to send code: $e');
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('rate') || errorStr.contains('throttl') || errorStr.contains('too many')) {
+          _showError('Too many attempts. Please wait a moment before trying again.');
+        } else if (errorStr.contains('invalid') || errorStr.contains('not a valid')) {
+          _showError('Invalid phone number. Please check the number and country code.');
+        } else if (errorStr.contains('unverified') || errorStr.contains('not verified')) {
+          _showError('This phone number cannot receive codes. Please try a different number.');
+        } else if (errorStr.contains('network') || errorStr.contains('connection') || errorStr.contains('timeout')) {
+          _showError('Network error. Please check your connection and try again.');
+        } else {
+          _showError('Failed to send verification code. Please try again.');
+        }
       }
     }
   }
@@ -502,6 +519,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 _buildNationalityField(isDark),
                 const SizedBox(height: 20),
 
+                // Gender
+                _buildGenderField(isDark),
+                const SizedBox(height: 20),
+
                 // Email with OTP
                 _buildEmailSection(isDark),
                 const SizedBox(height: 20),
@@ -516,6 +537,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
                 // Social Media
                 _buildSocialMediaSection(isDark),
+                const SizedBox(height: 32),
+
+                // Supporting Document (optional)
+                _buildDocumentUpload(isDark),
                 const SizedBox(height: 32),
 
                 // Notice
@@ -649,13 +674,123 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     );
   }
 
+  Widget _buildGenderField(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Gender *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedGender,
+          decoration: _inputDecoration(isDark: isDark, hint: 'Select your gender', prefixIcon: const Icon(Icons.person_outline)),
+          items: const [
+            DropdownMenuItem(value: 'male', child: Text('Male')),
+            DropdownMenuItem(value: 'female', child: Text('Female')),
+          ],
+          onChanged: (v) => setState(() => _selectedGender = v),
+          validator: (v) => (v == null || v.isEmpty) ? 'Please select your gender' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDocumentUpload(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Supporting Document (Optional)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 4),
+        Text(
+          'Upload a photo of your ID, business card, or other supporting document',
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
+        ),
+        const SizedBox(height: 12),
+        if (_supportingDocument != null) ...[
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  _supportingDocument!,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () => setState(() => _supportingDocument = null),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ] else
+          InkWell(
+            onTap: _pickDocument,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 100,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_upload_outlined, size: 32, color: isDark ? Colors.white38 : Colors.grey[500]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tap to upload image',
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickDocument() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 80,
+    );
+    if (picked != null) {
+      setState(() => _supportingDocument = File(picked.path));
+    }
+  }
+
   // ── Email with inline OTP ──────────────────────────────────
 
   Widget _buildEmailSection(bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Email *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text('Work/Professional Email *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 4),
+        Text(
+          'Use your professional or organizational email (not personal Gmail/Yahoo)',
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
+        ),
         const SizedBox(height: 8),
 
         // Email input + Get Code button
@@ -843,6 +978,23 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           ],
         ),
 
+        // SMS / WhatsApp channel toggle
+        if (!_phoneVerified) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text(
+                'Send code via:',
+                style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
+              ),
+              const SizedBox(width: 8),
+              _buildChannelChip('SMS', 'sms', isDark),
+              const SizedBox(width: 6),
+              _buildChannelChip('WhatsApp', 'whatsapp', isDark),
+            ],
+          ),
+        ],
+
         // OTP input after code sent
         if (_phoneOtpSent && !_phoneVerified) ...[
           const SizedBox(height: 12),
@@ -894,6 +1046,34 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildChannelChip(String label, String channel, bool isDark) {
+    final isSelected = _phoneOtpChannel == channel;
+    return GestureDetector(
+      onTap: () => setState(() => _phoneOtpChannel = channel),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.burundiGreen.withValues(alpha: 0.15)
+              : (isDark ? AppColors.darkSurface : Colors.grey[100]),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.burundiGreen : (isDark ? AppColors.darkDivider : Colors.grey[300]!),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppColors.burundiGreen : (isDark ? Colors.white70 : Colors.black54),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1169,6 +1349,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         phoneNumber: '$_selectedCountryCode${_phoneController.text.trim()}',
         positionRole: _positionController.text.trim(),
         countryCode: _selectedNationality,
+        gender: _selectedGender,
         twitterUrl: twitterUrl,
         linkedinUrl: linkedinUrl,
         facebookUrl: facebookUrl,

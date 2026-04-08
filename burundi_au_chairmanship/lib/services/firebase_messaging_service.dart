@@ -35,6 +35,10 @@ class FirebaseMessagingService {
 
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  /// Track processed message IDs to prevent duplicate notifications
+  final Set<String> _processedMessageIds = {};
+  static const int _maxProcessedIds = 100;
+
   /// Initialize Firebase Messaging and request permissions
   ///
   /// Should be called during app startup
@@ -110,16 +114,35 @@ class FirebaseMessagingService {
   /// Handle foreground messages by showing a local notification
   ///
   /// When the app is in the foreground, Firebase doesn't automatically show
-  /// notifications, so we use flutter_local_notifications to display them
+  /// notifications, so we use flutter_local_notifications to display them.
+  /// Includes deduplication to prevent showing the same notification multiple times.
   void _handleForegroundMessage(RemoteMessage message) {
     if (kDebugMode) {
       print('Foreground message received: ${message.messageId}');
     }
 
+    // Deduplication: generate a stable ID from messageId or content hash
+    final messageId = message.messageId ??
+        '${message.notification?.title}:${message.notification?.body}:${message.data}'.hashCode.toString();
+
+    if (_processedMessageIds.contains(messageId)) {
+      if (kDebugMode) print('Duplicate message skipped: $messageId');
+      return;
+    }
+
+    _processedMessageIds.add(messageId);
+    // Trim set to prevent unbounded memory growth
+    if (_processedMessageIds.length > _maxProcessedIds) {
+      _processedMessageIds.remove(_processedMessageIds.first);
+    }
+
     final notification = message.notification;
     if (notification != null) {
+      // Use stable notification ID from messageId to prevent system-level duplicates
+      final notificationId = messageId.hashCode.abs() % 2147483647;
+
       _localNotifications.show(
-        id: message.hashCode,
+        id: notificationId,
         title: notification.title,
         body: notification.body,
         notificationDetails: NotificationDetails(

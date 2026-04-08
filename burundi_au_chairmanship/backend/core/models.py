@@ -50,6 +50,12 @@ class UserProfile(models.Model):
     phone_number = models.CharField(max_length=20, blank=True)
     gender = models.CharField(max_length=20, choices=GENDER_CHOICES, blank=True)
     nationality = models.CharField(max_length=5, choices=NATIONALITY_CHOICES, blank=True, help_text='User nationality (ISO country code)')
+    preferred_language = models.CharField(
+        max_length=5,
+        choices=[('en', 'English'), ('fr', 'French')],
+        default='en',
+        help_text='Preferred language for push notifications'
+    )
     date_of_birth = models.DateField(blank=True, null=True, help_text='Date of birth for age-based targeting')
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True, validators=[validate_image_file])
 
@@ -859,6 +865,13 @@ class Notification(models.Model):
         choices=[('BLUE', 'Blue Badge'), ('GOLD', 'Gold Badge')],
         help_text='Filter by badge type (leave blank for any verified)'
     )
+    target_language = models.CharField(
+        max_length=5,
+        blank=True,
+        choices=[('', 'All Languages'), ('en', 'English Only'), ('fr', 'French Only')],
+        default='',
+        help_text='Send only to users with this language preference'
+    )
 
     # Push notification tracking
     push_sent = models.BooleanField(default=False, help_text='Has push notification been sent?')
@@ -1313,6 +1326,7 @@ class VerificationRequest(models.Model):
     first_name = models.CharField(max_length=100, default='', help_text='First name (for identity verification)')
     last_name = models.CharField(max_length=100, default='', help_text='Last name (for identity verification)')
     full_name = models.CharField(max_length=200, help_text='Full legal name')
+    gender = models.CharField(max_length=20, choices=[('male', 'Male'), ('female', 'Female')], blank=True, help_text='Applicant gender')
 
     # Email verification
     email = models.EmailField(
@@ -1332,6 +1346,7 @@ class VerificationRequest(models.Model):
         blank=True,
         help_text='User explanation for why they deserve the verification badge'
     )
+    supporting_document = models.ImageField(upload_to='verification_documents/', blank=True, null=True, help_text='Optional supporting document or photo')
 
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -1397,6 +1412,22 @@ class VerificationRequest(models.Model):
         profile.is_verified = True
         profile.badge_type = badge_type
         profile.verified_at = timezone.now()
+        profile.save()
+
+        # Transfer verified data to user profile (don't overwrite existing data)
+        if self.full_name:
+            parts = self.full_name.split(' ', 1)
+            if not self.user.first_name:
+                self.user.first_name = parts[0]
+            if not self.user.last_name and len(parts) > 1:
+                self.user.last_name = parts[1]
+            self.user.save(update_fields=['first_name', 'last_name'])
+        if self.phone_number and not profile.phone_number:
+            profile.phone_number = self.phone_number
+        if self.gender and not profile.gender:
+            profile.gender = self.gender
+        if self.country_code and not profile.nationality:
+            profile.nationality = self.country_code
         profile.save()
 
     def reject(self, admin_user, reason):
@@ -1635,6 +1666,8 @@ class UserSession(models.Model):
     device_type = models.CharField(max_length=50, blank=True)
     device_os = models.CharField(max_length=50, blank=True)
     app_version = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
+    terminated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

@@ -41,6 +41,9 @@ def get_target_tokens(notification):
     if notification.target_nationalities:
         profiles = profiles.filter(nationality__in=notification.target_nationalities)
 
+    if notification.target_language:
+        profiles = profiles.filter(preferred_language=notification.target_language)
+
     today = date.today()
     if notification.target_age_min is not None:
         max_dob = today.replace(year=today.year - notification.target_age_min)

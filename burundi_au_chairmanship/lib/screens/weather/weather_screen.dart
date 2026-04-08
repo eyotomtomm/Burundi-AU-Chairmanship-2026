@@ -25,6 +25,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
   final List<_CityWeather> _cities = [];
   List<WeatherCity> _defaultCities = []; // Loaded from backend
   bool _isLoading = true;
+  bool _hasError = false;
   DateTime? _lastUpdated;
 
   @override
@@ -34,7 +35,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   Future<void> _loadCitiesAndFetch() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
 
     try {
       // Fetch default cities from backend API
@@ -44,17 +48,26 @@ class _WeatherScreenState extends State<WeatherScreen> {
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to load weather cities from API: $e');
-      // Keep _defaultCities empty, user can still add custom cities
+      // Keep _defaultCities empty, fallback below will handle it
     }
 
-    // Always start with cities from backend
+    // Fallback: if backend returned no cities, use hardcoded defaults
+    if (_defaultCities.isEmpty) {
+      _defaultCities = [
+        WeatherCity(id: 0, name: 'Bujumbura', latitude: -3.3614, longitude: 29.3599, order: 0, isDefault: true),
+        WeatherCity(id: 0, name: 'Addis Ababa', latitude: 9.0192, longitude: 38.7525, order: 1, isDefault: true),
+        WeatherCity(id: 0, name: 'Nairobi', latitude: -1.2921, longitude: 36.8219, order: 2, isDefault: true),
+      ];
+    }
+
+    // Always start with cities from backend (or fallback)
     _cities.clear();
     for (final d in _defaultCities) {
       _cities.add(_CityWeather(
         name: d.name,
         lat: d.latitude,
         lon: d.longitude,
-        backgroundImageUrl: d.backgroundImage,
+        backgroundImageUrl: (d.backgroundImage != null && d.backgroundImage!.isNotEmpty) ? d.backgroundImage : null,
       ));
     }
 
@@ -92,7 +105,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
   bool _isDefaultCity(int index) => index < _defaultCities.length;
 
   Future<void> _fetchWeather() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    int failCount = 0;
     for (final city in _cities) {
       try {
         final url = Uri.parse(
@@ -125,15 +142,18 @@ class _WeatherScreenState extends State<WeatherScreen> {
               weatherCode: (daily['weather_code'][i] as num).toInt(),
             ));
           }
+        } else {
+          failCount++;
         }
       } catch (_) {
-        // Use fallback data
+        failCount++;
       }
     }
     if (mounted) {
       setState(() {
         _isLoading = false;
-        _lastUpdated = DateTime.now();
+        _hasError = failCount == _cities.length && _cities.isNotEmpty;
+        if (!_hasError) _lastUpdated = DateTime.now();
       });
     }
   }
@@ -230,13 +250,140 @@ class _WeatherScreenState extends State<WeatherScreen> {
     final primary = _cities.isNotEmpty ? _cities.first : null;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.burundiGreen,
-        onPressed: _showAddCityDialog,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      floatingActionButton: _isLoading
+          ? null
+          : FloatingActionButton(
+              backgroundColor: AppColors.burundiGreen,
+              onPressed: _showAddCityDialog,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? CustomScrollView(
+              slivers: [
+                // Always render the AppBar so users can go back during loading
+                SliverAppBar(
+                  expandedHeight: 280,
+                  pinned: true,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  backgroundColor: const Color(0xFF065A1A),
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: Text(
+                      l10n.translate('weather'),
+                      style: const TextStyle(
+                        fontFamily: 'HeatherGreen',
+                        fontSize: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                    background: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: AppColors.burundiGreen),
+                        SizedBox(height: 16),
+                        Text(
+                          'Loading weather data…',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : _hasError
+              ? CustomScrollView(
+                  slivers: [
+                    SliverAppBar(
+                      expandedHeight: 280,
+                      pinned: true,
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      backgroundColor: const Color(0xFF065A1A),
+                      flexibleSpace: FlexibleSpaceBar(
+                        title: Text(
+                          l10n.translate('weather'),
+                          style: const TextStyle(
+                            fontFamily: 'HeatherGreen',
+                            fontSize: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        background: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverFillRemaining(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.cloud_off_rounded,
+                              size: 56,
+                              color: isDark ? Colors.white38 : Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Could not load weather data',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white70 : Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Please check your connection and try again.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? Colors.white38 : Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              onPressed: _loadCitiesAndFetch,
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Retry'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.burundiGreen,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                )
           : RefreshIndicator(
               onRefresh: _fetchWeather,
               color: AppColors.burundiGreen,
@@ -260,6 +407,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           color: Colors.white,
                         ),
                       ),
+
                       background: Stack(
                         fit: StackFit.expand,
                         children: [

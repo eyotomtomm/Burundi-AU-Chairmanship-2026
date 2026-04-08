@@ -1,8 +1,10 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../../../config/app_colors.dart';
@@ -131,108 +133,163 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
+  /// Cache the home feed response for offline/fallback use
+  Future<void> _cacheHomeFeed(Map<String, dynamic> homeFeed) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_home_feed', json.encode(homeFeed));
+    } catch (_) {}
+  }
+
+  /// Load cached home feed data as fallback when network fails
+  Future<Map<String, dynamic>?> _loadCachedHomeFeed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('cached_home_feed');
+      if (cached != null) {
+        return json.decode(cached) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _loadData() async {
     try {
       final api = ApiService();
-      final homeFeed = await api.getHomeFeed();
+
+      // Fetch main home feed + secondary data in parallel
+      final results = await Future.wait([
+        api.getHomeFeed(),
+        api.getPriorityAgendas().catchError((_) => <Map<String, dynamic>>[]),
+        api.getHeroTextContent().catchError((_) => <Map<String, dynamic>>[]),
+        api.getQuickAccessMenu().catchError((_) => <Map<String, dynamic>>[]),
+      ]);
+
       if (!mounted) return;
 
-      // Parse hero slides
-      final heroSlides = (homeFeed['hero_slides'] as List<dynamic>?)
-          ?.map((j) => HeroSlide.fromJson(j as Map<String, dynamic>))
-          .toList();
+      final homeFeed = results[0] as Map<String, dynamic>;
+      final priorityAgendas = results[1] as List<Map<String, dynamic>>;
+      final heroTextData = results[2] as List<Map<String, dynamic>>;
+      final quickAccessMenu = results[3] as List<Map<String, dynamic>>;
 
-      // Parse articles
-      final articles = (homeFeed['articles'] as List<dynamic>?)
-          ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
-          .toList();
+      // Cache successful response for future fallback
+      _cacheHomeFeed(homeFeed);
 
-      // Parse feature cards from API into the map format the UI expects
-      final langCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
-      final featureCardIcons = [Icons.stars, Icons.travel_explore, Icons.gavel, Icons.auto_stories];
-      final rawCards = homeFeed['feature_cards'] as List<dynamic>? ?? [];
-      final featureCards = rawCards.asMap().entries.map((entry) {
-        final j = entry.value as Map<String, dynamic>;
-        final gradStart = _hexToColor(j['gradient_start'] ?? '#1EB53A');
-        final gradEnd = _hexToColor(j['gradient_end'] ?? '#4CAF50');
+      _applyHomeFeedData(homeFeed, priorityAgendas, heroTextData, quickAccessMenu);
+    } catch (e, stack) {
+      debugPrint('Failed to load home feed data: $e');
+      Sentry.captureException(e, stackTrace: stack);
 
-        // Parse icon from icon_name or use fallback
-        IconData icon = featureCardIcons[entry.key % featureCardIcons.length];
-        final iconName = j['icon_name'] as String?;
-        if (iconName != null && iconName.isNotEmpty) {
-          icon = _getIconFromName(iconName);
-        }
+      if (!mounted) return;
 
-        return <String, dynamic>{
-          'title': langCode == 'fr' ? (j['title_fr'] ?? j['title'] ?? '') : (j['title'] ?? ''),
-          'description': langCode == 'fr' ? (j['description_fr'] ?? j['description'] ?? '') : (j['description'] ?? ''),
-          'icon': icon,
-          'iconImageUrl': j['icon_image'] ?? '',
-          'gradient': [gradStart, gradEnd],
-          'imageUrl': j['image'] ?? '',
-          'actionType': j['action_type'] ?? 'none',
-          'actionValue': j['action_value'] ?? '',
-          // Rich content fields for detail page
-          'gradient_start': j['gradient_start'] ?? '#1EB53A',
-          'gradient_end': j['gradient_end'] ?? '#4CAF50',
-          'overview': j['overview'] ?? '',
-          'overview_fr': j['overview_fr'] ?? '',
-          'key_points': j['key_points'] ?? [],
-          'key_points_fr': j['key_points_fr'] ?? [],
-          'impact_areas': j['impact_areas'] ?? [],
-          'impact_areas_fr': j['impact_areas_fr'] ?? [],
-          'extra_content': j['extra_content'] ?? '',
-          'extra_content_fr': j['extra_content_fr'] ?? '',
-          'media': j['media'] ?? [],
-          // Keep raw title fields for detail screen localization
-          'title_raw': j['title'] ?? '',
-          'title_fr': j['title_fr'] ?? '',
-        };
-      }).toList();
-
-      // Fetch priority agendas
-      final priorityAgendas = await api.getPriorityAgendas();
-
-      // Fetch hero text content
-      final heroTextData = await api.getHeroTextContent();
-      final heroTextMap = <String, String>{};
-      for (final item in heroTextData) {
-        final key = item['key'] as String;
-        final text = langCode == 'fr' && item['text_fr'] != null && (item['text_fr'] as String).isNotEmpty
-            ? item['text_fr'] as String
-            : item['text_en'] as String;
-        heroTextMap[key] = text;
+      // Try loading cached data as fallback
+      final cachedFeed = await _loadCachedHomeFeed();
+      if (cachedFeed != null && mounted) {
+        // Use cached data so user sees something
+        _applyHomeFeedData(cachedFeed, [], [], []);
+        return;
       }
 
-      // Parse event cards
-      final rawEventCards = homeFeed['event_cards'] as List<dynamic>? ?? [];
-      final eventCards = rawEventCards
-          .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>))
-          .toList();
-
-      // Fetch quick access menu
-      final quickAccessMenu = await api.getQuickAccessMenu();
-
-      setState(() {
-        _apiHeroSlides = heroSlides;
-        _apiArticles = articles;
-        _apiFeatureCards = featureCards;
-        _apiPriorityAgendas = priorityAgendas;
-        _apiEventCards = eventCards;
-        _heroTextContent = heroTextMap;
-        _quickAccessItems = quickAccessMenu;
-        _isLoading = false;
-        _hasError = false;
-      });
-    } catch (e) {
-      if (kDebugMode) debugPrint('Failed to load home feed data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
           _hasError = true;
+          // Store error type for specific messaging
+          _lastErrorMessage = e is ApiException && e.statusCode == 0
+              ? 'no_internet'
+              : 'server_error';
         });
       }
     }
+  }
+
+  String _lastErrorMessage = '';
+
+  /// Apply parsed home feed data to state (shared between live and cached loads)
+  void _applyHomeFeedData(
+    Map<String, dynamic> homeFeed,
+    List<Map<String, dynamic>> priorityAgendas,
+    List<Map<String, dynamic>> heroTextData,
+    List<Map<String, dynamic>> quickAccessMenu,
+  ) {
+    // Parse hero slides
+    final heroSlides = (homeFeed['hero_slides'] as List<dynamic>?)
+        ?.map((j) => HeroSlide.fromJson(j as Map<String, dynamic>))
+        .toList();
+
+    // Parse articles
+    final articles = (homeFeed['articles'] as List<dynamic>?)
+        ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
+        .toList();
+
+    // Parse feature cards from API
+    final langCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
+    final featureCardIcons = [Icons.stars, Icons.travel_explore, Icons.gavel, Icons.auto_stories];
+    final rawCards = homeFeed['feature_cards'] as List<dynamic>? ?? [];
+    final featureCards = rawCards.asMap().entries.map((entry) {
+      final j = entry.value as Map<String, dynamic>;
+      final gradStart = _hexToColor(j['gradient_start'] ?? '#1EB53A');
+      final gradEnd = _hexToColor(j['gradient_end'] ?? '#4CAF50');
+
+      IconData icon = featureCardIcons[entry.key % featureCardIcons.length];
+      final iconName = j['icon_name'] as String?;
+      if (iconName != null && iconName.isNotEmpty) {
+        icon = _getIconFromName(iconName);
+      }
+
+      return <String, dynamic>{
+        'title': langCode == 'fr' ? (j['title_fr'] ?? j['title'] ?? '') : (j['title'] ?? ''),
+        'description': langCode == 'fr' ? (j['description_fr'] ?? j['description'] ?? '') : (j['description'] ?? ''),
+        'icon': icon,
+        'iconImageUrl': j['icon_image'] ?? '',
+        'gradient': [gradStart, gradEnd],
+        'imageUrl': j['image'] ?? '',
+        'actionType': j['action_type'] ?? 'none',
+        'actionValue': j['action_value'] ?? '',
+        'gradient_start': j['gradient_start'] ?? '#1EB53A',
+        'gradient_end': j['gradient_end'] ?? '#4CAF50',
+        'overview': j['overview'] ?? '',
+        'overview_fr': j['overview_fr'] ?? '',
+        'key_points': j['key_points'] ?? [],
+        'key_points_fr': j['key_points_fr'] ?? [],
+        'impact_areas': j['impact_areas'] ?? [],
+        'impact_areas_fr': j['impact_areas_fr'] ?? [],
+        'extra_content': j['extra_content'] ?? '',
+        'extra_content_fr': j['extra_content_fr'] ?? '',
+        'media': j['media'] ?? [],
+        'title_raw': j['title'] ?? '',
+        'title_fr': j['title_fr'] ?? '',
+      };
+    }).toList();
+
+    // Parse hero text content
+    final heroTextMap = <String, String>{};
+    for (final item in heroTextData) {
+      final key = item['key'] as String?;
+      if (key == null) continue;
+      final text = langCode == 'fr' && item['text_fr'] != null && (item['text_fr'] as String).isNotEmpty
+          ? item['text_fr'] as String
+          : item['text_en'] as String;
+      heroTextMap[key] = text;
+    }
+
+    // Parse event cards
+    final rawEventCards = homeFeed['event_cards'] as List<dynamic>? ?? [];
+    final eventCards = rawEventCards
+        .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>))
+        .toList();
+
+    setState(() {
+      _apiHeroSlides = heroSlides;
+      _apiArticles = articles;
+      _apiFeatureCards = featureCards;
+      _apiPriorityAgendas = priorityAgendas;
+      _apiEventCards = eventCards;
+      _heroTextContent = heroTextMap;
+      _quickAccessItems = quickAccessMenu;
+      _isLoading = false;
+      _hasError = false;
+    });
   }
 
   @override
@@ -290,20 +347,27 @@ class _HomeTabState extends State<HomeTab> {
 
     // Show error/retry when loading failed and no data loaded
     if (_hasError && _apiHeroSlides == null && _apiArticles == null) {
+      final isNoInternet = _lastErrorMessage == 'no_internet';
+      final errorIcon = isNoInternet ? Icons.wifi_off_rounded : Icons.cloud_off_rounded;
+      final errorTitle = isNoInternet
+          ? (langCode == 'fr' ? 'Pas de connexion internet' : 'No internet connection')
+          : (langCode == 'fr' ? 'Serveur temporairement indisponible' : 'Server temporarily unavailable');
+      final errorSubtitle = isNoInternet
+          ? (langCode == 'fr' ? 'Vérifiez votre connexion et réessayez' : 'Check your connection and try again')
+          : (langCode == 'fr' ? 'Veuillez réessayer dans un moment' : 'Please try again in a moment');
+
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.cloud_off_rounded, size: 72,
+              Icon(errorIcon, size: 72,
                 color: Theme.of(context).brightness == Brightness.dark
                     ? Colors.white38 : Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
-                langCode == 'fr'
-                    ? 'Impossible de charger le contenu'
-                    : 'Unable to load content',
+                errorTitle,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -314,9 +378,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
               const SizedBox(height: 8),
               Text(
-                langCode == 'fr'
-                    ? 'Vérifiez votre connexion et réessayez'
-                    : 'Check your connection and try again',
+                errorSubtitle,
                 style: TextStyle(
                   fontSize: 14,
                   color: Theme.of(context).brightness == Brightness.dark
@@ -1382,6 +1444,27 @@ class _HomeTabState extends State<HomeTab> {
       if (actionValue.startsWith('/')) {
         Navigator.pushNamed(context, actionValue);
       }
+      return;
+    }
+
+    // Link to event with registration: action_type='event' navigates to event detail
+    if (actionType == 'event' && actionValue != null && actionValue.isNotEmpty) {
+      // Try to find the event in loaded event cards
+      final eventId = int.tryParse(actionValue);
+      if (eventId != null && _apiEventCards != null) {
+        final matchingEvent = _apiEventCards!.where((e) => e.id == eventId).toList();
+        if (matchingEvent.isNotEmpty) {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => EventDetailScreen(event: matchingEvent.first),
+            ),
+          );
+          return;
+        }
+      }
+      // Fallback: navigate to calendar
+      Navigator.pushNamed(context, '/calendar');
       return;
     }
 

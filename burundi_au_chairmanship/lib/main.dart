@@ -117,6 +117,49 @@ void main() async {
 
   await _initializeApp();
 
+  // Global error handler: catch all uncaught async errors to prevent random crashes
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (kDebugMode) print('Uncaught error: $error\n$stack');
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    } catch (_) {}
+    if (Environment.sentryDsn.isNotEmpty) {
+      Sentry.captureException(error, stackTrace: stack);
+    }
+    return true; // Handled — don't crash the app
+  };
+
+  // Graceful error widget: show a friendly UI instead of crashing on widget build errors
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                const Text(
+                  'Something went wrong',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please restart the app and try again.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   // Initialize Sentry if DSN is configured
   if (Environment.sentryDsn.isNotEmpty) {
     await SentryFlutter.init(

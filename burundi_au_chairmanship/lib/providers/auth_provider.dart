@@ -41,6 +41,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   bool _requiresEmailVerification = false;
+  bool _hasInitialized = false; // Guard against premature sign-out during startup
 
   bool get isAuthenticated => _isAuthenticated;
   int? get userId => _userId;
@@ -68,13 +69,31 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Listen to Firebase auth state changes
+  ///
+  /// Guards against premature sign-out: during app startup, Firebase may briefly
+  /// report null before restoring the auth state. We skip sign-out until
+  /// [_checkAuthStatus] has completed and [_hasInitialized] is true.
   void _listenToAuthChanges() {
     _firebaseAuth.authStateChanges.listen((User? firebaseUser) async {
       if (firebaseUser != null) {
         // User signed in - sync with Django backend
         await _syncWithBackend();
       } else {
-        // User signed out
+        // Skip sign-out during initial boot — Firebase may briefly report null
+        if (!_hasInitialized) return;
+
+        // Double-check: if we have cached credentials, don't sign out yet
+        if (_isAuthenticated) {
+          // Wait briefly and recheck — Firebase might be recovering
+          await Future.delayed(const Duration(seconds: 2));
+          if (_firebaseAuth.currentUser != null) return;
+
+          // Also check for legacy JWT tokens
+          final token = await _secureStorage.read(key: AppConstants.userTokenKey);
+          if (token != null && token.isNotEmpty) return;
+        }
+
+        // User genuinely signed out
         _isAuthenticated = false;
         await _clearUserData();
         notifyListeners();
@@ -139,6 +158,7 @@ class AuthProvider extends ChangeNotifier {
         }
       }
     }
+    _hasInitialized = true;
     notifyListeners();
   }
 
@@ -296,7 +316,12 @@ class AuthProvider extends ChangeNotifier {
       }
 
       // 3. Login or register with backend (backend auto-creates if new)
-      final data = await _api.firebaseLogin(idToken: idToken);
+      //    If login returns 404, auto-register the user
+      final data = await _firebaseLoginOrRegister(
+        idToken: idToken,
+        name: credential.user?.displayName ?? '',
+        email: credential.user?.email ?? '',
+      );
       await _storeUserData(data['user']);
 
       // Google sign-in: backend trusts Firebase email_verified flag
@@ -341,7 +366,12 @@ class AuthProvider extends ChangeNotifier {
       }
 
       // 3. Login or register with backend (backend auto-creates if new)
-      final data = await _api.firebaseLogin(idToken: idToken);
+      //    If login returns 404, auto-register the user
+      final data = await _firebaseLoginOrRegister(
+        idToken: idToken,
+        name: credential.user?.displayName ?? '',
+        email: credential.user?.email ?? '',
+      );
       await _storeUserData(data['user']);
 
       // Apple sign-in: backend trusts Firebase email_verified flag
@@ -366,6 +396,27 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Try firebase login first; if user doesn't exist (404), auto-register
+  Future<Map<String, dynamic>> _firebaseLoginOrRegister({
+    required String idToken,
+    required String name,
+    required String email,
+  }) async {
+    try {
+      return await _api.firebaseLogin(idToken: idToken);
+    } on ApiException catch (e) {
+      // If user not found on backend, auto-create their account
+      if (e.statusCode == 404 || e.statusCode == 401) {
+        return await _api.firebaseRegister(
+          idToken: idToken,
+          name: name.isNotEmpty ? name : email.split('@').first,
+          email: email,
+        );
+      }
+      rethrow;
     }
   }
 

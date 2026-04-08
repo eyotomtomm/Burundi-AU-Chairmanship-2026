@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
@@ -198,7 +199,10 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          await _loadData();
+        },
         color: AppColors.burundiGreen,
         child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -452,6 +456,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     }
     return RefreshIndicator(
       onRefresh: () async {
+        HapticFeedback.mediumImpact();
         setState(() => _isLoading = true);
         await _loadData();
       },
@@ -817,6 +822,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     }
     return RefreshIndicator(
       onRefresh: () async {
+        HapticFeedback.mediumImpact();
         setState(() => _isLoading = true);
         await _loadData();
       },

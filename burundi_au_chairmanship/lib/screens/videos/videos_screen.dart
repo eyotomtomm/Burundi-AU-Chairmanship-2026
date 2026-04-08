@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
@@ -93,7 +94,10 @@ class _VideosScreenState extends State<VideosScreen> {
       body: _isLoading
           ? const ShimmerVideoGridSkeleton()
           : RefreshIndicator(
-              onRefresh: _loadVideos,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                await _loadVideos();
+              },
               child: CustomScrollView(
                 slivers: [
                   // App Bar

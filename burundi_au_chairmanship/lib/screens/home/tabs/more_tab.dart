@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -22,6 +23,7 @@ import '../../security/login_history_screen.dart';
 import '../../security/active_sessions_screen.dart';
 import '../../security/change_password_screen.dart';
 import '../../settings/notification_preferences_screen.dart';
+import '../../settings/linked_accounts_screen.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -59,8 +61,14 @@ class _MoreTabState extends State<MoreTab> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            HapticFeedback.mediumImpact();
+            if (mounted) setState(() {});
+          },
+          color: AppColors.burundiGreen,
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             // Clean minimal header
             SliverToBoxAdapter(
@@ -246,7 +254,10 @@ class _MoreTabState extends State<MoreTab> {
                     child: Consumer<LanguageProvider>(
                       builder: (context, langProvider, _) {
                         return GestureDetector(
-                          onTap: () => langProvider.toggleLanguage(),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            langProvider.toggleLanguage();
+                          },
                           child: Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
@@ -308,7 +319,10 @@ class _MoreTabState extends State<MoreTab> {
                     child: Consumer<ThemeProvider>(
                       builder: (context, themeProvider, _) {
                         return GestureDetector(
-                          onTap: () => themeProvider.toggleTheme(),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            themeProvider.toggleTheme();
+                          },
                           child: Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
@@ -447,14 +461,16 @@ class _MoreTabState extends State<MoreTab> {
                             isDark: isDark,
                             authProvider: authProvider,
                           ),
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.lock_rounded,
-                            iconBgColor: const Color(0xFF8D6E63),
-                            title: l10n.translate('change_password'),
-                            isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ChangePasswordScreen())),
-                          ),
+                          // Only show Change Password for email/password users (not Google/Apple SSO)
+                          if (authProvider.hasPasswordProvider)
+                            _buildMenuItem(
+                              context: context,
+                              icon: Icons.lock_rounded,
+                              iconBgColor: const Color(0xFF8D6E63),
+                              title: l10n.translate('change_password'),
+                              isDark: isDark,
+                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ChangePasswordScreen())),
+                            ),
                           _buildMenuItem(
                             context: context,
                             icon: Icons.history_rounded,
@@ -470,6 +486,15 @@ class _MoreTabState extends State<MoreTab> {
                             title: l10n.translate('active_sessions'),
                             isDark: isDark,
                             onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ActiveSessionsScreen())),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.link_rounded,
+                            iconBgColor: const Color(0xFF26A69A),
+                            title: 'Linked Accounts',
+                            subtitle: 'Manage sign-in methods',
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const LinkedAccountsScreen())),
                           ),
                         ],
                         // Get Verified - Only show if logged in and NOT verified
@@ -681,6 +706,7 @@ class _MoreTabState extends State<MoreTab> {
             ),
           ),
         ],
+      ),
       ),
     ));
   }
@@ -1145,6 +1171,7 @@ class _MoreTabState extends State<MoreTab> {
           trailing: Switch.adaptive(
             value: authProvider.receivesNewsletter,
             onChanged: (val) async {
+              HapticFeedback.lightImpact();
               final success = await authProvider.toggleNewsletter(val);
               if (!success && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

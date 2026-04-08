@@ -1,0 +1,261 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Comments - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">chat_bubble</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Comments</h1>
+        <p class="text-sm text-slate-500 mt-1">Manage comments across articles and events</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flash Messages -->
+  {% if messages %}
+  <div class="mb-6 space-y-2">
+    {% for message in messages %}
+    <div class="flex items-center gap-3 px-4 py-3 rounded-lg border {% if message.tags == 'success' %}bg-emerald-50 border-emerald-200 text-emerald-800{% elif message.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-800{% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+      <span class="material-symbols-outlined text-lg">{% if message.tags == 'success' %}check_circle{% elif message.tags == 'warning' %}warning{% elif message.tags == 'error' %}error{% else %}info{% endif %}</span>
+      <span class="text-sm font-medium">{{ message }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Comments</p>
+      <p class="text-2xl font-bold text-slate-900 mt-1">{{ total_all }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-blue-100">
+      <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Article Comments</p>
+      <p class="text-2xl font-bold text-blue-700 mt-1">{{ total_article }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-purple-100">
+      <p class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Event Comments</p>
+      <p class="text-2xl font-bold text-purple-700 mt-1">{{ total_event }}</p>
+    </div>
+  </div>
+
+  <!-- Filters & Search -->
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+    <div class="flex items-center gap-2">
+      <a href="?type=all{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'all' %}bg-slate-900 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+        All ({{ total_all }})
+      </a>
+      <a href="?type=articles{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'articles' %}bg-blue-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+        Articles ({{ total_article }})
+      </a>
+      <a href="?type=events{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="px-4 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'events' %}bg-purple-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+        Events ({{ total_event }})
+      </a>
+    </div>
+    <form method="get" class="flex items-center gap-2">
+      <input type="hidden" name="type" value="{{ current_filter }}">
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search comments, users, content..."
+             class="border border-slate-200 bg-white rounded-lg py-2.5 px-4 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40">
+      <button type="submit" class="px-4 py-2.5 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors">
+        <span class="material-symbols-outlined text-lg align-middle">search</span>
+      </button>
+      {% if search_query %}
+      <a href="?type={{ current_filter }}" class="px-3 py-2.5 text-slate-500 hover:text-slate-700 text-sm" title="Clear search">
+        <span class="material-symbols-outlined text-lg align-middle">close</span>
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Bulk Delete Form -->
+  <form method="post" action="{% url 'custom_admin:comment_bulk_delete' %}" id="bulkDeleteForm">
+    {% csrf_token %}
+
+    <!-- Bulk Actions Bar -->
+    <div id="bulkBar" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-red-600">warning</span>
+        <span class="text-sm font-semibold text-red-800"><span id="selectedCount">0</span> comment(s) selected</span>
+      </div>
+      <button type="button" onclick="confirmBulkDelete()" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-2">
+        <span class="material-symbols-outlined text-lg">delete_sweep</span>
+        Delete Selected
+      </button>
+    </div>
+
+    <!-- Comments Table -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th class="px-4 py-4 text-left">
+                <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" class="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500">
+              </th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Comment</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Author</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Content</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Type</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Date</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in comments %}
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <td class="px-4 py-4">
+                {% if c.content_type == 'article' %}
+                <input type="checkbox" name="article_comment_ids" value="{{ c.pk }}" class="comment-checkbox w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500" onchange="updateBulkBar()">
+                {% else %}
+                <input type="checkbox" name="event_comment_ids" value="{{ c.pk }}" class="comment-checkbox w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500" onchange="updateBulkBar()">
+                {% endif %}
+              </td>
+              <td class="px-6 py-4">
+                <p class="text-sm text-slate-900 max-w-xs truncate" title="{{ c.content }}">{{ c.content|truncatewords:15 }}</p>
+                {% if not c.is_approved %}
+                <span class="mt-1 inline-flex px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">Pending Approval</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center">
+                    <span class="text-xs font-bold text-slate-600">{{ c.user.username|first|upper }}</span>
+                  </div>
+                  <span class="text-sm text-slate-700 font-medium">{{ c.user.username }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4">
+                <p class="text-sm text-slate-700 max-w-[200px] truncate" title="{{ c.content_title }}">{{ c.content_title|truncatewords:8 }}</p>
+              </td>
+              <td class="px-6 py-4">
+                {% if c.content_type == 'article' %}
+                <span class="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Article</span>
+                {% else %}
+                <span class="px-2.5 py-1 bg-purple-50 text-purple-700 text-xs font-bold rounded-full">Event</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4">
+                <span class="text-sm text-slate-500">{{ c.created_at|date:"M d, Y" }}</span>
+                <br>
+                <span class="text-xs text-slate-400">{{ c.created_at|time:"H:i" }}</span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                <form method="post" action="{% url 'custom_admin:comment_delete' c.pk %}" class="inline" onsubmit="return confirm('Are you sure you want to delete this comment by {{ c.user.username }}?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="comment_type" value="{{ c.content_type }}">
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete comment">
+                    <span class="material-symbols-outlined text-xl">delete</span>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="px-6 py-16 text-center">
+                <div class="flex flex-col items-center gap-3">
+                  <span class="material-symbols-outlined text-5xl text-slate-300">chat_bubble_outline</span>
+                  <p class="text-slate-500 text-sm">No comments found</p>
+                  {% if search_query %}
+                  <a href="?type={{ current_filter }}" class="text-sm text-amber-600 hover:text-amber-700 font-medium">Clear search</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+
+  <!-- Pagination -->
+  {% if comments.has_other_pages %}
+  <div class="mt-6 flex justify-center gap-2">
+    {% if comments.has_previous %}
+    <a href="?page={{ comments.previous_page_number }}&type={{ current_filter }}{% if search_query %}&q={{ search_query }}{% endif %}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Previous</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm text-slate-500">Page {{ comments.number }} of {{ comments.paginator.num_pages }}</span>
+    {% if comments.has_next %}
+    <a href="?page={{ comments.next_page_number }}&type={{ current_filter }}{% if search_query %}&q={{ search_query }}{% endif %}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Bulk Delete Confirmation Dialog -->
+<div id="bulkDeleteDialog" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+    <div class="flex items-center gap-4 mb-6">
+      <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-2xl text-red-600">delete_forever</span>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-slate-900 font-headline">Delete Comments</h3>
+        <p class="text-sm text-slate-500">This action cannot be undone.</p>
+      </div>
+    </div>
+    <p class="text-sm text-slate-700 mb-6">Are you sure you want to permanently delete <strong id="dialogCount">0</strong> selected comment(s)?</p>
+    <div class="flex items-center justify-end gap-3">
+      <button type="button" onclick="closeBulkDialog()" class="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">Cancel</button>
+      <button type="button" onclick="submitBulkDelete()" class="px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors">Delete Comments</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleSelectAll(checkbox) {
+  document.querySelectorAll('.comment-checkbox').forEach(function(cb) {
+    cb.checked = checkbox.checked;
+  });
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  var checked = document.querySelectorAll('.comment-checkbox:checked').length;
+  var bar = document.getElementById('bulkBar');
+  var count = document.getElementById('selectedCount');
+  count.textContent = checked;
+  if (checked > 0) {
+    bar.classList.remove('hidden');
+  } else {
+    bar.classList.add('hidden');
+  }
+  // Update select-all state
+  var total = document.querySelectorAll('.comment-checkbox').length;
+  document.getElementById('selectAll').checked = (checked === total && total > 0);
+}
+
+function confirmBulkDelete() {
+  var checked = document.querySelectorAll('.comment-checkbox:checked').length;
+  document.getElementById('dialogCount').textContent = checked;
+  document.getElementById('bulkDeleteDialog').classList.remove('hidden');
+}
+
+function closeBulkDialog() {
+  document.getElementById('bulkDeleteDialog').classList.add('hidden');
+}
+
+function submitBulkDelete() {
+  document.getElementById('bulkDeleteForm').submit();
+}
+
+// Close dialog on backdrop click
+document.getElementById('bulkDeleteDialog').addEventListener('click', function(e) {
+  if (e.target === this) closeBulkDialog();
+});
+
+// Close dialog on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeBulkDialog();
+});
+</script>
+{% endblock %}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
@@ -67,7 +68,10 @@ class _PollsScreenState extends State<PollsScreen> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _loadPolls,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    await _loadPolls();
+                  },
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _polls.length,

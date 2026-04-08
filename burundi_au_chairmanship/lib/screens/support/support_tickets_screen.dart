@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -243,7 +244,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
               : _tickets.isEmpty
                   ? _buildEmptyState(isDark)
                   : RefreshIndicator(
-                      onRefresh: _loadTickets,
+                      onRefresh: () async {
+                        HapticFeedback.mediumImpact();
+                        await _loadTickets();
+                      },
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),
                         itemCount: _tickets.length,
@@ -252,6 +256,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                     ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          HapticFeedback.lightImpact();
           final result = await Navigator.pushNamed(context, '/contact-support');
           if (result == true) _loadTickets();
         },

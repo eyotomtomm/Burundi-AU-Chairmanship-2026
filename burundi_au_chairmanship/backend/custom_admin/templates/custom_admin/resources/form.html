@@ -172,6 +172,9 @@
                     <p class="mt-2 text-xs text-on-surface-variant">Optional: Enter file size (e.g., 2.5 MB, 1.2 GB)</p>
                 </div>
 
+                <!-- Content Status & Scheduling -->
+                {% include 'custom_admin/includes/content_scheduling.html' with obj=resource %}
+
                 <!-- Form Actions -->
                 <div class="flex items-center justify-between pt-6 border-t border-outline-variant">
                     <a href="{% url 'custom_admin:resources_list' %}" class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-on-surface-variant hover:bg-surface-container rounded-full transition-all duration-200">

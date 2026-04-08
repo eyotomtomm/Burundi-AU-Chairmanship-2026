@@ -109,30 +109,104 @@ def generate_weekly_report():
 
 @shared_task
 def send_scheduled_notifications():
-    """Send scheduled notifications whose scheduled_at time has passed.
-    Runs every minute via CELERY_BEAT_SCHEDULE."""
-    from .models import Notification, UserProfile
-    now = timezone.now()
+    """Send scheduled and recurring notifications.
+    Runs every minute via CELERY_BEAT_SCHEDULE.
 
+    Handles:
+    - One-time scheduled notifications (scheduled_at has passed, not yet sent)
+    - Daily recurring notifications (is_scheduled=True, schedule_type='daily')
+    - Weekly recurring notifications (is_scheduled=True, schedule_type='weekly')
+    """
+    from .models import Notification
+    from .push_service import send_push_notification
+    from datetime import datetime, date as date_type
+
+    now = timezone.now()
+    sent_count = 0
+
+    # 1. One-time scheduled notifications
     pending = Notification.objects.filter(
         scheduled_at__lte=now,
         push_sent=False,
         is_active=True,
-    ).exclude(scheduled_at__isnull=True)
+    ).exclude(scheduled_at__isnull=True).exclude(
+        is_scheduled=True, schedule_type__in=['daily', 'weekly']
+    )
 
-    sent_count = 0
     for notification in pending:
         try:
-            from .push_service import send_push_notification
             success, failure = send_push_notification(notification)
-            notification.push_sent = True
-            notification.push_sent_at = now
-            notification.push_recipient_count = success
-            notification.save(update_fields=['push_sent', 'push_sent_at', 'push_recipient_count'])
             sent_count += 1
             logger.info(f"Scheduled notification '{notification.title}' sent to {success} devices")
         except Exception as e:
             logger.error(f"Failed to send scheduled notification {notification.id}: {e}")
+
+    # 2. Daily recurring notifications
+    daily_notifications = Notification.objects.filter(
+        is_scheduled=True,
+        schedule_type='daily',
+        is_active=True,
+        schedule_time__isnull=False,
+    )
+
+    for notification in daily_notifications:
+        current_time = now.time()
+        scheduled_dt = datetime.combine(date_type.today(), notification.schedule_time)
+        current_dt = datetime.combine(date_type.today(), current_time)
+        diff = abs((current_dt - scheduled_dt).total_seconds())
+
+        if diff > 120:
+            continue
+
+        # Skip if already sent today
+        if notification.last_scheduled_send and notification.last_scheduled_send.date() == now.date():
+            continue
+
+        try:
+            notification.push_sent = False
+            notification.save(update_fields=['push_sent'])
+            success, failure = send_push_notification(notification)
+            notification.last_scheduled_send = now
+            notification.save(update_fields=['last_scheduled_send'])
+            sent_count += 1
+            logger.info(f"Daily notification '{notification.title}' sent to {success} devices")
+        except Exception as e:
+            logger.error(f"Failed to send daily notification {notification.id}: {e}")
+
+    # 3. Weekly recurring notifications
+    weekly_notifications = Notification.objects.filter(
+        is_scheduled=True,
+        schedule_type='weekly',
+        is_active=True,
+        schedule_time__isnull=False,
+        schedule_day__isnull=False,
+    )
+
+    for notification in weekly_notifications:
+        if now.weekday() != notification.schedule_day:
+            continue
+
+        current_time = now.time()
+        scheduled_dt = datetime.combine(date_type.today(), notification.schedule_time)
+        current_dt = datetime.combine(date_type.today(), current_time)
+        diff = abs((current_dt - scheduled_dt).total_seconds())
+
+        if diff > 120:
+            continue
+
+        if notification.last_scheduled_send and notification.last_scheduled_send.date() == now.date():
+            continue
+
+        try:
+            notification.push_sent = False
+            notification.save(update_fields=['push_sent'])
+            success, failure = send_push_notification(notification)
+            notification.last_scheduled_send = now
+            notification.save(update_fields=['last_scheduled_send'])
+            sent_count += 1
+            logger.info(f"Weekly notification '{notification.title}' sent to {success} devices")
+        except Exception as e:
+            logger.error(f"Failed to send weekly notification {notification.id}: {e}")
 
     if sent_count:
         logger.info(f"Processed {sent_count} scheduled notifications")

@@ -175,6 +175,17 @@ class AppLocalizations {
       'no_comments_yet': 'No comments yet. Be the first!',
       'gallery': 'Gallery',
       'watch_video': 'Watch Video',
+
+      // Security / Change Password
+      'change_password': 'Change Password',
+      'current_password': 'Current Password',
+      'new_password': 'New Password',
+      'login_history': 'Login History',
+      'active_sessions': 'Active Sessions',
+      'password_changed': 'Password changed successfully',
+      'password_mismatch': 'Passwords do not match',
+      'password_too_short': 'At least 8 characters',
+      'field_required': 'Required',
     },
     'fr': {
       // App
@@ -339,6 +350,17 @@ class AppLocalizations {
       'no_comments_yet': 'Aucun commentaire. Soyez le premier!',
       'gallery': 'Galerie',
       'watch_video': 'Regarder la vidéo',
+
+      // Security / Change Password
+      'change_password': 'Changer le mot de passe',
+      'current_password': 'Mot de passe actuel',
+      'new_password': 'Nouveau mot de passe',
+      'login_history': 'Historique de connexion',
+      'active_sessions': 'Sessions actives',
+      'password_changed': 'Mot de passe changé avec succès',
+      'password_mismatch': 'Les mots de passe ne correspondent pas',
+      'password_too_short': 'Au moins 8 caractères',
+      'field_required': 'Obligatoire',
     },
   };
 

@@ -8,7 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../config/app_colors.dart';
-import '../../widgets/fullscreen_image_viewer.dart';
+import '../../widgets/image_gallery_viewer.dart';
 import '../../services/haptic_service.dart';
 import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
@@ -395,31 +395,51 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: _article.imageUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
-                    errorWidget: (_, _, _) => Container(
-                      color: AppColors.auGold.withValues(alpha: 0.2),
-                      child: const Icon(Icons.article_rounded, size: 48, color: Colors.white54),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
+              background: GestureDetector(
+                onTap: () {
+                  HapticService.light();
+                  // Collect all images: hero image + media images
+                  final allImages = <String>[_article.imageUrl];
+                  final allCaptions = <String>[_article.getTitle(langCode)];
+                  for (final m in _article.media) {
+                    if (m.isImage && m.imageUrl.isNotEmpty) {
+                      allImages.add(m.imageUrl);
+                      allCaptions.add(m.getCaption(langCode));
+                    }
+                  }
+                  ImageGalleryViewer.show(
+                    context,
+                    images: allImages,
+                    initialIndex: 0,
+                    captions: allCaptions,
+                  );
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: _article.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
+                      errorWidget: (_, _, _) => Container(
+                        color: AppColors.auGold.withValues(alpha: 0.2),
+                        child: const Icon(Icons.article_rounded, size: 48, color: Colors.white54),
                       ),
                     ),
-                  ),
-                ],
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.7),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -566,15 +586,22 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                               GestureDetector(
                                 onTap: () {
                                   HapticService.light();
-                                  final imageUrls = _article.media
+                                  final imageMedia = _article.media
                                       .where((media) => media.isImage && media.imageUrl.isNotEmpty)
+                                      .toList();
+                                  final imageUrls = imageMedia
                                       .map((media) => media.imageUrl)
                                       .toList();
+                                  final captions = imageMedia
+                                      .map((media) => media.getCaption(langCode))
+                                      .toList();
                                   final index = imageUrls.indexOf(m.imageUrl);
-                                  FullscreenImageViewer.show(
+                                  ImageGalleryViewer.show(
                                     context,
-                                    imageUrls: imageUrls,
+                                    images: imageUrls,
                                     initialIndex: index >= 0 ? index : 0,
+                                    captions: captions,
+                                    heroTagPrefix: 'article_media_${_article.id}',
                                   );
                                 },
                                 child: ClipRRect(

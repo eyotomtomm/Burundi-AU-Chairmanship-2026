@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
@@ -86,6 +87,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                   opacity: 0.03,
                   child: RefreshIndicator(
                     onRefresh: () async {
+                      HapticFeedback.mediumImpact();
                       setState(() => _isLoading = true);
                       await _loadData();
                     },

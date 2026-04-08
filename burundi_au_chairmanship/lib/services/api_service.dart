@@ -152,8 +152,17 @@ class ApiService {
     return await _post('auth/login/', {'email': email, 'password': password});
   }
 
-  Future<Map<String, dynamic>> register(String name, String email, String password) async {
-    return await _post('auth/register/', {'name': name, 'email': email, 'password': password});
+  Future<Map<String, dynamic>> register(String name, String email, String password, {String honeypot = ''}) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'email': email,
+      'password': password,
+    };
+    // Honeypot anti-bot field — only sent if a bot filled it in
+    if (honeypot.isNotEmpty) {
+      body['_hp'] = honeypot;
+    }
+    return await _post('auth/register/', body);
   }
 
   Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
@@ -167,14 +176,20 @@ class ApiService {
     required String email,
     String? phoneNumber,
     String? gender,
+    String honeypot = '',
   }) async {
-    return await _post('auth/firebase-register/', {
+    final body = <String, dynamic>{
       'firebase_token': idToken,
       'name': name,
       'email': email,
       'phone_number': phoneNumber ?? '',
       'gender': gender ?? '',
-    });
+    };
+    // Honeypot anti-bot field — only sent if a bot filled it in
+    if (honeypot.isNotEmpty) {
+      body['_hp'] = honeypot;
+    }
+    return await _post('auth/firebase-register/', body);
   }
 
   Future<Map<String, dynamic>> firebaseLogin({required String idToken}) async {
@@ -185,6 +200,13 @@ class ApiService {
 
   Future<void> updateFCMToken(String fcmToken) async {
     await _post('auth/update-fcm-token/', {
+      'fcm_token': fcmToken,
+    }, auth: true);
+  }
+
+  /// Deactivate FCM token on logout (don't delete, just mark inactive)
+  Future<void> deactivateFCMToken(String fcmToken) async {
+    await _post('auth/deactivate-fcm-token/', {
       'fcm_token': fcmToken,
     }, auth: true);
   }
@@ -1022,6 +1044,39 @@ class ApiService {
   // ── Newsletter ──────────────────────────────────────────
   Future<Map<String, dynamic>> toggleNewsletter(bool receives) async {
     return await _post('newsletter/toggle/', {'receives_newsletter': receives}, auth: true);
+  }
+
+  // ── Linked Accounts ────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getLinkedAccounts() async {
+    final data = await _get('auth/linked-accounts/', auth: true);
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> linkAccount({
+    required String provider,
+    required String providerUid,
+    String email = '',
+    String displayName = '',
+  }) async {
+    return await _post('auth/link-account/', {
+      'provider': provider,
+      'provider_uid': providerUid,
+      'email': email,
+      'display_name': displayName,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> unlinkAccount(String provider, {String? providerUid}) async {
+    final body = <String, dynamic>{'provider': provider};
+    if (providerUid != null) body['provider_uid'] = providerUid;
+    return await _post('auth/unlink-account/', body, auth: true);
+  }
+
+  Future<Map<String, dynamic>> mergeAccounts(int sourceUserId) async {
+    return await _post('auth/merge-accounts/', {
+      'source_user_id': sourceUserId,
+    }, auth: true);
   }
 }
 

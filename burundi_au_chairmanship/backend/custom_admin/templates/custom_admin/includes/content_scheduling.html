@@ -1,0 +1,99 @@
+{% comment %}
+Content Scheduling & Draft System UI
+Include this in any content form template.
+
+Required context variables:
+  - obj: The model instance being edited (or None for create)
+  - status_field: Name of the status field on the model (default: 'status', use 'content_status' for LiveFeed)
+
+Usage:
+  {% include 'custom_admin/includes/content_scheduling.html' with obj=article status_field='status' %}
+  {% include 'custom_admin/includes/content_scheduling.html' with obj=feed status_field='content_status' %}
+{% endcomment %}
+
+<!-- Content Status & Scheduling -->
+<div class="space-y-6">
+    <div class="border-l-4 border-primary-container pl-4">
+        <h2 class="text-xl font-headline font-bold text-on-surface">Publishing Status</h2>
+        <p class="text-sm text-on-surface-variant mt-1">Control when this content is visible to app users</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Status Dropdown -->
+        <div>
+            <label for="content_status" class="block text-sm font-body font-medium text-on-surface mb-2">
+                Status
+            </label>
+            <select
+                id="content_status"
+                name="content_status"
+                onchange="toggleScheduleDateField()"
+                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+            >
+                {% if obj.content_status %}
+                {# LiveFeed uses content_status for publishing workflow #}
+                <option value="published" {% if obj.content_status == 'published' %}selected{% endif %}>Published</option>
+                <option value="draft" {% if obj.content_status == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="scheduled" {% if obj.content_status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                <option value="archived" {% if obj.content_status == 'archived' %}selected{% endif %}>Archived</option>
+                {% elif obj %}
+                {# All other models use status for publishing workflow #}
+                <option value="published" {% if obj.status == 'published' %}selected{% endif %}>Published</option>
+                <option value="draft" {% if obj.status == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="scheduled" {% if obj.status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+                <option value="archived" {% if obj.status == 'archived' %}selected{% endif %}>Archived</option>
+                {% else %}
+                {# Create mode - default to published #}
+                <option value="published" selected>Published</option>
+                <option value="draft">Draft</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="archived">Archived</option>
+                {% endif %}
+            </select>
+            <p class="text-xs text-on-surface-variant mt-2">
+                <strong>Draft</strong> = hidden, work in progress.
+                <strong>Scheduled</strong> = auto-publishes at the specified date.
+                <strong>Published</strong> = visible to all users.
+                <strong>Archived</strong> = hidden from app, kept for records.
+            </p>
+        </div>
+
+        <!-- Scheduled Publish Date (shown only when status=scheduled) -->
+        <div id="scheduled_publish_date_wrapper" style="display: none;">
+            <label for="scheduled_publish_date" class="block text-sm font-body font-medium text-on-surface mb-2">
+                Scheduled Publish Date <span class="text-error">*</span>
+            </label>
+            <input
+                type="datetime-local"
+                id="scheduled_publish_date"
+                name="scheduled_publish_date"
+                value="{% if obj and obj.scheduled_publish_date %}{{ obj.scheduled_publish_date|date:'Y-m-d\TH:i' }}{% endif %}"
+                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+            />
+            <p class="text-xs text-on-surface-variant mt-2">
+                Content will automatically be published at this date and time.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleScheduleDateField() {
+    var statusSelect = document.getElementById('content_status');
+    var dateWrapper = document.getElementById('scheduled_publish_date_wrapper');
+    var dateInput = document.getElementById('scheduled_publish_date');
+
+    if (statusSelect.value === 'scheduled') {
+        dateWrapper.style.display = 'block';
+        dateInput.required = true;
+    } else {
+        dateWrapper.style.display = 'none';
+        dateInput.required = false;
+    }
+}
+
+// Run on page load to handle edit mode
+document.addEventListener('DOMContentLoaded', function() {
+    toggleScheduleDateField();
+});
+</script>

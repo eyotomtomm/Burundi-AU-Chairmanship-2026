@@ -12,6 +12,14 @@ from .validators import validate_image_file, validate_document_file, validate_fc
 
 logger = logging.getLogger(__name__)
 
+# Content status choices used across multiple content models
+CONTENT_STATUS_CHOICES = [
+    ('draft', 'Draft'),
+    ('scheduled', 'Scheduled'),
+    ('published', 'Published'),
+    ('archived', 'Archived'),
+]
+
 # All 55 African Union member states + key international nationalities
 NATIONALITY_CHOICES = [
     # AU Member States (alphabetical)
@@ -189,6 +197,14 @@ class MagazineEdition(models.Model):
     like_count = models.PositiveIntegerField(default=0)
     page_count = models.PositiveIntegerField(default=0, help_text='Number of pages in the PDF')
     file_size = models.CharField(max_length=20, blank=True, help_text='e.g. 2.4 MB')
+    status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Content workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this magazine (used when status=scheduled)'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -196,6 +212,7 @@ class MagazineEdition(models.Model):
         indexes = [
             models.Index(fields=['-publish_date']),
             models.Index(fields=['is_featured', '-publish_date']),
+            models.Index(fields=['status', '-publish_date']),
         ]
 
     def __str__(self):
@@ -307,9 +324,17 @@ class Article(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    scheduled_publish_at = models.DateTimeField(null=True, blank=True, help_text='Schedule article for future publication. If set and in the future, article is hidden from public API.')
+    status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Content workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this article (used when status=scheduled)'
+    )
+    scheduled_publish_at = models.DateTimeField(null=True, blank=True, help_text='Legacy: Schedule article for future publication. If set and in the future, article is hidden from public API.')
     expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-archive article after this date. Expired articles are hidden from public API but remain in the database.')
-    is_draft = models.BooleanField(default=False, help_text='Draft articles are hidden from the public API until published.')
+    is_draft = models.BooleanField(default=False, help_text='Legacy: Draft articles are hidden from the public API until published.')
 
     class Meta:
         ordering = ['-publish_date']
@@ -317,6 +342,7 @@ class Article(models.Model):
             models.Index(fields=['-publish_date']),
             models.Index(fields=['is_featured', '-publish_date']),
             models.Index(fields=['is_draft', '-publish_date']),
+            models.Index(fields=['status', '-publish_date']),
         ]
 
     def __str__(self):
@@ -325,10 +351,11 @@ class Article(models.Model):
     @property
     def is_scheduled(self):
         """Check if article is scheduled for future publication."""
-        if self.scheduled_publish_at is None:
+        if self.scheduled_publish_at is None and self.scheduled_publish_date is None:
             return False
         from django.utils import timezone
-        return self.scheduled_publish_at > timezone.now()
+        sched = self.scheduled_publish_date or self.scheduled_publish_at
+        return sched and sched > timezone.now()
 
     @property
     def is_expired(self):
@@ -341,6 +368,8 @@ class Article(models.Model):
     @property
     def is_publicly_visible(self):
         """Check if article should be visible in public API."""
+        if self.status in ('draft', 'scheduled', 'archived'):
+            return False
         return not self.is_draft and not self.is_scheduled and not self.is_expired
 
     @property
@@ -449,6 +478,14 @@ class Event(models.Model):
     event_date = models.DateTimeField()
     image = models.ImageField(upload_to='events/', blank=True, validators=[validate_image_file])
     is_active = models.BooleanField(default=True, help_text='When off, event is hidden from the app')
+    status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Content workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this event (used when status=scheduled)'
+    )
 
     # Recurrence fields
     RECURRENCE_CHOICES = [
@@ -475,6 +512,7 @@ class Event(models.Model):
         ordering = ['event_date']
         indexes = [
             models.Index(fields=['is_active', 'event_date']),
+            models.Index(fields=['status', 'event_date']),
         ]
 
     def __str__(self):
@@ -513,12 +551,21 @@ class LiveFeed(models.Model):
     viewer_count = models.IntegerField(default=0)
     duration = models.CharField(max_length=50, blank=True, help_text='e.g. 1h 30m')
     scheduled_time = models.DateTimeField(null=True, blank=True)
+    content_status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Publishing workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this live feed (used when content_status=scheduled)'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['content_status', '-created_at']),
         ]
 
     def __str__(self):
@@ -560,10 +607,21 @@ class Resource(models.Model):
     file = models.FileField(upload_to='resources/', validators=[validate_document_file])
     file_size = models.CharField(max_length=20, help_text='e.g. 2.4 MB')
     file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='pdf')
+    status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Content workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this resource (used when status=scheduled)'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['category', 'title']
+        indexes = [
+            models.Index(fields=['status']),
+        ]
 
     def __str__(self):
         return self.title
@@ -997,17 +1055,51 @@ class Notification(models.Model):
         help_text='Send only to users with this language preference'
     )
 
-    # Scheduling
+    # Scheduling — one-time scheduled_at for backward compatibility
     scheduled_at = models.DateTimeField(
         null=True,
         blank=True,
         help_text='Schedule notification for a future date/time. Leave blank to send immediately.'
     )
 
+    # Recurring schedule fields
+    SCHEDULE_TYPE_CHOICES = [
+        ('once', 'One-time'),
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+    ]
+    is_scheduled = models.BooleanField(
+        default=False,
+        help_text='Enable recurring schedule for this notification'
+    )
+    schedule_type = models.CharField(
+        max_length=10,
+        choices=SCHEDULE_TYPE_CHOICES,
+        default='once',
+        blank=True,
+        help_text='How often to repeat this notification'
+    )
+    schedule_day = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Day of week for weekly schedule (0=Monday, 6=Sunday)'
+    )
+    schedule_time = models.TimeField(
+        null=True,
+        blank=True,
+        help_text='Time of day to send the scheduled notification (HH:MM)'
+    )
+    last_scheduled_send = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Last time this recurring notification was sent'
+    )
+
     # Push notification tracking
     push_sent = models.BooleanField(default=False, help_text='Has push notification been sent?')
     push_sent_at = models.DateTimeField(blank=True, null=True)
     push_recipient_count = models.IntegerField(default=0, help_text='Number of users who received push')
+    opened_count = models.IntegerField(default=0, help_text='Number of times users opened/tapped this notification')
 
     # Status
     is_active = models.BooleanField(default=True, help_text='Active notifications appear in app')
@@ -1022,10 +1114,61 @@ class Notification(models.Model):
         verbose_name_plural = 'Notifications'
         indexes = [
             models.Index(fields=['is_active', 'is_global', '-created_at']),
+            models.Index(fields=['is_scheduled', 'schedule_type']),
         ]
 
     def __str__(self):
         return f'{self.title} ({self.notification_type})'
+
+    @property
+    def open_rate(self):
+        """Calculate open rate as a percentage."""
+        if self.push_recipient_count > 0:
+            return round((self.opened_count / self.push_recipient_count) * 100, 1)
+        return 0
+
+
+class DeviceToken(models.Model):
+    """FCM device tokens linked to specific users for multi-account device handling.
+
+    Tokens are deactivated (not deleted) on logout and reactivated on login.
+    Ensures no duplicate sends to the same physical device.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_tokens')
+    token = models.CharField(
+        max_length=255,
+        db_index=True,
+        validators=[validate_fcm_token],
+        help_text='FCM registration token'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Deactivated on logout, reactivated on login'
+    )
+    device_type = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='e.g. iPhone 15, Samsung Galaxy S24'
+    )
+    device_os = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text='e.g. iOS 17.4, Android 14'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'token')
+        verbose_name = 'Device Token'
+        verbose_name_plural = 'Device Tokens'
+        indexes = [
+            models.Index(fields=['is_active', 'token']),
+        ]
+
+    def __str__(self):
+        status = 'active' if self.is_active else 'inactive'
+        return f"{self.user.username} - {self.token[:20]}... ({status})"
 
 
 class SupportTicket(models.Model):
@@ -1190,6 +1333,14 @@ class GalleryAlbum(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_featured = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0)
+    status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Content workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this album (used when status=scheduled)'
+    )
 
     class Meta:
         ordering = ['-is_featured', 'display_order', '-created_at']
@@ -1197,6 +1348,7 @@ class GalleryAlbum(models.Model):
         verbose_name_plural = 'Gallery Albums'
         indexes = [
             models.Index(fields=['-is_featured', 'display_order', '-created_at']),
+            models.Index(fields=['status']),
         ]
 
     def __str__(self):
@@ -1315,6 +1467,14 @@ class Video(models.Model):
     like_count = models.PositiveIntegerField(default=0)
     publish_date = models.DateTimeField()
     is_featured = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
+        help_text='Content workflow status: draft, scheduled, published, or archived'
+    )
+    scheduled_publish_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When to auto-publish this video (used when status=scheduled)'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1324,6 +1484,7 @@ class Video(models.Model):
         indexes = [
             models.Index(fields=['-is_featured', '-publish_date']),
             models.Index(fields=['category', '-publish_date']),
+            models.Index(fields=['status', '-publish_date']),
         ]
 
     def __str__(self):
@@ -1347,11 +1508,15 @@ class VideoChapter(models.Model):
     """Timestamp markers/chapters within a video."""
     video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='chapters')
     title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True, default='')
     timestamp_seconds = models.PositiveIntegerField(help_text='Chapter start time in seconds')
+    description = models.TextField(blank=True, default='')
+    description_fr = models.TextField(blank=True, default='')
+    thumbnail = models.ImageField(upload_to='video_chapters/', null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['order']
+        ordering = ['timestamp_seconds']
         verbose_name = 'Video Chapter'
         verbose_name_plural = 'Video Chapters'
 
@@ -3118,7 +3283,7 @@ class RateLimitLog(models.Model):
 
 
 class AdminActivityLog(models.Model):
-    """Tracks all admin staff actions for the activity log page."""
+    """Tracks all admin staff actions for the audit trail / activity log page."""
     ACTION_TYPE_CHOICES = [
         ('create', 'Create'),
         ('update', 'Update'),
@@ -3129,13 +3294,16 @@ class AdminActivityLog(models.Model):
         ('approve', 'Approve'),
         ('reject', 'Reject'),
         ('bulk_action', 'Bulk Action'),
+        ('status_change', 'Status Change'),
+        ('send_notification', 'Send Notification'),
+        ('backup', 'Backup'),
     ]
 
     user = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='admin_activity_logs'
     )
-    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
+    action_type = models.CharField(max_length=30, choices=ACTION_TYPE_CHOICES)
     model_name = models.CharField(max_length=100, blank=True, help_text='e.g. Article, User, Event')
     object_id = models.IntegerField(null=True, blank=True, help_text='PK of the affected object')
     object_repr = models.CharField(max_length=255, blank=True, help_text='String representation of the object')
@@ -3486,6 +3654,41 @@ class EventAgendaItem(models.Model):
 
     def __str__(self):
         return f"{self.event.name} - {self.title}"
+
+
+# ══════════════════════════════════════════════════════════════
+# Account Linking — multi-provider auth consolidation
+# ══════════════════════════════════════════════════════════════
+
+class LinkedAccount(models.Model):
+    """Tracks auth providers linked to a single user account.
+
+    Allows users to sign in via multiple providers (Google, Apple, email/password)
+    and link them all to one unified account.
+    """
+    PROVIDER_CHOICES = [
+        ('email', 'Email/Password'),
+        ('google', 'Google'),
+        ('apple', 'Apple'),
+        ('firebase', 'Firebase'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='linked_accounts')
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES)
+    provider_uid = models.CharField(max_length=255, help_text='Unique user ID from the auth provider')
+    email = models.EmailField(blank=True, default='')
+    display_name = models.CharField(max_length=200, blank=True, default='')
+    linked_at = models.DateTimeField(auto_now_add=True)
+    is_primary = models.BooleanField(default=False, help_text='Whether this is the primary auth method')
+
+    class Meta:
+        unique_together = ['provider', 'provider_uid']
+        ordering = ['-is_primary', '-linked_at']
+        verbose_name = 'Linked Account'
+        verbose_name_plural = 'Linked Accounts'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_provider_display()} ({self.email or self.provider_uid})"
 
 
 # ── Auto-optimize images on upload ────────────────────────────

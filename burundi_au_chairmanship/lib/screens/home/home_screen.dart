@@ -220,7 +220,10 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            HapticService.selection();
+            setState(() => _currentIndex = index);
+          },
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.home_rounded),

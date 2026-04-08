@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -27,6 +28,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   final _signUpPasswordController = TextEditingController();
   final _signUpConfirmPasswordController = TextEditingController();
 
+  // Honeypot field controller — invisible to users, bots auto-fill it.
+  // If this field has a value on submit, the backend silently rejects the registration.
+  final _honeypotController = TextEditingController();
+
   bool _obscureSignInPassword = true;
   bool _obscureSignUpPassword = true;
   bool _obscureConfirmPassword = true;
@@ -47,6 +52,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     _signUpEmailController.dispose();
     _signUpPasswordController.dispose();
     _signUpConfirmPasswordController.dispose();
+    _honeypotController.dispose();
     super.dispose();
   }
 
@@ -183,7 +189,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Widget _buildLangChip(String label, String code, LanguageProvider provider, bool isDark) {
     final isSelected = provider.languageCode == code;
     return GestureDetector(
-      onTap: () => provider.setLanguage(code),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        provider.setLanguage(code);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -236,7 +245,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       ),
       child: TabBar(
         controller: _tabController,
-        onTap: (_) => setState(() {}),
+        onTap: (_) {
+          HapticFeedback.selectionClick();
+          setState(() {});
+        },
         indicator: BoxDecoration(
           color: AppColors.burundiGreen,
           borderRadius: BorderRadius.circular(12),
@@ -547,6 +559,24 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               return null;
             },
           ),
+
+          // Honeypot field — invisible to real users, bots auto-fill it.
+          // Positioned off-screen with zero height so it's hidden from view.
+          SizedBox(
+            height: 0,
+            child: Opacity(
+              opacity: 0,
+              child: TextFormField(
+                controller: _honeypotController,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  labelText: 'Leave this field empty',
+                ),
+              ),
+            ),
+          ),
+
           const SizedBox(height: 24),
 
           // Sign Up button
@@ -784,6 +814,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   Future<void> _signIn(BuildContext context) async {
     if (!(_signInFormKey.currentState?.validate() ?? false)) return;
+    HapticFeedback.lightImpact();
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signIn(
       _signInEmailController.text,
@@ -809,6 +840,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } else if (context.mounted && authProvider.errorMessage != null) {
+      HapticFeedback.heavyImpact();
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
@@ -816,12 +848,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Future<void> _signUp(BuildContext context) async {
     // Validate form before proceeding
     if (!_signUpFormKey.currentState!.validate()) return;
+    HapticFeedback.lightImpact();
 
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signUp(
       _signUpNameController.text,
       _signUpEmailController.text,
       _signUpPasswordController.text,
+      honeypot: _honeypotController.text,
     );
     if (success && context.mounted) {
       // After sign-up: require email verification
@@ -832,11 +866,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       }
     } else if (context.mounted && authProvider.errorMessage != null) {
       // Show error message
+      HapticFeedback.heavyImpact();
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
 
   Future<void> _signInWithGoogle(BuildContext context) async {
+    HapticFeedback.lightImpact();
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signInWithGoogle();
     if (success && context.mounted) {
@@ -846,11 +882,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } else if (context.mounted && authProvider.errorMessage != null) {
+      HapticFeedback.heavyImpact();
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
 
   Future<void> _signInWithApple(BuildContext context) async {
+    HapticFeedback.lightImpact();
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signInWithApple();
     if (success && context.mounted) {
@@ -860,6 +898,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } else if (context.mounted && authProvider.errorMessage != null) {
+      HapticFeedback.heavyImpact();
       _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }

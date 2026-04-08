@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../widgets/confetti_overlay.dart';
 
 class VerificationRequestScreen extends StatefulWidget {
   const VerificationRequestScreen({super.key});
@@ -416,6 +417,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   void _showError(String message) {
+    HapticFeedback.heavyImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -426,6 +428,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   void _showSuccess(String message) {
+    HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -1316,6 +1319,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_emailVerified || !_phoneVerified) return;
+    HapticFeedback.lightImpact();
 
     setState(() => _isLoading = true);
 
@@ -1360,6 +1364,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       );
 
       if (mounted) {
+        HapticFeedback.mediumImpact();
+        // Trigger confetti celebration
+        ConfettiOverlay.show(context);
+
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -1401,6 +1409,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       }
     } catch (e) {
       if (mounted) {
+        HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.burundiRed),
         );

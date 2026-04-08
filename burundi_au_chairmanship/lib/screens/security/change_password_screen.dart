@@ -28,9 +28,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     try {
       await ApiService().changePassword(_currentPwCtrl.text, _newPwCtrl.text);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         HapticService.success();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password changed successfully'), backgroundColor: Colors.green),
+          SnackBar(content: Text(l10n.translate('password_changed')), backgroundColor: Colors.green),
         );
         Navigator.pop(context);
       }
@@ -100,7 +101,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.isEmpty ? l10n.translate('field_required') : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -117,8 +118,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        if (v.length < 8) return 'At least 8 characters';
+                        if (v == null || v.isEmpty) return l10n.translate('field_required');
+                        if (v.length < 8) return l10n.translate('password_too_short');
                         return null;
                       },
                     ),
@@ -133,7 +134,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       validator: (v) {
-                        if (v != _newPwCtrl.text) return 'Passwords do not match';
+                        if (v != _newPwCtrl.text) return l10n.translate('password_mismatch');
                         return null;
                       },
                     ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,7 @@ import '../../config/app_constants.dart';
 import '../../widgets/african_pattern.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/app_update_dialog.dart';
 import '../maintenance/maintenance_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -68,9 +70,16 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(AppConstants.splashDuration);
     if (!mounted) return;
 
-    // CRITICAL: Wait for auth provider to fully initialize
-    // Give it enough time to read from secure storage and SharedPreferences
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // CRITICAL: Await auth provider initialization instead of using a fixed delay.
+    // This Completer-based approach guarantees we wait exactly until auth state
+    // has been fully determined (tokens read, backend synced or timed out).
+    final authProvider = context.read<AuthProvider>();
+    try {
+      await authProvider.initialized.timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // If init times out, proceed with whatever state we have
+      if (kDebugMode) print('Auth init timed out in splash — proceeding');
+    }
     if (!mounted) return;
 
     // Check maintenance mode before proceeding
@@ -90,15 +99,20 @@ class _SplashScreenState extends State<SplashScreen>
     }
     if (!mounted) return;
 
-    final authProvider = context.read<AuthProvider>();
+    // Check for app update via Remote Config before navigating
+    final langCode = Localizations.localeOf(context).languageCode;
+    await AppUpdateDialog.check(
+      context: context,
+      currentVersion: AppConstants.appVersion,
+      langCode: langCode,
+    );
+    if (!mounted) return;
 
-    // Navigate based on authentication status
-    // Check BOTH isAuthenticated AND userId to ensure data is loaded
-    final isFullyAuthenticated = authProvider.isAuthenticated &&
-                                 authProvider.userId != null &&
-                                 authProvider.userEmail != null;
-
-    if (isFullyAuthenticated) {
+    // Navigate based on authentication status.
+    // Only require isAuthenticated — profile data may be partially cached
+    // and that's OK; it will be refreshed in the background once the user
+    // reaches the home screen.
+    if (authProvider.isAuthenticated) {
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
       Navigator.of(context).pushReplacementNamed('/auth');

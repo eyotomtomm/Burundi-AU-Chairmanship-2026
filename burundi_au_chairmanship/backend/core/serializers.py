@@ -22,7 +22,7 @@ from .models import (
     AuditLogEntry, AccountMergeRequest, FunnelStep,
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
     EventComment, CommentMention, NewsletterEdition,
-    EventAgendaItem,
+    EventAgendaItem, LinkedAccount,
 )
 
 
@@ -417,7 +417,8 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
 class VideoChapterSerializer(serializers.ModelSerializer):
     class Meta:
         model = VideoChapter
-        fields = ['id', 'title', 'timestamp_seconds', 'order']
+        fields = ['id', 'title', 'title_fr', 'timestamp_seconds',
+                  'description', 'description_fr', 'thumbnail', 'order']
 
 
 class VideoSubtitleSerializer(serializers.ModelSerializer):
@@ -1280,6 +1281,17 @@ class AccountMergeRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccountMergeRequest
         fields = ['id', 'primary_user', 'secondary_user', 'status', 'created_at', 'processed_at']
+
+
+class LinkedAccountSerializer(serializers.ModelSerializer):
+    provider_display = serializers.CharField(source='get_provider_display', read_only=True)
+
+    class Meta:
+        from .models import LinkedAccount
+        model = LinkedAccount
+        fields = ['id', 'provider', 'provider_display', 'provider_uid', 'email',
+                  'display_name', 'linked_at', 'is_primary']
+        read_only_fields = ['id', 'linked_at']
 
 
 class EventCommentSerializer(serializers.ModelSerializer):

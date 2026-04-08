@@ -113,7 +113,10 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       body: _isLoading
           ? const ShimmerLiveFeedsSkeleton()
           : RefreshIndicator(
-              onRefresh: _loadData,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                await _loadData();
+              },
               color: AppColors.burundiGreen,
               child: CustomScrollView(
               slivers: [

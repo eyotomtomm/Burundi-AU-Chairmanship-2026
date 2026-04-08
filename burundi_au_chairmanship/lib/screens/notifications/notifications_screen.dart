@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -202,7 +203,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadNotifications,
+      onRefresh: () async {
+        HapticFeedback.mediumImpact();
+        await _loadNotifications();
+      },
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _notifications.length,

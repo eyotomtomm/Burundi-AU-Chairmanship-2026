@@ -82,6 +82,11 @@
                 </label>
             </div>
 
+            <!-- Content Status & Scheduling -->
+            <div class="mb-8">
+                {% include 'custom_admin/includes/content_scheduling.html' with obj=album %}
+            </div>
+
             <div class="flex justify-end gap-4">
                 <a href="{% url 'custom_admin:gallery_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
                     Cancel

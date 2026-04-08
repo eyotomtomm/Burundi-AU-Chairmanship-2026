@@ -19,6 +19,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
+from core.utils import log_admin_action, compute_model_diff
 from core.models import (
     HeroSlide, FeatureCard, Article, MagazineEdition, Event,
     LiveFeed, Video, GalleryAlbum, GalleryPhoto, EmbassyLocation, Resource,
@@ -37,7 +38,8 @@ from core.models import (
     UserSegment, UserSegmentMembership,
     AdminNotification,
     ABTest, ABTestParticipant,
-    TranslationRequest,
+    TranslationRequest, VideoChapter,
+    ArticleComment, EventComment,
 )
 
 
@@ -56,6 +58,7 @@ def admin_login(request):
 
         if user and is_staff(user):
             login(request, user)
+            log_admin_action(request, 'login', 'Auth', object_repr=user.username)
             return redirect('custom_admin:dashboard')
         else:
             messages.error(request, 'Invalid credentials or insufficient permissions')
@@ -66,6 +69,7 @@ def admin_login(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def admin_logout(request):
+    log_admin_action(request, 'logout', 'Auth', object_repr=request.user.username)
     logout(request)
     return redirect('custom_admin:login')
 
@@ -310,9 +314,14 @@ def article_create(request):
     categories = Category.objects.all()
     if request.method == 'POST':
         is_draft = request.POST.get('save_as_draft') == 'on'
+        content_status = request.POST.get('content_status', 'published')
+        # Handle legacy "Save as Draft" button
+        if is_draft:
+            content_status = 'draft'
         scheduled_publish_at = request.POST.get('scheduled_publish_at') or None
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         expires_at = request.POST.get('expires_at') or None
-        Article.objects.create(
+        article = Article.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
             content=request.POST.get('content'),
@@ -323,11 +332,16 @@ def article_create(request):
             publish_date=request.POST.get('publish_date') or timezone.now(),
             is_featured=request.POST.get('is_featured') == 'on',
             is_draft=is_draft,
+            status=content_status,
             scheduled_publish_at=scheduled_publish_at,
+            scheduled_publish_date=scheduled_publish_date,
             expires_at=expires_at,
         )
-        if is_draft:
+        log_admin_action(request, 'create', 'Article', object_id=article.pk, object_repr=article.title)
+        if content_status == 'draft':
             messages.success(request, 'Article saved as draft!')
+        elif content_status == 'scheduled':
+            messages.success(request, 'Article scheduled for publication!')
         else:
             messages.success(request, 'Article created successfully!')
         return redirect('custom_admin:articles_list')
@@ -355,20 +369,39 @@ def article_edit(request, pk):
             change_summary=request.POST.get('change_summary', ''),
         )
 
-        article.title = request.POST.get('title')
-        article.title_fr = request.POST.get('title_fr', '')
-        article.content = request.POST.get('content')
-        article.content_fr = request.POST.get('content_fr', '')
+        # Compute diff before applying changes
+        new_values = {
+            'title': request.POST.get('title'),
+            'title_fr': request.POST.get('title_fr', ''),
+            'content': request.POST.get('content'),
+            'content_fr': request.POST.get('content_fr', ''),
+            'author': request.POST.get('author', article.author),
+            'is_featured': request.POST.get('is_featured') == 'on',
+            'is_draft': request.POST.get('save_as_draft') == 'on',
+        }
+        changes = compute_model_diff(article, new_values)
+
+        article.title = new_values['title']
+        article.title_fr = new_values['title_fr']
+        article.content = new_values['content']
+        article.content_fr = new_values['content_fr']
         article.category_id = request.POST.get('category') if request.POST.get('category') else None
-        article.author = request.POST.get('author', article.author)
+        article.author = new_values['author']
         if request.FILES.get('image'):
             article.image = request.FILES.get('image')
-        article.is_featured = request.POST.get('is_featured') == 'on'
-        article.is_draft = request.POST.get('save_as_draft') == 'on'
+            changes['image'] = {'old': '', 'new': 'new image uploaded'}
+        article.is_featured = new_values['is_featured']
+        article.is_draft = new_values['is_draft']
+        content_status = request.POST.get('content_status', 'published')
+        if article.is_draft:
+            content_status = 'draft'
+        article.status = content_status
         article.scheduled_publish_at = request.POST.get('scheduled_publish_at') or None
+        article.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         article.expires_at = request.POST.get('expires_at') or None
         article.save()
-        if article.is_draft:
+        log_admin_action(request, 'update', 'Article', object_id=article.pk, object_repr=article.title, changes=changes)
+        if content_status == 'draft':
             messages.success(request, 'Article saved as draft!')
         else:
             messages.success(request, 'Article updated successfully!')
@@ -383,6 +416,8 @@ def article_edit(request, pk):
 @require_POST
 def article_delete(request, pk):
     article = get_object_or_404(Article, pk=pk)
+    title = article.title
+    log_admin_action(request, 'delete', 'Article', object_id=pk, object_repr=title)
     article.delete()
     messages.success(request, 'Article deleted successfully!')
     return redirect('custom_admin:articles_list')
@@ -476,7 +511,9 @@ def events_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def event_create(request):
     if request.method == 'POST':
-        Event.objects.create(
+        content_status = request.POST.get('content_status', 'published')
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
+        event = Event.objects.create(
             name=request.POST.get('name'),
             name_fr=request.POST.get('name_fr', ''),
             description=request.POST.get('description', ''),
@@ -489,7 +526,10 @@ def event_create(request):
             is_active=request.POST.get('is_active') == 'on',
             recurrence_type=request.POST.get('recurrence_type', 'none'),
             recurrence_end_date=request.POST.get('recurrence_end_date') or None,
+            status=content_status,
+            scheduled_publish_date=scheduled_publish_date,
         )
+        log_admin_action(request, 'create', 'Event', object_id=event.pk, object_repr=event.name)
         messages.success(request, 'Event created successfully!')
         return redirect('custom_admin:events_list')
     return render(request, 'custom_admin/events/form.html', {
@@ -503,20 +543,33 @@ def event_create(request):
 def event_edit(request, pk):
     event = get_object_or_404(Event, pk=pk)
     if request.method == 'POST':
-        event.name = request.POST.get('name')
-        event.name_fr = request.POST.get('name_fr', '')
-        event.description = request.POST.get('description', '')
+        new_values = {
+            'name': request.POST.get('name'),
+            'name_fr': request.POST.get('name_fr', ''),
+            'description': request.POST.get('description', ''),
+            'address': request.POST.get('address'),
+            'is_active': request.POST.get('is_active') == 'on',
+        }
+        changes = compute_model_diff(event, new_values)
+
+        event.name = new_values['name']
+        event.name_fr = new_values['name_fr']
+        event.description = new_values['description']
         event.description_fr = request.POST.get('description_fr', '')
-        event.address = request.POST.get('address')
+        event.address = new_values['address']
         event.latitude = request.POST.get('latitude', 0)
         event.longitude = request.POST.get('longitude', 0)
         event.event_date = request.POST.get('event_date')
         if request.FILES.get('image'):
             event.image = request.FILES.get('image')
-        event.is_active = request.POST.get('is_active') == 'on'
+            changes['image'] = {'old': '', 'new': 'new image uploaded'}
+        event.is_active = new_values['is_active']
         event.recurrence_type = request.POST.get('recurrence_type', 'none')
         event.recurrence_end_date = request.POST.get('recurrence_end_date') or None
+        event.status = request.POST.get('content_status', 'published')
+        event.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         event.save()
+        log_admin_action(request, 'update', 'Event', object_id=event.pk, object_repr=event.name, changes=changes)
         messages.success(request, 'Event updated successfully!')
         return redirect('custom_admin:events_list')
     return render(request, 'custom_admin/events/form.html', {
@@ -531,9 +584,14 @@ def event_edit(request, pk):
 @require_POST
 def event_toggle_active(request, pk):
     event = get_object_or_404(Event, pk=pk)
+    old_active = event.is_active
     event.is_active = not event.is_active
     event.save()
     status = 'visible in app' if event.is_active else 'hidden from app'
+    log_admin_action(
+        request, 'status_change', 'Event', object_id=pk, object_repr=event.name,
+        changes={'is_active': {'old': str(old_active), 'new': str(event.is_active)}}
+    )
     messages.success(request, f'Event "{event.name}" is now {status}.')
     return redirect('custom_admin:events_list')
 
@@ -543,6 +601,8 @@ def event_toggle_active(request, pk):
 @require_POST
 def event_delete(request, pk):
     event = get_object_or_404(Event, pk=pk)
+    name = event.name
+    log_admin_action(request, 'delete', 'Event', object_id=pk, object_repr=name)
     event.delete()
     messages.success(request, 'Event deleted successfully!')
     return redirect('custom_admin:events_list')
@@ -573,6 +633,13 @@ def notification_create(request):
             from django.utils.dateparse import parse_datetime
             scheduled_at = parse_datetime(scheduled_at_str)
 
+        # Parse schedule_time
+        schedule_time = None
+        schedule_time_str = request.POST.get('schedule_time', '').strip()
+        if schedule_time_str:
+            from django.utils.dateparse import parse_time
+            schedule_time = parse_time(schedule_time_str)
+
         notification = Notification.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -590,8 +657,24 @@ def notification_create(request):
             target_age_max=int(request.POST['target_age_max']) if request.POST.get('target_age_max') else None,
             target_verified_only=request.POST.get('target_verified_only') == 'on',
             target_badge_type=request.POST.get('target_badge_type', ''),
+            target_language=request.POST.get('target_language', ''),
             scheduled_at=scheduled_at,
+            # Recurring schedule fields
+            is_scheduled=request.POST.get('is_scheduled') == 'on',
+            schedule_type=request.POST.get('schedule_type', 'once'),
+            schedule_day=int(request.POST['schedule_day']) if request.POST.get('schedule_day') else None,
+            schedule_time=schedule_time,
         )
+        log_admin_action(request, 'create', 'Notification', object_id=notification.pk, object_repr=notification.title)
+
+        # If recurring schedule is set, don't send immediately
+        if notification.is_scheduled and notification.schedule_type in ('daily', 'weekly'):
+            messages.success(
+                request,
+                f'Recurring notification created ({notification.get_schedule_type_display()}).'
+            )
+            return redirect('custom_admin:notifications_list')
+
         # If scheduled for the future, don't send immediately
         if scheduled_at and scheduled_at > timezone.now():
             messages.success(
@@ -606,6 +689,11 @@ def notification_create(request):
             try:
                 from core.push_service import send_push_notification
                 success, failure = send_push_notification(notification)
+                log_admin_action(
+                    request, 'send_notification', 'Notification',
+                    object_id=notification.pk, object_repr=notification.title,
+                    changes={'push_sent': {'old': '', 'new': f'{success} success, {failure} failed'}}
+                )
                 messages.success(
                     request,
                     f'Notification created and push sent to {success} device(s).'
@@ -645,6 +733,24 @@ def notification_edit(request, pk):
         notification.target_age_max = int(request.POST['target_age_max']) if request.POST.get('target_age_max') else None
         notification.target_verified_only = request.POST.get('target_verified_only') == 'on'
         notification.target_badge_type = request.POST.get('target_badge_type', '')
+        notification.target_language = request.POST.get('target_language', '')
+        # Recurring schedule fields
+        notification.is_scheduled = request.POST.get('is_scheduled') == 'on'
+        notification.schedule_type = request.POST.get('schedule_type', 'once')
+        notification.schedule_day = int(request.POST['schedule_day']) if request.POST.get('schedule_day') else None
+        schedule_time_str = request.POST.get('schedule_time', '').strip()
+        if schedule_time_str:
+            from django.utils.dateparse import parse_time
+            notification.schedule_time = parse_time(schedule_time_str)
+        else:
+            notification.schedule_time = None
+        # Update scheduled_at
+        scheduled_at_str = request.POST.get('scheduled_at', '').strip()
+        if scheduled_at_str:
+            from django.utils.dateparse import parse_datetime
+            notification.scheduled_at = parse_datetime(scheduled_at_str)
+        else:
+            notification.scheduled_at = None
         notification.save()
         # Send push if explicitly requested on edit
         send_push = request.POST.get('send_push') == 'on'
@@ -675,6 +781,8 @@ def notification_edit(request, pk):
 @require_POST
 def notification_delete(request, pk):
     notification = get_object_or_404(Notification, pk=pk)
+    title = notification.title
+    log_admin_action(request, 'delete', 'Notification', object_id=pk, object_repr=title)
     notification.delete()
     messages.success(request, 'Notification deleted successfully!')
     return redirect('custom_admin:notifications_list')
@@ -714,6 +822,11 @@ def notification_send_push(request, pk):
         except Exception as e:
             sms_msg = f' | SMS failed: {e}'
 
+    log_admin_action(
+        request, 'send_notification', 'Notification',
+        object_id=notification.pk, object_repr=notification.title,
+        changes={'result': {'old': '', 'new': push_msg + sms_msg}}
+    )
     messages.success(request, push_msg + sms_msg)
     return redirect('custom_admin:notifications_list')
 
@@ -849,9 +962,15 @@ def user_toggle_active(request, pk):
     if target_user == request.user:
         messages.error(request, 'You cannot block yourself.')
         return redirect('custom_admin:users_list')
+    old_active = target_user.is_active
     target_user.is_active = not target_user.is_active
     target_user.save()
     action = 'unblocked' if target_user.is_active else 'blocked'
+    log_admin_action(
+        request, 'status_change', 'User', object_id=pk,
+        object_repr=target_user.username,
+        changes={'is_active': {'old': str(old_active), 'new': str(target_user.is_active)}}
+    )
     messages.success(request, f'User "{target_user.username}" has been {action}.')
     return redirect('custom_admin:users_list')
 
@@ -868,9 +987,15 @@ def user_toggle_staff(request, pk):
     if target_user == request.user:
         messages.error(request, 'You cannot remove your own staff status.')
         return redirect('custom_admin:users_list')
+    old_staff = target_user.is_staff
     target_user.is_staff = not target_user.is_staff
     target_user.save()
     action = 'granted staff access' if target_user.is_staff else 'removed from staff'
+    log_admin_action(
+        request, 'status_change', 'User', object_id=pk,
+        object_repr=target_user.username,
+        changes={'is_staff': {'old': str(old_staff), 'new': str(target_user.is_staff)}}
+    )
     messages.success(request, f'User "{target_user.username}" {action}.')
     return redirect('custom_admin:users_list')
 
@@ -1024,6 +1149,11 @@ def verification_request_review(request, pk):
             profile.badge_type = badge_type
             profile.verified_at = timezone.now()
             profile.save()
+            log_admin_action(
+                request, 'approve', 'VerificationRequest', object_id=pk,
+                object_repr=ver_request.full_name,
+                changes={'status': {'old': 'pending', 'new': 'approved'}, 'badge_type': {'old': '', 'new': badge_type}}
+            )
             messages.success(request, f'Approved {ver_request.full_name} with {badge_type} badge.')
         elif action == 'reject':
             ver_request.status = 'rejected'
@@ -1031,6 +1161,11 @@ def verification_request_review(request, pk):
             ver_request.reviewed_by = request.user
             ver_request.reviewed_at = timezone.now()
             ver_request.save()
+            log_admin_action(
+                request, 'reject', 'VerificationRequest', object_id=pk,
+                object_repr=ver_request.full_name,
+                changes={'status': {'old': 'pending', 'new': 'rejected'}, 'reason': {'old': '', 'new': ver_request.rejection_reason}}
+            )
             messages.success(request, f'Rejected verification request from {ver_request.full_name}.')
         return redirect('custom_admin:verification_requests_list')
     return render(request, 'custom_admin/verification/review.html', {'ver_request': ver_request})
@@ -1054,6 +1189,8 @@ def magazines_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def magazine_create(request):
     if request.method == 'POST':
+        content_status = request.POST.get('content_status', 'published')
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         MagazineEdition.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -1065,8 +1202,11 @@ def magazine_create(request):
             file_size=request.POST.get('file_size', ''),
             publish_date=request.POST.get('publish_date') or timezone.now().date(),
             is_featured=request.POST.get('is_featured') == 'on',
+            status=content_status,
+            scheduled_publish_date=scheduled_publish_date,
         )
-        messages.success(request, 'Magazine created successfully!')
+        log_admin_action(request, 'create', 'MagazineEdition', object_repr=request.POST.get('title', ''))
+        messages.success(request, f'Magazine created as {content_status}!')
         return redirect('custom_admin:magazines_list')
     return render(request, 'custom_admin/magazines/form.html', {'action': 'Create'})
 
@@ -1076,18 +1216,31 @@ def magazine_create(request):
 def magazine_edit(request, pk):
     magazine = get_object_or_404(MagazineEdition, pk=pk)
     if request.method == 'POST':
-        magazine.title = request.POST.get('title')
-        magazine.title_fr = request.POST.get('title_fr', '')
-        magazine.description = request.POST.get('description', '')
+        new_values = {
+            'title': request.POST.get('title'),
+            'title_fr': request.POST.get('title_fr', ''),
+            'description': request.POST.get('description', ''),
+            'is_featured': request.POST.get('is_featured') == 'on',
+        }
+        changes = compute_model_diff(magazine, new_values)
+
+        magazine.title = new_values['title']
+        magazine.title_fr = new_values['title_fr']
+        magazine.description = new_values['description']
         magazine.description_fr = request.POST.get('description_fr', '')
         if request.FILES.get('cover_image'):
             magazine.cover_image = request.FILES.get('cover_image')
+            changes['cover_image'] = {'old': '', 'new': 'new image uploaded'}
         if request.FILES.get('pdf_file'):
             magazine.pdf_file = request.FILES.get('pdf_file')
+            changes['pdf_file'] = {'old': '', 'new': 'new PDF uploaded'}
         magazine.page_count = request.POST.get('page_count', 0)
         magazine.file_size = request.POST.get('file_size', '')
-        magazine.is_featured = request.POST.get('is_featured') == 'on'
+        magazine.is_featured = new_values['is_featured']
+        magazine.status = request.POST.get('content_status', 'published')
+        magazine.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         magazine.save()
+        log_admin_action(request, 'update', 'MagazineEdition', object_id=pk, object_repr=magazine.title, changes=changes)
         messages.success(request, 'Magazine updated successfully!')
         return redirect('custom_admin:magazines_list')
     return render(request, 'custom_admin/magazines/form.html', {'magazine': magazine, 'action': 'Edit'})
@@ -1098,6 +1251,8 @@ def magazine_edit(request, pk):
 @require_POST
 def magazine_delete(request, pk):
     magazine = get_object_or_404(MagazineEdition, pk=pk)
+    title = magazine.title
+    log_admin_action(request, 'delete', 'MagazineEdition', object_id=pk, object_repr=title)
     magazine.delete()
     messages.success(request, 'Magazine deleted successfully!')
     return redirect('custom_admin:magazines_list')
@@ -1721,6 +1876,8 @@ def gallery_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def gallery_create(request):
     if request.method == 'POST':
+        content_status = request.POST.get('content_status', 'published')
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         album = GalleryAlbum.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -1728,6 +1885,8 @@ def gallery_create(request):
             description_fr=request.POST.get('description_fr', ''),
             cover_image=request.FILES.get('cover_image'),
             is_featured=request.POST.get('is_featured') == 'on',
+            status=content_status,
+            scheduled_publish_date=scheduled_publish_date,
         )
         # Handle multiple photo uploads
         photos = request.FILES.getlist('photos')
@@ -1752,6 +1911,8 @@ def gallery_edit(request, pk):
         if request.FILES.get('cover_image'):
             album.cover_image = request.FILES.get('cover_image')
         album.is_featured = request.POST.get('is_featured') == 'on'
+        album.status = request.POST.get('content_status', 'published')
+        album.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         # Handle new photo uploads
         photos = request.FILES.getlist('photos')
         existing_count = album.photos.count()
@@ -1788,10 +1949,47 @@ def videos_list(request):
     return render(request, 'custom_admin/videos/list.html', {'videos': videos})
 
 
+
+def _save_video_chapters(request, video):
+    """Save inline video chapters from the form POST data."""
+    video.chapters.all().delete()
+    titles = request.POST.getlist('chapter_title[]')
+    titles_fr = request.POST.getlist('chapter_title_fr[]')
+    timestamps = request.POST.getlist('chapter_timestamp[]')
+    descriptions = request.POST.getlist('chapter_description[]')
+    descriptions_fr = request.POST.getlist('chapter_description_fr[]')
+    for i, title in enumerate(titles):
+        if not title.strip():
+            continue
+        # Parse MM:SS or HH:MM:SS timestamp to seconds
+        ts_raw = timestamps[i] if i < len(timestamps) else '0:00'
+        try:
+            parts = ts_raw.strip().split(':')
+            if len(parts) == 2:
+                ts_seconds = int(parts[0]) * 60 + int(parts[1])
+            elif len(parts) == 3:
+                ts_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            else:
+                ts_seconds = int(ts_raw)
+        except (ValueError, IndexError):
+            ts_seconds = 0
+        VideoChapter.objects.create(
+            video=video,
+            title=title.strip(),
+            title_fr=(titles_fr[i] if i < len(titles_fr) else '').strip(),
+            timestamp_seconds=ts_seconds,
+            description=(descriptions[i] if i < len(descriptions) else '').strip(),
+            description_fr=(descriptions_fr[i] if i < len(descriptions_fr) else '').strip(),
+            order=i,
+        )
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def video_create(request):
     if request.method == 'POST':
+        content_status = request.POST.get('content_status', 'published')
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         video = Video.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -1803,11 +2001,14 @@ def video_create(request):
             category=request.POST.get('category', 'highlight'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
             is_featured=request.POST.get('is_featured') == 'on',
+            status=content_status,
+            scheduled_publish_date=scheduled_publish_date,
         )
         if request.FILES.get('video_file'):
             video.video_file = request.FILES['video_file']
             video.save()
-        messages.success(request, 'Video created successfully!')
+        _save_video_chapters(request, video)
+        messages.success(request, f'Video created as {content_status}!')
         return redirect('custom_admin:videos_list')
     category_choices = Video.CATEGORY_CHOICES
     return render(request, 'custom_admin/videos/form.html', {'action': 'Create', 'category_choices': category_choices})
@@ -1830,11 +2031,18 @@ def video_edit(request, pk):
         video.duration = request.POST.get('duration', '')
         video.category = request.POST.get('category', 'highlight')
         video.is_featured = request.POST.get('is_featured') == 'on'
+        video.status = request.POST.get('content_status', 'published')
+        video.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         video.save()
+        _save_video_chapters(request, video)
         messages.success(request, 'Video updated successfully!')
         return redirect('custom_admin:videos_list')
     category_choices = Video.CATEGORY_CHOICES
-    return render(request, 'custom_admin/videos/form.html', {'video': video, 'action': 'Edit', 'category_choices': category_choices})
+    chapters = video.chapters.all()
+    return render(request, 'custom_admin/videos/form.html', {
+        'video': video, 'action': 'Edit',
+        'category_choices': category_choices, 'chapters': chapters,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -1862,6 +2070,8 @@ def live_feeds_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def live_feed_create(request):
     if request.method == 'POST':
+        content_status = request.POST.get('content_status', 'published')
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         LiveFeed.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -1870,8 +2080,10 @@ def live_feed_create(request):
             status=request.POST.get('status', 'upcoming'),
             duration=request.POST.get('duration', ''),
             scheduled_time=request.POST.get('scheduled_time') or None,
+            content_status=content_status,
+            scheduled_publish_date=scheduled_publish_date,
         )
-        messages.success(request, 'Live feed created successfully!')
+        messages.success(request, f'Live feed created as {content_status}!')
         return redirect('custom_admin:live_feeds_list')
     return render(request, 'custom_admin/live_feeds/form.html', {'action': 'Create'})
 
@@ -1889,6 +2101,8 @@ def live_feed_edit(request, pk):
         feed.status = request.POST.get('status', 'upcoming')
         feed.duration = request.POST.get('duration', '')
         feed.scheduled_time = request.POST.get('scheduled_time') or None
+        feed.content_status = request.POST.get('content_status', 'published')
+        feed.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         feed.save()
         messages.success(request, 'Live feed updated successfully!')
         return redirect('custom_admin:live_feeds_list')
@@ -1923,6 +2137,8 @@ def resources_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def resource_create(request):
     if request.method == 'POST':
+        content_status = request.POST.get('content_status', 'published')
+        scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         Resource.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -1930,8 +2146,10 @@ def resource_create(request):
             file=request.FILES.get('file'),
             file_size=request.POST.get('file_size', ''),
             file_type=request.POST.get('file_type', 'pdf'),
+            status=content_status,
+            scheduled_publish_date=scheduled_publish_date,
         )
-        messages.success(request, 'Resource created successfully!')
+        messages.success(request, f'Resource created as {content_status}!')
         return redirect('custom_admin:resources_list')
     return render(request, 'custom_admin/resources/form.html', {'action': 'Create'})
 
@@ -1948,6 +2166,8 @@ def resource_edit(request, pk):
             resource.file = request.FILES.get('file')
         resource.file_size = request.POST.get('file_size', '')
         resource.file_type = request.POST.get('file_type', 'pdf')
+        resource.status = request.POST.get('content_status', 'published')
+        resource.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
         resource.save()
         messages.success(request, 'Resource updated successfully!')
         return redirect('custom_admin:resources_list')
@@ -3263,12 +3483,15 @@ def maintenance_delete(request, pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def admin_audit_log(request):
-    logs = AuditLogEntry.objects.all().select_related('user').order_by('-timestamp')
+    """Enhanced audit log with AdminActivityLog (detailed changes, IP, user-agent)."""
+    logs = AdminActivityLog.objects.all().select_related('user').order_by('-timestamp')
 
     # Filters
-    user_filter = request.GET.get('user')
-    action_filter = request.GET.get('action')
-    model_filter = request.GET.get('model')
+    user_filter = request.GET.get('user', '').strip()
+    action_filter = request.GET.get('action', '').strip()
+    model_filter = request.GET.get('model', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
 
     if user_filter:
         logs = logs.filter(
@@ -3276,16 +3499,53 @@ def admin_audit_log(request):
             Q(user__email__icontains=user_filter)
         )
     if action_filter:
-        logs = logs.filter(action=action_filter)
+        logs = logs.filter(action_type=action_filter)
     if model_filter:
-        logs = logs.filter(entity_type__icontains=model_filter)
+        logs = logs.filter(model_name__icontains=model_filter)
+    if date_from:
+        try:
+            from django.utils.dateparse import parse_date
+            d = parse_date(date_from)
+            if d:
+                logs = logs.filter(timestamp__date__gte=d)
+        except (ValueError, TypeError):
+            pass
+    if date_to:
+        try:
+            from django.utils.dateparse import parse_date
+            d = parse_date(date_to)
+            if d:
+                logs = logs.filter(timestamp__date__lte=d)
+        except (ValueError, TypeError):
+            pass
+
+    # Export CSV if requested
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="audit_log_export.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Timestamp', 'User', 'Action', 'Model', 'Object ID', 'Object', 'Changes', 'IP Address', 'Path'])
+        for log in logs[:5000]:  # Limit export to 5000 rows
+            writer.writerow([
+                log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else '',
+                log.user.username if log.user else 'System',
+                log.action_type,
+                log.model_name,
+                log.object_id or '',
+                log.object_repr,
+                json.dumps(log.changes) if log.changes else '',
+                log.ip_address or '',
+                log.path or '',
+            ])
+        return response
 
     # Get distinct values for filter dropdowns
-    action_choices = AuditLogEntry.ACTION_CHOICES
+    action_choices = AdminActivityLog.ACTION_TYPE_CHOICES
     entity_types = (
-        AuditLogEntry.objects.values_list('entity_type', flat=True)
+        AdminActivityLog.objects.values_list('model_name', flat=True)
+        .exclude(model_name='')
         .distinct()
-        .order_by('entity_type')
+        .order_by('model_name')
     )
 
     paginator = Paginator(logs, 30)
@@ -3296,9 +3556,11 @@ def admin_audit_log(request):
         'logs': logs,
         'action_choices': action_choices,
         'entity_types': entity_types,
-        'current_user_filter': user_filter or '',
-        'current_action_filter': action_filter or '',
-        'current_model_filter': model_filter or '',
+        'current_user_filter': user_filter,
+        'current_action_filter': action_filter,
+        'current_model_filter': model_filter,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
     })
 
 
@@ -3324,14 +3586,20 @@ def bulk_user_action(request):
 
     if action == 'activate':
         users.update(is_active=True)
+        log_admin_action(request, 'bulk_action', 'User', object_repr=f'Bulk activate {count} user(s)',
+                         changes={'action': {'old': '', 'new': 'activate'}, 'count': {'old': '', 'new': str(count)}})
         messages.success(request, f'{count} user(s) activated successfully.')
     elif action == 'deactivate':
         users.update(is_active=False)
+        log_admin_action(request, 'bulk_action', 'User', object_repr=f'Bulk deactivate {count} user(s)',
+                         changes={'action': {'old': '', 'new': 'deactivate'}, 'count': {'old': '', 'new': str(count)}})
         messages.success(request, f'{count} user(s) deactivated successfully.')
     elif action == 'delete':
         if not request.user.is_superuser:
             messages.error(request, 'Only superusers can bulk delete users.')
             return redirect('custom_admin:users_list')
+        log_admin_action(request, 'bulk_action', 'User', object_repr=f'Bulk delete {count} user(s)',
+                         changes={'action': {'old': '', 'new': 'delete'}, 'count': {'old': '', 'new': str(count)}})
         users.delete()
         messages.success(request, f'{count} user(s) deleted successfully.')
     else:
@@ -3356,11 +3624,17 @@ def bulk_content_action(request):
 
     if action == 'activate':
         articles.update(is_featured=True)
+        log_admin_action(request, 'bulk_action', 'Article', object_repr=f'Bulk feature {count} article(s)',
+                         changes={'action': {'old': '', 'new': 'feature'}, 'count': {'old': '', 'new': str(count)}})
         messages.success(request, f'{count} article(s) set to featured.')
     elif action == 'deactivate':
         articles.update(is_featured=False)
+        log_admin_action(request, 'bulk_action', 'Article', object_repr=f'Bulk unfeature {count} article(s)',
+                         changes={'action': {'old': '', 'new': 'unfeature'}, 'count': {'old': '', 'new': str(count)}})
         messages.success(request, f'{count} article(s) unfeatured.')
     elif action == 'delete':
+        log_admin_action(request, 'bulk_action', 'Article', object_repr=f'Bulk delete {count} article(s)',
+                         changes={'action': {'old': '', 'new': 'delete'}, 'count': {'old': '', 'new': str(count)}})
         articles.delete()
         messages.success(request, f'{count} article(s) deleted successfully.')
     else:
@@ -3608,7 +3882,7 @@ def export_users_csv(request):
             profile.is_verified if profile else False,
         ])
 
-    # Log the export
+    # Log the export (both old AuditLogEntry and new AdminActivityLog)
     AuditLogEntry.objects.create(
         user=request.user,
         action='EXPORT',
@@ -3616,6 +3890,7 @@ def export_users_csv(request):
         entity_label=f'CSV export of {users.count()} users',
         status='success',
     )
+    log_admin_action(request, 'export', 'User', object_repr=f'CSV export of {users.count()} users')
 
     return response
 
@@ -4785,6 +5060,8 @@ def create_backup(request):
         backup_record.status = 'completed'
         backup_record.save()
 
+        log_admin_action(request, 'backup', 'DatabaseBackup', object_id=backup_record.pk,
+                         object_repr=filename, changes={'type': {'old': '', 'new': backup_type}, 'size': {'old': '', 'new': _format_file_size(file_size)}})
         messages.success(request, f'Backup "{filename}" created successfully ({_format_file_size(file_size)}).')
     except Exception as e:
         backup_record.status = 'failed'
@@ -4837,6 +5114,7 @@ def delete_backup(request, pk):
 
     backup = get_object_or_404(DatabaseBackup, pk=pk)
     filename = backup.filename
+    log_admin_action(request, 'delete', 'DatabaseBackup', object_id=pk, object_repr=filename)
 
     # Delete file from disk if it exists
     if backup.file_path and os.path.exists(backup.file_path):
@@ -6115,3 +6393,100 @@ def translation_queue_update(request, pk):
 
     messages.success(request, f'Translation request #{tr.pk} updated.')
     return redirect('custom_admin:translation_queue_list')
+
+
+# ==============================================================
+#  COMMENTS MANAGEMENT
+# ==============================================================
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def comments_list(request):
+    """List all comments across articles and events with filters."""
+    content_filter = request.GET.get('type', 'all')
+    search_query = request.GET.get('q', '').strip()
+    article_qs = ArticleComment.objects.select_related('user', 'article').all()
+    event_qs = EventComment.objects.select_related('user', 'event').all()
+    if search_query:
+        article_qs = article_qs.filter(
+            Q(content__icontains=search_query)
+            | Q(user__username__icontains=search_query)
+            | Q(article__title__icontains=search_query)
+        )
+        event_qs = event_qs.filter(
+            Q(content__icontains=search_query)
+            | Q(user__username__icontains=search_query)
+            | Q(event__name__icontains=search_query)
+        )
+    total_article = article_qs.count()
+    total_event = event_qs.count()
+    total_all = total_article + total_event
+    if content_filter == 'articles':
+        event_qs = EventComment.objects.none()
+    elif content_filter == 'events':
+        article_qs = ArticleComment.objects.none()
+    unified = []
+    for c in article_qs:
+        unified.append({
+            'pk': c.pk, 'content': c.content, 'user': c.user,
+            'content_type': 'article', 'content_title': c.article.title,
+            'content_pk': c.article.pk, 'created_at': c.created_at,
+            'is_approved': True,
+        })
+    for c in event_qs:
+        unified.append({
+            'pk': c.pk, 'content': c.content, 'user': c.user,
+            'content_type': 'event', 'content_title': c.event.name,
+            'content_pk': c.event.pk, 'created_at': c.created_at,
+            'is_approved': c.is_approved,
+        })
+    unified.sort(key=lambda x: x['created_at'], reverse=True)
+    paginator = Paginator(unified, 25)
+    page = request.GET.get('page')
+    comments_page = paginator.get_page(page)
+    return render(request, 'custom_admin/comments/list.html', {
+        'comments': comments_page, 'total_all': total_all,
+        'total_article': total_article, 'total_event': total_event,
+        'current_filter': content_filter, 'search_query': search_query,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def comment_delete(request, pk):
+    """Delete a specific comment (article or event)."""
+    comment_type = request.POST.get('comment_type', 'article')
+    if comment_type == 'event':
+        comment = get_object_or_404(EventComment, pk=pk)
+        label = f'event comment by {comment.user.username}'
+    else:
+        comment = get_object_or_404(ArticleComment, pk=pk)
+        label = f'article comment by {comment.user.username}'
+    comment.delete()
+    messages.success(request, f'Comment deleted: {label}')
+    return redirect('custom_admin:comments_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def comment_bulk_delete(request):
+    """Bulk delete selected comments."""
+    article_ids = request.POST.getlist('article_comment_ids')
+    event_ids = request.POST.getlist('event_comment_ids')
+    deleted_count = 0
+    if article_ids:
+        pks = [int(x) for x in article_ids if x.isdigit()]
+        count, _ = ArticleComment.objects.filter(pk__in=pks).delete()
+        deleted_count += count
+    if event_ids:
+        pks = [int(x) for x in event_ids if x.isdigit()]
+        count, _ = EventComment.objects.filter(pk__in=pks).delete()
+        deleted_count += count
+    if deleted_count:
+        messages.success(request, f'{deleted_count} comment(s) deleted successfully.')
+    else:
+        messages.warning(request, 'No comments were selected for deletion.')
+    return redirect('custom_admin:comments_list')

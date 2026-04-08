@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
@@ -270,7 +271,10 @@ class _MagazineScreenState extends State<MagazineScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-            onRefresh: _loadMagazines,
+            onRefresh: () async {
+              HapticFeedback.mediumImpact();
+              await _loadMagazines();
+            },
             child: Builder(builder: (context) {
           final magazines = _magazines ?? MagazineData.getMockEditions();
 

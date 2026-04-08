@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
@@ -134,7 +135,10 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadSocialMedia,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                await _loadSocialMedia();
+              },
               child: CustomScrollView(
                 slivers: [
                   // App Bar

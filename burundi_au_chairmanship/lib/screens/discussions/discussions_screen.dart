@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
@@ -145,7 +146,10 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                         ),
                       )
                     : RefreshIndicator(
-                        onRefresh: _loadDiscussions,
+                        onRefresh: () async {
+                          HapticFeedback.mediumImpact();
+                          await _loadDiscussions();
+                        },
                         child: ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _discussions.length,

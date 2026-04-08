@@ -198,7 +198,7 @@
             <!-- Status Section -->
             <div class="space-y-6">
                 <div class="border-l-4 border-primary-container pl-4">
-                    <h2 class="text-xl font-headline font-bold text-on-surface">Status</h2>
+                    <h2 class="text-xl font-headline font-bold text-on-surface">Visibility</h2>
                     <p class="text-sm text-on-surface-variant mt-1">Event visibility settings</p>
                 </div>
 
@@ -213,6 +213,9 @@
                     </label>
                 </div>
             </div>
+
+            <!-- Content Status & Scheduling -->
+            {% include 'custom_admin/includes/content_scheduling.html' with obj=event %}
 
             <!-- Form Actions -->
             <div class="flex items-center justify-end gap-4 pt-6 border-t border-outline-variant">

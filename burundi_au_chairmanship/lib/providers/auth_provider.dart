@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
 import '../services/firebase_auth_service.dart';
+import '../services/firebase_messaging_service.dart';
 
 /// Authentication provider using Firebase Auth + Django backend
 ///
@@ -21,6 +23,14 @@ class AuthProvider extends ChangeNotifier {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
   );
+
+  /// Completer that resolves once initial auth state has been fully determined.
+  /// The splash screen awaits this before deciding where to navigate.
+  final Completer<void> _initCompleter = Completer<void>();
+
+  /// A future that completes when auth initialization is done.
+  /// Await this in the splash screen to avoid race conditions.
+  Future<void> get initialized => _initCompleter.future;
 
   bool _isAuthenticated = false;
   int? _userId;
@@ -65,6 +75,15 @@ class AuthProvider extends ChangeNotifier {
   bool get requiresEmailVerification => _userEmail?.toLowerCase() == 'apple.review@burundi4africa.com' ? false : _requiresEmailVerification;
   bool get receivesNewsletter => _receivesNewsletter;
 
+  /// Whether the current user has an email/password credential (not SSO-only).
+  /// Returns true for email/password users who can change their password.
+  /// Returns false for Google/Apple SSO-only users.
+  bool get hasPasswordProvider {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    return user.providerData.any((info) => info.providerId == 'password');
+  }
+
   AuthProvider() {
     _checkAuthStatus();
     _listenToAuthChanges();
@@ -73,17 +92,18 @@ class AuthProvider extends ChangeNotifier {
   /// Listen to Firebase auth state changes
   ///
   /// Guards against premature sign-out: during app startup, Firebase may briefly
-  /// report null before restoring the auth state. We skip sign-out until
-  /// [_checkAuthStatus] has completed and [_hasInitialized] is true.
+  /// report null before restoring the auth state. We skip ALL auth-change events
+  /// until [_checkAuthStatus] has completed and [_hasInitialized] is true,
+  /// because _checkAuthStatus already handles the initial state.
   void _listenToAuthChanges() {
     _firebaseAuth.authStateChanges.listen((User? firebaseUser) async {
+      // Skip all events during initial boot — _checkAuthStatus handles startup
+      if (!_hasInitialized) return;
+
       if (firebaseUser != null) {
-        // User signed in - sync with Django backend
+        // User signed in (or token refreshed) — sync with Django backend
         await _syncWithBackend();
       } else {
-        // Skip sign-out during initial boot — Firebase may briefly report null
-        if (!_hasInitialized) return;
-
         // Double-check: if we have cached credentials, don't sign out yet
         if (_isAuthenticated) {
           // Wait briefly and recheck — Firebase might be recovering
@@ -124,45 +144,68 @@ class AuthProvider extends ChangeNotifier {
     _receivesNewsletter = prefs.getBool('user_receives_newsletter') ?? false;
   }
 
-  /// Check if user is already authenticated
+  /// Check if user is already authenticated.
+  ///
+  /// This method determines auth state from Firebase Auth and/or stored JWT
+  /// tokens, loads cached profile data, and then syncs with the backend.
+  /// It completes [_initCompleter] when finished so the splash screen
+  /// can reliably await initialization.
   Future<void> _checkAuthStatus() async {
-    final firebaseUser = _firebaseAuth.currentUser;
-    if (firebaseUser != null) {
-      // User is signed in with Firebase - load cached profile first
-      _isAuthenticated = true;
-      await _loadLocalUserData();
-      notifyListeners();
-      
-      // Then sync with backend in the background
-      _syncWithBackend();
-    } else {
-      // Check for legacy JWT auth (for backward compatibility)
-      // Tokens stored in encrypted secure storage (Android Keystore / iOS Keychain)
-      final token = await _secureStorage.read(key: AppConstants.userTokenKey);
-      if (token != null && token.isNotEmpty) {
+    try {
+      final firebaseUser = _firebaseAuth.currentUser;
+      if (firebaseUser != null) {
+        // User is signed in with Firebase — load cached profile immediately
         _isAuthenticated = true;
         await _loadLocalUserData();
+        notifyListeners();
+
+        // Sync with backend and wait for it so user data (userId, email) is populated.
+        // Use a timeout so slow networks don't block startup forever.
+        try {
+          await _syncWithBackend().timeout(const Duration(seconds: 8));
+        } catch (e) {
+          // Sync failed or timed out — user stays authenticated with cached data.
+          // If we have cached userId, that's enough for the app to function.
+          if (kDebugMode) print('Auth init: backend sync failed/timed out: $e');
+        }
       } else {
-        // Migration: check if token exists in old SharedPreferences and migrate
-        final prefs = await SharedPreferences.getInstance();
-        final legacyToken = prefs.getString(AppConstants.userTokenKey);
-        if (legacyToken != null && legacyToken.isNotEmpty) {
-          // Migrate token to secure storage
-          await _secureStorage.write(key: AppConstants.userTokenKey, value: legacyToken);
-          final legacyRefresh = prefs.getString('refresh_token');
-          if (legacyRefresh != null) {
-            await _secureStorage.write(key: 'refresh_token', value: legacyRefresh);
-          }
-          // Remove from insecure storage
-          await prefs.remove(AppConstants.userTokenKey);
-          await prefs.remove('refresh_token');
+        // No Firebase user — check for legacy JWT auth (backward compatibility)
+        // Tokens stored in encrypted secure storage (Android Keystore / iOS Keychain)
+        final token = await _secureStorage.read(key: AppConstants.userTokenKey);
+        if (token != null && token.isNotEmpty) {
           _isAuthenticated = true;
           await _loadLocalUserData();
+        } else {
+          // Migration: check if token exists in old SharedPreferences and migrate
+          final prefs = await SharedPreferences.getInstance();
+          final legacyToken = prefs.getString(AppConstants.userTokenKey);
+          if (legacyToken != null && legacyToken.isNotEmpty) {
+            // Migrate token to secure storage
+            await _secureStorage.write(key: AppConstants.userTokenKey, value: legacyToken);
+            final legacyRefresh = prefs.getString('refresh_token');
+            if (legacyRefresh != null) {
+              await _secureStorage.write(key: 'refresh_token', value: legacyRefresh);
+            }
+            // Remove from insecure storage
+            await prefs.remove(AppConstants.userTokenKey);
+            await prefs.remove('refresh_token');
+            _isAuthenticated = true;
+            await _loadLocalUserData();
+          }
         }
       }
+    } catch (e) {
+      // If anything fails during init, don't crash — just treat as unauthenticated
+      if (kDebugMode) print('Auth init error: $e');
     }
+
     _hasInitialized = true;
     notifyListeners();
+
+    // Signal that initialization is complete so splash screen can proceed
+    if (!_initCompleter.isCompleted) {
+      _initCompleter.complete();
+    }
   }
 
   /// Sync Firebase user with Django backend
@@ -189,8 +232,11 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Sign up a new user with Firebase Auth + Django backend
+  ///
+  /// [honeypot] is an anti-bot field. If filled (by a bot), the backend
+  /// silently rejects the registration. Real users never see this field.
   Future<bool> signUp(String name, String email, String password,
-      {String? phoneNumber, String? gender}) async {
+      {String? phoneNumber, String? gender, String? honeypot}) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -225,6 +271,7 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         phoneNumber: phoneNumber,
         gender: gender,
+        honeypot: honeypot ?? '',
       );
 
       // 5. Store user data locally
@@ -471,6 +518,15 @@ class AuthProvider extends ChangeNotifier {
 
   /// Sign out the current user
   Future<void> signOut() async {
+    // Deactivate FCM token on backend before signing out
+    // (don't delete - allows reactivation on next login)
+    try {
+      final messaging = FirebaseMessagingService();
+      await messaging.deactivateToken();
+    } catch (e) {
+      if (kDebugMode) print('Failed to deactivate FCM token on logout: $e');
+    }
+
     await _firebaseAuth.signOut();
     await _clearUserData();
     _isAuthenticated = false;

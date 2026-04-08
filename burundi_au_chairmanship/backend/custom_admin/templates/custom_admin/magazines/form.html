@@ -185,6 +185,9 @@
             </div>
         </div>
 
+        <!-- Content Status & Scheduling -->
+        {% include 'custom_admin/includes/content_scheduling.html' with obj=magazine %}
+
         <!-- Form Actions -->
         <div class="flex items-center justify-between pt-6 border-t border-outline-variant">
             <a href="{% url 'custom_admin:magazines_list' %}" class="text-on-surface-variant hover:text-on-surface font-medium transition-colors">

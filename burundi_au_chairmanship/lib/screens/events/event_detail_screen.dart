@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:add_2_calendar/add_2_calendar.dart' as cal;
@@ -15,6 +16,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/events/event_countdown.dart';
 import '../../widgets/events/event_info_card.dart';
 import '../../widgets/translate_button.dart';
+import '../../widgets/confetti_overlay.dart';
 import 'event_ticket_screen.dart';
 
 class EventDetailScreen extends StatefulWidget {
@@ -1903,6 +1905,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<void> _submitRegistration(String langCode) async {
     if (!_formKey.currentState!.validate()) return;
+    HapticFeedback.lightImpact();
 
     setState(() => _isSubmitting = true);
 
@@ -1928,6 +1931,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         _isSubmitting = false;
       });
 
+      // Trigger confetti celebration
+      HapticFeedback.mediumImpact();
+      ConfettiOverlay.show(context);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Registration successful!'),
@@ -1937,12 +1944,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     } on ApiException catch (e) {
       setState(() => _isSubmitting = false);
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
       );
     } catch (e) {
       setState(() => _isSubmitting = false);
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registration failed. Try again.'), backgroundColor: AppColors.burundiRed),
       );
@@ -1951,6 +1960,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Future<void> _submitProxyRegistration() async {
     if (!_proxyFormKey.currentState!.validate()) return;
+    HapticFeedback.lightImpact();
 
     setState(() => _isSubmitting = true);
 
@@ -1972,6 +1982,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       _proxyEmailController.clear();
       _proxyPhoneController.clear();
 
+      HapticFeedback.mediumImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Proxy registration submitted!'),
@@ -1981,12 +1992,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     } on ApiException catch (e) {
       setState(() => _isSubmitting = false);
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
       );
     } catch (e) {
       setState(() => _isSubmitting = false);
       if (!mounted) return;
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Proxy registration failed. Try again.'), backgroundColor: AppColors.burundiRed),
       );

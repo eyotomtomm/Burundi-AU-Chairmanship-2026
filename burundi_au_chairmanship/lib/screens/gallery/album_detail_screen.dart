@@ -12,6 +12,7 @@ import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/image_gallery_viewer.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -249,15 +250,29 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   /// Open fullscreen photo viewer with swipe support
   void _openPhotoViewer(int initialIndex) {
     final photos = widget.album['photos'] as List? ?? [];
-    Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (context) => _PhotoViewerScreen(
-          photos: photos,
-          initialIndex: initialIndex,
-          isDownloaded: _isDownloaded,
-          localPhotoPaths: _localPhotoPaths,
-        ),
-      ),
+    final langCode = Localizations.localeOf(context).languageCode;
+
+    // Build image URLs: prefer local files if downloaded, otherwise network
+    final imageUrls = <String>[];
+    final captions = <String>[];
+
+    for (final photo in photos) {
+      // Use network URL - CachedNetworkImage handles caching automatically
+      imageUrls.add(Environment.fixMediaUrl(photo['image'] ?? ''));
+
+      // Get caption in current language
+      final caption = langCode == 'fr'
+          ? (photo['caption_fr'] ?? photo['caption'] ?? '')
+          : (photo['caption'] ?? '');
+      captions.add(caption?.toString() ?? '');
+    }
+
+    ImageGalleryViewer.show(
+      context,
+      images: imageUrls,
+      initialIndex: initialIndex,
+      captions: captions,
+      heroTagPrefix: 'album_${widget.album['id']}',
     );
   }
 
@@ -442,12 +457,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       onTap: () {
         _openPhotoViewer(index);
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            imageWidget,
+      child: Hero(
+        tag: 'album_${widget.album['id']}_$index',
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              imageWidget,
             if (isLocalAvailable)
               Positioned(
                 top: 4,
@@ -464,11 +481,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 }
 
-/// Fullscreen photo viewer with swipe support
+/// Fullscreen photo viewer with swipe support (legacy, kept for reference)
 class _PhotoViewerScreen extends StatefulWidget {
   final List photos;
   final int initialIndex;

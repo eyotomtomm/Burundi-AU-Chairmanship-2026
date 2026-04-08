@@ -41,7 +41,8 @@ from .models import (
     WeeklyReport, UserSession, FunnelStep, EngagementHeatmap,
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
     EventComment, CommentMention, NewsletterEdition,
-    EventAgendaItem,
+    EventAgendaItem, LinkedAccount,
+    DeviceToken,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -70,10 +71,10 @@ from .serializers import (
     UserPreferenceSerializer, OnboardingStepSerializer, ScheduledMaintenanceSerializer,
     AppReleaseSerializer, ContentAnalyticsSerializer, WeeklyReportSerializer,
     AuditLogEntrySerializer, TranslationEntrySerializer, ContentVersionSerializer,
-    AccountMergeRequestSerializer,
+    AccountMergeRequestSerializer, LinkedAccountSerializer,
     ArticleRevisionSerializer, TranslationRequestSerializer,
     EventCommentSerializer, NewsletterEditionSerializer, EventAttendeeSerializer,
-    EventAgendaItemSerializer,
+    EventAgendaItemSerializer, VideoChapterSerializer,
 )
 
 
@@ -122,12 +123,69 @@ def lookup_ip_geolocation(login_history_id):
         pass  # Non-critical, don't break login flow
 
 
+# ── reCAPTCHA Verification ────────────────────────────────
+
+def verify_recaptcha(token):
+    """
+    Verify a reCAPTCHA token with Google's API.
+    Returns True if verification succeeds or if RECAPTCHA_SECRET_KEY is not configured.
+    Returns False if verification fails.
+    """
+    secret_key = getattr(django_settings, 'RECAPTCHA_SECRET_KEY', '')
+    if not secret_key:
+        return True
+
+    try:
+        import urllib.parse
+        data = urllib.parse.urlencode({
+            'secret': secret_key,
+            'response': token,
+        }).encode('utf-8')
+        req = urllib.request.Request(
+            'https://www.google.com/recaptcha/api/siteverify',
+            data=data,
+            method='POST',
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json_module.loads(resp.read().decode())
+        return result.get('success', False)
+    except Exception as e:
+        logger.warning(f'reCAPTCHA verification failed: {e}')
+        return True
+
+
 # ── Auth Views ────────────────────────────────────────────
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([AuthRateThrottle])
 def register(request):
+    # Honeypot anti-bot check: if the hidden '_hp' field is filled, reject silently
+    honeypot = request.data.get('_hp', '')
+    if honeypot:
+        # Bots typically fill hidden fields — return a fake success to avoid tipping them off
+        return Response({
+            'user': {},
+            'access': '',
+            'refresh': '',
+            'email_verified': False,
+            'requires_email_verification': True,
+        }, status=status.HTTP_201_CREATED)
+
+    # reCAPTCHA verification (optional — skipped if RECAPTCHA_SECRET_KEY is not set)
+    captcha_token = request.data.get('captcha_token', '')
+    if getattr(django_settings, 'RECAPTCHA_SECRET_KEY', ''):
+        if not captcha_token:
+            return Response(
+                {'detail': 'CAPTCHA verification is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not verify_recaptcha(captcha_token):
+            return Response(
+                {'detail': 'CAPTCHA verification failed. Please try again.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
@@ -442,6 +500,16 @@ def firebase_register(request):
     Register a new user after Firebase Auth signup.
     Creates Django User and UserProfile with Firebase UID.
     """
+    # Honeypot anti-bot check
+    honeypot = request.data.get('_hp', '')
+    if honeypot:
+        return Response({
+            'user': {},
+            'message': 'User registered successfully',
+            'email_verified': False,
+            'requires_email_verification': True,
+        }, status=status.HTTP_201_CREATED)
+
     id_token = request.data.get('firebase_token')
     name = request.data.get('name', '')
     phone_number = request.data.get('phone_number', '')
@@ -613,6 +681,8 @@ def firebase_login(request):
 def update_fcm_token(request):
     """
     Update user's FCM token for push notifications.
+    Creates/reactivates a DeviceToken entry and also updates the legacy
+    UserProfile.fcm_token for backward compatibility.
     """
     fcm_token = request.data.get('fcm_token')
 
@@ -623,9 +693,26 @@ def update_fcm_token(request):
         )
 
     try:
+        # Update legacy profile token for backward compatibility
         profile = request.user.profile
         profile.fcm_token = fcm_token
-        profile.save()
+        profile.save(update_fields=['fcm_token'])
+
+        # Deactivate this token for any other users (device ownership transfer)
+        DeviceToken.objects.filter(token=fcm_token).exclude(
+            user=request.user
+        ).update(is_active=False)
+
+        # Create or reactivate for the current user
+        DeviceToken.objects.update_or_create(
+            user=request.user,
+            token=fcm_token,
+            defaults={
+                'is_active': True,
+                'device_type': profile.device_type,
+                'device_os': profile.device_os,
+            }
+        )
 
         return Response({
             'message': 'FCM token updated successfully'
@@ -635,6 +722,38 @@ def update_fcm_token(request):
         logger.exception('Failed to update FCM token')
         return Response(
             {'detail': 'Failed to update notification settings. Please try again.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def deactivate_fcm_token(request):
+    """
+    Deactivate user's FCM token on logout.
+    Does not delete the token so it can be reactivated on next login.
+    """
+    fcm_token = request.data.get('fcm_token')
+
+    try:
+        if fcm_token:
+            DeviceToken.objects.filter(
+                user=request.user,
+                token=fcm_token,
+            ).update(is_active=False)
+        else:
+            DeviceToken.objects.filter(user=request.user).update(is_active=False)
+
+        # Clear legacy token
+        profile = request.user.profile
+        profile.fcm_token = ''
+        profile.save(update_fields=['fcm_token'])
+
+        return Response({'message': 'FCM token deactivated'})
+    except Exception as e:
+        logger.exception('Failed to deactivate FCM token')
+        return Response(
+            {'detail': 'Failed to deactivate token.'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -723,7 +842,9 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MagazineEditionSerializer
 
     def get_queryset(self):
-        qs = MagazineEdition.objects.prefetch_related('images').all()
+        qs = MagazineEdition.objects.prefetch_related('images').filter(
+            status='published',  # Only show published magazines in public API
+        )
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -794,7 +915,8 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         qs = Article.objects.select_related('category').prefetch_related('media').annotate(
             comment_count=Count('comments', distinct=True),
         ).filter(
-            is_draft=False,  # Exclude drafts from public API
+            is_draft=False,  # Exclude legacy drafts from public API
+            status='published',  # Only show published articles
         ).exclude(
             scheduled_publish_at__gt=now,  # Exclude scheduled (future) articles
         ).exclude(
@@ -827,6 +949,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         now = timezone.now()
         related_qs = Article.objects.select_related('category').prefetch_related('media').filter(
             is_draft=False,
+            status='published',
         ).exclude(
             scheduled_publish_at__gt=now,
         ).exclude(
@@ -961,9 +1084,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view active events, with recurring event expansion."""
+    """Public endpoint: Anyone can view active, published events, with recurring event expansion."""
     permission_classes = [AllowAny]
-    queryset = Event.objects.filter(is_active=True).prefetch_related('speakers')
+    queryset = Event.objects.filter(is_active=True, status='published').prefetch_related('speakers')
     serializer_class = EventSerializer
 
     def list(self, request, *args, **kwargs):
@@ -1060,15 +1183,15 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view live feeds"""
     permission_classes = [AllowAny]
-    queryset = LiveFeed.objects.all().order_by('-created_at')  # Show newest first
+    queryset = LiveFeed.objects.filter(content_status='published').order_by('-created_at')
     serializer_class = LiveFeedSerializer
     filterset_fields = ['status']
 
 
 class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view resources"""
+    """Public endpoint: Anyone can view published resources"""
     permission_classes = [AllowAny]
-    queryset = Resource.objects.all()
+    queryset = Resource.objects.filter(status='published')
     serializer_class = ResourceSerializer
     filterset_fields = ['category', 'file_type']
 
@@ -1098,7 +1221,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = GalleryAlbumSerializer
 
     def get_queryset(self):
-        qs = GalleryAlbum.objects.prefetch_related('photos').all()
+        qs = GalleryAlbum.objects.prefetch_related('photos').filter(status='published')
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -1141,7 +1264,7 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = Video.objects.prefetch_related(
             'chapters', 'subtitles'
-        ).all().order_by('-is_featured', '-publish_date')
+        ).filter(status='published').order_by('-is_featured', '-publish_date')
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -1173,6 +1296,14 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             is_liked = True
         video.refresh_from_db()
         return Response({'like_count': video.like_count, 'is_liked': is_liked})
+
+    @action(detail=True, methods=['get'], url_path='chapters', permission_classes=[AllowAny])
+    def chapters(self, request, pk=None):
+        """Return all chapters for a specific video, ordered by timestamp."""
+        video = self.get_object()
+        chapters = video.chapters.all()
+        serializer = VideoChapterSerializer(chapters, many=True, context={'request': request})
+        return Response(serializer.data)
 
 
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1259,6 +1390,48 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         notifications = self.get_queryset()
         count = notifications.exclude(read_by=request.user).count()
         return Response({'unread_count': count})
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='opened')
+    def opened(self, request, pk=None):
+        """
+        Track that a user opened/tapped a push notification.
+        Increments the opened_count on the Notification.
+        Called from Flutter when a push notification is tapped.
+        """
+        notification = self.get_object()
+        Notification.objects.filter(pk=notification.pk).update(
+            opened_count=models.F('opened_count') + 1
+        )
+        return Response({
+            'message': 'Notification open tracked',
+            'notification_id': notification.pk,
+        })
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def notification_target_count(request):
+    """
+    Preview target audience count for a notification before sending.
+    Accepts same targeting fields as the notification create form.
+    Returns the number of users who would receive the notification.
+    """
+    from core.push_service import get_target_audience_count
+
+    # Build a temporary (unsaved) Notification from the request data
+    notification = Notification(
+        is_global=request.data.get('is_global', True),
+        target_gender=request.data.get('target_gender', ''),
+        target_nationalities=request.data.get('target_nationalities', []),
+        target_age_min=request.data.get('target_age_min'),
+        target_age_max=request.data.get('target_age_max'),
+        target_verified_only=request.data.get('target_verified_only', False),
+        target_badge_type=request.data.get('target_badge_type', ''),
+        target_language=request.data.get('target_language', ''),
+    )
+
+    count = get_target_audience_count(notification)
+    return Response({'target_count': count})
 
 
 @api_view(['GET'])
@@ -3098,6 +3271,227 @@ def request_account_merge(request):
     if not created and merge.status == 'pending':
         return Response({'message': 'Merge request already pending'})
     return Response({'message': 'Merge request submitted', 'id': merge.id}, status=201)
+
+
+# ══════════════════════════════════════════════════════════════
+# Account Linking — multi-provider auth
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def linked_accounts_list(request):
+    """List all auth providers linked to the current user's account."""
+    accounts = LinkedAccount.objects.filter(user=request.user)
+    serializer = LinkedAccountSerializer(accounts, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def link_account(request):
+    """Link a new auth provider to the current user's account.
+
+    Expects: provider, provider_uid, email (optional), display_name (optional)
+    """
+    provider = request.data.get('provider')
+    provider_uid = request.data.get('provider_uid')
+
+    if not provider or not provider_uid:
+        return Response(
+            {'error': 'Both provider and provider_uid are required'},
+            status=400
+        )
+
+    valid_providers = [c[0] for c in LinkedAccount.PROVIDER_CHOICES]
+    if provider not in valid_providers:
+        return Response(
+            {'error': f'Invalid provider. Must be one of: {", ".join(valid_providers)}'},
+            status=400
+        )
+
+    # Check if this provider+uid is already linked to another user
+    existing = LinkedAccount.objects.filter(
+        provider=provider,
+        provider_uid=provider_uid
+    ).exclude(user=request.user).first()
+
+    if existing:
+        return Response(
+            {'error': 'This account is already linked to a different user. '
+                      'Please unlink it from the other account first or use account merge.'},
+            status=409
+        )
+
+    # Check if this user already has this provider linked
+    already_linked = LinkedAccount.objects.filter(
+        user=request.user,
+        provider=provider,
+        provider_uid=provider_uid
+    ).first()
+
+    if already_linked:
+        return Response(
+            {'message': 'This provider is already linked to your account'},
+            status=200
+        )
+
+    email = request.data.get('email', '')
+    display_name = request.data.get('display_name', '')
+
+    # Determine if this should be primary (first linked account)
+    is_primary = not LinkedAccount.objects.filter(user=request.user).exists()
+
+    linked = LinkedAccount.objects.create(
+        user=request.user,
+        provider=provider,
+        provider_uid=provider_uid,
+        email=email,
+        display_name=display_name,
+        is_primary=is_primary,
+    )
+
+    serializer = LinkedAccountSerializer(linked)
+    return Response(serializer.data, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def unlink_account(request):
+    """Unlink an auth provider from the current user's account.
+
+    Must keep at least one linked account.
+    Expects: provider (required), provider_uid (optional for specificity)
+    """
+    provider = request.data.get('provider')
+    if not provider:
+        return Response({'error': 'Provider is required'}, status=400)
+
+    # Find linked accounts for this provider
+    query = LinkedAccount.objects.filter(user=request.user, provider=provider)
+    provider_uid = request.data.get('provider_uid')
+    if provider_uid:
+        query = query.filter(provider_uid=provider_uid)
+
+    account_to_unlink = query.first()
+    if not account_to_unlink:
+        return Response({'error': 'No linked account found for this provider'}, status=404)
+
+    # Ensure at least one account remains
+    total_linked = LinkedAccount.objects.filter(user=request.user).count()
+    if total_linked <= 1:
+        return Response(
+            {'error': 'Cannot unlink your only authentication method. '
+                      'Link another provider before unlinking this one.'},
+            status=400
+        )
+
+    was_primary = account_to_unlink.is_primary
+    account_to_unlink.delete()
+
+    # If we removed the primary, promote the next one
+    if was_primary:
+        next_account = LinkedAccount.objects.filter(user=request.user).first()
+        if next_account:
+            next_account.is_primary = True
+            next_account.save(update_fields=['is_primary'])
+
+    return Response({'message': f'{provider} account unlinked successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def merge_accounts(request):
+    """Merge another user's data into the current user's account.
+
+    Moves all linked accounts, bookmarks, reactions, comments, etc.
+    from the source account to the current user, then deactivates the source.
+
+    Expects: source_user_id (the account to absorb)
+    """
+    source_user_id = request.data.get('source_user_id')
+    if not source_user_id:
+        return Response({'error': 'source_user_id is required'}, status=400)
+
+    try:
+        source_user = User.objects.get(id=source_user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'Source account not found'}, status=404)
+
+    if source_user == request.user:
+        return Response({'error': 'Cannot merge with yourself'}, status=400)
+
+    target_user = request.user
+
+    # Transfer linked accounts (skip duplicates)
+    for la in LinkedAccount.objects.filter(user=source_user):
+        if not LinkedAccount.objects.filter(
+            user=target_user, provider=la.provider, provider_uid=la.provider_uid
+        ).exists():
+            la.user = target_user
+            la.is_primary = False
+            la.save(update_fields=['user', 'is_primary'])
+
+    # Transfer bookmarks
+    Bookmark.objects.filter(user=source_user).update(user=target_user)
+
+    # Transfer reactions (skip duplicates)
+    for reaction in Reaction.objects.filter(user=source_user):
+        if not Reaction.objects.filter(
+            user=target_user,
+            content_type=reaction.content_type,
+            content_id=reaction.content_id,
+            reaction_type=reaction.reaction_type,
+        ).exists():
+            reaction.user = target_user
+            reaction.save(update_fields=['user'])
+
+    # Transfer reading progress
+    ReadingProgress.objects.filter(user=source_user).update(user=target_user)
+
+    # Transfer support tickets
+    SupportTicket.objects.filter(user=source_user).update(user=target_user)
+
+    # Transfer event submissions
+    EventSubmission.objects.filter(user=source_user).update(user=target_user)
+
+    # Transfer discussions & replies
+    Discussion.objects.filter(author=source_user).update(author=target_user)
+    DiscussionReply.objects.filter(author=source_user).update(author=target_user)
+
+    # Transfer poll votes
+    for vote in PollVote.objects.filter(user=source_user):
+        if not PollVote.objects.filter(user=target_user, poll=vote.poll).exists():
+            vote.user = target_user
+            vote.save(update_fields=['user'])
+
+    # Transfer notification preferences
+    NotificationPreference.objects.filter(user=source_user).update(user=target_user)
+
+    # Deactivate source account
+    source_user.is_active = False
+    source_user.save(update_fields=['is_active'])
+
+    # Update source profile
+    try:
+        source_profile = source_user.profile
+        source_profile.is_deactivated = True
+        source_profile.deactivated_at = timezone.now()
+        source_profile.save(update_fields=['is_deactivated', 'deactivated_at'])
+    except UserProfile.DoesNotExist:
+        pass
+
+    # Record the merge
+    AccountMergeRequest.objects.create(
+        primary_user=target_user,
+        secondary_user=source_user,
+        status='approved',
+        resolved_at=timezone.now(),
+    )
+
+    return Response({
+        'message': f'Account {source_user.email} merged successfully. '
+                   f'All data has been transferred to your account.',
+    })
 
 
 # ══════════════════════════════════════════════════════════════

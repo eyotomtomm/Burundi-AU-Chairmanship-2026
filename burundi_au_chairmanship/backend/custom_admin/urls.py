@@ -283,4 +283,9 @@ urlpatterns = [
     # Translation Queue
     path('translation-queue/', views.translation_queue_list, name='translation_queue_list'),
     path('translation-queue/<int:pk>/update/', views.translation_queue_update, name='translation_queue_update'),
+
+    # Comments Management
+    path('comments/', views.comments_list, name='comments_list'),
+    path('comments/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
+    path('comments/bulk-delete/', views.comment_bulk_delete, name='comment_bulk_delete'),
 ]

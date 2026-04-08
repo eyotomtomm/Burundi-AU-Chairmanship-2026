@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../config/app_colors.dart';
 
@@ -66,7 +67,10 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                   children: [
                     Expanded(
                       child: RefreshIndicator(
-                        onRefresh: _loadData,
+                        onRefresh: () async {
+                          HapticFeedback.mediumImpact();
+                          await _loadData();
+                        },
                         child: ListView(
                           padding: const EdgeInsets.all(16),
                           children: [

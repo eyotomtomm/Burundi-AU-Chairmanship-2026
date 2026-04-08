@@ -60,6 +60,7 @@ urlpatterns = [
     path('auth/firebase-register/', views.firebase_register, name='firebase-register'),
     path('auth/firebase-login/', views.firebase_login, name='firebase-login'),
     path('auth/update-fcm-token/', views.update_fcm_token, name='update-fcm-token'),
+    path('auth/deactivate-fcm-token/', views.deactivate_fcm_token, name='deactivate-fcm-token'),
     path('auth/update-device-info/', views.update_device_info, name='update-device-info'),
     path('auth/update-language/', views.update_language_preference, name='update-language'),
 
@@ -112,6 +113,7 @@ urlpatterns = [
 
     # Communication (NEW)
     path('notification-preferences/', views.notification_preferences, name='notification-preferences'),
+    path('notifications/target-count/', views.notification_target_count, name='notification-target-count'),
 
     # User Preferences & Onboarding (NEW)
     path('preferences/', views.user_preferences, name='user-preferences'),
@@ -141,6 +143,12 @@ urlpatterns = [
     # Translation Queue (#46)
     path('admin/translation-queue/', views.translation_queue, name='translation-queue'),
     path('admin/translation-queue/<int:pk>/', views.translation_queue_detail, name='translation-queue-detail'),
+
+    # Account Linking
+    path('auth/linked-accounts/', views.linked_accounts_list, name='linked-accounts-list'),
+    path('auth/link-account/', views.link_account, name='link-account'),
+    path('auth/unlink-account/', views.unlink_account, name='unlink-account'),
+    path('auth/merge-accounts/', views.merge_accounts, name='merge-accounts'),
 
     # User Features (NEW)
     path('auth/merge-account/', views.request_account_merge, name='request-account-merge'),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -11,6 +12,8 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/verified_badge.dart';
 import '../../services/api_service.dart';
 import '../../widgets/translate_button.dart';
+import '../security/change_password_screen.dart';
+import '../settings/linked_accounts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -452,6 +455,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: Column(
                       children: [
+                        // Change Password (only for email/password users, not SSO)
+                        if (authProvider.hasPasswordProvider) ...[
+                          ListTile(
+                            leading: const Icon(Icons.lock_outline,
+                                color: AppColors.burundiGreen),
+                            title: Text(l10n.translate('change_password')),
+                            trailing: const Icon(Icons.chevron_right, size: 20),
+                            onTap: () => Navigator.push(
+                              context,
+                              CupertinoPageRoute(
+                                builder: (_) => const ChangePasswordScreen(),
+                              ),
+                            ),
+                          ),
+                          const Divider(height: 1, indent: 16, endIndent: 16),
+                        ],
+                        // Linked Accounts
+                        ListTile(
+                          leading: const Icon(Icons.link_rounded,
+                              color: Color(0xFF26A69A)),
+                          title: const Text('Linked Accounts'),
+                          subtitle: const Text('Manage sign-in methods'),
+                          trailing: const Icon(Icons.chevron_right, size: 20),
+                          onTap: () => Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) => const LinkedAccountsScreen(),
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
                         // Sign Out
                         ListTile(
                           leading: const Icon(Icons.logout,
@@ -608,6 +642,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await authProvider.updateProfile(controller.text.trim());
 
               if (context.mounted) {
+                if (success) {
+                  HapticFeedback.mediumImpact();
+                } else {
+                  HapticFeedback.heavyImpact();
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(success
@@ -641,6 +680,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
+              HapticFeedback.mediumImpact();
               Navigator.pop(dialogContext);
               await authProvider.signOut();
               if (context.mounted) {
@@ -712,6 +752,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(context);
 
                 if (success) {
+                  HapticFeedback.mediumImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Account deactivated. Log in anytime to come back!'),
@@ -721,6 +762,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.pushNamedAndRemoveUntil(
                       context, '/auth', (route) => false);
                 } else {
+                  HapticFeedback.heavyImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(authProvider.errorMessage ??
@@ -781,6 +823,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(context); // Close loading
 
                 if (success) {
+                  HapticFeedback.mediumImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Account scheduled for deletion. Log in within 30 days to cancel.'),
@@ -790,6 +833,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.pushNamedAndRemoveUntil(
                       context, '/auth', (route) => false);
                 } else {
+                  HapticFeedback.heavyImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(authProvider.errorMessage ??
@@ -1153,6 +1197,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (context.mounted) {
         Navigator.pop(context); // Close loading
+        if (success) {
+          HapticFeedback.mediumImpact();
+        } else {
+          HapticFeedback.heavyImpact();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(success
@@ -1165,6 +1214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // Close loading if open
+        HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to upload image: $e'),

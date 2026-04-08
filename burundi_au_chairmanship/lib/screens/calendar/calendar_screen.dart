@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 import '../../config/app_colors.dart';
@@ -168,7 +169,10 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
                 )
               : RefreshIndicator(
                   color: AppColors.burundiGreen,
-                  onRefresh: _loadEvents,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    await _loadEvents();
+                  },
                   child: _buildEventsList(langCode),
                 ),
     );

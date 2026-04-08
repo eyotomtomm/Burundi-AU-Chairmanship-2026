@@ -180,12 +180,17 @@
         <p class="text-sm text-on-surface-variant mt-2 ml-8">Featured articles appear prominently on the home screen</p>
       </div>
 
-      <!-- Scheduling & Lifecycle -->
+      <!-- Content Status & Scheduling -->
+      <div class="mb-6">
+        {% include 'custom_admin/includes/content_scheduling.html' with obj=article %}
+      </div>
+
+      <!-- Legacy Scheduling & Lifecycle -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <!-- Scheduled Publish -->
+        <!-- Scheduled Publish (legacy) -->
         <div>
           <label for="scheduled_publish_at" class="block font-headline font-bold text-on-surface mb-2">
-            Schedule Publication
+            Schedule Publication (Legacy)
           </label>
           <input
             type="datetime-local"
@@ -194,7 +199,7 @@
             value="{% if article and article.scheduled_publish_at %}{{ article.scheduled_publish_at|date:'Y-m-d\TH:i' }}{% endif %}"
             class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
           />
-          <p class="text-xs text-on-surface-variant mt-2">Leave empty to publish immediately. Set a future date to schedule.</p>
+          <p class="text-xs text-on-surface-variant mt-2">Legacy field. Use the Status dropdown above instead for new articles.</p>
         </div>
 
         <!-- Expiry Date -->

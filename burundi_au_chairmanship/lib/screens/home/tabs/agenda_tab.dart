@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../services/api_service.dart';
 import '../../../config/app_colors.dart';
@@ -76,7 +77,10 @@ class _AgendaTabState extends State<AgendaTab> {
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _loadAgendas,
+          onRefresh: () async {
+            HapticFeedback.mediumImpact();
+            await _loadAgendas();
+          },
           color: AppColors.burundiGreen,
           child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),

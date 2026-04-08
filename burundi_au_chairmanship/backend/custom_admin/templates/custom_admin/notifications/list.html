@@ -104,6 +104,25 @@
                                             <span class="material-symbols-outlined text-sm">check_circle</span>
                                             Pushed ({{ notification.push_recipient_count }})
                                         </span>
+                                        <!-- Open Rate Badge -->
+                                        <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full" title="{{ notification.opened_count }} opens out of {{ notification.push_recipient_count }} sent">
+                                            <span class="material-symbols-outlined text-sm">visibility</span>
+                                            {{ notification.open_rate }}% opened ({{ notification.opened_count }})
+                                        </span>
+                                        {% endif %}
+                                        <!-- Schedule Badge -->
+                                        {% if notification.is_scheduled and notification.schedule_type != 'once' %}
+                                        <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-medium rounded-full">
+                                            <span class="material-symbols-outlined text-sm">repeat</span>
+                                            {{ notification.get_schedule_type_display }}
+                                        </span>
+                                        {% endif %}
+                                        <!-- Language Target Badge -->
+                                        {% if notification.target_language %}
+                                        <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium rounded-full">
+                                            <span class="material-symbols-outlined text-sm">translate</span>
+                                            {{ notification.target_language|upper }}
+                                        </span>
                                         {% endif %}
 
                                         <!-- Send Now Button -->

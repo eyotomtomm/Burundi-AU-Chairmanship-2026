@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
@@ -102,7 +103,10 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                         ),
                       )
                     : RefreshIndicator(
-                        onRefresh: _loadBookmarks,
+                        onRefresh: () async {
+                          HapticFeedback.mediumImpact();
+                          await _loadBookmarks();
+                        },
                         child: ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filteredBookmarks.length,

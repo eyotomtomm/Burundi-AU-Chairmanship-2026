@@ -32,6 +32,7 @@ class RemoteConfigService {
         'show_maintenance_banner': false,
         'maintenance_message': '',
         'min_app_version': '1.0.0',
+        'latest_app_version': '1.0.0',
         'force_update': false,
         // API URL defaults to production HTTPS
         'api_base_url': 'https://api.burundi4africa.com/api',
@@ -91,8 +92,11 @@ class RemoteConfigService {
 
   // ─── App Version Control ──────────────────────────────────────
 
-  /// Get minimum required app version
+  /// Get minimum required app version (force update threshold)
   String get minAppVersion => getString('min_app_version');
+
+  /// Get latest available app version (optional update threshold)
+  String get latestAppVersion => getString('latest_app_version');
 
   /// Check if force update is required
   bool get forceUpdate => getBool('force_update');

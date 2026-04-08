@@ -11,9 +11,15 @@
         </h1>
     </div>
 
-    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
+    <form method="post" enctype="multipart/form-data" class="space-y-8">
+        {% csrf_token %}
+
+        <!-- Basic Information -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                <span class="material-symbols-outlined">info</span>
+                Basic Information
+            </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
@@ -129,16 +135,175 @@
                     </label>
                 </div>
             </div>
+        </div>
 
-            <div class="flex justify-end gap-4">
-                <a href="{% url 'custom_admin:videos_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
-                    Cancel
-                </a>
-                <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
-                    {% if video.pk %}Update{% else %}Create{% endif %} Video
+        <!-- Video Chapters -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="font-headline text-2xl font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined">bookmark</span>
+                    Video Chapters
+                </h2>
+                <button type="button"
+                        onclick="addChapterRow()"
+                        class="bg-secondary-container text-white font-headline font-bold rounded-lg py-2 px-6 hover:bg-secondary transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined">add</span>
+                    Add Chapter
                 </button>
             </div>
-        </form>
-    </div>
+            <p class="text-sm text-on-surface-variant mb-4">
+                Add timestamp markers to help viewers navigate through the video. Enter time as MM:SS (e.g., 2:30) or HH:MM:SS (e.g., 1:15:00).
+            </p>
+
+            <div id="chaptersContainer" class="space-y-4">
+                {% for ch in chapters %}
+                <div class="dynamic-row p-4 bg-surface-container rounded-lg relative space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Timestamp (MM:SS)
+                            </label>
+                            <input type="text"
+                                   name="chapter_timestamp[]"
+                                   value="{{ ch.timestamp_seconds|divisibleby:60|yesno:',' }}{% widthratio ch.timestamp_seconds 60 1 %}:{% widthratio ch.timestamp_seconds 1 1 %}"
+                                   data-seconds="{{ ch.timestamp_seconds }}"
+                                   placeholder="0:00"
+                                   class="chapter-timestamp w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Title (English) *
+                            </label>
+                            <input type="text"
+                                   name="chapter_title[]"
+                                   value="{{ ch.title }}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Title (French)
+                            </label>
+                            <input type="text"
+                                   name="chapter_title_fr[]"
+                                   value="{{ ch.title_fr }}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Description (English)
+                            </label>
+                            <input type="text"
+                                   name="chapter_description[]"
+                                   value="{{ ch.description }}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                        <div>
+                            <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                                Description (French)
+                            </label>
+                            <input type="text"
+                                   name="chapter_description_fr[]"
+                                   value="{{ ch.description_fr }}"
+                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        </div>
+                    </div>
+                    <button type="button"
+                            onclick="removeRow(this)"
+                            class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Content Status & Scheduling -->
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mt-6">
+            {% include 'custom_admin/includes/content_scheduling.html' with obj=video %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-end gap-4">
+            <a href="{% url 'custom_admin:videos_list' %}" class="bg-surface-container text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container-high transition-all">
+                Cancel
+            </a>
+            <button type="submit" class="bg-primary-container text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-primary transition-all">
+                {% if video.pk %}Update{% else %}Create{% endif %} Video
+            </button>
+        </div>
+    </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Format seconds to MM:SS on page load for existing chapters
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.chapter-timestamp').forEach(function(input) {
+        var seconds = parseInt(input.getAttribute('data-seconds'));
+        if (!isNaN(seconds)) {
+            var m = Math.floor(seconds / 60);
+            var s = seconds % 60;
+            input.value = m + ':' + (s < 10 ? '0' : '') + s;
+        }
+    });
+});
+
+function addChapterRow() {
+    var container = document.getElementById('chaptersContainer');
+    var row = document.createElement('div');
+    row.className = 'dynamic-row p-4 bg-surface-container rounded-lg relative space-y-4';
+    row.innerHTML = '' +
+        '<div class="grid grid-cols-1 md:grid-cols-3 gap-4">' +
+            '<div>' +
+                '<label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">' +
+                    'Timestamp (MM:SS)' +
+                '</label>' +
+                '<input type="text" name="chapter_timestamp[]" placeholder="0:00" ' +
+                       'class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">' +
+            '</div>' +
+            '<div>' +
+                '<label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">' +
+                    'Title (English) *' +
+                '</label>' +
+                '<input type="text" name="chapter_title[]" ' +
+                       'class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">' +
+            '</div>' +
+            '<div>' +
+                '<label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">' +
+                    'Title (French)' +
+                '</label>' +
+                '<input type="text" name="chapter_title_fr[]" ' +
+                       'class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">' +
+            '</div>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
+            '<div>' +
+                '<label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">' +
+                    'Description (English)' +
+                '</label>' +
+                '<input type="text" name="chapter_description[]" ' +
+                       'class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">' +
+            '</div>' +
+            '<div>' +
+                '<label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">' +
+                    'Description (French)' +
+                '</label>' +
+                '<input type="text" name="chapter_description_fr[]" ' +
+                       'class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">' +
+            '</div>' +
+        '</div>' +
+        '<button type="button" onclick="removeRow(this)" ' +
+                'class="absolute -top-2 -right-2 bg-error-container text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-error transition-all">' +
+            '<span class="material-symbols-outlined text-sm">close</span>' +
+        '</button>';
+    container.appendChild(row);
+}
+
+function removeRow(btn) {
+    btn.closest('.dynamic-row').remove();
+}
+</script>
 {% endblock %}

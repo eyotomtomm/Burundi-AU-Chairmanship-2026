@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -76,6 +77,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
   Future<void> _submitSupport() async {
     if (!_formKey.currentState!.validate()) return;
+    HapticFeedback.lightImpact();
 
     setState(() => _isSubmitting = true);
 
@@ -89,6 +91,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       );
 
       if (mounted) {
+        HapticFeedback.mediumImpact();
         Navigator.pop(context, true); // Return true to signal ticket created
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -99,6 +102,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       }
     } catch (e) {
       if (mounted) {
+        HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to submit: $e'),

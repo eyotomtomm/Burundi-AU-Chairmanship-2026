@@ -13,7 +13,7 @@ from .models import (
     EventRegistration, RegistrationFormField, EventSubmission,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     AuditLogEntry, AdminRole, SupportTicket, TicketMessage, Popup,
-    UserSession,
+    UserSession, LinkedAccount,
 )
 
 
@@ -1513,3 +1513,12 @@ class UserSessionAdmin(admin.ModelAdmin):
         count = queryset.filter(is_active=True).update(is_active=False, terminated_at=timezone.now())
         self.message_user(request, f'{count} session(s) terminated.')
     terminate_selected_sessions.short_description = 'Terminate selected sessions'
+
+
+@admin.register(LinkedAccount)
+class LinkedAccountAdmin(admin.ModelAdmin):
+    list_display = ('user', 'provider', 'email', 'display_name', 'is_primary', 'linked_at')
+    list_filter = ('provider', 'is_primary')
+    search_fields = ('user__username', 'user__email', 'email', 'provider_uid', 'display_name')
+    readonly_fields = ('linked_at',)
+    raw_id_fields = ('user',)

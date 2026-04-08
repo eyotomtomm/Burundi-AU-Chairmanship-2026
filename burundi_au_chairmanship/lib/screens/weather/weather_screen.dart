@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
@@ -385,7 +386,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   ],
                 )
           : RefreshIndicator(
-              onRefresh: _fetchWeather,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                await _fetchWeather();
+              },
               color: AppColors.burundiGreen,
               child: CustomScrollView(
                 slivers: [

@@ -639,6 +639,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Discussions</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'comment' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:comments_list' %}">
+      <span class="material-symbols-outlined">chat_bubble</span>
+      <span class="text-sm tracking-wide font-headline">Comments</span>
+    </a>
+
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'announcement' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:announcements_list' %}">
       <span class="material-symbols-outlined">campaign</span>
       <span class="text-sm tracking-wide font-headline">Announcements</span>

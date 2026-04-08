@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
@@ -131,7 +132,10 @@ class _TrendingScreenState extends State<TrendingScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _loadTrending,
+                      onRefresh: () async {
+                        HapticFeedback.mediumImpact();
+                        await _loadTrending();
+                      },
                       color: AppColors.burundiGreen,
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),

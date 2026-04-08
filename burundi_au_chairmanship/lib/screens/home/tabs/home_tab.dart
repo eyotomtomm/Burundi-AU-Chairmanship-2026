@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -18,6 +19,7 @@ import '../../../models/api_models.dart';
 import '../../../models/magazine_model.dart';
 import '../../../models/event_registration_model.dart';
 import '../../../services/api_service.dart';
+import '../../../services/firebase_messaging_service.dart';
 import '../../news/article_detail_screen.dart';
 import '../../feature_card/feature_card_detail_screen.dart';
 import '../../events/event_detail_screen.dart';
@@ -26,7 +28,6 @@ import '../painters/zigzag_line_painter.dart';
 import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
 import '../widgets/news_card.dart';
-import '../widgets/feature_item.dart';
 import '../widgets/event_card.dart';
 import '../../../widgets/shimmer_loading.dart';
 
@@ -128,6 +129,19 @@ class _HomeTabState extends State<HomeTab> {
     _startFeatureAutoSlide();
     // Poll unread count every 60 seconds
     _badgeTimer = Timer.periodic(const Duration(seconds: 60), (_) => _loadUnreadCount());
+    // Check notification permission after a brief delay (non-blocking)
+    _checkNotificationPermission();
+  }
+
+  /// Show a permission dialog if push notifications are not enabled.
+  /// Prompts at most once per week to avoid being annoying.
+  Future<void> _checkNotificationPermission() async {
+    // Wait for the home screen to finish building before showing dialog
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    final langCode = context.read<LanguageProvider>().languageCode;
+    final messagingService = FirebaseMessagingService();
+    await messagingService.showPermissionDialog(context, langCode);
   }
 
   Future<void> _loadUnreadCount() async {
@@ -446,6 +460,7 @@ class _HomeTabState extends State<HomeTab> {
 
     return RefreshIndicator(
       onRefresh: () async {
+        HapticFeedback.mediumImpact();
         setState(() {
           _isLoading = true;
           _hasError = false;
@@ -478,20 +493,19 @@ class _HomeTabState extends State<HomeTab> {
           ),
 
         // Quick Access Section
-        if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle(context, l10n.translate('quick_access')),
-                  const SizedBox(height: 12),
-                  _buildQuickAccessGrid(context, l10n),
-                ],
-              ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSectionTitle(context, l10n.translate('quick_access')),
+                const SizedBox(height: 12),
+                _buildQuickAccessGrid(context, l10n),
+              ],
             ),
           ),
+        ),
 
         // Upcoming Events Section
         if (_apiEventCards != null && _apiEventCards!.isNotEmpty) ...[
@@ -602,48 +616,6 @@ class _HomeTabState extends State<HomeTab> {
             ),
           ),
         ],
-
-        // Features Grid
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-            child: _buildSectionTitle(context, l10n.translate('explore_features')),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.2,
-            ),
-            delegate: SliverChildListDelegate([
-              FeatureItem(
-                title: 'Gallery',
-                subtitle: 'Browse photo albums',
-                icon: Icons.photo_library_rounded,
-                color: AppColors.burundiGreen,
-                onTap: () => Navigator.pushNamed(context, '/gallery'),
-              ),
-              FeatureItem(
-                title: 'Videos',
-                subtitle: 'Watch highlights & speeches',
-                icon: Icons.play_circle_rounded,
-                color: AppColors.burundiRed,
-                onTap: () => Navigator.pushNamed(context, '/videos'),
-              ),
-              FeatureItem(
-                title: 'Social Media',
-                subtitle: 'Connect with us online',
-                icon: Icons.share_rounded,
-                color: AppColors.auGold,
-                onTap: () => Navigator.pushNamed(context, '/social-media'),
-              ),
-            ]),
-          ),
-        ),
 
         const SliverToBoxAdapter(
           child: SizedBox(height: 100),
@@ -1271,10 +1243,12 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildQuickAccessGrid(BuildContext context, AppLocalizations l10n) {
+    final langCode = Localizations.localeOf(context).languageCode;
+    final List<Map<String, dynamic>> items = [];
+
     // Use API data if available
     if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty) {
-      final langCode = Localizations.localeOf(context).languageCode;
-      final items = _quickAccessItems!.map((menuItem) {
+      items.addAll(_quickAccessItems!.map((menuItem) {
         final title = langCode == 'fr' && menuItem['title_fr'] != null && (menuItem['title_fr'] as String).isNotEmpty
             ? menuItem['title_fr'] as String
             : menuItem['title_en'] as String;
@@ -1306,13 +1280,38 @@ class _HomeTabState extends State<HomeTab> {
             }
           },
         };
-      }).toList();
-
-      return QuickAccessGrid(items: items);
+      }));
     }
 
-    // No fallback - show empty state
-    return const SizedBox.shrink();
+    // Append hardcoded Gallery, Videos, and Follow Us items
+    items.addAll([
+      <String, dynamic>{
+        'title': langCode == 'fr' ? 'Galerie' : 'Gallery',
+        'icon': Icons.photo_library_rounded,
+        'hasLiveDot': false,
+        'badgeText': '',
+        'badgeColor': '',
+        'onTap': () => Navigator.pushNamed(context, '/gallery'),
+      },
+      <String, dynamic>{
+        'title': langCode == 'fr' ? 'Vid\u00e9os' : 'Videos',
+        'icon': Icons.play_circle_rounded,
+        'hasLiveDot': false,
+        'badgeText': '',
+        'badgeColor': '',
+        'onTap': () => Navigator.pushNamed(context, '/videos'),
+      },
+      <String, dynamic>{
+        'title': langCode == 'fr' ? 'Suivez-nous' : 'Follow Us',
+        'icon': Icons.people_rounded,
+        'hasLiveDot': false,
+        'badgeText': '',
+        'badgeColor': '',
+        'onTap': () => Navigator.pushNamed(context, '/social-media'),
+      },
+    ]);
+
+    return QuickAccessGrid(items: items);
   }
 
   Widget _buildPriorityAgendasSection(BuildContext context) {

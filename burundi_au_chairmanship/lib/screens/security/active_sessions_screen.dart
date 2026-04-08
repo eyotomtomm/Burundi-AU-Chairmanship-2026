@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
@@ -67,7 +68,10 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
           : _sessions.isEmpty
               ? const Center(child: Text('No active sessions'))
               : RefreshIndicator(
-                  onRefresh: _load,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    await _load();
+                  },
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _sessions.length,

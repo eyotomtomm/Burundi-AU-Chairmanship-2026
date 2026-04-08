@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from datetime import timedelta
@@ -394,14 +395,52 @@ SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
 if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    _sentry_integrations = [
+        DjangoIntegration(
+            transaction_style='url',
+            middleware_spans=True,
+        ),
+        LoggingIntegration(
+            level=logging.INFO,        # Capture info and above as breadcrumbs
+            event_level=logging.ERROR,  # Send errors and above as events
+        ),
+    ]
+
+    # Add Celery integration if celery is available
+    try:
+        from sentry_sdk.integrations.celery import CeleryIntegration
+        _sentry_integrations.append(CeleryIntegration(monitor_beat_tasks=True))
+    except ImportError:
+        pass
+
+    def _sentry_before_send(event, hint):
+        """Filter out noisy or expected errors before sending to Sentry."""
+        if 'exc_info' in hint:
+            exc_type, exc_value, _ = hint['exc_info']
+            # Don't report 404s or permission denied as Sentry events
+            from django.http import Http404
+            from django.core.exceptions import PermissionDenied
+            if isinstance(exc_value, (Http404, PermissionDenied)):
+                return None
+            # Don't report rate-limit (throttling) responses
+            from rest_framework.exceptions import Throttled
+            if isinstance(exc_value, Throttled):
+                return None
+        return event
+
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
+        integrations=_sentry_integrations,
         traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.2')),
         profiles_sample_rate=float(os.environ.get('SENTRY_PROFILES_SAMPLE_RATE', '0.1')),
         send_default_pii=True,
         environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
         release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
+        before_send=_sentry_before_send,
+        # Attach server name for multi-server debugging
+        server_name=os.environ.get('SENTRY_SERVER_NAME', ''),
     )
 
 # ─── Celery Task Queue ───────────────────────────────────────
@@ -460,6 +499,12 @@ CHANNEL_LAYERS = {
 # Download GeoLite2-City.mmdb from MaxMind and place in backend/geoip/
 GEOIP_PATH = os.path.join(BASE_DIR, 'geoip')
 GEOIP_CITY = 'GeoLite2-City.mmdb'
+
+# ─── reCAPTCHA Configuration ────────────────────────────────────
+# Optional: Set RECAPTCHA_SECRET_KEY to enable server-side reCAPTCHA verification
+# on registration. If not set, reCAPTCHA verification is skipped (development mode).
+RECAPTCHA_SECRET_KEY = os.environ.get('RECAPTCHA_SECRET_KEY', '')
+RECAPTCHA_SITE_KEY = os.environ.get('RECAPTCHA_SITE_KEY', '')
 
 # ─── Database Backup Configuration ────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')

@@ -12,14 +12,21 @@
           <span class="material-symbols-outlined text-4xl text-blue-600">history</span>
           Audit Log
         </h1>
-        <p class="mt-2 text-sm text-on-surface-variant">Track all administrative actions performed in the portal</p>
+        <p class="mt-2 text-sm text-on-surface-variant">Track all administrative actions performed in the portal with detailed change history</p>
+      </div>
+      <div>
+        <a href="?export=csv{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}"
+           class="inline-flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg py-2.5 px-5 font-medium transition-colors text-sm">
+          <span class="material-symbols-outlined text-sm">download</span>
+          Export CSV
+        </a>
       </div>
     </div>
   </div>
 
   <!-- Filters -->
   <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 mb-6">
-    <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-4">
       <!-- User Filter -->
       <div>
         <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">User</label>
@@ -27,7 +34,7 @@
           type="text"
           name="user"
           value="{{ current_user_filter }}"
-          placeholder="Filter by username or email..."
+          placeholder="Username or email..."
           class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
         />
       </div>
@@ -54,6 +61,28 @@
         </select>
       </div>
 
+      <!-- Date From -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">From Date</label>
+        <input
+          type="date"
+          name="date_from"
+          value="{{ current_date_from }}"
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- Date To -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">To Date</label>
+        <input
+          type="date"
+          name="date_to"
+          value="{{ current_date_to }}"
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
       <!-- Submit -->
       <div class="flex items-end gap-2">
         <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-2.5 px-6 font-medium transition-colors text-sm">
@@ -78,13 +107,14 @@
             <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">User</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Action</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Entity Type</th>
-            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Entity</th>
-            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Status</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Object</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">IP Address</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Changes</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-outline-variant">
           {% for log in logs %}
-          <tr class="hover:bg-surface-container-low transition-colors">
+          <tr class="hover:bg-surface-container-low transition-colors align-top">
             <td class="py-4 px-6 text-sm text-on-surface-variant whitespace-nowrap">
               {{ log.timestamp|date:"M d, Y" }}<br/>
               <span class="text-xs text-slate-400">{{ log.timestamp|date:"g:i:s A" }}</span>
@@ -104,36 +134,73 @@
             </td>
             <td class="py-4 px-6">
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold
-                {% if log.action == 'CREATE' %}bg-emerald-100 text-emerald-700
-                {% elif log.action == 'UPDATE' %}bg-blue-100 text-blue-700
-                {% elif log.action == 'DELETE' %}bg-red-100 text-red-700
-                {% elif log.action == 'LOGIN' %}bg-purple-100 text-purple-700
-                {% elif log.action == 'EXPORT' %}bg-amber-100 text-amber-700
+                {% if log.action_type == 'create' %}bg-emerald-100 text-emerald-700
+                {% elif log.action_type == 'update' %}bg-blue-100 text-blue-700
+                {% elif log.action_type == 'delete' %}bg-red-100 text-red-700
+                {% elif log.action_type == 'login' %}bg-amber-100 text-amber-700
+                {% elif log.action_type == 'logout' %}bg-amber-100 text-amber-700
+                {% elif log.action_type == 'export' %}bg-indigo-100 text-indigo-700
+                {% elif log.action_type == 'approve' %}bg-emerald-100 text-emerald-700
+                {% elif log.action_type == 'reject' %}bg-red-100 text-red-700
+                {% elif log.action_type == 'bulk_action' %}bg-purple-100 text-purple-700
+                {% elif log.action_type == 'status_change' %}bg-orange-100 text-orange-700
+                {% elif log.action_type == 'send_notification' %}bg-cyan-100 text-cyan-700
+                {% elif log.action_type == 'backup' %}bg-teal-100 text-teal-700
                 {% else %}bg-slate-100 text-slate-700{% endif %}">
                 <span class="material-symbols-outlined text-sm">
-                  {% if log.action == 'CREATE' %}add_circle
-                  {% elif log.action == 'UPDATE' %}edit
-                  {% elif log.action == 'DELETE' %}delete
-                  {% elif log.action == 'LOGIN' %}login
-                  {% elif log.action == 'EXPORT' %}download
+                  {% if log.action_type == 'create' %}add_circle
+                  {% elif log.action_type == 'update' %}edit
+                  {% elif log.action_type == 'delete' %}delete
+                  {% elif log.action_type == 'login' %}login
+                  {% elif log.action_type == 'logout' %}logout
+                  {% elif log.action_type == 'export' %}download
+                  {% elif log.action_type == 'approve' %}check_circle
+                  {% elif log.action_type == 'reject' %}cancel
+                  {% elif log.action_type == 'bulk_action' %}select_all
+                  {% elif log.action_type == 'status_change' %}toggle_on
+                  {% elif log.action_type == 'send_notification' %}send
+                  {% elif log.action_type == 'backup' %}backup
                   {% else %}info{% endif %}
                 </span>
-                {{ log.action }}
+                {{ log.get_action_type_display }}
               </span>
             </td>
-            <td class="py-4 px-6 text-sm text-on-surface font-medium">{{ log.entity_type }}</td>
-            <td class="py-4 px-6 text-sm text-on-surface-variant max-w-xs truncate">{{ log.entity_label }}</td>
+            <td class="py-4 px-6 text-sm text-on-surface font-medium">{{ log.model_name }}</td>
             <td class="py-4 px-6">
-              {% if log.status == 'success' %}
-              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
-                <span class="material-symbols-outlined text-xs">check_circle</span>
-                Success
-              </span>
+              <p class="text-sm text-on-surface-variant max-w-xs truncate" title="{{ log.object_repr }}">{{ log.object_repr }}</p>
+              {% if log.object_id %}
+              <p class="text-xs text-slate-400">ID: {{ log.object_id }}</p>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6 text-xs text-slate-400 font-mono whitespace-nowrap">{{ log.ip_address|default:"-" }}</td>
+            <td class="py-4 px-6">
+              {% if log.changes and log.changes != '{}' %}
+              <button onclick="toggleChanges(this)" class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-xs">unfold_more</span>
+                View Changes
+              </button>
+              <div class="changes-panel hidden mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs max-w-sm">
+                <table class="w-full">
+                  <thead>
+                    <tr class="border-b border-slate-200">
+                      <th class="text-left py-1 pr-2 font-semibold text-slate-500">Field</th>
+                      <th class="text-left py-1 pr-2 font-semibold text-red-500">Old</th>
+                      <th class="text-left py-1 font-semibold text-emerald-600">New</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for field, vals in log.changes.items %}
+                    <tr class="border-b border-slate-100 last:border-0">
+                      <td class="py-1 pr-2 font-mono font-medium text-slate-700">{{ field }}</td>
+                      <td class="py-1 pr-2 text-red-600 break-all max-w-[120px]">{{ vals.old|default:"-"|truncatechars:80 }}</td>
+                      <td class="py-1 text-emerald-700 break-all max-w-[120px]">{{ vals.new|default:"-"|truncatechars:80 }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
               {% else %}
-              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">
-                <span class="material-symbols-outlined text-xs">error</span>
-                Failed
-              </span>
+              <span class="text-xs text-slate-400">-</span>
               {% endif %}
             </td>
           </tr>
@@ -145,7 +212,7 @@
     <div class="text-center py-16">
       <span class="material-symbols-outlined text-6xl text-on-surface-variant mb-4">history</span>
       <p class="text-on-surface-variant text-lg">No audit log entries found</p>
-      <p class="text-sm text-slate-400 mt-2">Try adjusting your filters</p>
+      <p class="text-sm text-slate-400 mt-2">Try adjusting your filters or wait for admin actions to be recorded</p>
     </div>
     {% endif %}
   </div>
@@ -154,13 +221,39 @@
   {% if logs.has_other_pages %}
   <div class="flex items-center justify-center gap-2 mt-8">
     {% if logs.has_previous %}
-    <a href="?page={{ logs.previous_page_number }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Previous</a>
+    <a href="?page={{ logs.previous_page_number }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}"
+       class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">
+      <span class="material-symbols-outlined text-sm align-middle mr-1">chevron_left</span>
+      Previous
+    </a>
     {% endif %}
-    <span class="px-4 py-2 text-sm font-bold text-on-surface-variant">Page {{ logs.number }} of {{ logs.paginator.num_pages }}</span>
+    <span class="px-4 py-2 text-sm font-bold text-on-surface-variant">
+      Page {{ logs.number }} of {{ logs.paginator.num_pages }}
+      <span class="font-normal text-slate-400">({{ logs.paginator.count }} entries)</span>
+    </span>
     {% if logs.has_next %}
-    <a href="?page={{ logs.next_page_number }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Next</a>
+    <a href="?page={{ logs.next_page_number }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}"
+       class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">
+      Next
+      <span class="material-symbols-outlined text-sm align-middle ml-1">chevron_right</span>
+    </a>
     {% endif %}
   </div>
   {% endif %}
 </div>
+
+<script>
+function toggleChanges(btn) {
+  const panel = btn.nextElementSibling;
+  if (panel.classList.contains('hidden')) {
+    panel.classList.remove('hidden');
+    btn.querySelector('.material-symbols-outlined').textContent = 'unfold_less';
+    btn.querySelector('.material-symbols-outlined').nextSibling.textContent = ' Hide Changes';
+  } else {
+    panel.classList.add('hidden');
+    btn.querySelector('.material-symbols-outlined').textContent = 'unfold_more';
+    btn.querySelector('.material-symbols-outlined').nextSibling.textContent = ' View Changes';
+  }
+}
+</script>
 {% endblock %}

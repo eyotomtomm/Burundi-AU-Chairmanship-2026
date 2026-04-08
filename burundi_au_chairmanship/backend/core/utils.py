@@ -7,6 +7,102 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# ── Admin Audit Trail ─────────────────────────────────────────
+
+def log_admin_action(request, action_type, model_name, object_id=None,
+                     object_repr='', changes=None):
+    """
+    Create an AdminActivityLog entry for an admin action.
+
+    This is the primary entry point for recording admin audit trail events.
+    Call this from any admin view after a successful create/update/delete/etc.
+
+    Args:
+        request: The Django HTTP request (provides user, IP, user-agent, path).
+        action_type: One of AdminActivityLog.ACTION_TYPE_CHOICES keys
+                     (e.g. 'create', 'update', 'delete', 'status_change', etc.).
+        model_name: Human-readable model name (e.g. 'Article', 'Event', 'User').
+        object_id: Primary key of the affected object (optional).
+        object_repr: Short string representation of the object (e.g. article title).
+        changes: Dict of field changes in the format
+                 {field_name: {'old': old_value, 'new': new_value}} (optional).
+    """
+    try:
+        from core.models import AdminActivityLog
+
+        AdminActivityLog.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            action_type=action_type,
+            model_name=model_name,
+            object_id=object_id,
+            object_repr=str(object_repr)[:255],
+            changes=changes or {},
+            ip_address=_get_client_ip(request),
+            user_agent=(request.META.get('HTTP_USER_AGENT', '') or '')[:1000],
+            path=(request.path or '')[:500],
+        )
+    except Exception:
+        # Never let audit logging break the actual admin operation
+        logger.exception('Failed to log admin action: %s %s', action_type, model_name)
+
+
+def compute_model_diff(instance, new_values, fields=None):
+    """
+    Compute a diff between the current state of a model instance and new values.
+
+    Args:
+        instance: The Django model instance (before saving).
+        new_values: Dict of {field_name: new_value} to compare against.
+        fields: Optional list of field names to compare. If None, compares
+                all keys present in new_values.
+
+    Returns:
+        Dict of {field_name: {'old': old_value, 'new': new_value}} for fields
+        that actually changed. File/image fields are represented by their
+        string names rather than the raw FieldFile objects.
+    """
+    diff = {}
+    compare_fields = fields or list(new_values.keys())
+
+    for field in compare_fields:
+        if field not in new_values:
+            continue
+        old_val = getattr(instance, field, None)
+        new_val = new_values[field]
+
+        # Normalize file fields to string for comparison
+        if hasattr(old_val, 'name'):
+            old_val = old_val.name or ''
+        if hasattr(new_val, 'name'):
+            new_val = new_val.name or ''
+
+        # Normalize None vs empty string
+        old_str = str(old_val) if old_val is not None else ''
+        new_str = str(new_val) if new_val is not None else ''
+
+        if old_str != new_str:
+            diff[field] = {
+                'old': old_str[:500],
+                'new': new_str[:500],
+            }
+
+    return diff
+
+
+def _get_client_ip(request):
+    """
+    Extract the real client IP address from the request.
+    Respects X-Forwarded-For (set by Cloudflare middleware) or REMOTE_ADDR.
+    """
+    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if forwarded_for:
+        # Take the first IP in the chain (the real client)
+        ip = forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR', '127.0.0.1')
+    return ip
+
+
 def send_sms(phone_number, message):
     """
     Stub SMS sending function.

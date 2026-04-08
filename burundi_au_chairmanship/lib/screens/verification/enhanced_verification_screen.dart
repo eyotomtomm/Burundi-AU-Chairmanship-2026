@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../widgets/confetti_overlay.dart';
 
 class EnhancedVerificationScreen extends StatefulWidget {
   const EnhancedVerificationScreen({super.key});
@@ -398,6 +399,9 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
       await ApiService().post('verification/request/', body, auth: true);
 
       if (mounted) {
+        // Trigger confetti celebration
+        ConfettiOverlay.show(context);
+
         _showSuccess('Verification request submitted successfully!');
 
         // Navigate back after delay

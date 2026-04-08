@@ -50,7 +50,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source='first_name')
+    name = serializers.SerializerMethodField()
     profile = UserProfileSerializer(required=False)
 
     # Computed fields for easy access
@@ -69,6 +69,11 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'email', 'profile', 'phone_number', 'gender', 'nationality', 'date_of_birth',
                   'profile_picture', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
         read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
+
+    def get_name(self, obj):
+        """Return full name from first_name + last_name, falling back to first_name only."""
+        full = f'{obj.first_name} {obj.last_name}'.strip()
+        return full or obj.username
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -98,8 +103,12 @@ class UserSerializer(serializers.ModelSerializer):
         return ret
 
     def update(self, instance, validated_data):
-        # Update user fields
-        instance.first_name = validated_data.get('first_name', instance.first_name)
+        # Update user name fields
+        if 'first_name' in validated_data:
+            name = validated_data['first_name']
+            parts = name.strip().split(None, 1) if name else ['']
+            instance.first_name = parts[0][:150]
+            instance.last_name = parts[1][:150] if len(parts) > 1 else ''
         instance.save()
 
         # Update profile fields if provided

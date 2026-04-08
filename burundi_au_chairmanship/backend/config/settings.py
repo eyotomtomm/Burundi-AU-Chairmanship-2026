@@ -255,6 +255,12 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
+# ─── Admin Session Settings ──────────────────────────────────
+# Auto-logout after 30 minutes of inactivity (admin portal security)
+SESSION_COOKIE_AGE = 1800  # 30 minutes in seconds
+SESSION_SAVE_EVERY_REQUEST = True  # Reset timeout on every request (activity-based)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Also expire when browser closes
+
 # ─── Custom Admin Settings ────────────────────────────────────
 CUSTOM_ADMIN_SITE_TITLE = 'Burundi AU Chairmanship 2026'
 CUSTOM_ADMIN_SITE_HEADER = 'Content Management System'

@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
 tailwind.config = {
   darkMode: "class",
@@ -73,6 +74,7 @@ tailwind.config = {
 </script>
 <style>
 .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 body { font-family: 'Inter', sans-serif; }
 h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 .sidebar-scroll::-webkit-scrollbar { width: 4px; }
@@ -154,10 +156,17 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Administration</p>
     </div>
 
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'user' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:users_list' %}">
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'user' in url_name and 'admin_management' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:users_list' %}">
       <span class="material-symbols-outlined">group</span>
       <span class="text-sm tracking-wide font-headline">User Management</span>
     </a>
+
+    {% if user.is_superuser %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'admin_management' in url_name or 'admin_invite' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:admin_management' %}">
+      <span class="material-symbols-outlined">admin_panel_settings</span>
+      <span class="text-sm tracking-wide font-headline">Admin Team</span>
+    </a>
+    {% endif %}
 
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics' %}">
       <span class="material-symbols-outlined">analytics</span>
@@ -306,6 +315,92 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 // Dark mode persistence
 if(localStorage.getItem('darkMode')==='true'){document.documentElement.classList.add('dark')}
 </script>
+
+{% if user.is_authenticated %}
+<!-- Auto-logout: 30 min session, 2 min warning before expiry -->
+<div id="sessionWarning" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
+      <span class="material-symbols-outlined text-3xl text-amber-600">timer</span>
+    </div>
+    <h3 class="text-xl font-bold text-slate-900 mb-2">Session Expiring Soon</h3>
+    <p class="text-slate-600 mb-1">You will be logged out in <span id="warningCountdown" class="font-bold text-red-600">2:00</span></p>
+    <p class="text-sm text-slate-500 mb-6">Click below to stay signed in.</p>
+    <div class="flex gap-3 justify-center">
+      <button onclick="extendSession()" class="bg-blue-600 text-white font-semibold rounded-lg py-3 px-8 hover:bg-blue-700 transition-all shadow-sm">
+        Stay Signed In
+      </button>
+      <a href="{% url 'custom_admin:logout' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 hover:bg-slate-50 transition-all">
+        Log Out
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  const WARNING_BEFORE = 2 * 60 * 1000;   // Show warning 2 minutes before
+  let lastActivity = Date.now();
+  let warningShown = false;
+  let countdownInterval = null;
+
+  function resetTimer() {
+    lastActivity = Date.now();
+    if (warningShown) {
+      document.getElementById('sessionWarning').classList.add('hidden');
+      warningShown = false;
+      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    }
+  }
+
+  // Track user activity
+  ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, resetTimer, { passive: true });
+  });
+
+  window.extendSession = function() {
+    // Ping the server to reset session cookie
+    fetch('{% url "custom_admin:dashboard" %}', { method: 'HEAD', credentials: 'same-origin' })
+      .catch(function() {});
+    resetTimer();
+  };
+
+  function checkSession() {
+    const elapsed = Date.now() - lastActivity;
+    const remaining = SESSION_TIMEOUT - elapsed;
+
+    if (remaining <= 0) {
+      // Session expired — redirect to login
+      window.location.href = '{% url "custom_admin:logout" %}';
+      return;
+    }
+
+    if (remaining <= WARNING_BEFORE && !warningShown) {
+      warningShown = true;
+      document.getElementById('sessionWarning').classList.remove('hidden');
+      // Start countdown
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = setInterval(function() {
+        const now = Date.now();
+        const left = SESSION_TIMEOUT - (now - lastActivity);
+        if (left <= 0) {
+          window.location.href = '{% url "custom_admin:logout" %}';
+          return;
+        }
+        const mins = Math.floor(left / 60000);
+        const secs = Math.floor((left % 60000) / 1000);
+        document.getElementById('warningCountdown').textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+      }, 1000);
+    }
+  }
+
+  // Check every 10 seconds
+  setInterval(checkSession, 10000);
+})();
+</script>
+{% endif %}
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -742,6 +742,105 @@ def user_toggle_staff(request, pk):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  ADMIN MANAGEMENT (Superuser only)
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
+def admin_management(request):
+    """Superadmin page to view/manage other admin (staff) users."""
+    admins = User.objects.filter(
+        Q(is_staff=True) | Q(is_superuser=True)
+    ).select_related('profile').order_by('-last_login')
+
+    return render(request, 'custom_admin/admin_management/list.html', {
+        'admins': admins,
+        'total_admins': admins.count(),
+        'superadmins': admins.filter(is_superuser=True).count(),
+        'staff_only': admins.filter(is_staff=True, is_superuser=False).count(),
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
+def admin_invite(request):
+    """Invite a new admin by creating their account and sending credentials via email."""
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        role = request.POST.get('role', 'staff')  # 'staff' or 'superuser'
+
+        if not username or not email:
+            messages.error(request, 'Username and email are required.')
+            return redirect('custom_admin:admin_management')
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, f'Username "{username}" already exists.')
+            return redirect('custom_admin:admin_management')
+
+        if User.objects.filter(email=email).exists():
+            messages.error(request, f'Email "{email}" is already in use.')
+            return redirect('custom_admin:admin_management')
+
+        # Generate a temporary password
+        import secrets
+        import string
+        temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=temp_password,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        user.is_staff = True
+        user.is_superuser = (role == 'superuser')
+        user.save()
+
+        # Send invitation email
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings as conf_settings
+            subject = 'Admin Portal Access — Burundi AU Chairmanship 2026'
+            message = (
+                f'Dear {first_name or username},\n\n'
+                f'You have been granted {"Super Admin" if role == "superuser" else "Staff"} access '
+                f'to the Burundi AU Chairmanship Admin Portal.\n\n'
+                f'Your login credentials:\n'
+                f'  Portal URL: https://api.burundi4africa.com/admin/\n'
+                f'  Username: {username}\n'
+                f'  Temporary Password: {temp_password}\n\n'
+                f'Please change your password after your first login.\n\n'
+                f'For questions, contact info@burundi4africa.com\n\n'
+                f'Best regards,\n'
+                f'Burundi AU Chairmanship Team\n'
+                f'Ministère des Affaires Étrangères'
+            )
+            send_mail(
+                subject,
+                message,
+                conf_settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+            )
+            messages.success(request, f'Admin "{username}" created and invitation email sent to {email}.')
+        except Exception as e:
+            logger.exception('Failed to send admin invitation email')
+            messages.warning(
+                request,
+                f'Admin "{username}" created but email failed to send. '
+                f'Please manually share: Username: {username}, Password: {temp_password}'
+            )
+
+        return redirect('custom_admin:admin_management')
+
+    return redirect('custom_admin:admin_management')
+
+
+# ═══════════════════════════════════════════════════════════════
 #  VERIFICATION REQUESTS
 # ═══════════════════════════════════════════════════════════════
 
@@ -756,10 +855,16 @@ def verification_requests_list(request):
     page = request.GET.get('page')
     requests_page = paginator.get_page(page)
     pending_count = VerificationRequest.objects.filter(status='pending').count()
+    total_count = VerificationRequest.objects.count()
+    approved_count = VerificationRequest.objects.filter(status='approved').count()
+    rejected_count = VerificationRequest.objects.filter(status='rejected').count()
     return render(request, 'custom_admin/verification/list.html', {
         'requests': requests_page,
         'pending_count': pending_count,
-        'current_filter': status_filter or 'all',
+        'total_count': total_count,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'current_filter': status_filter or '',
     })
 
 
@@ -1061,7 +1166,7 @@ def event_registrations_list(request):
         registrations = registrations.filter(card_type=card_type_filter)
     return render(request, 'custom_admin/event_registrations/list.html', {
         'registrations': registrations,
-        'current_filter': card_type_filter or 'all',
+        'current_filter': card_type_filter or '',
     })
 
 
@@ -1166,9 +1271,10 @@ def event_registration_create(request):
         _save_form_fields(request, reg)
         messages.success(request, 'Event created successfully!')
         return redirect('custom_admin:event_registrations_list')
+    import json as _json
     return render(request, 'custom_admin/event_registrations/form.html', {
         'action': 'Create',
-        'field_type_choices': RegistrationFormField.FIELD_TYPE_CHOICES,
+        'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)),
     })
 
 
@@ -1215,7 +1321,7 @@ def event_registration_edit(request, pk):
     return render(request, 'custom_admin/event_registrations/form.html', {
         'reg': reg,
         'action': 'Edit',
-        'field_type_choices': RegistrationFormField.FIELD_TYPE_CHOICES,
+        'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)),
         'existing_fields_json': _json.dumps(existing_fields, default=str),
     })
 
@@ -1276,7 +1382,7 @@ def event_registration_submissions(request, pk):
     return render(request, 'custom_admin/event_registrations/submissions.html', {
         'reg': reg,
         'submissions': submissions,
-        'current_filter': status_filter or 'all',
+        'current_filter': status_filter or '',
         'total_count': EventSubmission.objects.filter(event_registration=reg).count(),
         'pending_count': EventSubmission.objects.filter(event_registration=reg, status='pending').count(),
         'approved_count': EventSubmission.objects.filter(event_registration=reg, status='approved').count(),

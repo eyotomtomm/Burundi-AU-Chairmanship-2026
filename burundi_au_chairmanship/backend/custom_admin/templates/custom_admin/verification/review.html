@@ -1,114 +1,179 @@
 {% extends 'custom_admin/base.html' %}
 
-{% block title %}Review Verification Request{% endblock %}
+{% block title %}Review Verification - {{ ver_request.full_name }} | AU Chairmanship Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
   <!-- Header -->
   <div class="flex items-center justify-between mb-8">
-    <div class="flex items-center gap-3">
-      <span class="material-symbols-rounded text-5xl text-primary">verified</span>
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white" style="font-variation-settings: 'FILL' 1">verified</span>
+      </div>
       <div>
-        <h1 class="font-headline text-4xl font-bold text-on-surface">Review Verification Request</h1>
-        <p class="font-body text-on-surface-variant mt-1">Evaluate and process user verification application</p>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Review Verification</h1>
+        <p class="text-sm text-slate-500 mt-1">Evaluate and process verification application</p>
       </div>
     </div>
     <a href="{% url 'custom_admin:verification_requests_list' %}"
-       class="inline-flex items-center gap-2 bg-surface-container-low text-on-surface font-headline font-semibold rounded-lg py-2 px-4 hover:bg-surface-container transition-all">
-      <span class="material-symbols-rounded">arrow_back</span>
+       class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>
       Back to List
     </a>
   </div>
 
-  <!-- Request Details -->
-  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mb-6">
-    <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
-      <span class="material-symbols-rounded">person</span>
+  <!-- Status Banner -->
+  <div class="mb-6 rounded-xl p-4 flex items-center gap-3
+    {% if ver_request.status == 'pending' %}bg-amber-50 border border-amber-200
+    {% elif ver_request.status == 'approved' %}bg-emerald-50 border border-emerald-200
+    {% elif ver_request.status == 'rejected' %}bg-red-50 border border-red-200
+    {% endif %}">
+    <span class="material-symbols-outlined text-2xl
+      {% if ver_request.status == 'pending' %}text-amber-600
+      {% elif ver_request.status == 'approved' %}text-emerald-600
+      {% elif ver_request.status == 'rejected' %}text-red-600
+      {% endif %}">
+      {% if ver_request.status == 'pending' %}hourglass_top
+      {% elif ver_request.status == 'approved' %}task_alt
+      {% elif ver_request.status == 'rejected' %}block
+      {% endif %}
+    </span>
+    <div>
+      <p class="font-semibold text-sm
+        {% if ver_request.status == 'pending' %}text-amber-800
+        {% elif ver_request.status == 'approved' %}text-emerald-800
+        {% elif ver_request.status == 'rejected' %}text-red-800
+        {% endif %}">
+        Status: {{ ver_request.get_status_display }}
+      </p>
+      <p class="text-xs
+        {% if ver_request.status == 'pending' %}text-amber-600
+        {% elif ver_request.status == 'approved' %}text-emerald-600
+        {% elif ver_request.status == 'rejected' %}text-red-600
+        {% endif %}">
+        Submitted {{ ver_request.created_at|date:"M d, Y" }} at {{ ver_request.created_at|date:"g:i A" }}
+      </p>
+    </div>
+  </div>
+
+  <!-- Applicant Information -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-600">person</span>
       Applicant Information
     </h2>
 
-    <div class="grid grid-cols-2 gap-6">
-      <div>
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Username</label>
-        <p class="font-body text-lg text-on-surface">{{ ver_request.user.username }}</p>
+    <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+      <div class="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+        {{ ver_request.user.username|first|upper }}
       </div>
       <div>
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Email</label>
-        <p class="font-body text-lg text-on-surface">{{ ver_request.user.email }}</p>
+        <p class="text-lg font-bold text-slate-900">{{ ver_request.full_name }}</p>
+        <p class="text-sm text-slate-500">{{ ver_request.user.email }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">@{{ ver_request.user.username }}</p>
       </div>
-      <div>
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Full Name</label>
-        <p class="font-body text-lg text-on-surface">{{ ver_request.full_name }}</p>
-      </div>
-      <div>
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Current Status</label>
-        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-headline font-bold
-          {% if ver_request.status == 'pending' %}bg-amber-100 text-amber-700
-          {% elif ver_request.status == 'approved' %}bg-emerald-100 text-emerald-700
-          {% elif ver_request.status == 'rejected' %}bg-red-100 text-red-700
+      <div class="ml-auto">
+        <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
+          {% if ver_request.badge_type == 'BLUE' %}bg-blue-50 text-blue-700 border border-blue-200
+          {% elif ver_request.badge_type == 'GOLD' %}bg-amber-50 text-amber-700 border border-amber-200
+          {% elif ver_request.badge_type == 'GOVERNMENT' %}bg-purple-50 text-purple-700 border border-purple-200
           {% endif %}">
-          {{ ver_request.get_status_display }}
+          <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1">
+            {% if ver_request.badge_type == 'BLUE' %}verified{% elif ver_request.badge_type == 'GOLD' %}workspace_premium{% elif ver_request.badge_type == 'GOVERNMENT' %}shield{% endif %}
+          </span>
+          {{ ver_request.get_badge_type_display }} Badge
         </span>
       </div>
-      <div>
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Requested Badge Type</label>
-        <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-headline font-bold
-          {% if ver_request.badge_type == 'BLUE' %}bg-blue-100 text-blue-700
-          {% elif ver_request.badge_type == 'GOLD' %}bg-yellow-100 text-yellow-700
-          {% elif ver_request.badge_type == 'GOVERNMENT' %}bg-purple-100 text-purple-700
-          {% endif %}">
-          {{ ver_request.get_badge_type_display }}
-        </span>
-      </div>
-      <div>
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Submitted</label>
-        <p class="font-body text-lg text-on-surface">{{ ver_request.created_at|date:"M d, Y - H:i" }}</p>
-      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       {% if ver_request.organization %}
-      <div class="col-span-2">
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Organization</label>
-        <p class="font-body text-lg text-on-surface">{{ ver_request.organization }}</p>
+      <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Organization</label>
+        <p class="text-slate-800 font-medium">{{ ver_request.organization }}</p>
       </div>
       {% endif %}
-      {% if ver_request.role %}
-      <div class="col-span-2">
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Role/Position</label>
-        <p class="font-body text-lg text-on-surface">{{ ver_request.role }}</p>
+      {% if ver_request.position_role %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Position / Role</label>
+        <p class="text-slate-800 font-medium">{{ ver_request.position_role }}</p>
+      </div>
+      {% endif %}
+      {% if ver_request.title %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Title</label>
+        <p class="text-slate-800 font-medium">{{ ver_request.get_title_display }}</p>
       </div>
       {% endif %}
       {% if ver_request.reason %}
-      <div class="col-span-2">
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Reason for Verification</label>
-        <p class="font-body text-lg text-on-surface leading-relaxed">{{ ver_request.reason }}</p>
+      <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Reason for Verification</label>
+        <p class="text-slate-800 leading-relaxed bg-slate-50 rounded-lg p-4">{{ ver_request.reason }}</p>
       </div>
       {% endif %}
       {% if ver_request.document %}
-      <div class="col-span-2">
-        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Supporting Document</label>
+      <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">Supporting Document</label>
         <a href="{{ ver_request.document.url }}" target="_blank"
-           class="inline-flex items-center gap-2 bg-primary-container text-white font-headline font-bold rounded-lg py-2 px-4 hover:bg-primary transition-all">
-          <span class="material-symbols-rounded">description</span>
+           class="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-blue-100 transition-all">
+          <span class="material-symbols-outlined">description</span>
           View Document
+          <span class="material-symbols-outlined text-sm">open_in_new</span>
         </a>
+      </div>
+      {% endif %}
+
+      {% if ver_request.social_media_links %}
+      <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">Social Media Proof</label>
+        <div class="bg-slate-50 rounded-lg p-4">
+          <p class="text-slate-800 text-sm break-all">{{ ver_request.social_media_links }}</p>
+        </div>
       </div>
       {% endif %}
     </div>
   </div>
 
-  <!-- Action Form -->
+  <!-- Reviewed Info (for already processed requests) -->
+  {% if ver_request.status != 'pending' and ver_request.reviewed_by %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-slate-600">task_alt</span>
+      Review Details
+    </h2>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="text-slate-500 font-medium">Reviewed By</p>
+        <p class="text-slate-900 font-semibold">{{ ver_request.reviewed_by.get_full_name|default:ver_request.reviewed_by.username }}</p>
+      </div>
+      <div>
+        <p class="text-slate-500 font-medium">Reviewed At</p>
+        <p class="text-slate-900 font-semibold">{{ ver_request.reviewed_at|date:"M d, Y - g:i A" }}</p>
+      </div>
+      {% if ver_request.rejection_reason %}
+      <div class="col-span-2">
+        <p class="text-slate-500 font-medium mb-1">Rejection Reason</p>
+        <p class="text-red-700 bg-red-50 rounded-lg p-3">{{ ver_request.rejection_reason }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Action Form (pending only) -->
   {% if ver_request.status == 'pending' %}
-  <form method="post" class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+  <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
     {% csrf_token %}
 
-    <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
-      <span class="material-symbols-rounded">gavel</span>
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-amber-600">gavel</span>
       Review Decision
     </h2>
 
     <div class="mb-6">
-      <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Action *</label>
+      <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">Action *</label>
       <select name="action" id="action-select" required
-              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+              class="w-full bg-slate-50 border border-slate-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
         <option value="">Select an action...</option>
         <option value="approve">Approve Request</option>
         <option value="reject">Reject Request</option>
@@ -116,38 +181,46 @@
     </div>
 
     <!-- Approve Section -->
-    <div id="approve-section" class="hidden mb-6">
-      <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Badge Type *</label>
+    <div id="approve-section" class="hidden mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-6">
+      <h3 class="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">check_circle</span>
+        Approve Configuration
+      </h3>
+      <label class="text-xs uppercase tracking-wider text-emerald-700 font-semibold block mb-2">Badge Type *</label>
       <select name="badge_type"
-              class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+              class="w-full bg-white border border-emerald-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-slate-800">
         <option value="BLUE" {% if ver_request.badge_type == 'BLUE' %}selected{% endif %}>Blue Badge (Verified Professional)</option>
-        <option value="GOLD" {% if ver_request.badge_type == 'GOLD' %}selected{% endif %}>Gold Badge (VIP/Dignitary)</option>
+        <option value="GOLD" {% if ver_request.badge_type == 'GOLD' %}selected{% endif %}>Gold Badge (VIP / Dignitary)</option>
         <option value="GOVERNMENT" {% if ver_request.badge_type == 'GOVERNMENT' %}selected{% endif %}>Government Badge (Official)</option>
       </select>
-      <p class="font-body text-sm text-on-surface-variant mt-2">Select the appropriate verification badge for this user</p>
+      <p class="text-xs text-emerald-600 mt-2">Select the appropriate verification badge for this user</p>
     </div>
 
     <!-- Reject Section -->
-    <div id="reject-section" class="hidden mb-6">
-      <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">Rejection Reason *</label>
+    <div id="reject-section" class="hidden mb-6 bg-red-50 border border-red-200 rounded-xl p-6">
+      <h3 class="text-sm font-bold text-red-800 mb-3 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">cancel</span>
+        Rejection Details
+      </h3>
+      <label class="text-xs uppercase tracking-wider text-red-700 font-semibold block mb-2">Rejection Reason *</label>
       <textarea name="rejection_reason" rows="4"
-                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                class="w-full bg-white border border-red-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-800"
                 placeholder="Provide a clear reason for rejecting this verification request..."></textarea>
-      <p class="font-body text-sm text-on-surface-variant mt-2">This reason will be visible to the user</p>
+      <p class="text-xs text-red-600 mt-2">This reason will be visible to the applicant</p>
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex gap-4 pt-6 border-t border-outline-variant">
-      <button type="submit" id="approve-btn" class="hidden bg-emerald-600 text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-emerald-700 transition-all flex items-center gap-2">
-        <span class="material-symbols-rounded">check_circle</span>
+    <div class="flex gap-3 pt-6 border-t border-slate-100">
+      <button type="submit" id="approve-btn" class="hidden bg-emerald-600 text-white font-semibold rounded-lg py-3 px-8 hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">check_circle</span>
         Approve Verification
       </button>
-      <button type="submit" id="reject-btn" class="hidden bg-red-600 text-white font-headline font-bold rounded-lg py-3 px-8 hover:bg-red-700 transition-all flex items-center gap-2">
-        <span class="material-symbols-rounded">cancel</span>
+      <button type="submit" id="reject-btn" class="hidden bg-red-600 text-white font-semibold rounded-lg py-3 px-8 hover:bg-red-700 transition-all shadow-sm flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">cancel</span>
         Reject Request
       </button>
       <a href="{% url 'custom_admin:verification_requests_list' %}"
-         class="bg-surface-container-low text-on-surface font-headline font-bold rounded-lg py-3 px-8 hover:bg-surface-container transition-all">
+         class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-8 hover:bg-slate-50 transition-all">
         Cancel
       </a>
     </div>
@@ -162,7 +235,6 @@
 
     actionSelect.addEventListener('change', function() {
       const action = this.value;
-
       if (action === 'approve') {
         approveSection.classList.remove('hidden');
         rejectSection.classList.add('hidden');
@@ -186,10 +258,13 @@
     });
   </script>
   {% else %}
-  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center">
-    <span class="material-symbols-rounded text-6xl text-on-surface-variant opacity-50 mb-4 block">info</span>
-    <p class="font-headline text-xl text-on-surface-variant">This request has already been processed</p>
-    <p class="font-body text-sm text-on-surface-variant mt-2">Status: {{ ver_request.get_status_display }}</p>
+  <!-- Already processed info -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+      <span class="material-symbols-outlined text-3xl text-slate-400">info</span>
+    </div>
+    <p class="text-lg font-semibold text-slate-700">This request has already been processed</p>
+    <p class="text-sm text-slate-500 mt-2">Status: {{ ver_request.get_status_display }}</p>
   </div>
   {% endif %}
 </div>

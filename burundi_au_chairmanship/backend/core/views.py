@@ -40,6 +40,19 @@ from .serializers import (
 )
 
 
+def _split_display_name(display_name):
+    """Split a social login display name into (first_name, last_name).
+    Handles long names from Google/Apple by taking the first word as first_name
+    and the rest as last_name. Both fields are capped at 150 chars (Django limit).
+    """
+    if not display_name or not display_name.strip():
+        return ('', '')
+    parts = display_name.strip().split(None, 1)  # Split on first whitespace
+    first_name = parts[0][:150]
+    last_name = parts[1][:150] if len(parts) > 1 else ''
+    return (first_name, last_name)
+
+
 # ── Auth Views ────────────────────────────────────────────
 
 @api_view(['POST'])
@@ -333,9 +346,11 @@ def firebase_register(request):
         # Check if user already exists — return success (idempotent)
         try:
             existing_user = User.objects.get(username=firebase_uid)
-            # Update name if provided
+            # Update name if provided (split into first/last for long social names)
             if name and not existing_user.first_name:
-                existing_user.first_name = name
+                first_name, last_name = _split_display_name(name)
+                existing_user.first_name = first_name
+                existing_user.last_name = last_name
                 existing_user.save()
             profile = existing_user.profile
             profile.is_email_verified = decoded_token.get('email_verified', False)
@@ -353,11 +368,15 @@ def firebase_register(request):
         except User.DoesNotExist:
             pass
 
+        # Split display name into first/last (handles long Google/Apple names)
+        first_name, last_name = _split_display_name(name)
+
         # Create Django user with Firebase UID as username
         user = User.objects.create(
             username=firebase_uid,
             email=email,
-            first_name=name,
+            first_name=first_name,
+            last_name=last_name,
         )
 
         # Update profile with Firebase data
@@ -418,10 +437,12 @@ def firebase_login(request):
             is_new_user = False
         except UserProfile.DoesNotExist:
             # Auto-create user if they don't exist (standard for social logins)
+            first_name, last_name = _split_display_name(name)
             user = User.objects.create(
                 username=firebase_uid,
                 email=email,
-                first_name=name,
+                first_name=first_name,
+                last_name=last_name,
             )
             profile = user.profile
             profile.firebase_uid = firebase_uid

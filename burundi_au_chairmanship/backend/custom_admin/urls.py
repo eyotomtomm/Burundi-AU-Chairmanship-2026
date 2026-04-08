@@ -56,6 +56,10 @@ urlpatterns = [
     path('users/<int:pk>/toggle-active/', views.user_toggle_active, name='user_toggle_active'),
     path('users/<int:pk>/toggle-staff/', views.user_toggle_staff, name='user_toggle_staff'),
 
+    # Admin Management (Superuser only)
+    path('admin-management/', views.admin_management, name='admin_management'),
+    path('admin-management/invite/', views.admin_invite, name='admin_invite'),
+
     # Verification Requests
     path('verification-requests/', views.verification_requests_list, name='verification_requests_list'),
     path('verification-requests/<int:pk>/review/', views.verification_request_review, name='verification_request_review'),

@@ -39,6 +39,8 @@ router.register('announcement-banners', views.AnnouncementBannerViewSet, basenam
 router.register('contact-directory', views.ContactDirectoryViewSet, basename='contact-directory')
 router.register('live-qa', views.LiveQAViewSet, basename='live-qa')
 router.register('onboarding-steps', views.OnboardingStepViewSet, basename='onboarding-step')
+router.register('podcasts', views.PodcastViewSet, basename='podcast')
+router.register('event-agenda-items', views.EventAgendaItemViewSet, basename='event-agenda-item')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -130,12 +132,28 @@ urlpatterns = [
     path('admin/content-versions/', views.content_versions, name='content-versions'),
     path('admin/generate-report/', views.generate_weekly_report, name='generate-weekly-report'),
 
+    # Article Share Cards (#34)
+    path('articles/<int:pk>/share/', views.article_share_card, name='article-share-card'),
+
+    # Article Revisions (#40)
+    path('admin/articles/<int:pk>/revisions/', views.article_revisions, name='article-revisions'),
+    path('admin/articles/<int:pk>/revisions/<int:revision_id>/restore/', views.article_revision_restore, name='article-revision-restore'),
+
+    # Translation Queue (#46)
+    path('admin/translation-queue/', views.translation_queue, name='translation-queue'),
+    path('admin/translation-queue/<int:pk>/', views.translation_queue_detail, name='translation-queue-detail'),
+
     # User Features (NEW)
     path('auth/merge-account/', views.request_account_merge, name='request-account-merge'),
     path('password-strength/', views.validate_password_strength, name='password-strength'),
     path('profile-completion/', views.profile_completion, name='profile-completion'),
     path('whats-new/', views.whats_new, name='whats-new'),
     path('events/<int:event_id>/comments/', views.event_comments, name='event-comments'),
+    path('events/<int:event_id>/comments/<int:comment_id>/', views.event_comment_delete, name='event-comment-delete'),
+    path('events/<int:event_id>/attendees/', views.event_attendees, name='event-attendees'),
+
+    # Newsletter
+    path('newsletter/toggle/', views.toggle_newsletter, name='toggle-newsletter'),
 
     # Analytics API (admin only)
     path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),

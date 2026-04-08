@@ -340,6 +340,25 @@ class ApiService {
     return await _post('articles/$articleId/toggle-like/', {}, auth: true);
   }
 
+  // ── Related Articles ──────────────────────────────────────
+  Future<List<Article>> getRelatedArticles(String articleId) async {
+    final data = await _get('articles/$articleId/related/');
+    if (data is List) return data.map((j) => Article.fromJson(j as Map<String, dynamic>)).toList();
+    return _extractResults(data).map((j) => Article.fromJson(j)).toList();
+  }
+
+  // ── Article Reading Progress ──────────────────────────────
+  Future<Map<String, dynamic>> getArticleReadingProgress(String articleId) async {
+    return await _get('articles/$articleId/reading-progress/', auth: true) as Map<String, dynamic>;
+  }
+
+  Future<void> saveArticleReadingProgress(String articleId, int scrollPosition, int progressPercent) async {
+    await _post('articles/$articleId/reading-progress/', {
+      'scroll_position': scrollPosition,
+      'progress_percent': progressPercent,
+    }, auth: true);
+  }
+
   // ── Magazines ────────────────────────────────────────────
   Future<List<MagazineEdition>> getMagazines() async {
     final data = await _get('magazines/');
@@ -467,6 +486,17 @@ class ApiService {
       'proxy_phone': proxyPhone,
       'form_data': formData ?? {},
     }, auth: true);
+  }
+
+  // ── Event Ticket & Calendar ────────────────────────────────
+  Future<Map<String, dynamic>> getEventQrTicket(int submissionId) async {
+    final data = await _get('event-submissions/$submissionId/qr-ticket/', auth: true);
+    return data as Map<String, dynamic>;
+  }
+
+  /// Returns the URL for downloading the ICS calendar file for an event registration.
+  String getEventRegistrationIcsUrl(int eventRegId) {
+    return '$_baseUrl/event-registrations/$eventRegId/ics/';
   }
 
   // ── Home Feed (combined) ─────────────────────────────────
@@ -922,6 +952,82 @@ class ApiService {
   // ── Auto Translate ───────────────────────────────────────
   Future<Map<String, dynamic>> autoTranslate(String text, String source, String target) async {
     return await _post('admin/auto-translate/', {'text': text, 'source': source, 'target': target}, auth: true);
+  }
+
+  // ── Podcasts ────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getPodcasts() async {
+    final data = await _get('podcasts/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Event Agenda Items ──────────────────────────────────
+  Future<List<Map<String, dynamic>>> getEventAgendaItems(int eventId) async {
+    final data = await _get('event-agenda-items/?event=$eventId');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Event Comments ──────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getEventComments(int eventId) async {
+    final data = await _get('events/$eventId/comments/');
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> postEventComment(int eventId, String content, {int? parentId}) async {
+    final body = <String, dynamic>{'content': content};
+    if (parentId != null) body['parent'] = parentId;
+    return await _post('events/$eventId/comments/', body, auth: true);
+  }
+
+  Future<void> deleteEventComment(int eventId, int commentId) async {
+    await _delete('events/$eventId/comments/$commentId/', auth: true);
+  }
+
+  // ── Event Attendees ─────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getEventAttendees(int eventId) async {
+    final data = await _get('events/$eventId/attendees/', auth: true);
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Event Photos ────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getEventPhotos(int eventId) async {
+    final data = await _get('event-photos/?event=$eventId', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> uploadEventPhoto(int eventId, File imageFile, {String caption = ''}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/event-photos/');
+      final request = http.MultipartRequest('POST', uri);
+
+      final headers = await _headers(auth: true);
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+
+      request.fields['event'] = eventId.toString();
+      request.fields['caption'] = caption;
+      request.files.add(
+        await http.MultipartFile.fromPath('image', imageFile.path),
+      );
+
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return json.decode(response.body);
+      }
+      throw ApiException('Failed to upload photo', response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
+  }
+
+  // ── Newsletter ──────────────────────────────────────────
+  Future<Map<String, dynamic>> toggleNewsletter(bool receives) async {
+    return await _post('newsletter/toggle/', {'receives_newsletter': receives}, auth: true);
   }
 }
 

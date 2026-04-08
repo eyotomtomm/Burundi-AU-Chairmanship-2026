@@ -107,6 +107,142 @@ def generate_weekly_report():
     return stats
 
 
+@shared_task
+def send_scheduled_notifications():
+    """Send scheduled notifications whose scheduled_at time has passed.
+    Runs every minute via CELERY_BEAT_SCHEDULE."""
+    from .models import Notification, UserProfile
+    now = timezone.now()
+
+    pending = Notification.objects.filter(
+        scheduled_at__lte=now,
+        push_sent=False,
+        is_active=True,
+    ).exclude(scheduled_at__isnull=True)
+
+    sent_count = 0
+    for notification in pending:
+        try:
+            from .push_service import send_push_notification
+            success, failure = send_push_notification(notification)
+            notification.push_sent = True
+            notification.push_sent_at = now
+            notification.push_recipient_count = success
+            notification.save(update_fields=['push_sent', 'push_sent_at', 'push_recipient_count'])
+            sent_count += 1
+            logger.info(f"Scheduled notification '{notification.title}' sent to {success} devices")
+        except Exception as e:
+            logger.error(f"Failed to send scheduled notification {notification.id}: {e}")
+
+    if sent_count:
+        logger.info(f"Processed {sent_count} scheduled notifications")
+    return sent_count
+
+
+@shared_task
+def send_weekly_newsletter():
+    """Collect articles/events from the past/upcoming week and email subscribers."""
+    from .models import Article, Event, UserProfile, NewsletterEdition, EmailTemplate
+    from django.core.mail import send_mass_mail
+    from django.template import Template, Context
+
+    now = timezone.now()
+    week_ago = now - timedelta(days=7)
+    week_ahead = now + timedelta(days=7)
+
+    # Collect recent content
+    recent_articles = Article.objects.filter(
+        publish_date__gte=week_ago
+    ).order_by('-publish_date')[:10]
+
+    upcoming_events = Event.objects.filter(
+        event_date__gte=now,
+        event_date__lte=week_ahead,
+        is_active=True,
+    ).order_by('event_date')[:10]
+
+    if not recent_articles.exists() and not upcoming_events.exists():
+        logger.info("No content for weekly newsletter, skipping")
+        return 0
+
+    # Build HTML body
+    articles_html = ""
+    for article in recent_articles:
+        articles_html += f"<li><strong>{article.title}</strong> - {article.author}</li>\n"
+
+    events_html = ""
+    for event in upcoming_events:
+        events_html += f"<li><strong>{event.name}</strong> - {event.event_date.strftime('%b %d, %Y')}</li>\n"
+
+    body_html = f"""
+    <h2>This Week's Highlights</h2>
+    {'<h3>Recent Articles</h3><ul>' + articles_html + '</ul>' if articles_html else ''}
+    {'<h3>Upcoming Events</h3><ul>' + events_html + '</ul>' if events_html else ''}
+    <p>Stay connected with the Burundi AU Chairmanship.</p>
+    """
+
+    subject = f"Burundi AU Chairmanship - Weekly Digest ({now.strftime('%b %d, %Y')})"
+
+    # Get subscribers
+    subscribers = UserProfile.objects.filter(
+        receives_newsletter=True,
+        user__is_active=True,
+    ).select_related('user').exclude(user__email='')
+
+    recipient_emails = [p.user.email for p in subscribers if p.user.email]
+
+    if not recipient_emails:
+        logger.info("No newsletter subscribers found")
+        return 0
+
+    # Try to use the 'newsletter' EmailTemplate if it exists
+    try:
+        template = EmailTemplate.objects.get(key='newsletter', is_active=True)
+        tmpl = Template(template.body_html)
+        body_html = tmpl.render(Context({
+            'articles': recent_articles,
+            'events': upcoming_events,
+            'articles_html': articles_html,
+            'events_html': events_html,
+        }))
+        subject = template.subject or subject
+    except EmailTemplate.DoesNotExist:
+        pass  # Use default body_html built above
+
+    # Send emails in batch
+    from django.core.mail import EmailMessage
+    from django.conf import settings as django_settings
+
+    sent = 0
+    batch_size = 50
+    for i in range(0, len(recipient_emails), batch_size):
+        batch = recipient_emails[i:i + batch_size]
+        for email_addr in batch:
+            try:
+                msg = EmailMessage(
+                    subject=subject,
+                    body=body_html,
+                    from_email=django_settings.DEFAULT_FROM_EMAIL,
+                    to=[email_addr],
+                )
+                msg.content_subtype = 'html'
+                msg.send(fail_silently=True)
+                sent += 1
+            except Exception as e:
+                logger.error(f"Newsletter send failed for {email_addr}: {e}")
+
+    # Record the edition
+    NewsletterEdition.objects.create(
+        subject=subject,
+        body_html=body_html,
+        sent_at=now,
+        recipient_count=sent,
+    )
+
+    logger.info(f"Weekly newsletter sent to {sent}/{len(recipient_emails)} subscribers")
+    return sent
+
+
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
 def optimize_image_async(self, image_path):
     """Generate WebP thumbnails at multiple sizes."""

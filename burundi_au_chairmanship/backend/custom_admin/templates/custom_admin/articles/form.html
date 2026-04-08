@@ -58,7 +58,7 @@
         />
       </div>
 
-      <!-- Content (English) -->
+      <!-- Content (English) - Rich Text Editor -->
       <div class="mb-6">
         <label for="content" class="block font-headline font-bold text-on-surface mb-2">
           Content (English) <span class="text-error">*</span>
@@ -68,12 +68,12 @@
           name="content"
           rows="8"
           required
-          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y tinymce-editor"
           placeholder="Enter article content in English"
         >{% if article %}{{ article.content }}{% endif %}</textarea>
       </div>
 
-      <!-- Content (French) -->
+      <!-- Content (French) - Rich Text Editor -->
       <div class="mb-6">
         <label for="content_fr" class="block font-headline font-bold text-on-surface mb-2">
           Content (French) <span class="text-error">*</span>
@@ -83,7 +83,7 @@
           name="content_fr"
           rows="8"
           required
-          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y"
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y tinymce-editor"
           placeholder="Entrez le contenu de l'article en français"
         >{% if article %}{{ article.content_fr }}{% endif %}</textarea>
       </div>
@@ -180,6 +180,39 @@
         <p class="text-sm text-on-surface-variant mt-2 ml-8">Featured articles appear prominently on the home screen</p>
       </div>
 
+      <!-- Scheduling & Lifecycle -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Scheduled Publish -->
+        <div>
+          <label for="scheduled_publish_at" class="block font-headline font-bold text-on-surface mb-2">
+            Schedule Publication
+          </label>
+          <input
+            type="datetime-local"
+            id="scheduled_publish_at"
+            name="scheduled_publish_at"
+            value="{% if article and article.scheduled_publish_at %}{{ article.scheduled_publish_at|date:'Y-m-d\TH:i' }}{% endif %}"
+            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+          />
+          <p class="text-xs text-on-surface-variant mt-2">Leave empty to publish immediately. Set a future date to schedule.</p>
+        </div>
+
+        <!-- Expiry Date -->
+        <div>
+          <label for="expires_at" class="block font-headline font-bold text-on-surface mb-2">
+            Expiry Date
+          </label>
+          <input
+            type="datetime-local"
+            id="expires_at"
+            name="expires_at"
+            value="{% if article and article.expires_at %}{{ article.expires_at|date:'Y-m-d\TH:i' }}{% endif %}"
+            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+          />
+          <p class="text-xs text-on-surface-variant mt-2">Leave empty for no expiry. Article auto-archives after this date.</p>
+        </div>
+      </div>
+
       <!-- Action Buttons -->
       <div class="flex items-center gap-4 pt-6 border-t border-outline-variant">
         <button
@@ -188,6 +221,17 @@
         >
           <span class="material-symbols-outlined text-xl">save</span>
           {% if article %}Update Article{% else %}Create Article{% endif %}
+        </button>
+
+        <!-- Save as Draft button -->
+        <button
+          type="submit"
+          name="save_as_draft"
+          value="on"
+          class="bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-lg py-3 px-6 font-medium inline-flex items-center gap-2 transition-colors"
+        >
+          <span class="material-symbols-outlined text-xl">draft</span>
+          Save as Draft
         </button>
 
         <a
@@ -236,4 +280,40 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- TinyMCE 6 WYSIWYG Editor -->
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  tinymce.init({
+    selector: 'textarea.tinymce-editor',
+    height: 400,
+    menubar: false,
+    plugins: 'lists link image autolink',
+    toolbar: 'bold italic underline | h2 h3 | bullist numlist | link image | blockquote',
+    content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 15px; line-height: 1.6; color: #1a1a1a; }',
+    branding: false,
+    promotion: false,
+    statusbar: true,
+    resize: true,
+    link_default_target: '_blank',
+    image_advtab: true,
+    setup: function(editor) {
+      editor.on('change', function() {
+        editor.save();
+      });
+    }
+  });
+
+  // Ensure TinyMCE content is saved before form submission
+  var form = document.querySelector('form[method="post"]');
+  if (form) {
+    form.addEventListener('submit', function() {
+      tinymce.triggerSave();
+    });
+  }
+});
+</script>
 {% endblock %}

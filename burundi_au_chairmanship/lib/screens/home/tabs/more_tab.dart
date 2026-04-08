@@ -442,6 +442,11 @@ class _MoreTabState extends State<MoreTab> {
                             isDark: isDark,
                             onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const NotificationPreferencesScreen())),
                           ),
+                          _buildNewsletterToggle(
+                            context: context,
+                            isDark: isDark,
+                            authProvider: authProvider,
+                          ),
                           _buildMenuItem(
                             context: context,
                             icon: Icons.lock_rounded,
@@ -1100,6 +1105,60 @@ class _MoreTabState extends State<MoreTab> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildNewsletterToggle({
+    required BuildContext context,
+    required bool isDark,
+    required AuthProvider authProvider,
+  }) {
+    return Column(
+      children: [
+        Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF26A69A).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.newspaper_rounded, color: Color(0xFF26A69A), size: 22),
+          ),
+          title: Text(
+            'Weekly Newsletter',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+            ),
+          ),
+          subtitle: Text(
+            'Receive weekly digest via email',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white60 : Colors.black54,
+            ),
+          ),
+          trailing: Switch.adaptive(
+            value: authProvider.receivesNewsletter,
+            onChanged: (val) async {
+              final success = await authProvider.toggleNewsletter(val);
+              if (!success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to update newsletter preference'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            activeTrackColor: AppColors.burundiGreen,
+          ),
+        ),
+      ],
     );
   }
 

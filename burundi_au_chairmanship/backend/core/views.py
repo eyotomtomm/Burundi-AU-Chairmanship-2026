@@ -39,6 +39,9 @@ from .models import (
     ScheduledMaintenance, AppRelease, ContentAnalytics,
     AuditLogEntry, TranslationEntry, ContentVersion, AccountMergeRequest,
     WeeklyReport, UserSession, FunnelStep, EngagementHeatmap,
+    VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
+    EventComment, CommentMention, NewsletterEdition,
+    Podcast, EventAgendaItem,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -68,6 +71,9 @@ from .serializers import (
     AppReleaseSerializer, ContentAnalyticsSerializer, WeeklyReportSerializer,
     AuditLogEntrySerializer, TranslationEntrySerializer, ContentVersionSerializer,
     AccountMergeRequestSerializer,
+    ArticleRevisionSerializer, TranslationRequestSerializer,
+    EventCommentSerializer, NewsletterEditionSerializer, EventAttendeeSerializer,
+    PodcastSerializer, EventAgendaItemSerializer,
 )
 
 
@@ -784,8 +790,15 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['category', 'is_featured']
 
     def get_queryset(self):
+        now = timezone.now()
         qs = Article.objects.select_related('category').prefetch_related('media').annotate(
             comment_count=Count('comments', distinct=True),
+        ).filter(
+            is_draft=False,  # Exclude drafts from public API
+        ).exclude(
+            scheduled_publish_at__gt=now,  # Exclude scheduled (future) articles
+        ).exclude(
+            expires_at__lt=now,  # Exclude expired articles
         ).order_by('-publish_date')  # Explicitly order by newest first
         user = self.request.user
         if user.is_authenticated:
@@ -798,6 +811,69 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             from django.db.models import Value, BooleanField
             qs = qs.annotate(is_liked=Value(False, output_field=BooleanField()))
         return qs
+
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve to increment view_count on each article view using F() for thread safety."""
+        instance = self.get_object()
+        Article.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
+        instance.refresh_from_db()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='related', permission_classes=[AllowAny])
+    def related(self, request, pk=None):
+        """Get related articles in the same category, excluding the current article."""
+        article = self.get_object()
+        now = timezone.now()
+        related_qs = Article.objects.select_related('category').prefetch_related('media').filter(
+            is_draft=False,
+        ).exclude(
+            scheduled_publish_at__gt=now,
+        ).exclude(
+            expires_at__lt=now,
+        ).exclude(pk=article.pk)
+
+        if article.category_id:
+            related_qs = related_qs.filter(category=article.category)
+
+        related_qs = related_qs.annotate(
+            comment_count=Count('comments', distinct=True),
+        ).order_by('-publish_date')[:5]
+
+        if request.user.is_authenticated:
+            related_qs = related_qs.annotate(
+                is_liked=Exists(ArticleLike.objects.filter(article=OuterRef('pk'), user=request.user)),
+            )
+        else:
+            from django.db.models import Value, BooleanField
+            related_qs = related_qs.annotate(is_liked=Value(False, output_field=BooleanField()))
+
+        serializer = ArticleSerializer(related_qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='reading-progress', permission_classes=[IsAuthenticated])
+    def reading_progress(self, request, pk=None):
+        """Get or save reading progress for an article."""
+        article = self.get_object()
+        if request.method == 'GET':
+            try:
+                progress = ReadingProgress.objects.get(user=request.user, article=article)
+                return Response(ReadingProgressSerializer(progress).data)
+            except ReadingProgress.DoesNotExist:
+                return Response({'scroll_position': 0, 'progress_percent': 0, 'completed': False})
+
+        # POST
+        scroll_pos = request.data.get('scroll_position', 0)
+        progress_pct = request.data.get('progress_percent', 0)
+        obj, created = ReadingProgress.objects.update_or_create(
+            user=request.user, article=article,
+            defaults={
+                'progress_percent': min(100, max(0, int(progress_pct))),
+                'scroll_position': int(scroll_pos),
+                'completed': int(progress_pct) >= 90,
+            }
+        )
+        return Response(ReadingProgressSerializer(obj).data)
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
@@ -885,10 +961,100 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view active events"""
+    """Public endpoint: Anyone can view active events, with recurring event expansion."""
     permission_classes = [AllowAny]
     queryset = Event.objects.filter(is_active=True).prefetch_related('speakers')
     serializer_class = EventSerializer
+
+    def list(self, request, *args, **kwargs):
+        """Override list to expand recurring events into individual instances."""
+        from dateutil.relativedelta import relativedelta
+        from copy import copy
+
+        response = super().list(request, *args, **kwargs)
+        events_data = response.data.get('results', response.data) if isinstance(response.data, dict) else response.data
+
+        expanded = []
+        for event_data in events_data:
+            expanded.append(event_data)
+            recurrence = event_data.get('recurrence_type', 'none')
+            end_date_str = event_data.get('recurrence_end_date')
+
+            if recurrence == 'none' or not end_date_str:
+                continue
+
+            try:
+                from datetime import datetime
+                import copy as copy_module
+                event_date = datetime.fromisoformat(event_data['event_date'].replace('Z', '+00:00'))
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(
+                    tzinfo=event_date.tzinfo
+                )
+
+                current_date = event_date
+                max_instances = 52  # Safety limit
+
+                for _ in range(max_instances):
+                    if recurrence == 'daily':
+                        current_date = current_date + timedelta(days=1)
+                    elif recurrence == 'weekly':
+                        current_date = current_date + timedelta(weeks=1)
+                    elif recurrence == 'monthly':
+                        current_date = current_date + relativedelta(months=1)
+                    else:
+                        break
+
+                    if current_date.date() > end_date.date():
+                        break
+
+                    recurring_event = copy_module.deepcopy(event_data)
+                    recurring_event['event_date'] = current_date.isoformat()
+                    recurring_event['id'] = f"{event_data['id']}_r{_+1}"
+                    expanded.append(recurring_event)
+            except (ValueError, KeyError):
+                continue
+
+        if isinstance(response.data, dict) and 'results' in response.data:
+            response.data['results'] = expanded
+        else:
+            response.data = expanded
+
+        return response
+
+    @action(detail=True, methods=['get'], url_path='ics', permission_classes=[AllowAny])
+    def download_ics(self, request, pk=None):
+        """Generate and download an ICS calendar file for the event."""
+        from django.http import HttpResponse
+        event = self.get_object()
+
+        dtstart = event.event_date.strftime('%Y%m%dT%H%M%SZ')
+        # Default to 1 hour if no end time
+        dtend = (event.event_date + timedelta(hours=1)).strftime('%Y%m%dT%H%M%SZ')
+        uid = f"event-{event.id}@burundi4africa.com"
+        dtstamp = timezone.now().strftime('%Y%m%dT%H%M%SZ')
+
+        ics_content = (
+            "BEGIN:VCALENDAR\r\n"
+            "VERSION:2.0\r\n"
+            "PRODID:-//Burundi AU Chairmanship//Events//EN\r\n"
+            "CALSCALE:GREGORIAN\r\n"
+            "METHOD:PUBLISH\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            f"DTSTART:{dtstart}\r\n"
+            f"DTEND:{dtend}\r\n"
+            f"DTSTAMP:{dtstamp}\r\n"
+            f"SUMMARY:{event.name}\r\n"
+            f"DESCRIPTION:{event.description[:500]}\r\n"
+            f"LOCATION:{event.address}\r\n"
+            "STATUS:CONFIRMED\r\n"
+            "END:VEVENT\r\n"
+            "END:VCALENDAR\r\n"
+        )
+
+        response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="event-{event.id}.ics"'
+        return response
 
 
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
@@ -973,7 +1139,9 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['category', 'is_featured']
 
     def get_queryset(self):
-        qs = Video.objects.all().order_by('-is_featured', '-publish_date')
+        qs = Video.objects.prefetch_related(
+            'chapters', 'subtitles'
+        ).all().order_by('-is_featured', '-publish_date')
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -1198,7 +1366,14 @@ def home_feed(request):
     """Combined endpoint for home screen — hero slides, featured articles, feature cards, categories, event cards, and settings."""
     hero_slides = HeroSlide.objects.filter(is_active=True)
 
-    base_articles = Article.objects.select_related('category').prefetch_related('media').annotate(
+    now = timezone.now()
+    base_articles = Article.objects.select_related('category').prefetch_related('media').filter(
+        is_draft=False,
+    ).exclude(
+        scheduled_publish_at__gt=now,
+    ).exclude(
+        expires_at__lt=now,
+    ).annotate(
         comment_count=Count('comments', distinct=True),
     ).order_by('-publish_date')  # Explicitly order by newest first
     if request.user.is_authenticated:
@@ -1549,6 +1724,51 @@ class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
         context['request'] = self.request
         return context
 
+    @action(detail=True, methods=['get'], url_path='ics', permission_classes=[AllowAny])
+    def download_ics(self, request, pk=None):
+        """Generate and download an ICS calendar file for the event registration."""
+        from django.http import HttpResponse
+        event_reg = self.get_object()
+
+        if not event_reg.event_date:
+            return Response({'detail': 'No event date set.'}, status=400)
+
+        dtstart = event_reg.event_date.strftime('%Y%m%dT%H%M%SZ')
+        if event_reg.event_end_date:
+            dtend = event_reg.event_end_date.strftime('%Y%m%dT%H%M%SZ')
+        else:
+            dtend = (event_reg.event_date + timedelta(hours=2)).strftime('%Y%m%dT%H%M%SZ')
+        uid = f"event-reg-{event_reg.id}@burundi4africa.com"
+        dtstamp = timezone.now().strftime('%Y%m%dT%H%M%SZ')
+
+        # Escape special chars in ICS text
+        summary = event_reg.event_title.replace(',', '\\,').replace(';', '\\;')
+        description = event_reg.event_description[:500].replace('\n', '\\n').replace(',', '\\,')
+        location = event_reg.venue.replace(',', '\\,') if event_reg.venue else ''
+
+        ics_content = (
+            "BEGIN:VCALENDAR\r\n"
+            "VERSION:2.0\r\n"
+            "PRODID:-//Burundi AU Chairmanship//Events//EN\r\n"
+            "CALSCALE:GREGORIAN\r\n"
+            "METHOD:PUBLISH\r\n"
+            "BEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\n"
+            f"DTSTART:{dtstart}\r\n"
+            f"DTEND:{dtend}\r\n"
+            f"DTSTAMP:{dtstamp}\r\n"
+            f"SUMMARY:{summary}\r\n"
+            f"DESCRIPTION:{description}\r\n"
+            f"LOCATION:{location}\r\n"
+            "STATUS:CONFIRMED\r\n"
+            "END:VEVENT\r\n"
+            "END:VCALENDAR\r\n"
+        )
+
+        response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="event-{event_reg.id}.ics"'
+        return response
+
 
 class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                              mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -1570,7 +1790,113 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             if EventSubmission.objects.filter(event_registration=event_reg, user=user, is_proxy=False).exists():
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({'detail': 'You have already registered for this event.'})
-        serializer.save(user=user)
+
+        # Check capacity and auto-waitlist if full
+        is_waitlisted = False
+        if event_reg.max_registrations > 0:
+            current_count = event_reg.submissions.filter(is_waitlisted=False).count()
+            if current_count >= event_reg.max_registrations:
+                is_waitlisted = True
+
+        submission = serializer.save(
+            user=user,
+            is_waitlisted=is_waitlisted,
+            status='waitlist' if is_waitlisted else 'pending',
+        )
+
+        # Also create EventWaitlist entry for waitlisted submissions
+        if is_waitlisted:
+            position = EventWaitlist.objects.filter(event_registration=event_reg).count() + 1
+            EventWaitlist.objects.get_or_create(
+                user=user,
+                event_registration=event_reg,
+                defaults={'position': position},
+            )
+
+    @action(detail=True, methods=['get'], url_path='qr-ticket')
+    def qr_ticket(self, request, pk=None):
+        """Generate QR ticket data for a submission."""
+        import hashlib
+        submission = self.get_object()
+
+        # Ensure only the owner can view their ticket
+        if submission.user != request.user:
+            return Response({'detail': 'Not your submission.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Ensure QR hash exists
+        if not submission.qr_ticket_hash:
+            submission.generate_qr_hash()
+            EventSubmission.objects.filter(pk=submission.pk).update(qr_ticket_hash=submission.qr_ticket_hash)
+
+        event_reg = submission.event_registration
+        attendee_name = submission.proxy_name if submission.is_proxy else (
+            submission.user.first_name or submission.user.username
+        )
+
+        ticket_data = {
+            'ticket_id': f'TKT-{submission.id:06d}',
+            'submission_id': submission.id,
+            'event_name': event_reg.event_title,
+            'event_date': event_reg.event_date.isoformat() if event_reg.event_date else None,
+            'event_end_date': event_reg.event_end_date.isoformat() if event_reg.event_end_date else None,
+            'venue': event_reg.venue,
+            'venue_address': event_reg.venue_address,
+            'attendee_name': attendee_name,
+            'attendee_email': submission.proxy_email if submission.is_proxy else submission.user.email,
+            'status': submission.status,
+            'is_waitlisted': submission.is_waitlisted,
+            'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
+            'qr_data': f'{submission.id}:{submission.qr_ticket_hash}',
+            'qr_hash': submission.qr_ticket_hash,
+            'event_poster': event_reg.event_poster.url if event_reg.event_poster else None,
+        }
+        return Response(ticket_data)
+
+    @action(detail=True, methods=['post'], url_path='check-in')
+    def check_in(self, request, pk=None):
+        """Check in a submission using QR code data (admin/staff use)."""
+        submission = self.get_object()
+        qr_data = request.data.get('qr_data', '')
+
+        if not qr_data:
+            return Response({'detail': 'qr_data field is required.'}, status=400)
+
+        # Parse qr_data format: "submission_id:hash"
+        parts = qr_data.split(':')
+        if len(parts) != 2:
+            return Response({'detail': 'Invalid QR code format.'}, status=400)
+
+        qr_sub_id, qr_hash = parts
+        try:
+            qr_sub_id = int(qr_sub_id)
+        except ValueError:
+            return Response({'detail': 'Invalid QR code.'}, status=400)
+
+        if qr_sub_id != submission.id or qr_hash != submission.qr_ticket_hash:
+            return Response({'detail': 'QR code validation failed.'}, status=400)
+
+        if submission.checked_in_at:
+            return Response({
+                'detail': 'Already checked in.',
+                'checked_in_at': submission.checked_in_at.isoformat(),
+            }, status=400)
+
+        submission.checked_in_at = timezone.now()
+        submission.save(update_fields=['checked_in_at'])
+
+        # Also update EventCheckIn if exists
+        EventCheckIn.objects.filter(submission=submission).update(
+            checked_in=True,
+            checked_in_at=submission.checked_in_at,
+            checked_in_by=request.user,
+        )
+
+        return Response({
+            'message': 'Check-in successful.',
+            'checked_in_at': submission.checked_in_at.isoformat(),
+            'attendee': submission.user.first_name or submission.user.username,
+            'event': submission.event_registration.event_title,
+        })
 
     @action(detail=False, methods=['post'], url_path='register-proxy')
     def register_proxy(self, request):
@@ -2922,24 +3248,100 @@ def whats_new(request):
 
 @api_view(['GET', 'POST'])
 def event_comments(request, event_id):
-    """Get or post comments on an event."""
+    """Get or post comments on an event. Supports nested replies (1 level deep) and @mentions."""
+    import re
     event = get_object_or_404(Event, pk=event_id)
-    if request.method == 'GET':
-        comments = ArticleComment.objects.filter(
-            article__isnull=True
-        ).none()  # Use a generic approach
-        # Store event comments using content_type pattern
-        from django.contrib.contenttypes.models import ContentType
-        ct = ContentType.objects.get_for_model(Event)
-        comments_data = Reaction.objects.filter(
-            content_type=ct.model, content_id=event_id, reaction_type='comment'
-        ).order_by('-created_at').values('user__username', 'user__first_name', 'created_at')
-        return Response(list(comments_data))
 
+    if request.method == 'GET':
+        comments = EventComment.objects.filter(
+            event=event, parent__isnull=True, is_approved=True
+        ).select_related('user', 'user__profile').prefetch_related(
+            'replies', 'replies__user', 'replies__user__profile'
+        ).order_by('-created_at')
+        serializer = EventCommentSerializer(comments, many=True, context={'request': request})
+        return Response({
+            'count': comments.count(),
+            'results': serializer.data
+        })
+
+    # POST - create a comment
     if not request.user.is_authenticated:
         return Response({'error': 'Login required'}, status=401)
 
-    return Response({'message': 'Comment posted'}, status=201)
+    content = request.data.get('content', '').strip()
+    if not content:
+        return Response({'error': 'Content is required'}, status=400)
+
+    parent_id = request.data.get('parent')
+    parent = None
+    if parent_id:
+        parent = get_object_or_404(EventComment, pk=parent_id, event=event)
+        if parent.parent is not None:
+            parent = parent.parent
+
+    comment = EventComment.objects.create(
+        event=event, user=request.user, parent=parent, content=content,
+    )
+
+    # Parse @mentions
+    mention_pattern = re.compile(r'@(\w+)')
+    usernames = mention_pattern.findall(content)
+    if usernames:
+        mentioned_users = User.objects.filter(username__in=usernames)
+        for mu in mentioned_users:
+            if mu != request.user:
+                CommentMention.objects.get_or_create(comment=comment, mentioned_user=mu)
+                try:
+                    from .tasks import send_push_notification_async
+                    name = request.user.get_full_name() or request.user.username
+                    send_push_notification_async.delay(
+                        user_ids=[mu.id],
+                        title=f'{name} mentioned you',
+                        body=f'"{content[:80]}..." in {event.name}',
+                        data={'type': 'event_comment', 'event_id': str(event.id)}
+                    )
+                except Exception:
+                    pass
+
+    serializer = EventCommentSerializer(comment, context={'request': request})
+    return Response(serializer.data, status=201)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def event_comment_delete(request, event_id, comment_id):
+    """Delete own comment on an event."""
+    comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
+    if comment.user != request.user and not request.user.is_staff:
+        return Response({'error': 'Permission denied'}, status=403)
+    comment.delete()
+    return Response({'message': 'Comment deleted'}, status=204)
+
+
+@api_view(['GET'])
+def event_attendees(request, event_id):
+    """List attendees for event networking (name, badge, nationality only - no email/phone)."""
+    get_object_or_404(Event, pk=event_id)
+    submissions = EventSubmission.objects.filter(
+        status__in=['pending', 'approved']
+    )
+    attendee_users = User.objects.filter(
+        id__in=submissions.values_list('user_id', flat=True)
+    ).select_related('profile').distinct()
+    serializer = EventAttendeeSerializer(attendee_users, many=True, context={'request': request})
+    return Response({'count': attendee_users.count(), 'results': serializer.data})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_newsletter(request):
+    """Toggle newsletter subscription for the authenticated user."""
+    profile = request.user.profile
+    receives = request.data.get('receives_newsletter')
+    if receives is not None:
+        profile.receives_newsletter = bool(receives)
+        profile.save(update_fields=['receives_newsletter'])
+    return Response({'receives_newsletter': profile.receives_newsletter})
 
 
 # ══════════════════════════════════════════════════════════════
@@ -2965,3 +3367,207 @@ def generate_weekly_report(request):
         top_content={},
     )
     return Response(WeeklyReportSerializer(report).data, status=201)
+
+
+# ══════════════════════════════════════════════════════════════
+# Podcast ViewSet
+# ══════════════════════════════════════════════════════════════
+
+class PodcastViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: list and retrieve active podcast episodes."""
+    permission_classes = [AllowAny]
+    queryset = Podcast.objects.filter(is_active=True)
+    serializer_class = PodcastSerializer
+    pagination_class = PageNumberPagination
+
+
+# ══════════════════════════════════════════════════════════════
+# Event Agenda Items ViewSet
+# ══════════════════════════════════════════════════════════════
+
+class EventAgendaItemViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: list agenda items for events, filterable by event."""
+    permission_classes = [AllowAny]
+    serializer_class = EventAgendaItemSerializer
+
+    def get_queryset(self):
+        qs = EventAgendaItem.objects.select_related('speaker').all()
+        event_id = self.request.query_params.get('event')
+        if event_id:
+            qs = qs.filter(event_id=event_id)
+        return qs
+
+
+# ══════════════════════════════════════════════════════════════
+# Article Share Cards (#34) - OG meta tags for social sharing
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def article_share_card(request, pk):
+    """Return an HTML page with Open Graph meta tags for article sharing."""
+    from django.http import HttpResponse
+    import re
+
+    article = get_object_or_404(Article, pk=pk)
+
+    # Strip HTML tags from content for description
+    clean_content = re.sub(r'<[^>]+>', '', article.content)
+    description = clean_content[:160].strip()
+    if len(clean_content) > 160:
+        description += '...'
+
+    # Build absolute image URL
+    image_url = ''
+    if article.image:
+        image_url = request.build_absolute_uri(article.image.url)
+
+    share_url = f'https://burundi4africa.com/articles/{article.pk}/share/'
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{article.title}</title>
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{article.title}" />
+    <meta property="og:description" content="{description}" />
+    <meta property="og:image" content="{image_url}" />
+    <meta property="og:url" content="{share_url}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Burundi AU Chairmanship" />
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{article.title}" />
+    <meta name="twitter:description" content="{description}" />
+    <meta name="twitter:image" content="{image_url}" />
+
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+        }}
+        .header {{ text-align: center; padding: 20px 0; }}
+        .header img {{ max-width: 100%; border-radius: 12px; }}
+        h1 {{ font-size: 28px; line-height: 1.3; color: #1a1a1a; }}
+        .meta {{ color: #666; font-size: 14px; margin: 10px 0 20px; }}
+        .content {{ font-size: 16px; line-height: 1.7; }}
+        .cta {{
+            display: inline-block;
+            margin-top: 24px;
+            padding: 12px 24px;
+            background: #1EB53A;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        {"<img src='" + image_url + "' alt='" + article.title + "' />" if image_url else ""}
+    </div>
+    <h1>{article.title}</h1>
+    <div class="meta">By {article.author} | {article.publish_date.strftime('%B %d, %Y')}</div>
+    <div class="content">{clean_content[:500]}{"..." if len(clean_content) > 500 else ""}</div>
+    <a href="https://burundi4africa.com" class="cta">Read more in the app</a>
+</body>
+</html>"""
+
+    return HttpResponse(html, content_type='text/html')
+
+
+# ══════════════════════════════════════════════════════════════
+# Article Revisions (#40) - Content versioning with rollback
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def article_revisions(request, pk):
+    """List all revisions for an article."""
+    article = get_object_or_404(Article, pk=pk)
+    revisions = article.revisions.select_related('edited_by').order_by('-revision_number')
+    serializer = ArticleRevisionSerializer(revisions, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def article_revision_restore(request, pk, revision_id):
+    """Restore an article to a specific revision."""
+    article = get_object_or_404(Article, pk=pk)
+    revision = get_object_or_404(ArticleRevision, pk=revision_id, article=article)
+
+    # Create a new revision to preserve current state before restoring
+    current_max = article.revisions.aggregate(
+        max_num=models.Max('revision_number')
+    )['max_num'] or 0
+    ArticleRevision.objects.create(
+        article=article,
+        revision_number=current_max + 1,
+        title=article.title,
+        content=article.content,
+        edited_by=request.user,
+        change_summary=f'Auto-saved before restoring to revision {revision.revision_number}',
+    )
+
+    # Restore article to the selected revision
+    article.title = revision.title
+    article.content = revision.content
+    article.save()
+
+    return Response({
+        'detail': f'Article restored to revision {revision.revision_number}.',
+        'article': ArticleSerializer(article, context={'request': request}).data,
+    })
+
+
+# ══════════════════════════════════════════════════════════════
+# Translation Queue (#46) - EN->FR workflow
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def translation_queue(request):
+    """List all translation requests or create a new one."""
+    if request.method == 'GET':
+        status_filter = request.query_params.get('status')
+        qs = TranslationRequest.objects.select_related('assigned_to').all()
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        serializer = TranslationRequestSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    serializer = TranslationRequestSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAdminUser])
+def translation_queue_detail(request, pk):
+    """Get or update a specific translation request."""
+    tr = get_object_or_404(TranslationRequest, pk=pk)
+    if request.method == 'GET':
+        return Response(TranslationRequestSerializer(tr).data)
+
+    old_status = tr.status
+    serializer = TranslationRequestSerializer(tr, data=request.data, partial=True)
+    if serializer.is_valid():
+        # Auto-set completed_at when status changes to completed
+        if request.data.get('status') == 'completed' and old_status != 'completed':
+            serializer.save(completed_at=timezone.now())
+        else:
+            serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

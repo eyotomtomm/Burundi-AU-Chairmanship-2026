@@ -45,23 +45,25 @@ class EventInfoCard extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
-          // Date
-          if (event.eventDate != null)
+          // Date range for multi-day events
+          if (event.eventDate != null && event.isMultiDay) ...[
+            _infoRow(
+              Icons.calendar_today,
+              '${_formatShortDate(event.eventDate!)} - ${_formatShortDate(event.eventEndDate!)}',
+              isDark,
+            ),
+            const SizedBox(height: 6),
+            _infoRow(
+              Icons.date_range,
+              '${event.totalDays} days',
+              isDark,
+            ),
+          ] else if (event.eventDate != null)
             _infoRow(
               Icons.calendar_today,
               _formatFullDate(event.eventDate!),
               isDark,
             ),
-
-          // End date
-          if (event.eventEndDate != null) ...[
-            const SizedBox(height: 10),
-            _infoRow(
-              Icons.event_available,
-              'Until ${_formatFullDate(event.eventEndDate!)}',
-              isDark,
-            ),
-          ],
 
           // Venue
           if (venue.isNotEmpty) ...[
@@ -119,6 +121,12 @@ class EventInfoCard extends StatelessWidget {
     final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
     return '${months[date.month - 1]} ${date.day}, ${date.year} at $hour:${date.minute.toString().padLeft(2, '0')} $amPm';
+  }
+
+  String _formatShortDate(DateTime date) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   void _openDirections(String address) {

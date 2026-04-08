@@ -279,4 +279,8 @@ urlpatterns = [
     path('webhooks/<int:pk>/toggle/', views.webhook_toggle, name='webhook_toggle'),
     path('webhooks/<int:pk>/logs/', views.webhook_logs, name='webhook_logs'),
     path('webhooks/<int:pk>/test/', views.webhook_test, name='webhook_test'),
+
+    # Translation Queue
+    path('translation-queue/', views.translation_queue_list, name='translation_queue_list'),
+    path('translation-queue/<int:pk>/update/', views.translation_queue_update, name='translation_queue_update'),
 ]

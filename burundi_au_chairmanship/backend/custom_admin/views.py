@@ -37,6 +37,7 @@ from core.models import (
     UserSegment, UserSegmentMembership,
     AdminNotification,
     ABTest, ABTestParticipant,
+    TranslationRequest,
 )
 
 
@@ -308,6 +309,9 @@ def articles_list(request):
 def article_create(request):
     categories = Category.objects.all()
     if request.method == 'POST':
+        is_draft = request.POST.get('save_as_draft') == 'on'
+        scheduled_publish_at = request.POST.get('scheduled_publish_at') or None
+        expires_at = request.POST.get('expires_at') or None
         Article.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -318,8 +322,14 @@ def article_create(request):
             author=request.POST.get('author', 'Admin'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
             is_featured=request.POST.get('is_featured') == 'on',
+            is_draft=is_draft,
+            scheduled_publish_at=scheduled_publish_at,
+            expires_at=expires_at,
         )
-        messages.success(request, 'Article created successfully!')
+        if is_draft:
+            messages.success(request, 'Article saved as draft!')
+        else:
+            messages.success(request, 'Article created successfully!')
         return redirect('custom_admin:articles_list')
     return render(request, 'custom_admin/articles/form.html', {'categories': categories, 'action': 'Create'})
 
@@ -330,6 +340,21 @@ def article_edit(request, pk):
     article = get_object_or_404(Article, pk=pk)
     categories = Category.objects.all()
     if request.method == 'POST':
+        # Auto-create a revision before saving changes (content versioning)
+        from core.models import ArticleRevision
+        from django.db.models import Max
+        current_max = article.revisions.aggregate(
+            max_num=Max('revision_number')
+        )['max_num'] or 0
+        ArticleRevision.objects.create(
+            article=article,
+            revision_number=current_max + 1,
+            title=article.title,
+            content=article.content,
+            edited_by=request.user,
+            change_summary=request.POST.get('change_summary', ''),
+        )
+
         article.title = request.POST.get('title')
         article.title_fr = request.POST.get('title_fr', '')
         article.content = request.POST.get('content')
@@ -339,8 +364,14 @@ def article_edit(request, pk):
         if request.FILES.get('image'):
             article.image = request.FILES.get('image')
         article.is_featured = request.POST.get('is_featured') == 'on'
+        article.is_draft = request.POST.get('save_as_draft') == 'on'
+        article.scheduled_publish_at = request.POST.get('scheduled_publish_at') or None
+        article.expires_at = request.POST.get('expires_at') or None
         article.save()
-        messages.success(request, 'Article updated successfully!')
+        if article.is_draft:
+            messages.success(request, 'Article saved as draft!')
+        else:
+            messages.success(request, 'Article updated successfully!')
         return redirect('custom_admin:articles_list')
     return render(request, 'custom_admin/articles/form.html', {
         'article': article, 'categories': categories, 'action': 'Edit'
@@ -456,10 +487,15 @@ def event_create(request):
             event_date=request.POST.get('event_date'),
             image=request.FILES.get('image'),
             is_active=request.POST.get('is_active') == 'on',
+            recurrence_type=request.POST.get('recurrence_type', 'none'),
+            recurrence_end_date=request.POST.get('recurrence_end_date') or None,
         )
         messages.success(request, 'Event created successfully!')
         return redirect('custom_admin:events_list')
-    return render(request, 'custom_admin/events/form.html', {'action': 'Create'})
+    return render(request, 'custom_admin/events/form.html', {
+        'action': 'Create',
+        'recurrence_choices': Event.RECURRENCE_CHOICES,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -478,10 +514,16 @@ def event_edit(request, pk):
         if request.FILES.get('image'):
             event.image = request.FILES.get('image')
         event.is_active = request.POST.get('is_active') == 'on'
+        event.recurrence_type = request.POST.get('recurrence_type', 'none')
+        event.recurrence_end_date = request.POST.get('recurrence_end_date') or None
         event.save()
         messages.success(request, 'Event updated successfully!')
         return redirect('custom_admin:events_list')
-    return render(request, 'custom_admin/events/form.html', {'event': event, 'action': 'Edit'})
+    return render(request, 'custom_admin/events/form.html', {
+        'event': event,
+        'action': 'Edit',
+        'recurrence_choices': Event.RECURRENCE_CHOICES,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -524,6 +566,13 @@ def notifications_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def notification_create(request):
     if request.method == 'POST':
+        # Parse scheduled_at datetime
+        scheduled_at = None
+        scheduled_at_str = request.POST.get('scheduled_at', '').strip()
+        if scheduled_at_str:
+            from django.utils.dateparse import parse_datetime
+            scheduled_at = parse_datetime(scheduled_at_str)
+
         notification = Notification.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -541,7 +590,16 @@ def notification_create(request):
             target_age_max=int(request.POST['target_age_max']) if request.POST.get('target_age_max') else None,
             target_verified_only=request.POST.get('target_verified_only') == 'on',
             target_badge_type=request.POST.get('target_badge_type', ''),
+            scheduled_at=scheduled_at,
         )
+        # If scheduled for the future, don't send immediately
+        if scheduled_at and scheduled_at > timezone.now():
+            messages.success(
+                request,
+                f'Notification scheduled for {scheduled_at.strftime("%b %d, %Y %H:%M")}.'
+            )
+            return redirect('custom_admin:notifications_list')
+
         # Send push notification if requested
         send_push = request.POST.get('send_push') == 'on'
         if send_push and notification.is_active:
@@ -626,7 +684,7 @@ def notification_delete(request, pk):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def notification_send_push(request, pk):
-    """Send (or resend) a push notification for an existing notification."""
+    """Send (or resend) a push notification for an existing notification, with optional SMS."""
     notification = get_object_or_404(Notification, pk=pk)
     if not notification.is_active:
         messages.error(request, 'Cannot send push for an inactive notification. Activate it first.')
@@ -634,13 +692,29 @@ def notification_send_push(request, pk):
     try:
         from core.push_service import send_push_notification
         success, failure = send_push_notification(notification)
-        messages.success(
-            request,
+        push_msg = (
             f'Push sent to {success} device(s).'
             + (f' ({failure} failed)' if failure else '')
         )
     except Exception as e:
-        messages.error(request, f'Push notification failed: {e}')
+        push_msg = f'Push notification failed: {e}'
+
+    # Also send SMS if requested
+    send_sms_flag = request.POST.get('send_sms') == 'on'
+    sms_msg = ''
+    if send_sms_flag:
+        try:
+            from core.utils import send_sms_to_enabled_users
+            sms_success, sms_failure = send_sms_to_enabled_users(
+                notification.title, notification.message
+            )
+            sms_msg = f' | SMS sent to {sms_success} user(s).'
+            if sms_failure:
+                sms_msg += f' ({sms_failure} SMS failed)'
+        except Exception as e:
+            sms_msg = f' | SMS failed: {e}'
+
+    messages.success(request, push_msg + sms_msg)
     return redirect('custom_admin:notifications_list')
 
 
@@ -5979,3 +6053,62 @@ def webhook_test(request, pk):
         messages.error(request, f'Test webhook failed: {error}')
 
     return redirect('custom_admin:webhook_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  TRANSLATION QUEUE (#46)
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def translation_queue_list(request):
+    """Admin view for the translation queue."""
+    status_filter = request.GET.get('status')
+    qs = TranslationRequest.objects.select_related('assigned_to').all()
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    total = TranslationRequest.objects.count()
+    pending = TranslationRequest.objects.filter(status='pending').count()
+    in_progress = TranslationRequest.objects.filter(status='in_progress').count()
+    completed = TranslationRequest.objects.filter(status='completed').count()
+
+    paginator = Paginator(qs, 20)
+    page = request.GET.get('page')
+    items = paginator.get_page(page)
+
+    staff_users = User.objects.filter(is_staff=True).order_by('username')
+
+    return render(request, 'custom_admin/translation_queue/list.html', {
+        'items': items,
+        'total': total,
+        'pending': pending,
+        'in_progress': in_progress,
+        'completed': completed,
+        'current_filter': status_filter or 'all',
+        'staff_users': staff_users,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def translation_queue_update(request, pk):
+    """Update a translation request status/assignment."""
+    tr = get_object_or_404(TranslationRequest, pk=pk)
+    new_status = request.POST.get('status')
+    assigned_to_id = request.POST.get('assigned_to')
+    notes = request.POST.get('notes', '')
+
+    if new_status:
+        tr.status = new_status
+        if new_status == 'completed':
+            tr.completed_at = timezone.now()
+    if assigned_to_id:
+        tr.assigned_to_id = int(assigned_to_id) if assigned_to_id else None
+    if notes:
+        tr.notes = notes
+    tr.save()
+
+    messages.success(request, f'Translation request #{tr.pk} updated.')
+    return redirect('custom_admin:translation_queue_list')

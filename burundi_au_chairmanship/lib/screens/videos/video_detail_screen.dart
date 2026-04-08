@@ -33,11 +33,27 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   bool _isLiked = false;
   int _likeCount = 0;
 
+  // Chapters
+  List<Map<String, dynamic>> _chapters = [];
+
+  // Subtitles
+  List<Map<String, dynamic>> _subtitles = [];
+  bool _subtitlesEnabled = false;
+
   @override
   void initState() {
     super.initState();
     _isLiked = widget.video['is_liked'] == true;
     _likeCount = widget.video['like_count'] ?? 0;
+    // Parse chapters and subtitles from video data
+    if (widget.video['chapters'] != null) {
+      _chapters = List<Map<String, dynamic>>.from(widget.video['chapters']);
+    }
+    if (widget.video['subtitles'] != null) {
+      _subtitles = List<Map<String, dynamic>>.from(widget.video['subtitles']);
+      // Auto-enable if there's a default subtitle
+      _subtitlesEnabled = _subtitles.any((s) => s['is_default'] == true);
+    }
     _initPlayer();
   }
 
@@ -176,6 +192,98 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _seekToChapter(int timestampSeconds) {
+    final duration = Duration(seconds: timestampSeconds);
+    if (_videoController != null) {
+      _videoController!.seekTo(duration);
+      if (!_videoController!.value.isPlaying) {
+        _videoController!.play();
+      }
+    } else if (_youtubeController != null) {
+      _youtubeController!.seekTo(duration);
+    }
+  }
+
+  String _formatTimestamp(int totalSeconds) {
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildChaptersList(bool isDark) {
+    if (_chapters.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Icon(Icons.list_rounded, size: 20, color: AppColors.auGold),
+            const SizedBox(width: 8),
+            Text(
+              'Chapters',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.lightText,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(_chapters.length, (index) {
+          final chapter = _chapters[index];
+          final timestamp = chapter['timestamp_seconds'] as int? ?? 0;
+          final title = chapter['title'] as String? ?? '';
+          return InkWell(
+            onTap: () => _seekToChapter(timestamp),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.auGold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _formatTimestamp(timestamp),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.auGold,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? AppColors.darkText : AppColors.lightText,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.play_circle_outline_rounded,
+                    size: 20,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
   }
 
   Widget _buildErrorWidget(String message) {
@@ -355,6 +463,41 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             ),
                           ),
                         ],
+                        // Subtitle toggle button
+                        if (_subtitles.isNotEmpty) ...[
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _subtitlesEnabled = !_subtitlesEnabled;
+                              });
+                            },
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _subtitlesEnabled
+                                      ? Icons.closed_caption_rounded
+                                      : Icons.closed_caption_off_rounded,
+                                  size: 20,
+                                  color: _subtitlesEnabled
+                                      ? AppColors.auGold
+                                      : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _subtitlesEnabled ? 'CC ON' : 'CC OFF',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _subtitlesEnabled
+                                        ? AppColors.auGold
+                                        : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
 
@@ -381,6 +524,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         ),
                       ),
                     ],
+
+                    // Chapters list
+                    _buildChaptersList(isDark),
                   ],
                 ),
               ),

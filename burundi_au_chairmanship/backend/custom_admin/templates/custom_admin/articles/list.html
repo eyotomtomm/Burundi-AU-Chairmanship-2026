@@ -114,7 +114,22 @@
             </td>
             <td class="py-4 px-6 text-on-surface-variant">{{ article.author }}</td>
             <td class="py-4 px-6">
-              {% if article.is_featured %}
+              {% if article.is_draft %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                <span class="material-symbols-outlined text-sm">draft</span>
+                Draft
+              </span>
+              {% elif article.is_scheduled %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span class="material-symbols-outlined text-sm">schedule</span>
+                Scheduled
+              </span>
+              {% elif article.is_expired %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                <span class="material-symbols-outlined text-sm">event_busy</span>
+                Expired
+              </span>
+              {% elif article.is_featured %}
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-tertiary-container text-on-tertiary-container">
                 <span class="material-symbols-outlined text-sm">star</span>
                 Featured
@@ -122,7 +137,7 @@
               {% else %}
               <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-surface-container text-on-surface-variant">
                 <span class="material-symbols-outlined text-sm">article</span>
-                Regular
+                Published
               </span>
               {% endif %}
             </td>

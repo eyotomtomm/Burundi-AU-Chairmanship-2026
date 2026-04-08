@@ -42,6 +42,7 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   bool _requiresEmailVerification = false;
   bool _hasInitialized = false; // Guard against premature sign-out during startup
+  bool _receivesNewsletter = false;
 
   bool get isAuthenticated => _isAuthenticated;
   int? get userId => _userId;
@@ -62,6 +63,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get requiresEmailVerification => _userEmail?.toLowerCase() == 'apple.review@burundi4africa.com' ? false : _requiresEmailVerification;
+  bool get receivesNewsletter => _receivesNewsletter;
 
   AuthProvider() {
     _checkAuthStatus();
@@ -119,6 +121,7 @@ class AuthProvider extends ChangeNotifier {
     _verificationTitle = prefs.getString('user_verification_title');
     _verificationRole = prefs.getString('user_verification_role');
     _verificationName = prefs.getString('user_verification_name');
+    _receivesNewsletter = prefs.getBool('user_receives_newsletter') ?? false;
   }
 
   /// Check if user is already authenticated
@@ -676,6 +679,7 @@ class AuthProvider extends ChangeNotifier {
     final verificationTitle = user['verification_title'] as String?;
     final verificationRole = user['verification_role'] as String?;
     final verificationName = user['verification_name'] as String?;
+    final receivesNewsletter = user['receives_newsletter'] ?? false;
 
     // Profile picture: can be in top-level or nested in profile
     String? profilePic = user['profile_picture'] as String?;
@@ -734,6 +738,23 @@ class AuthProvider extends ChangeNotifier {
     _verificationTitle = verificationTitle;
     _verificationRole = verificationRole;
     _verificationName = verificationName;
+    _receivesNewsletter = receivesNewsletter;
+    await prefs.setBool('user_receives_newsletter', receivesNewsletter);
+  }
+
+  /// Toggle newsletter subscription
+  Future<bool> toggleNewsletter(bool receives) async {
+    try {
+      await _api.toggleNewsletter(receives);
+      _receivesNewsletter = receives;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('user_receives_newsletter', receives);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      if (kDebugMode) print('Failed to toggle newsletter: $e');
+      return false;
+    }
   }
 
   /// Clear user data from SharedPreferences and secure storage

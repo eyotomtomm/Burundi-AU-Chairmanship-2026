@@ -91,6 +91,12 @@ class UserProfile(models.Model):
     government_verified_at = models.DateTimeField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True, help_text='When admin approved verification')
 
+    # SMS notification fields
+    sms_enabled = models.BooleanField(
+        default=False,
+        help_text='Enable SMS notifications for VIP/Government users'
+    )
+
     # Account status fields
     is_deactivated = models.BooleanField(
         default=False,
@@ -106,6 +112,9 @@ class UserProfile(models.Model):
         null=True, blank=True,
         help_text='Date when account will be permanently deleted'
     )
+
+    # Newsletter preference
+    receives_newsletter = models.BooleanField(default=True, help_text='User opted in for weekly newsletter')
 
     # Device tracking
     device_type = models.CharField(max_length=50, blank=True, help_text='e.g. iPhone 15, Samsung Galaxy S24')
@@ -298,16 +307,41 @@ class Article(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    scheduled_publish_at = models.DateTimeField(null=True, blank=True, help_text='Schedule article for future publication. If set and in the future, article is hidden from public API.')
+    expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-archive article after this date. Expired articles are hidden from public API but remain in the database.')
+    is_draft = models.BooleanField(default=False, help_text='Draft articles are hidden from the public API until published.')
 
     class Meta:
         ordering = ['-publish_date']
         indexes = [
             models.Index(fields=['-publish_date']),
             models.Index(fields=['is_featured', '-publish_date']),
+            models.Index(fields=['is_draft', '-publish_date']),
         ]
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_scheduled(self):
+        """Check if article is scheduled for future publication."""
+        if self.scheduled_publish_at is None:
+            return False
+        from django.utils import timezone
+        return self.scheduled_publish_at > timezone.now()
+
+    @property
+    def is_expired(self):
+        """Check if article has expired."""
+        if self.expires_at is None:
+            return False
+        from django.utils import timezone
+        return self.expires_at < timezone.now()
+
+    @property
+    def is_publicly_visible(self):
+        """Check if article should be visible in public API."""
+        return not self.is_draft and not self.is_scheduled and not self.is_expired
 
     @property
     def thumbnail_url(self):
@@ -415,6 +449,26 @@ class Event(models.Model):
     event_date = models.DateTimeField()
     image = models.ImageField(upload_to='events/', blank=True, validators=[validate_image_file])
     is_active = models.BooleanField(default=True, help_text='When off, event is hidden from the app')
+
+    # Recurrence fields
+    RECURRENCE_CHOICES = [
+        ('none', 'None'),
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+    ]
+    recurrence_type = models.CharField(
+        max_length=10,
+        choices=RECURRENCE_CHOICES,
+        default='none',
+        help_text='Recurrence pattern for the event'
+    )
+    recurrence_end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='When the recurring series ends'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -817,6 +871,11 @@ class EventSubmission(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     admin_notes = models.TextField(blank=True, help_text='Internal notes from admin')
 
+    # Waitlist & check-in fields
+    is_waitlisted = models.BooleanField(default=False, help_text='True if placed on waitlist due to full capacity')
+    checked_in_at = models.DateTimeField(null=True, blank=True, help_text='When attendee was checked in via QR')
+    qr_ticket_hash = models.CharField(max_length=64, blank=True, db_index=True, help_text='SHA-256 hash for QR ticket validation')
+
     submitted_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(blank=True, null=True)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_submissions')
@@ -832,6 +891,20 @@ class EventSubmission(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.event_registration.event_title}"
+
+    def generate_qr_hash(self):
+        """Generate a unique hash for QR ticket validation."""
+        import hashlib
+        raw = f"{self.id}:{self.user_id}:{self.event_registration_id}:{self.submitted_at}"
+        self.qr_ticket_hash = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        return self.qr_ticket_hash
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Auto-generate QR hash after first save (needs pk)
+        if not self.qr_ticket_hash and self.pk:
+            self.generate_qr_hash()
+            EventSubmission.objects.filter(pk=self.pk).update(qr_ticket_hash=self.qr_ticket_hash)
 
 
 class Notification(models.Model):
@@ -922,6 +995,13 @@ class Notification(models.Model):
         choices=[('', 'All Languages'), ('en', 'English Only'), ('fr', 'French Only')],
         default='',
         help_text='Send only to users with this language preference'
+    )
+
+    # Scheduling
+    scheduled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Schedule notification for a future date/time. Leave blank to send immediately.'
     )
 
     # Push notification tracking
@@ -1261,6 +1341,48 @@ class VideoLike(models.Model):
 
     def __str__(self):
         return f"{self.user.username} likes {self.video.title[:30]}"
+
+
+class VideoChapter(models.Model):
+    """Timestamp markers/chapters within a video."""
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='chapters')
+    title = models.CharField(max_length=200)
+    timestamp_seconds = models.PositiveIntegerField(help_text='Chapter start time in seconds')
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Video Chapter'
+        verbose_name_plural = 'Video Chapters'
+
+    def __str__(self):
+        minutes = self.timestamp_seconds // 60
+        seconds = self.timestamp_seconds % 60
+        return f"{minutes:02d}:{seconds:02d} - {self.title}"
+
+
+class VideoSubtitle(models.Model):
+    """Multi-language subtitle/caption files for videos."""
+    LANGUAGE_CHOICES = [
+        ('en', 'English'),
+        ('fr', 'French'),
+    ]
+
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='subtitles')
+    language = models.CharField(max_length=5, choices=LANGUAGE_CHOICES)
+    subtitle_file = models.FileField(
+        upload_to='subtitles/',
+        help_text='Upload .srt or .vtt subtitle file'
+    )
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Video Subtitle'
+        verbose_name_plural = 'Video Subtitles'
+        unique_together = ('video', 'language')
+
+    def __str__(self):
+        return f"{self.video.title[:30]} - {self.get_language_display()}"
 
 
 class SocialMediaLink(models.Model):
@@ -2230,8 +2352,8 @@ class EventPhoto(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='user_photos', null=True, blank=True)
     event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='user_photos', null=True, blank=True)
     image = models.ImageField(upload_to='event_photos/', validators=[validate_image_file])
-    caption = models.CharField(max_length=300, blank=True)
-    is_approved = models.BooleanField(default=False, help_text='Admin must approve before public display')
+    caption = models.CharField(max_length=200, blank=True)
+    is_approved = models.BooleanField(default=True, help_text='Auto-approved; admin can revoke')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -3277,6 +3399,118 @@ class AdminNotification(models.Model):
         return self.created_at.strftime('%b %d')
 
 
+# ══════════════════════════════════════════════════════════════
+# Content Versioning - Article Revisions
+# ══════════════════════════════════════════════════════════════
+
+class ArticleRevision(models.Model):
+    """Track revisions of articles with rollback capability."""
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='revisions')
+    revision_number = models.PositiveIntegerField()
+    title = models.CharField(max_length=300)
+    content = models.TextField()
+    edited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    change_summary = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        unique_together = ('article', 'revision_number')
+        ordering = ['-revision_number']
+        verbose_name = 'Article Revision'
+        verbose_name_plural = 'Article Revisions'
+
+    def __str__(self):
+        return f"{self.article.title[:30]} - Revision {self.revision_number}"
+
+
+# ══════════════════════════════════════════════════════════════
+# Content Translation Queue
+# ══════════════════════════════════════════════════════════════
+
+class TranslationRequest(models.Model):
+    """Translation workflow queue for EN->FR content."""
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('event', 'Event'),
+        ('feature_card', 'Feature Card'),
+        ('notification', 'Notification'),
+        ('magazine', 'Magazine'),
+        ('resource', 'Resource'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('rejected', 'Rejected'),
+    ]
+
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    object_id = models.PositiveIntegerField()
+    source_language = models.CharField(max_length=5, default='en')
+    target_language = models.CharField(max_length=5, default='fr')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    assigned_to = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='translation_assignments'
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Translation Request'
+        verbose_name_plural = 'Translation Requests'
+
+    def __str__(self):
+        return f"{self.content_type}:{self.object_id} ({self.source_language}->{self.target_language}) [{self.status}]"
+
+
+# ── Podcast Model ─────────────────────────────────────────────
+class Podcast(models.Model):
+    """Audio podcast episodes with cover art and metadata."""
+    title = models.CharField(max_length=300)
+    title_fr = models.CharField(max_length=300, blank=True)
+    description = models.TextField(blank=True)
+    description_fr = models.TextField(blank=True)
+    audio_file = models.FileField(upload_to='podcasts/')
+    cover_image = models.ImageField(upload_to='podcast_covers/', null=True, blank=True, validators=[validate_image_file])
+    duration_seconds = models.PositiveIntegerField(default=0)
+    episode_number = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Podcast'
+        verbose_name_plural = 'Podcasts'
+
+    def __str__(self):
+        return f"Ep. {self.episode_number}: {self.title}"
+
+
+# ── Event Agenda Item Model ───────────────────────────────────
+class EventAgendaItem(models.Model):
+    """Individual agenda items/sessions within an event, supporting multi-track schedules."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='agenda_items')
+    title = models.CharField(max_length=300)
+    description = models.TextField(blank=True)
+    speaker = models.ForeignKey(EventSpeaker, on_delete=models.SET_NULL, null=True, blank=True, related_name='agenda_items')
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    room = models.CharField(max_length=200, blank=True)
+    track = models.CharField(max_length=200, blank=True, help_text='Track name for multi-track events')
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['start_time', 'order']
+        verbose_name = 'Event Agenda Item'
+        verbose_name_plural = 'Event Agenda Items'
+
+    def __str__(self):
+        return f"{self.event.name} - {self.title}"
+
+
 # ── Auto-optimize images on upload ────────────────────────────
 def _auto_optimize_image(sender, instance, **kwargs):
     """Convert uploaded images to WebP on save for all core models."""
@@ -3298,6 +3532,64 @@ def _auto_optimize_image(sender, instance, **kwargs):
             pass
 
 
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Social & Engagement
+# ══════════════════════════════════════════════════════════════
+
+class EventComment(models.Model):
+    """User comments on events for discussions."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_comments_authored')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    content = models.TextField()
+    is_approved = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Event Comment'
+        verbose_name_plural = 'Event Comments'
+        indexes = [
+            models.Index(fields=['event', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} on {self.event.name[:30]}"
+
+
+class CommentMention(models.Model):
+    """Tracks @mentions in event comments."""
+    comment = models.ForeignKey(EventComment, on_delete=models.CASCADE, related_name='mentions')
+    mentioned_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comment_mentions')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('comment', 'mentioned_user')
+        verbose_name = 'Comment Mention'
+        verbose_name_plural = 'Comment Mentions'
+
+    def __str__(self):
+        return f"@{self.mentioned_user.username} in comment #{self.comment_id}"
+
+
+class NewsletterEdition(models.Model):
+    """Weekly newsletter editions sent to subscribers."""
+    subject = models.CharField(max_length=300)
+    body_html = models.TextField()
+    sent_at = models.DateTimeField(null=True, blank=True)
+    recipient_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Newsletter Edition'
+        verbose_name_plural = 'Newsletter Editions'
+
+    def __str__(self):
+        status = f"Sent to {self.recipient_count}" if self.sent_at else "Draft"
+        return f"{self.subject} ({status})"
+
+
 # Connect to all core models with image fields
 from django.db.models.signals import pre_save  # noqa: E402
 for _model in [
@@ -3307,6 +3599,6 @@ for _model in [
     VerificationRequest, WeatherCity, Popup, UserProfile,
     # New models with image fields
     ArticleDraft, ArticleSeries, EventSpeaker, EventPhoto,
-    DirectMessage, ContactDirectory, OnboardingStep,
+    DirectMessage, ContactDirectory, OnboardingStep, Podcast,
 ]:
     pre_save.connect(_auto_optimize_image, sender=_model)

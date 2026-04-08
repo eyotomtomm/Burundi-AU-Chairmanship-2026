@@ -26,6 +26,8 @@ class EventRegistrationModel {
   final String? userSubmissionStatus;
   final bool isRegistrationOpen;
   final int currentRegistrationCount;
+  final int? spotsRemaining;
+  final int? userSubmissionId;
 
   EventRegistrationModel({
     required this.id,
@@ -53,8 +55,10 @@ class EventRegistrationModel {
     this.formFields = const [],
     this.hasRegistered = false,
     this.userSubmissionStatus,
+    this.userSubmissionId,
     this.isRegistrationOpen = true,
     this.currentRegistrationCount = 0,
+    this.spotsRemaining,
   });
 
   factory EventRegistrationModel.fromJson(Map<String, dynamic> json) {
@@ -87,8 +91,10 @@ class EventRegistrationModel {
           [],
       hasRegistered: json['has_registered'] as bool? ?? false,
       userSubmissionStatus: json['user_submission_status'] as String?,
+      userSubmissionId: json['user_submission_id'] as int?,
       isRegistrationOpen: json['is_registration_open'] as bool? ?? true,
       currentRegistrationCount: json['current_registration_count'] as int? ?? 0,
+      spotsRemaining: json['spots_remaining'] as int?,
     );
   }
 
@@ -114,6 +120,26 @@ class EventRegistrationModel {
     if (eventDate == null) return false;
     return DateTime.now().isAfter(eventDate!);
   }
+
+  /// Returns the total number of days for multi-day events, or 1 for single-day.
+  int get totalDays {
+    if (eventDate == null || eventEndDate == null) return 1;
+    final days = eventEndDate!.difference(eventDate!).inDays;
+    return days > 0 ? days + 1 : 1;
+  }
+
+  /// Returns the current day number (1-based) if the event is ongoing, or null.
+  int? get currentDayNumber {
+    if (eventDate == null || eventEndDate == null) return null;
+    if (totalDays <= 1) return null;
+    final now = DateTime.now();
+    if (now.isBefore(eventDate!)) return null;
+    if (now.isAfter(eventEndDate!)) return null;
+    return now.difference(eventDate!).inDays + 1;
+  }
+
+  /// True if this is a multi-day event.
+  bool get isMultiDay => totalDays > 1;
 }
 
 class RegistrationFormField {

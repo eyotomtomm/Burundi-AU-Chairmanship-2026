@@ -20,6 +20,9 @@ from .models import (
     EmailTemplate, Webhook, ScheduledMaintenance, ABTest,
     ContentAnalytics, EngagementHeatmap, WeeklyReport, TranslationEntry, AppRelease,
     AuditLogEntry, AccountMergeRequest, FunnelStep,
+    VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
+    EventComment, CommentMention, NewsletterEdition,
+    Podcast, EventAgendaItem,
 )
 
 
@@ -53,7 +56,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ['phone_number', 'gender', 'nationality', 'date_of_birth', 'profile_picture', 'is_email_verified',
                   'is_government_official', 'is_verified', 'badge_type', 'verification_requested_at',
-                  'email_verified_at', 'government_verified_at', 'verified_at']
+                  'email_verified_at', 'government_verified_at', 'verified_at', 'receives_newsletter']
         read_only_fields = ['is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
                             'email_verified_at', 'government_verified_at', 'verified_at',
                             'verification_requested_at']
@@ -246,7 +249,8 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ['id', 'name', 'name_fr', 'description', 'description_fr',
-                  'address', 'latitude', 'longitude', 'event_date', 'image']
+                  'address', 'latitude', 'longitude', 'event_date', 'image',
+                  'recurrence_type', 'recurrence_end_date']
 
 
 class LiveFeedSerializer(serializers.ModelSerializer):
@@ -410,16 +414,31 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
                   'created_at', 'is_featured', 'display_order', 'photos', 'is_liked']
 
 
+class VideoChapterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoChapter
+        fields = ['id', 'title', 'timestamp_seconds', 'order']
+
+
+class VideoSubtitleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoSubtitle
+        fields = ['id', 'language', 'subtitle_file', 'is_default']
+
+
 class VideoSerializer(serializers.ModelSerializer):
     # Return either the uploaded file URL or the external video_url
     video_url = serializers.SerializerMethodField()
     is_liked = serializers.BooleanField(read_only=True, default=False)
+    chapters = VideoChapterSerializer(many=True, read_only=True)
+    subtitles = VideoSubtitleSerializer(many=True, read_only=True)
 
     class Meta:
         model = Video
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'video_url', 'thumbnail', 'duration', 'category', 'view_count',
-                  'like_count', 'publish_date', 'is_featured', 'is_liked']
+                  'like_count', 'publish_date', 'is_featured', 'is_liked',
+                  'chapters', 'subtitles']
 
     def get_video_url(self, obj):
         """Return video_file URL if exists, otherwise return video_url"""
@@ -633,8 +652,10 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
     form_fields = RegistrationFormFieldSerializer(many=True, read_only=True)
     has_registered = serializers.SerializerMethodField()
     user_submission_status = serializers.SerializerMethodField()
+    user_submission_id = serializers.SerializerMethodField()
     is_registration_open = serializers.SerializerMethodField()
     current_registration_count = serializers.SerializerMethodField()
+    spots_remaining = serializers.SerializerMethodField()
 
     class Meta:
         model = EventRegistration
@@ -647,7 +668,9 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
                   'confirmation_message', 'confirmation_message_fr',
                   'is_active', 'order',
                   'form_fields', 'has_registered', 'user_submission_status',
-                  'is_registration_open', 'current_registration_count']
+                  'user_submission_id',
+                  'is_registration_open', 'current_registration_count',
+                  'spots_remaining']
 
     def get_has_registered(self, obj):
         request = self.context.get('request')
@@ -678,6 +701,21 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
     def get_current_registration_count(self, obj):
         return obj.submissions.count()
 
+    def get_user_submission_id(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            submission = obj.submissions.filter(user=request.user, is_proxy=False).first()
+            if submission:
+                return submission.id
+        return None
+
+    def get_spots_remaining(self, obj):
+        if obj.max_registrations <= 0:
+            return None  # Unlimited
+        count = obj.submissions.filter(is_waitlisted=False).count()
+        remaining = obj.max_registrations - count
+        return max(0, remaining)
+
 
 class EventSubmissionSerializer(serializers.ModelSerializer):
     event_title = serializers.CharField(source='event_registration.event_title', read_only=True)
@@ -689,9 +727,10 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
         fields = ['id', 'event_registration', 'event_title', 'user', 'user_name', 'user_email',
                   'form_data', 'uploaded_files',
                   'is_proxy', 'proxy_name', 'proxy_email', 'proxy_phone',
-                  'status',
+                  'status', 'is_waitlisted', 'checked_in_at', 'qr_ticket_hash',
                   'submitted_at', 'reviewed_at', 'reviewed_by']
-        read_only_fields = ['id', 'user', 'submitted_at', 'reviewed_at', 'reviewed_by']
+        read_only_fields = ['id', 'user', 'is_waitlisted', 'checked_in_at', 'qr_ticket_hash',
+                            'submitted_at', 'reviewed_at', 'reviewed_by']
 
 
 class ProxyRegistrationSerializer(serializers.Serializer):
@@ -1244,15 +1283,132 @@ class AccountMergeRequestSerializer(serializers.ModelSerializer):
 
 
 class EventCommentSerializer(serializers.ModelSerializer):
+    """Serializer for event comments with nested replies and @mention highlighting."""
     user_name = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+
     class Meta:
-        model = ArticleComment  # reusing for events too
-        fields = ['id', 'user', 'user_name', 'content', 'created_at']
+        from .models import EventComment
+        model = EventComment
+        fields = ['id', 'event', 'user_id', 'user_name', 'profile_picture', 'badge_type',
+                  'parent', 'content', 'is_approved', 'created_at', 'replies', 'reply_count']
+        read_only_fields = ['id', 'user_id', 'user_name', 'profile_picture', 'badge_type',
+                            'is_approved', 'created_at', 'replies', 'reply_count']
+
     def get_user_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
+
+    def get_profile_picture(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.user.profile.profile_picture.url)
+        return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
+            return obj.user.profile.badge_type
+        return None
+
+    def get_replies(self, obj):
+        # Only include replies for top-level comments (parent=None)
+        if obj.parent is not None:
+            return []
+        replies = obj.replies.filter(is_approved=True).select_related('user', 'user__profile').order_by('created_at')
+        return EventCommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_count(self, obj):
+        if obj.parent is not None:
+            return 0
+        return obj.replies.filter(is_approved=True).count()
+
+
+class NewsletterEditionSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import NewsletterEdition
+        model = NewsletterEdition
+        fields = ['id', 'subject', 'body_html', 'sent_at', 'recipient_count', 'created_at']
+        read_only_fields = ['id', 'sent_at', 'recipient_count', 'created_at']
+
+
+class EventAttendeeSerializer(serializers.ModelSerializer):
+    """Public attendee info for event networking (no email/phone for privacy)."""
+    name = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    nationality = serializers.SerializerMethodField()
+
+    class Meta:
+        from django.contrib.auth.models import User
+        model = User
+        fields = ['id', 'name', 'badge_type', 'nationality']
+
+    def get_name(self, obj):
+        return obj.get_full_name() or obj.username
+
+    def get_badge_type(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.is_verified:
+            return obj.profile.badge_type
+        return None
+
+    def get_nationality(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.nationality:
+            return obj.profile.nationality
+        return None
 
 
 class PasswordChangeHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = PasswordChangeHistory
         fields = ['id', 'changed_at', 'ip_address']
+
+
+class ArticleRevisionSerializer(serializers.ModelSerializer):
+    edited_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ArticleRevision
+        fields = ['id', 'article', 'revision_number', 'title', 'content',
+                  'edited_by', 'edited_by_name', 'created_at', 'change_summary']
+
+    def get_edited_by_name(self, obj):
+        if obj.edited_by:
+            return obj.edited_by.get_full_name() or obj.edited_by.username
+        return None
+
+
+class TranslationRequestSerializer(serializers.ModelSerializer):
+    assigned_to_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TranslationRequest
+        fields = ['id', 'content_type', 'object_id', 'source_language',
+                  'target_language', 'status', 'assigned_to', 'assigned_to_name',
+                  'notes', 'created_at', 'completed_at']
+
+    def get_assigned_to_name(self, obj):
+        if obj.assigned_to:
+            return obj.assigned_to.get_full_name() or obj.assigned_to.username
+        return None
+
+
+class PodcastSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Podcast
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'audio_file', 'cover_image', 'duration_seconds',
+                  'episode_number', 'is_active', 'created_at']
+
+
+class EventAgendaItemSerializer(serializers.ModelSerializer):
+    speaker_name = serializers.CharField(source='speaker.name', read_only=True, default=None)
+    speaker_photo = serializers.ImageField(source='speaker.photo', read_only=True, default=None)
+
+    class Meta:
+        model = EventAgendaItem
+        fields = ['id', 'event', 'title', 'description', 'speaker',
+                  'speaker_name', 'speaker_photo', 'start_time', 'end_time',
+                  'room', 'track', 'order']

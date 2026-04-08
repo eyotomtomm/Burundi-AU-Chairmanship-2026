@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:add_2_calendar/add_2_calendar.dart' as cal;
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
+import 'dart:io';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../models/event_registration_model.dart';
@@ -12,6 +15,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/events/event_countdown.dart';
 import '../../widgets/events/event_info_card.dart';
 import '../../widgets/translate_button.dart';
+import 'event_ticket_screen.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -36,6 +40,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   // Speakers
   List<Map<String, dynamic>> _speakers = [];
 
+  // Agenda items
+  List<Map<String, dynamic>> _agendaItems = [];
+  bool _loadingAgenda = true;
+
+  // Comments
+  List<Map<String, dynamic>> _comments = [];
+  bool _loadingComments = true;
+  bool _postingComment = false;
+  final _commentController = TextEditingController();
+  int? _replyingToId;
+  String? _replyingToName;
+
+  // Photos
+  List<Map<String, dynamic>> _photos = [];
+  bool _loadingPhotos = true;
+  bool _uploadingPhoto = false;
+
+  // Attendees
+  List<Map<String, dynamic>> _attendees = [];
+  bool _loadingAttendees = true;
+
   // Proxy form controllers
   final _proxyNameController = TextEditingController();
   final _proxyEmailController = TextEditingController();
@@ -48,6 +73,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     _initFormControllers();
     _startCountdown();
     _loadSpeakers();
+    _loadAgendaItems();
+    _loadComments();
+    _loadPhotos();
+    _loadAttendees();
   }
 
   void _initFormControllers() {
@@ -114,6 +143,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
+  Future<void> _loadAgendaItems() async {
+    try {
+      final items = await ApiService().getEventAgendaItems(_event.id);
+      if (mounted) {
+        setState(() {
+          _agendaItems = items;
+          _loadingAgenda = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAgenda = false);
+    }
+  }
+
   void _startCountdown() {
     _updateTimeLeft();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -134,6 +177,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     for (final c in _formControllers.values) {
       c.dispose();
     }
+    _commentController.dispose();
     _proxyNameController.dispose();
     _proxyEmailController.dispose();
     _proxyPhoneController.dispose();
@@ -242,11 +286,30 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     langCode: langCode,
                     isDark: isDark,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+
+                  // Multi-day event indicator
+                  if (_event.isMultiDay)
+                    _buildMultiDayIndicator(isDark),
+
+                  // Add to Calendar button
+                  if (_event.eventDate != null && !_event.isEventPast)
+                    _buildAddToCalendarButton(isDark),
+                  const SizedBox(height: 12),
+
+                  // Spots remaining indicator
+                  if (_event.isRegistrationEnabled && _event.maxRegistrations > 0)
+                    _buildSpotsRemainingIndicator(isDark),
+
+                  const SizedBox(height: 8),
 
                   // Speakers section
                   if (_speakers.isNotEmpty)
                     _buildSpeakersSection(isDark),
+
+                  // Agenda section
+                  if (!_loadingAgenda && _agendaItems.isNotEmpty)
+                    _buildAgendaSection(isDark, langCode),
 
                   // Registration section
                   _buildRegistrationSection(context, langCode, isDark),
@@ -258,6 +321,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   // Contact section
                   if (_event.contactEmail.isNotEmpty || _event.contactPhone.isNotEmpty)
                     _buildContactSection(context, isDark),
+
+                  const SizedBox(height: 20),
+
+                  // Photos section
+                  _buildPhotosSection(isDark),
+
+                  // Attendees section
+                  _buildAttendeesSection(isDark),
+
+                  // Comments section
+                  _buildCommentsSection(isDark),
 
                   const SizedBox(height: 40),
                 ],
@@ -727,6 +801,189 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
+  // ── Agenda Section ───────────────────────────────────────
+
+  Widget _buildAgendaSection(bool isDark, String langCode) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.view_timeline_rounded, color: AppColors.burundiGreen, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              langCode == 'fr' ? 'Programme' : 'Agenda',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.lightText,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        ..._agendaItems.map((item) => _buildAgendaItemTile(item, isDark)),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildAgendaItemTile(Map<String, dynamic> item, bool isDark) {
+    final title = item['title'] ?? '';
+    final description = item['description'] ?? '';
+    final speakerName = item['speaker_name'] as String?;
+    final room = item['room'] as String? ?? '';
+    final track = item['track'] as String? ?? '';
+    final startTime = DateTime.tryParse(item['start_time'] ?? '');
+    final endTime = DateTime.tryParse(item['end_time'] ?? '');
+
+    String timeLabel = '';
+    if (startTime != null && endTime != null) {
+      final startStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}';
+      final endStr = '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      timeLabel = '$startStr - $endStr';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline indicator
+          Column(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.3), width: 2),
+                ),
+              ),
+              Container(
+                width: 2,
+                height: 60,
+                color: AppColors.burundiGreen.withValues(alpha: 0.2),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          // Content card
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE8E8E8),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Time
+                  if (timeLabel.isNotEmpty)
+                    Text(
+                      timeLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.burundiGreen,
+                      ),
+                    ),
+                  if (timeLabel.isNotEmpty) const SizedBox(height: 4),
+                  // Title
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : AppColors.lightText,
+                    ),
+                  ),
+                  // Description
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        height: 1.4,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  // Speaker + Room + Track metadata
+                  if (speakerName != null || room.isNotEmpty || track.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      children: [
+                        if (speakerName != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.person_rounded, size: 14,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                speakerName,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (room.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.room_rounded, size: 14,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                room,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (track.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.auGold.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              track,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.auGold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Registration Section ──────────────────────────────────
 
   Widget _buildRegistrationSection(BuildContext context, String langCode, bool isDark) {
@@ -807,6 +1064,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 fontSize: 14,
                 color: isDark ? Colors.white70 : Colors.black54,
                 height: 1.4,
+              ),
+            ),
+          ],
+
+          // View Ticket button
+          if (_event.userSubmissionId != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openTicket(),
+                icon: const Icon(Icons.confirmation_number_outlined, size: 18),
+                label: const Text('View Ticket'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.burundiGreen,
+                  side: const BorderSide(color: AppColors.burundiGreen),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ),
           ],
@@ -1410,6 +1688,217 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
+  // ── Multi-day Indicator ─────────────────────────────────
+
+  Widget _buildMultiDayIndicator(bool isDark) {
+    final totalDays = _event.totalDays;
+    final currentDay = _event.currentDayNumber;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.burundiGreen.withValues(alpha: isDark ? 0.15 : 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.date_range,
+            color: AppColors.burundiGreen,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$totalDays-Day Event',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                if (currentDay != null)
+                  Text(
+                    'Day $currentDay of $totalDays',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.burundiGreen,
+                    ),
+                  )
+                else if (_event.isEventPast)
+                  Text(
+                    'Event completed',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white38 : Colors.black38,
+                    ),
+                  )
+                else
+                  Text(
+                    'Starts in ${_event.timeUntilEvent?.inDays ?? 0} days',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white54 : Colors.black54,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Progress dots for multi-day
+          if (totalDays <= 10)
+            Row(
+              children: List.generate(totalDays, (i) {
+                final dayNum = i + 1;
+                final isCurrentDay = currentDay != null && dayNum == currentDay;
+                final isPastDay = currentDay != null && dayNum < currentDay;
+                return Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(left: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isCurrentDay
+                        ? AppColors.burundiGreen
+                        : isPastDay
+                            ? AppColors.burundiGreen.withValues(alpha: 0.4)
+                            : (isDark ? const Color(0xFF444444) : const Color(0xFFD0D0D0)),
+                  ),
+                );
+              }),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Add to Calendar ────────────────────────────────────
+
+  Widget _buildAddToCalendarButton(bool isDark) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _addToCalendar,
+        icon: const Icon(Icons.calendar_month, size: 18),
+        label: const Text('Add to Calendar'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.burundiGreen,
+          side: const BorderSide(color: AppColors.burundiGreen),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _addToCalendar() {
+    if (_event.eventDate == null) return;
+
+    final event = cal.Event(
+      title: _event.eventTitle,
+      description: _event.eventDescription,
+      location: _event.venue.isNotEmpty
+          ? '${_event.venue}, ${_event.venueAddress}'
+          : _event.venueAddress,
+      startDate: _event.eventDate!,
+      endDate: _event.eventEndDate ?? _event.eventDate!.add(const Duration(hours: 2)),
+    );
+
+    cal.Add2Calendar.addEvent2Cal(event);
+  }
+
+  // ── Spots Remaining ────────────────────────────────────
+
+  Widget _buildSpotsRemainingIndicator(bool isDark) {
+    final spots = _event.spotsRemaining;
+    final maxReg = _event.maxRegistrations;
+
+    // If spots_remaining is null, the backend has unlimited capacity
+    if (spots == null || maxReg <= 0) return const SizedBox.shrink();
+
+    final percentage = spots / maxReg;
+    final Color spotColor;
+    final String urgencyText;
+
+    if (spots <= 0) {
+      spotColor = AppColors.burundiRed;
+      urgencyText = 'Event Full';
+    } else if (percentage < 0.2) {
+      spotColor = AppColors.burundiRed;
+      urgencyText = 'Almost full! $spots spot${spots == 1 ? '' : 's'} remaining';
+    } else if (percentage < 0.5) {
+      spotColor = Colors.orange;
+      urgencyText = '$spots spot${spots == 1 ? '' : 's'} remaining';
+    } else {
+      spotColor = AppColors.burundiGreen;
+      urgencyText = '$spots spot${spots == 1 ? '' : 's'} remaining';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: spotColor.withValues(alpha: isDark ? 0.15 : 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: spotColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            spots <= 0 ? Icons.people : Icons.event_seat,
+            color: spotColor,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              urgencyText,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: spotColor,
+              ),
+            ),
+          ),
+          // Progress bar
+          SizedBox(
+            width: 60,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: 1.0 - percentage.clamp(0.0, 1.0),
+                backgroundColor: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+                valueColor: AlwaysStoppedAnimation(spotColor),
+                minHeight: 6,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── View Ticket ─────────────────────────────────────────
+
+  void _openTicket() {
+    if (_event.userSubmissionId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventTicketScreen(submissionId: _event.userSubmissionId!),
+      ),
+    );
+  }
+
   // ── Actions ───────────────────────────────────────────────
 
   Future<void> _submitRegistration(String langCode) async {
@@ -1525,6 +2014,974 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  // ── Load Comments ──────────────────────────────────────
+
+  Future<void> _loadComments() async {
+    try {
+      final comments = await ApiService().getEventComments(_event.id);
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _loadingComments = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingComments = false);
+    }
+  }
+
+  // ── Load Photos ───────────────────────────────────────
+
+  Future<void> _loadPhotos() async {
+    try {
+      final photos = await ApiService().getEventPhotos(_event.id);
+      if (mounted) {
+        setState(() {
+          _photos = photos;
+          _loadingPhotos = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingPhotos = false);
+    }
+  }
+
+  // ── Load Attendees ────────────────────────────────────
+
+  Future<void> _loadAttendees() async {
+    try {
+      final attendees = await ApiService().getEventAttendees(_event.id);
+      if (mounted) {
+        setState(() {
+          _attendees = attendees;
+          _loadingAttendees = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAttendees = false);
+    }
+  }
+
+  // ── Comments Section ──────────────────────────────────
+
+  Widget _buildCommentsSection(bool isDark) {
+    final auth = context.watch<AuthProvider>();
+    final isLoggedIn = auth.isAuthenticated;
+    final topLevelComments = _comments.where((c) => c['parent'] == null).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Icon(Icons.chat_bubble_outline, color: AppColors.burundiGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Comments',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.lightText,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (!_loadingComments)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${topLevelComments.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.burundiGreen,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // Comment input
+        if (isLoggedIn)
+          _buildCommentInput(isDark, auth)
+        else
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lock_outline, size: 16, color: isDark ? Colors.white38 : Colors.black38),
+                const SizedBox(width: 8),
+                Text(
+                  'Sign in to post a comment',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 14),
+
+        // Comments list
+        if (_loadingComments)
+          const Center(child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ))
+        else if (topLevelComments.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'No comments yet. Be the first!',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+            ),
+          )
+        else
+          ...topLevelComments.map((comment) => _buildCommentTile(comment, isDark, auth, isReply: false)),
+
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildCommentInput(bool isDark, AuthProvider auth) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_replyingToName != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Replying to $_replyingToName',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.burundiGreen,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _replyingToId = null;
+                      _replyingToName = null;
+                    }),
+                    child: const Icon(Icons.close, size: 14, color: AppColors.burundiGreen),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
+                backgroundImage: auth.profilePictureUrl != null && auth.profilePictureUrl!.isNotEmpty
+                    ? CachedNetworkImageProvider(Environment.fixMediaUrl(auth.profilePictureUrl!))
+                    : null,
+                child: auth.profilePictureUrl == null || auth.profilePictureUrl!.isEmpty
+                    ? Text(
+                        (auth.userName ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.burundiGreen),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _commentController,
+                  maxLines: 3,
+                  minLines: 1,
+                  decoration: InputDecoration(
+                    hintText: _replyingToName != null ? 'Write a reply...' : 'Write a comment...',
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.white30 : Colors.black26,
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  ),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _postingComment ? null : () => _submitComment(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.burundiGreen,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: _postingComment
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.send, color: Colors.white, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitComment() async {
+    final content = _commentController.text.trim();
+    if (content.isEmpty) return;
+
+    setState(() => _postingComment = true);
+
+    try {
+      await ApiService().postEventComment(
+        _event.id,
+        content,
+        parentId: _replyingToId,
+      );
+      _commentController.clear();
+      setState(() {
+        _replyingToId = null;
+        _replyingToName = null;
+      });
+      await _loadComments();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to post comment'), backgroundColor: AppColors.burundiRed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _postingComment = false);
+    }
+  }
+
+  Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark, AuthProvider auth, {required bool isReply}) {
+    final userName = comment['user_name'] ?? 'User';
+    final userId = comment['user_id'] as int?;
+    final content = comment['content'] ?? '';
+    final createdAt = comment['created_at'] as String?;
+    final profilePicture = comment['profile_picture'] as String?;
+    final badgeType = comment['badge_type'] as String?;
+    final replies = (comment['replies'] as List<dynamic>?) ?? [];
+    final replyCount = comment['reply_count'] ?? replies.length;
+    final commentId = comment['id'] as int?;
+    final isOwner = auth.isAuthenticated && userId == auth.userId;
+
+    String timeAgo = '';
+    if (createdAt != null) {
+      final dt = DateTime.tryParse(createdAt);
+      if (dt != null) {
+        final diff = DateTime.now().difference(dt);
+        if (diff.inDays > 0) {
+          timeAgo = '${diff.inDays}d ago';
+        } else if (diff.inHours > 0) {
+          timeAgo = '${diff.inHours}h ago';
+        } else if (diff.inMinutes > 0) {
+          timeAgo = '${diff.inMinutes}m ago';
+        } else {
+          timeAgo = 'Just now';
+        }
+      }
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(left: isReply ? 40.0 : 0.0, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: isReply ? 14 : 18,
+                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
+                backgroundImage: profilePicture != null && profilePicture.isNotEmpty
+                    ? CachedNetworkImageProvider(Environment.fixMediaUrl(profilePicture))
+                    : null,
+                child: profilePicture == null || profilePicture.isEmpty
+                    ? Text(
+                        userName[0].toUpperCase(),
+                        style: TextStyle(
+                          fontSize: isReply ? 11 : 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.burundiGreen,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          userName,
+                          style: TextStyle(
+                            fontSize: isReply ? 13 : 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        if (badgeType != null && badgeType.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.verified,
+                            size: 14,
+                            color: badgeType == 'GOLD' ? const Color(0xFFD4AF37) : Colors.blue,
+                          ),
+                        ],
+                        const SizedBox(width: 6),
+                        Text(
+                          timeAgo,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.white30 : Colors.black38,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (isOwner && commentId != null)
+                          GestureDetector(
+                            onTap: () => _deleteComment(commentId),
+                            child: Icon(
+                              Icons.delete_outline,
+                              size: 16,
+                              color: isDark ? Colors.white24 : Colors.black26,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _buildMentionRichText(content, isDark),
+                    const SizedBox(height: 6),
+                    if (!isReply && auth.isAuthenticated)
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _replyingToId = commentId;
+                          _replyingToName = userName;
+                        }),
+                        child: Text(
+                          'Reply',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.burundiGreen,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // Nested replies
+          if (!isReply && replies.isNotEmpty)
+            ...replies.map((reply) => _buildCommentTile(
+              reply as Map<String, dynamic>,
+              isDark,
+              auth,
+              isReply: true,
+            )),
+          // Show reply count if there are more
+          if (!isReply && replyCount > replies.length)
+            Padding(
+              padding: const EdgeInsets.only(left: 48, top: 4),
+              child: Text(
+                '${replyCount - replies.length} more replies...',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.burundiGreen,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Build rich text with @mentions highlighted in blue
+  Widget _buildMentionRichText(String content, bool isDark) {
+    final mentionRegex = RegExp(r'@(\w+)');
+    final spans = <TextSpan>[];
+    int lastEnd = 0;
+
+    for (final match in mentionRegex.allMatches(content)) {
+      // Add text before the mention
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: content.substring(lastEnd, match.start),
+        ));
+      }
+      // Add the mention in blue
+      spans.add(TextSpan(
+        text: match.group(0),
+        style: const TextStyle(
+          color: Colors.blue,
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+      lastEnd = match.end;
+    }
+
+    // Add remaining text after the last mention
+    if (lastEnd < content.length) {
+      spans.add(TextSpan(
+        text: content.substring(lastEnd),
+      ));
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: 14,
+          color: isDark ? Colors.white70 : Colors.black87,
+          height: 1.4,
+        ),
+        children: spans.isEmpty ? [TextSpan(text: content)] : spans,
+      ),
+    );
+  }
+
+  Future<void> _deleteComment(int commentId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.burundiRed),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ApiService().deleteEventComment(_event.id, commentId);
+      await _loadComments();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comment deleted'), backgroundColor: AppColors.burundiGreen),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete comment'), backgroundColor: AppColors.burundiRed),
+        );
+      }
+    }
+  }
+
+  // ── Photos Section ────────────────────────────────────
+
+  Widget _buildPhotosSection(bool isDark) {
+    final auth = context.watch<AuthProvider>();
+    final isLoggedIn = auth.isAuthenticated;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.photo_library_outlined, color: AppColors.burundiGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Photos',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.lightText,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (!_loadingPhotos)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_photos.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.burundiGreen,
+                  ),
+                ),
+              ),
+            const Spacer(),
+            if (isLoggedIn)
+              GestureDetector(
+                onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.burundiGreen,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_uploadingPhoto)
+                        const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      else
+                        const Icon(Icons.add_a_photo, size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Add',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (_loadingPhotos)
+          const Center(child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ))
+        else if (_photos.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.photo_camera_outlined,
+                    size: 40,
+                    color: isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black12,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No photos yet',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white38 : Colors.black38,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 140,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _photos.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final photo = _photos[index];
+                final imageUrl = photo['image'] as String? ?? '';
+                final caption = photo['caption'] as String? ?? '';
+
+                return GestureDetector(
+                  onTap: () => _showPhotoDetail(photo, isDark),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: Environment.fixMediaUrl(imageUrl),
+                          width: 140,
+                          height: 140,
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) => Container(
+                            width: 140,
+                            height: 140,
+                            color: isDark ? const Color(0xFF2C2C2C) : Colors.grey.shade200,
+                            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                          errorWidget: (_, _, _) => Container(
+                            width: 140,
+                            height: 140,
+                            color: isDark ? const Color(0xFF2C2C2C) : Colors.grey.shade200,
+                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
+                        ),
+                        // Caption overlay
+                        if (caption.isNotEmpty)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+                                ),
+                              ),
+                              child: Text(
+                                caption,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+
+    if (image == null) return;
+
+    // Ask for caption
+    String? caption;
+    if (mounted) {
+      caption = await showDialog<String>(
+        context: context,
+        builder: (ctx) {
+          final captionCtrl = TextEditingController();
+          return AlertDialog(
+            title: const Text('Add a caption'),
+            content: TextField(
+              controller: captionCtrl,
+              maxLength: 200,
+              decoration: const InputDecoration(
+                hintText: 'Optional caption...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, ''),
+                child: const Text('Skip'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, captionCtrl.text.trim()),
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    if (caption == null) return;
+
+    setState(() => _uploadingPhoto = true);
+
+    try {
+      await ApiService().uploadEventPhoto(
+        _event.id,
+        File(image.path),
+        caption: caption,
+      );
+      await _loadPhotos();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo uploaded!'), backgroundColor: AppColors.burundiGreen),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload photo'), backgroundColor: AppColors.burundiRed),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  void _showPhotoDetail(Map<String, dynamic> photo, bool isDark) {
+    final imageUrl = photo['image'] as String? ?? '';
+    final caption = photo['caption'] as String? ?? '';
+    final uploaderName = photo['uploaded_by_name'] as String? ?? 'Unknown';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: CachedNetworkImage(
+                imageUrl: Environment.fixMediaUrl(imageUrl),
+                fit: BoxFit.contain,
+                placeholder: (_, _) => const SizedBox(
+                  height: 300,
+                  child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                ),
+                errorWidget: (_, _, _) => const SizedBox(
+                  height: 300,
+                  child: Center(child: Icon(Icons.broken_image, color: Colors.white, size: 48)),
+                ),
+              ),
+            ),
+            if (caption.isNotEmpty || uploaderName.isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (caption.isNotEmpty)
+                      Text(
+                        caption,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    if (uploaderName.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'By $uploaderName',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Attendees Section ─────────────────────────────────
+
+  Widget _buildAttendeesSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.people_outline, color: AppColors.burundiGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Attendees',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.lightText,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (!_loadingAttendees)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_attendees.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.burundiGreen,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (_loadingAttendees)
+          const Center(child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ))
+        else if (_attendees.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'No attendees yet',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _attendees.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final attendee = _attendees[index];
+                final name = attendee['name'] as String? ?? 'User';
+                final badgeType = attendee['badge_type'] as String?;
+                final nationality = attendee['nationality'] as String? ?? '';
+
+                return SizedBox(
+                  width: 70,
+                  child: Column(
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
+                            child: Text(
+                              name[0].toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.burundiGreen,
+                              ),
+                            ),
+                          ),
+                          if (badgeType != null && badgeType.isNotEmpty)
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Icon(
+                                Icons.verified,
+                                size: 14,
+                                color: badgeType == 'GOLD' ? const Color(0xFFD4AF37) : Colors.blue,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        name.split(' ').first,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : AppColors.lightText,
+                        ),
+                      ),
+                      if (nationality.isNotEmpty)
+                        Text(
+                          nationality,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        const SizedBox(height: 16),
+      ],
+    );
   }
 
   static const List<String> _countryList = [

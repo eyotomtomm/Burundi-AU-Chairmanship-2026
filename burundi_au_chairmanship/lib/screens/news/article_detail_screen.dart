@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/fullscreen_image_viewer.dart';
 import '../../services/haptic_service.dart';
@@ -29,19 +33,130 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   final _commentController = TextEditingController();
   bool _postingComment = false;
 
+  // Reading progress tracking
+  final ScrollController _scrollController = ScrollController();
+  Timer? _readingProgressTimer;
+  int _savedScrollPosition = 0;
+  int _savedProgressPercent = 0;
+  bool _showContinueReading = false;
+  bool _restoredPosition = false;
+  double _readingProgress = 0.0;
+
+  // Related articles
+  List<Article> _relatedArticles = [];
+  bool _loadingRelated = true;
+
   @override
   void initState() {
     super.initState();
     _article = widget.article;
     _recordView();
     _loadComments();
+    _loadRelatedArticles();
+    _loadReadingProgress();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _readingProgressTimer?.cancel();
+    _saveReadingProgressNow();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _commentController.dispose();
     super.dispose();
   }
+
+  // ── Reading Progress ─────────────────────────────────────
+
+  void _onScroll() {
+    // Update visual reading progress bar
+    if (_scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        final progress = (_scrollController.offset / maxScroll).clamp(0.0, 1.0);
+        if ((progress - _readingProgress).abs() > 0.005) {
+          setState(() => _readingProgress = progress);
+        }
+      }
+    }
+
+    // Debounced save: every 5 seconds while scrolling
+    _readingProgressTimer?.cancel();
+    _readingProgressTimer = Timer(const Duration(seconds: 5), () {
+      _saveReadingProgressNow();
+    });
+  }
+
+  Future<void> _loadReadingProgress() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAuthenticated) return;
+    try {
+      final data = await ApiService().getArticleReadingProgress(_article.id);
+      final scrollPos = data['scroll_position'] as int? ?? 0;
+      final progressPct = data['progress_percent'] as int? ?? 0;
+      if (mounted && scrollPos > 0 && progressPct < 90) {
+        setState(() {
+          _savedScrollPosition = scrollPos;
+          _savedProgressPercent = progressPct;
+          _showContinueReading = true;
+        });
+      }
+    } catch (_) {
+      // Silently fail - reading progress is non-critical
+    }
+  }
+
+  void _scrollToSavedPosition() {
+    if (_savedScrollPosition > 0 && _scrollController.hasClients) {
+      _scrollController.animateTo(
+        _savedScrollPosition.toDouble(),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+      setState(() {
+        _showContinueReading = false;
+        _restoredPosition = true;
+      });
+    }
+  }
+
+  Future<void> _saveReadingProgressNow() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAuthenticated || !_scrollController.hasClients) return;
+
+    final scrollPos = _scrollController.offset.toInt();
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final progressPct = maxScroll > 0 ? ((scrollPos / maxScroll) * 100).toInt() : 0;
+
+    try {
+      await ApiService().saveArticleReadingProgress(
+        _article.id,
+        scrollPos,
+        progressPct.clamp(0, 100),
+      );
+    } catch (_) {
+      // Silently fail
+    }
+  }
+
+  // ── Related Articles ─────────────────────────────────────
+
+  Future<void> _loadRelatedArticles() async {
+    try {
+      final articles = await ApiService().getRelatedArticles(_article.id);
+      if (mounted) {
+        setState(() {
+          _relatedArticles = articles;
+          _loadingRelated = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingRelated = false);
+    }
+  }
+
+  // ── Existing methods ─────────────────────────────────────
 
   Future<void> _recordView() async {
     try {
@@ -191,13 +306,83 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final auth = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      // Continue Reading floating indicator
+      floatingActionButton: (_showContinueReading && !_restoredPosition)
+          ? FloatingActionButton.extended(
+              onPressed: _scrollToSavedPosition,
+              backgroundColor: AppColors.burundiGreen,
+              icon: const Icon(Icons.bookmark_rounded, color: Colors.white),
+              label: Text(
+                langCode == 'fr'
+                    ? 'Continuer ($_savedProgressPercent%)'
+                    : 'Continue ($_savedProgressPercent%)',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            )
+          : null,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // Hero image SliverAppBar
           SliverAppBar(
             expandedHeight: 260,
             pinned: true,
-            actions: const [TranslateButton()],
+            actions: [
+              // Listen button - copies article text for device TTS
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.headphones_rounded, color: Colors.white, size: 20),
+                ),
+                tooltip: langCode == 'fr' ? 'Ecouter' : 'Listen',
+                onPressed: () {
+                  final articleText = _article.getContent(langCode);
+                  Clipboard.setData(ClipboardData(text: articleText));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              langCode == 'fr'
+                                  ? 'Texte copie - utilisez la fonctionnalite de synthese vocale de votre appareil'
+                                  : 'Text copied - use your device\'s text-to-speech feature to listen',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 4),
+                      backgroundColor: AppColors.burundiGreen,
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                ),
+                onPressed: () {
+                  HapticService.light();
+                  final shareUrl = 'https://burundi4africa.com/articles/${_article.id}/share/';
+                  Share.share(
+                    '${_article.getTitle(Provider.of<LanguageProvider>(context, listen: false).languageCode)}\n\n$shareUrl',
+                  );
+                },
+              ),
+              const TranslateButton(),
+            ],
             leading: IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(6),
@@ -235,6 +420,25 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+          // Reading progress bar
+          SliverToBoxAdapter(
+            child: Container(
+              height: 3,
+              color: isDark ? AppColors.darkSurface : Colors.grey.shade200,
+              alignment: Alignment.centerLeft,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                height: 3,
+                width: MediaQuery.of(context).size.width * _readingProgress,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.burundiGreen, AppColors.auGold],
+                  ),
+                ),
               ),
             ),
           ),
@@ -474,6 +678,37 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     }),
                   ],
 
+                  // Related Articles section
+                  if (!_loadingRelated && _relatedArticles.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        Icon(Icons.recommend_rounded, size: 20, color: AppColors.auGold),
+                        const SizedBox(width: 8),
+                        Text(
+                          langCode == 'fr' ? 'Articles similaires' : 'Related Articles',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.darkText : AppColors.lightText,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 200,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _relatedArticles.length,
+                        itemBuilder: (context, index) {
+                          final related = _relatedArticles[index];
+                          return _buildRelatedArticleCard(related, langCode, isDark);
+                        },
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 32),
 
                   // Comments section header
@@ -584,6 +819,106 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRelatedArticleCard(Article article, String langCode, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => ArticleDetailScreen(article: article),
+          ),
+        );
+      },
+      child: Container(
+        width: 220,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: CachedNetworkImage(
+                imageUrl: article.imageUrl,
+                height: 110,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => Container(
+                  height: 110,
+                  color: AppColors.auGold.withValues(alpha: 0.1),
+                ),
+                errorWidget: (_, _, _) => Container(
+                  height: 110,
+                  color: AppColors.auGold.withValues(alpha: 0.1),
+                  child: const Icon(Icons.article_rounded, color: Colors.grey),
+                ),
+              ),
+            ),
+            // Title and metadata
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      article.getTitle(langCode),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkText : AppColors.lightText,
+                        height: 1.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Icon(Icons.visibility_rounded, size: 12,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${article.viewCount}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          DateFormat('MMM d').format(article.publishDate),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,0 +1,60 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Onboarding Steps - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">rocket_launch</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Onboarding Steps</h1>
+        <p class="text-sm text-slate-500 mt-1">Configure the new user onboarding walkthrough</p>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:onboarding_step_create' %}" class="inline-flex items-center gap-2 bg-sky-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-sky-700 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">add</span>
+      Add Step
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for step in steps %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow relative">
+      <div class="absolute top-3 left-3 w-8 h-8 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-sm">{{ step.order }}</div>
+      {% if step.image %}
+      <img src="{{ step.image.url }}" class="w-full h-40 object-cover">
+      {% else %}
+      <div class="w-full h-40 bg-gradient-to-br from-sky-50 to-sky-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-5xl text-sky-300">{{ step.icon|default:"star" }}</span>
+      </div>
+      {% endif %}
+      <div class="p-5">
+        <h3 class="font-bold text-slate-900 text-sm">{{ step.title }}</h3>
+        <p class="text-xs text-slate-500 mt-1">{{ step.description|truncatewords:15 }}</p>
+        <div class="flex items-center justify-between mt-3">
+          {% if step.is_active %}
+          <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">Active</span>
+          {% else %}
+          <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">Hidden</span>
+          {% endif %}
+          <div class="flex gap-1">
+            <a href="{% url 'custom_admin:onboarding_step_edit' step.pk %}" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-lg">edit</span></a>
+            <form method="post" action="{% url 'custom_admin:onboarding_step_delete' step.pk %}" class="inline" onsubmit="return confirm('Delete this step?');">{% csrf_token %}
+              <button type="submit" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-lg">delete</span></button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-span-full text-center py-16">
+      <span class="material-symbols-outlined text-5xl text-slate-300 mb-4">rocket_launch</span>
+      <p class="text-slate-500">No onboarding steps configured yet</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

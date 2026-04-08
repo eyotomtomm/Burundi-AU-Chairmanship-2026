@@ -1,0 +1,78 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Speaker - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:event_speakers_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+      <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+    </a>
+    <h1 class="text-3xl font-bold text-slate-900 font-headline">{{ action }} Speaker</h1>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
+    {% csrf_token %}
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event <span class="text-red-500">*</span></label>
+        <select name="event" required class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+          <option value="">Select an event</option>
+          {% for event in events %}
+          <option value="{{ event.pk }}" {% if speaker.event_id == event.pk %}selected{% endif %}>{{ event.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Full Name <span class="text-red-500">*</span></label>
+          <input type="text" name="name" required value="{{ speaker.name|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Title / Position</label>
+          <input type="text" name="title" value="{{ speaker.title|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Organization</label>
+        <input type="text" name="organization" value="{{ speaker.organization|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Bio (EN)</label>
+          <textarea name="bio" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">{{ speaker.bio|default:'' }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Bio (FR)</label>
+          <textarea name="bio_fr" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">{{ speaker.bio_fr|default:'' }}</textarea>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Topic (EN)</label>
+          <input type="text" name="topic" value="{{ speaker.topic|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Topic (FR)</label>
+          <input type="text" name="topic_fr" value="{{ speaker.topic_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Photo</label>
+          <input type="file" name="photo" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if speaker.photo %}<p class="text-xs text-slate-500 mt-1">Current: {{ speaker.photo.name }}</p>{% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Display Order</label>
+          <input type="number" name="display_order" value="{{ speaker.display_order|default:0 }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent">
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <a href="{% url 'custom_admin:event_speakers_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
+      <button type="submit" class="bg-violet-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-violet-700 transition-all shadow-sm">{{ action }} Speaker</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

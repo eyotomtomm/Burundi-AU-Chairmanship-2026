@@ -1,0 +1,59 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Email Templates - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center gap-4 mb-8">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center shadow-lg">
+      <span class="material-symbols-outlined text-3xl text-white">mail</span>
+    </div>
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 font-headline">Email Templates</h1>
+      <p class="text-sm text-slate-500 mt-1">Customize automated email content</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Template</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Subject</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Last Updated</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for tmpl in templates %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <p class="font-semibold text-slate-900 text-sm">{{ tmpl.get_key_display }}</p>
+              <p class="text-xs text-slate-500">{{ tmpl.key }}</p>
+            </td>
+            <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ tmpl.subject|truncatewords:8 }}</span></td>
+            <td class="px-6 py-4">
+              {% if tmpl.is_active %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active</span>
+              {% else %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Disabled</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ tmpl.updated_at|date:"M d, Y" }}</span></td>
+            <td class="px-6 py-4 text-right">
+              <a href="{% url 'custom_admin:email_template_edit' tmpl.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-block" title="Edit">
+                <span class="material-symbols-outlined text-xl">edit</span>
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-6 py-16 text-center"><p class="text-slate-500">No email templates configured yet</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

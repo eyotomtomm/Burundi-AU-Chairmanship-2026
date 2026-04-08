@@ -150,4 +150,50 @@ urlpatterns = [
     # Analytics
     path('analytics/', views.analytics_dashboard, name='analytics'),
     path('analytics/export-pdf/', views.analytics_export_pdf, name='analytics_export_pdf'),
+
+    # Polls
+    path('polls/', views.polls_list, name='polls_list'),
+    path('polls/create/', views.poll_create, name='poll_create'),
+    path('polls/<int:pk>/edit/', views.poll_edit, name='poll_edit'),
+    path('polls/<int:pk>/delete/', views.poll_delete, name='poll_delete'),
+
+    # Discussions / Forums
+    path('discussions/', views.discussions_list, name='discussions_list'),
+    path('discussions/<int:pk>/toggle-pin/', views.discussion_toggle_pin, name='discussion_toggle_pin'),
+    path('discussions/<int:pk>/toggle-lock/', views.discussion_toggle_lock, name='discussion_toggle_lock'),
+    path('discussions/<int:pk>/delete/', views.discussion_delete, name='discussion_delete'),
+
+    # Contact Directory
+    path('contact-directory/', views.contact_directory_list, name='contact_directory_list'),
+    path('contact-directory/create/', views.contact_directory_create, name='contact_directory_create'),
+    path('contact-directory/<int:pk>/edit/', views.contact_directory_edit, name='contact_directory_edit'),
+    path('contact-directory/<int:pk>/delete/', views.contact_directory_delete, name='contact_directory_delete'),
+
+    # Email Templates
+    path('email-templates/', views.email_templates_list, name='email_templates_list'),
+    path('email-templates/<int:pk>/edit/', views.email_template_edit, name='email_template_edit'),
+
+    # Announcement Banners
+    path('announcements/', views.announcements_list, name='announcements_list'),
+    path('announcements/create/', views.announcement_create, name='announcement_create'),
+    path('announcements/<int:pk>/edit/', views.announcement_edit, name='announcement_edit'),
+    path('announcements/<int:pk>/delete/', views.announcement_delete, name='announcement_delete'),
+
+    # Event Speakers
+    path('event-speakers/', views.event_speakers_list, name='event_speakers_list'),
+    path('event-speakers/create/', views.event_speaker_create, name='event_speaker_create'),
+    path('event-speakers/<int:pk>/edit/', views.event_speaker_edit, name='event_speaker_edit'),
+    path('event-speakers/<int:pk>/delete/', views.event_speaker_delete, name='event_speaker_delete'),
+
+    # Onboarding Steps
+    path('onboarding/', views.onboarding_steps_list, name='onboarding_steps_list'),
+    path('onboarding/create/', views.onboarding_step_create, name='onboarding_step_create'),
+    path('onboarding/<int:pk>/edit/', views.onboarding_step_edit, name='onboarding_step_edit'),
+    path('onboarding/<int:pk>/delete/', views.onboarding_step_delete, name='onboarding_step_delete'),
+
+    # Scheduled Maintenance
+    path('maintenance/', views.maintenance_list, name='maintenance_list'),
+    path('maintenance/create/', views.maintenance_create, name='maintenance_create'),
+    path('maintenance/<int:pk>/edit/', views.maintenance_edit, name='maintenance_edit'),
+    path('maintenance/<int:pk>/delete/', views.maintenance_delete, name='maintenance_delete'),
 ]

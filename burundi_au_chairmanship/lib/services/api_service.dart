@@ -657,6 +657,265 @@ class ApiService {
     }
     return [];
   }
+
+  // ── Bookmarks ─────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getBookmarks() async {
+    final data = await _get('bookmarks/', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> addBookmark(String contentType, int contentId) async {
+    return await _post('bookmarks/', {
+      'content_type': contentType,
+      'content_id': contentId,
+    }, auth: true);
+  }
+
+  Future<void> removeBookmark(int bookmarkId) async {
+    await _delete('bookmarks/$bookmarkId/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> checkBookmark(String contentType, int contentId) async {
+    return await _get('bookmarks/check_bookmark/?content_type=$contentType&content_id=$contentId', auth: true);
+  }
+
+  // ── Reactions ─────────────────────────────────────────────
+  Future<Map<String, dynamic>> toggleReaction(String contentType, int contentId, String reactionType) async {
+    return await _post('reactions/toggle/', {
+      'content_type': contentType,
+      'content_id': contentId,
+      'reaction_type': reactionType,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> getReactions(String contentType, int contentId) async {
+    return await _get('reactions/?content_type=$contentType&content_id=$contentId', auth: true);
+  }
+
+  // ── Discussions / Forums ──────────────────────────────────
+  Future<List<Map<String, dynamic>>> getDiscussions({String? category}) async {
+    String endpoint = 'discussions/';
+    if (category != null) endpoint += '?category=$category';
+    final data = await _get(endpoint, auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> getDiscussionDetail(int id) async {
+    return await _get('discussions/$id/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> createDiscussion(String title, String content, String category) async {
+    return await _post('discussions/', {
+      'title': title,
+      'content': content,
+      'category': category,
+    }, auth: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getDiscussionReplies(int discussionId) async {
+    final data = await _get('discussions/$discussionId/replies/', auth: true);
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> postDiscussionReply(int discussionId, String content, {int? parentId}) async {
+    final body = <String, dynamic>{'content': content};
+    if (parentId != null) body['parent'] = parentId;
+    return await _post('discussions/$discussionId/replies/', body, auth: true);
+  }
+
+  // ── Polls ─────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getPolls() async {
+    final data = await _get('polls/', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> votePoll(int pollId, int optionId) async {
+    return await _post('polls/$pollId/vote/', {'option_id': optionId}, auth: true);
+  }
+
+  // ── Contact Directory ─────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getContactDirectory() async {
+    final data = await _get('contact-directory/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Announcement Banners ──────────────────────────────────
+  Future<List<Map<String, dynamic>>> getAnnouncementBanners() async {
+    final data = await _get('announcement-banners/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Event Speakers ────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getEventSpeakers({int? eventId}) async {
+    String endpoint = 'event-speakers/';
+    if (eventId != null) endpoint += '?event=$eventId';
+    final data = await _get(endpoint);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Conversations / Messages ──────────────────────────────
+  Future<List<Map<String, dynamic>>> getConversations() async {
+    final data = await _get('conversations/', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getConversationMessages(int conversationId) async {
+    final data = await _get('conversations/$conversationId/messages/', auth: true);
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> sendMessage(int conversationId, String content) async {
+    return await _post('conversations/$conversationId/messages/', {
+      'content': content,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> startConversation(int userId, String message) async {
+    return await _post('conversations/', {
+      'participant_id': userId,
+      'message': message,
+    }, auth: true);
+  }
+
+  // ── Notification Preferences ──────────────────────────────
+  Future<Map<String, dynamic>> getNotificationPreferences() async {
+    return await _get('notification-preferences/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> updateNotificationPreferences(Map<String, dynamic> prefs) async {
+    return await _post('notification-preferences/', prefs, auth: true);
+  }
+
+  // ── User Preferences ─────────────────────────────────────
+  Future<Map<String, dynamic>> getUserPreferences() async {
+    return await _get('preferences/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> updateUserPreferences(Map<String, dynamic> prefs) async {
+    return await _post('preferences/', prefs, auth: true);
+  }
+
+  // ── Onboarding ────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getOnboardingSteps() async {
+    final data = await _get('onboarding-steps/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> completeOnboarding() async {
+    await _post('onboarding/complete/', {}, auth: true);
+  }
+
+  // ── Security ──────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getLoginHistory() async {
+    final data = await _get('auth/login-history/', auth: true);
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getActiveSessions() async {
+    final data = await _get('auth/active-sessions/', auth: true);
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> revokeSession(int sessionId) async {
+    await _post('auth/sessions/$sessionId/revoke/', {}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+    return await _post('auth/change-password/', {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    }, auth: true);
+  }
+
+  // ── Trending Content ──────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getTrendingContent() async {
+    final data = await _get('trending/');
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Event Features ────────────────────────────────────────
+  Future<Map<String, dynamic>> submitEventFeedback(int eventId, int rating, {String comment = ''}) async {
+    return await _post('events/feedback/', {
+      'event': eventId,
+      'rating': rating,
+      'comment': comment,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> eventCheckIn(int eventId, {String? qrCode}) async {
+    final body = <String, dynamic>{'event': eventId};
+    if (qrCode != null) body['qr_code'] = qrCode;
+    return await _post('events/checkin/', body, auth: true);
+  }
+
+  Future<Map<String, dynamic>> joinEventWaitlist(int eventId) async {
+    return await _post('events/waitlist/', {'event': eventId}, auth: true);
+  }
+
+  // ── App Updates ───────────────────────────────────────────
+  Future<Map<String, dynamic>> checkAppUpdate(String currentVersion) async {
+    return await _get('app-update/?current_version=$currentVersion');
+  }
+
+  // ── Maintenance Status ────────────────────────────────────
+  Future<Map<String, dynamic>> getMaintenanceStatus() async {
+    return await _get('maintenance/');
+  }
+
+  // ── Live Q&A ──────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getLiveQASessions() async {
+    final data = await _get('live-qa/', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> submitQAQuestion(int sessionId, String question) async {
+    return await _post('live-qa/$sessionId/questions/', {
+      'question': question,
+    }, auth: true);
+  }
+
+  Future<Map<String, dynamic>> upvoteQAQuestion(int sessionId, int questionId) async {
+    return await _post('live-qa/$sessionId/upvote_question/', {
+      'question_id': questionId,
+    }, auth: true);
+  }
+
+  // ── Reading Progress ──────────────────────────────────────
+  Future<void> updateReadingProgress(String contentType, int contentId, double progress) async {
+    await _post('reading-progress/', {
+      'content_type': contentType,
+      'content_id': contentId,
+      'progress_percentage': progress,
+    }, auth: true);
+  }
+
+  // ── Weather ───────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getWeatherCities() async {
+    final data = await _get('weather-cities/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  // ── Event Reminders ───────────────────────────────────────
+  Future<Map<String, dynamic>> setEventReminder(int eventId, int minutesBefore) async {
+    return await _post('event-reminders/', {
+      'event': eventId,
+      'minutes_before': minutesBefore,
+    }, auth: true);
+  }
+
+  Future<void> removeEventReminder(int reminderId) async {
+    await _delete('event-reminders/$reminderId/', auth: true);
+  }
+
+  // ── Export User Data (GDPR) ───────────────────────────────
+  Future<Map<String, dynamic>> exportUserData() async {
+    return await _get('auth/export-data/', auth: true);
+  }
 }
 
 class ApiException implements Exception {

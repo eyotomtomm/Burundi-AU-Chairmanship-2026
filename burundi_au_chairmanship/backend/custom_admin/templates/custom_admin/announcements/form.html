@@ -1,0 +1,79 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Announcement - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:announcements_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+      <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+    </a>
+    <h1 class="text-3xl font-bold text-slate-900 font-headline">{{ action }} Announcement</h1>
+  </div>
+
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Title (EN) <span class="text-red-500">*</span></label>
+          <input type="text" name="title" required value="{{ banner.title|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Title (FR)</label>
+          <input type="text" name="title_fr" value="{{ banner.title_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Message (EN)</label>
+          <textarea name="message" rows="3" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">{{ banner.message|default:'' }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Message (FR)</label>
+          <textarea name="message_fr" rows="3" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">{{ banner.message_fr|default:'' }}</textarea>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Banner Type</label>
+          <select name="banner_type" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <option value="info" {% if banner.banner_type == 'info' %}selected{% endif %}>Info</option>
+            <option value="warning" {% if banner.banner_type == 'warning' %}selected{% endif %}>Warning</option>
+            <option value="success" {% if banner.banner_type == 'success' %}selected{% endif %}>Success</option>
+            <option value="error" {% if banner.banner_type == 'error' %}selected{% endif %}>Error</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Link URL</label>
+          <input type="url" name="link_url" value="{{ banner.link_url|default:'' }}" placeholder="https://..." class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Starts At</label>
+          <input type="datetime-local" name="starts_at" value="{{ banner.starts_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Ends At</label>
+          <input type="datetime-local" name="ends_at" value="{{ banner.ends_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="flex gap-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="is_active" {% if banner.is_active or action == 'Create' %}checked{% endif %} class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+          <span class="text-sm text-slate-700">Active</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="is_dismissible" {% if banner.is_dismissible or action == 'Create' %}checked{% endif %} class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+          <span class="text-sm text-slate-700">Dismissible</span>
+        </label>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <a href="{% url 'custom_admin:announcements_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
+      <button type="submit" class="bg-amber-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-amber-700 transition-all shadow-sm">{{ action }} Announcement</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Event Speakers - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">record_voice_over</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Event Speakers</h1>
+        <p class="text-sm text-slate-500 mt-1">Manage speaker profiles for events</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <select onchange="window.location.href='?event='+this.value" class="border border-slate-200 bg-white rounded-lg py-2.5 px-4 text-sm">
+        <option value="">All Events</option>
+        {% for event in events %}
+        <option value="{{ event.pk }}" {% if current_event == event.pk|stringformat:"d" %}selected{% endif %}>{{ event.title|truncatewords:6 }}</option>
+        {% endfor %}
+      </select>
+      <a href="{% url 'custom_admin:event_speaker_create' %}" class="inline-flex items-center gap-2 bg-violet-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-violet-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">add</span>
+        Add Speaker
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for speaker in speakers %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
+      <div class="p-6">
+        <div class="flex items-start gap-4">
+          {% if speaker.photo %}
+          <img src="{{ speaker.photo.url }}" class="w-16 h-16 rounded-full object-cover flex-shrink-0">
+          {% else %}
+          <div class="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-xl flex-shrink-0">{{ speaker.name|first|upper }}</div>
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <p class="font-bold text-slate-900 text-sm">{{ speaker.name }}</p>
+            {% if speaker.title %}<p class="text-xs text-slate-600">{{ speaker.title }}</p>{% endif %}
+            {% if speaker.organization %}<p class="text-xs text-slate-500">{{ speaker.organization }}</p>{% endif %}
+          </div>
+        </div>
+        {% if speaker.topic %}<p class="text-xs text-slate-600 mt-3 bg-slate-50 rounded-lg px-3 py-2">Topic: {{ speaker.topic }}</p>{% endif %}
+        <p class="text-xs text-slate-400 mt-2">Event: {{ speaker.event.title|truncatewords:6 }}</p>
+      </div>
+      <div class="border-t border-slate-100 px-6 py-3 flex justify-end gap-1 bg-slate-50/50">
+        <a href="{% url 'custom_admin:event_speaker_edit' speaker.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">edit</span></a>
+        <form method="post" action="{% url 'custom_admin:event_speaker_delete' speaker.pk %}" class="inline" onsubmit="return confirm('Delete this speaker?');">{% csrf_token %}
+          <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">delete</span></button>
+        </form>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-span-full text-center py-16">
+      <span class="material-symbols-outlined text-5xl text-slate-300 mb-4">record_voice_over</span>
+      <p class="text-slate-500">No speakers yet</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

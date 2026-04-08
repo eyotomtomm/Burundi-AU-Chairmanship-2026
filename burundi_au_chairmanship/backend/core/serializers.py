@@ -10,6 +10,15 @@ from .models import (
     VerificationRequest, VerificationSocialMedia, WeatherCity, EventRegistration, RegistrationFormField,
     EventSubmission, FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     SupportTicket, TicketMessage, Popup,
+    # New models
+    LoginHistory, ActiveSession, PasswordChangeHistory, Bookmark, Reaction,
+    ReadingProgress, ContentSchedule, ArticleDraft, ContentVersion, ArticleSeries,
+    TrendingContent, EventReminder, EventWaitlist, EventSpeaker, EventFeedback,
+    EventCheckIn, EventPhoto, Conversation, DirectMessage, Discussion, DiscussionReply,
+    Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
+    ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
+    EmailTemplate, Webhook, ScheduledMaintenance, ABTest,
+    ContentAnalytics, EngagementHeatmap, WeeklyReport, TranslationEntry, AppRelease,
 )
 
 
@@ -497,9 +506,9 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         model = VerificationRequest
         fields = [
             'id', 'user', 'user_name', 'user_email',
-            'title', 'first_name', 'last_name', 'full_name',
+            'title', 'first_name', 'last_name', 'full_name', 'gender',
             'email', 'country_code', 'phone_number', 'phone_verified',
-            'position_role', 'reasoning_message',
+            'position_role', 'reasoning_message', 'supporting_document',
             'social_media_profiles',
             'status', 'badge_type', 'rejection_reason',
             'appeal_message', 'appeal_submitted_at',
@@ -750,3 +759,439 @@ class PopupSerializer(serializers.ModelSerializer):
             else:
                 ret['image'] = instance.image.url
         return ret
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — Authentication & Security
+# ══════════════════════════════════════════════════════════════
+
+class LoginHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LoginHistory
+        fields = ['id', 'email', 'method', 'ip_address', 'device_type',
+                  'country', 'city', 'success', 'failure_reason', 'created_at']
+        read_only_fields = fields
+
+
+class ActiveSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActiveSession
+        fields = ['id', 'device_name', 'device_type', 'ip_address', 'location',
+                  'app_version', 'is_current', 'last_active', 'created_at']
+        read_only_fields = fields
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """Serializer for changing password."""
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Current password is incorrect.')
+        return value
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — Content & Media
+# ══════════════════════════════════════════════════════════════
+
+class BookmarkSerializer(serializers.ModelSerializer):
+    content_title = serializers.SerializerMethodField()
+    content_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Bookmark
+        fields = ['id', 'content_type', 'content_id', 'notes', 'content_title',
+                  'content_image', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def get_content_title(self, obj):
+        try:
+            if obj.content_type == 'article':
+                return Article.objects.get(pk=obj.content_id).title
+            elif obj.content_type == 'magazine':
+                return MagazineEdition.objects.get(pk=obj.content_id).title
+            elif obj.content_type == 'video':
+                return Video.objects.get(pk=obj.content_id).title
+        except Exception:
+            pass
+        return None
+
+    def get_content_image(self, obj):
+        request = self.context.get('request')
+        try:
+            img = None
+            if obj.content_type == 'article':
+                img = Article.objects.get(pk=obj.content_id).image
+            elif obj.content_type == 'magazine':
+                img = MagazineEdition.objects.get(pk=obj.content_id).cover_image
+            elif obj.content_type == 'video':
+                img = Video.objects.get(pk=obj.content_id).thumbnail
+            if img and request:
+                return request.build_absolute_uri(img.url)
+        except Exception:
+            pass
+        return None
+
+
+class ReactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reaction
+        fields = ['id', 'content_type', 'content_id', 'reaction_type', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ReadingProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReadingProgress
+        fields = ['id', 'article', 'progress_percent', 'scroll_position',
+                  'completed', 'last_read_at']
+        read_only_fields = ['id', 'last_read_at']
+
+
+class ArticleDraftSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ArticleDraft
+        fields = ['id', 'title', 'title_fr', 'content', 'content_fr',
+                  'image', 'author', 'category', 'auto_saved',
+                  'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ContentVersionSerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.CharField(source='changed_by.username', read_only=True, default='')
+
+    class Meta:
+        model = ContentVersion
+        fields = ['id', 'content_type', 'content_id', 'version_number',
+                  'data_snapshot', 'changed_by_name', 'change_summary', 'created_at']
+        read_only_fields = fields
+
+
+class ArticleSeriesSerializer(serializers.ModelSerializer):
+    article_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ArticleSeries
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'cover_image', 'article_count', 'is_active', 'order']
+
+    def get_article_count(self, obj):
+        return obj.articles.count()
+
+
+class TrendingContentSerializer(serializers.ModelSerializer):
+    content_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrendingContent
+        fields = ['id', 'content_type', 'content_id', 'score',
+                  'content_title', 'period_start', 'period_end']
+
+    def get_content_title(self, obj):
+        try:
+            if obj.content_type == 'article':
+                return Article.objects.get(pk=obj.content_id).title
+            elif obj.content_type == 'magazine':
+                return MagazineEdition.objects.get(pk=obj.content_id).title
+            elif obj.content_type == 'video':
+                return Video.objects.get(pk=obj.content_id).title
+        except Exception:
+            pass
+        return None
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — Events & Calendar
+# ══════════════════════════════════════════════════════════════
+
+class EventReminderSerializer(serializers.ModelSerializer):
+    event_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventReminder
+        fields = ['id', 'event', 'event_registration', 'reminder_type',
+                  'reminder_time', 'sent', 'event_name', 'created_at']
+        read_only_fields = ['id', 'sent', 'created_at']
+
+    def get_event_name(self, obj):
+        if obj.event:
+            return obj.event.name
+        if obj.event_registration:
+            return obj.event_registration.event_title
+        return None
+
+
+class EventWaitlistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventWaitlist
+        fields = ['id', 'event_registration', 'position', 'notified',
+                  'promoted', 'created_at']
+        read_only_fields = ['id', 'position', 'notified', 'promoted', 'created_at']
+
+
+class EventSpeakerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventSpeaker
+        fields = ['id', 'name', 'title', 'bio', 'bio_fr', 'photo',
+                  'organization', 'linkedin_url', 'twitter_handle', 'order']
+
+
+class EventFeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventFeedback
+        fields = ['id', 'event', 'event_registration', 'overall_rating',
+                  'content_rating', 'organization_rating', 'venue_rating',
+                  'comments', 'would_recommend', 'submitted_at']
+        read_only_fields = ['id', 'submitted_at']
+
+
+class EventCheckInSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.first_name', read_only=True)
+
+    class Meta:
+        model = EventCheckIn
+        fields = ['id', 'user', 'user_name', 'event', 'event_registration',
+                  'qr_code', 'checked_in', 'checked_in_at', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class EventPhotoSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.first_name', read_only=True)
+
+    class Meta:
+        model = EventPhoto
+        fields = ['id', 'user', 'user_name', 'event', 'event_registration',
+                  'image', 'caption', 'is_approved', 'created_at']
+        read_only_fields = ['id', 'user', 'is_approved', 'created_at']
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — Communication & Social
+# ══════════════════════════════════════════════════════════════
+
+class ConversationSerializer(serializers.ModelSerializer):
+    participant_names = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Conversation
+        fields = ['id', 'participant_names', 'last_message', 'unread_count',
+                  'last_message_at', 'created_at']
+
+    def get_participant_names(self, obj):
+        request = self.context.get('request')
+        return [
+            {'id': u.id, 'name': f'{u.first_name} {u.last_name}'.strip() or u.username}
+            for u in obj.participants.all()
+            if not request or u != request.user
+        ]
+
+    def get_last_message(self, obj):
+        msg = obj.messages.order_by('-created_at').first()
+        if msg:
+            return {'content': msg.content[:100], 'sender_id': msg.sender_id, 'created_at': msg.created_at}
+        return None
+
+    def get_unread_count(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
+        return 0
+
+
+class DirectMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DirectMessage
+        fields = ['id', 'conversation', 'sender', 'sender_name', 'content',
+                  'attachment', 'is_read', 'read_at', 'created_at']
+        read_only_fields = ['id', 'sender', 'is_read', 'read_at', 'created_at']
+
+    def get_sender_name(self, obj):
+        return f'{obj.sender.first_name} {obj.sender.last_name}'.strip() or obj.sender.username
+
+
+class DiscussionSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    author_badge = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Discussion
+        fields = ['id', 'title', 'content', 'category', 'author', 'author_name',
+                  'author_badge', 'is_pinned', 'is_locked', 'view_count',
+                  'reply_count', 'last_reply_at', 'created_at']
+        read_only_fields = ['id', 'author', 'view_count', 'reply_count',
+                            'last_reply_at', 'created_at']
+
+    def get_author_name(self, obj):
+        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or obj.author.username
+
+    def get_author_badge(self, obj):
+        if hasattr(obj.author, 'profile') and obj.author.profile.is_verified:
+            return obj.author.profile.badge_type
+        return None
+
+
+class DiscussionReplySerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DiscussionReply
+        fields = ['id', 'discussion', 'author', 'author_name', 'content',
+                  'parent', 'like_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'author', 'like_count', 'created_at', 'updated_at']
+
+    def get_author_name(self, obj):
+        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or obj.author.username
+
+
+class PollOptionSerializer(serializers.ModelSerializer):
+    vote_percentage = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PollOption
+        fields = ['id', 'text', 'text_fr', 'vote_count', 'vote_percentage', 'order']
+
+    def get_vote_percentage(self, obj):
+        if obj.poll.total_votes > 0:
+            return round((obj.vote_count / obj.poll.total_votes) * 100, 1)
+        return 0
+
+
+class PollSerializer(serializers.ModelSerializer):
+    options = PollOptionSerializer(many=True, read_only=True)
+    user_voted = serializers.SerializerMethodField()
+    user_vote_option = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Poll
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'is_anonymous', 'multiple_choice', 'expires_at', 'total_votes',
+                  'options', 'user_voted', 'user_vote_option', 'created_at']
+
+    def get_user_voted(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return PollVote.objects.filter(poll=obj, user=request.user).exists()
+        return False
+
+    def get_user_vote_option(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            votes = PollVote.objects.filter(poll=obj, user=request.user).values_list('option_id', flat=True)
+            return list(votes)
+        return []
+
+
+class NotificationPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NotificationPreference
+        fields = ['push_enabled', 'email_enabled', 'new_articles', 'new_magazines',
+                  'event_reminders', 'event_updates', 'live_streams',
+                  'verification_updates', 'support_replies', 'polls_surveys',
+                  'direct_messages', 'discussion_replies', 'system_updates',
+                  'quiet_hours_enabled', 'quiet_start', 'quiet_end']
+
+
+class AnnouncementBannerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AnnouncementBanner
+        fields = ['id', 'message', 'message_fr', 'banner_type', 'action_url',
+                  'action_text', 'action_text_fr', 'is_dismissible', 'priority']
+
+
+class ContactDirectorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactDirectory
+        fields = ['id', 'name', 'title', 'organization', 'category',
+                  'email', 'phone', 'photo', 'country', 'order']
+
+
+class LiveQASessionSerializer(serializers.ModelSerializer):
+    question_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LiveQASession
+        fields = ['id', 'title', 'event', 'event_registration', 'is_active',
+                  'question_count', 'started_at', 'ended_at']
+
+    def get_question_count(self, obj):
+        return obj.questions.filter(is_approved=True).count()
+
+
+class LiveQAQuestionSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LiveQAQuestion
+        fields = ['id', 'session', 'user', 'user_name', 'question', 'is_answered',
+                  'is_approved', 'upvote_count', 'answer', 'answered_at', 'created_at']
+        read_only_fields = ['id', 'user', 'is_answered', 'is_approved', 'upvote_count',
+                            'answer', 'answered_at', 'created_at']
+
+    def get_user_name(self, obj):
+        return f'{obj.user.first_name} {obj.user.last_name}'.strip() or obj.user.username
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — User Preferences & Onboarding
+# ══════════════════════════════════════════════════════════════
+
+class UserPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreference
+        fields = ['theme', 'text_size', 'auto_play_videos', 'haptic_feedback',
+                  'data_saver_mode', 'onboarding_completed', 'onboarding_step',
+                  'profile_completion', 'interests']
+
+
+class OnboardingStepSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OnboardingStep
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'image', 'icon_name', 'order']
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW SERIALIZERS — Admin & Infrastructure
+# ══════════════════════════════════════════════════════════════
+
+class EmailTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmailTemplate
+        fields = ['id', 'key', 'subject', 'subject_fr', 'body_html', 'body_html_fr',
+                  'body_text', 'body_text_fr', 'is_active']
+
+
+class ScheduledMaintenanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScheduledMaintenance
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'starts_at', 'ends_at', 'is_active', 'show_banner']
+
+
+class AppReleaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppRelease
+        fields = ['id', 'version', 'version_code', 'title', 'title_fr',
+                  'release_notes', 'release_notes_fr', 'is_force_update',
+                  'min_supported_version', 'android_url', 'ios_url', 'released_at']
+
+
+class ContentAnalyticsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContentAnalytics
+        fields = ['content_type', 'content_id', 'date', 'views', 'likes',
+                  'shares', 'comments', 'bookmarks', 'avg_read_time_seconds']
+
+
+class WeeklyReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WeeklyReport
+        fields = ['id', 'week_start', 'week_end', 'new_users', 'active_users',
+                  'total_views', 'total_engagements', 'top_content', 'generated_at']

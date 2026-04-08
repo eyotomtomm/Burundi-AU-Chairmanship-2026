@@ -1,0 +1,111 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Discussions - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">forum</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Discussions</h1>
+        <p class="text-sm text-slate-500 mt-1">Moderate community forum discussions</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <select onchange="window.location.href='?category='+this.value" class="border border-slate-200 bg-white rounded-lg py-2.5 px-4 text-sm">
+        <option value="">All Categories</option>
+        {% for val, label in category_choices %}
+        <option value="{{ val }}" {% if current_category == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Discussions</p>
+      <p class="text-2xl font-bold text-slate-900 mt-1">{{ total }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-blue-100">
+      <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Pinned</p>
+      <p class="text-2xl font-bold text-blue-700 mt-1">{{ pinned }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-amber-100">
+      <p class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Locked</p>
+      <p class="text-2xl font-bold text-amber-700 mt-1">{{ locked }}</p>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Discussion</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Author</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Category</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Replies</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for d in discussions %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-2">
+                {% if d.is_pinned %}<span class="material-symbols-outlined text-blue-500 text-sm">push_pin</span>{% endif %}
+                {% if d.is_locked %}<span class="material-symbols-outlined text-amber-500 text-sm">lock</span>{% endif %}
+                <p class="font-semibold text-slate-900 text-sm">{{ d.title|truncatewords:10 }}</p>
+              </div>
+            </td>
+            <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ d.author.username }}</span></td>
+            <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-semibold rounded">{{ d.get_category_display }}</span></td>
+            <td class="px-6 py-4"><span class="text-sm font-semibold text-slate-900">{{ d.reply_count }}</span></td>
+            <td class="px-6 py-4">
+              <div class="flex gap-1">
+                {% if d.is_pinned %}<span class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Pinned</span>{% endif %}
+                {% if d.is_locked %}<span class="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-full">Locked</span>{% endif %}
+                {% if not d.is_pinned and not d.is_locked %}<span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">Open</span>{% endif %}
+              </div>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <form method="post" action="{% url 'custom_admin:discussion_toggle_pin' d.pk %}" class="inline">{% csrf_token %}
+                  <button type="submit" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="{% if d.is_pinned %}Unpin{% else %}Pin{% endif %}">
+                    <span class="material-symbols-outlined text-xl">push_pin</span>
+                  </button>
+                </form>
+                <form method="post" action="{% url 'custom_admin:discussion_toggle_lock' d.pk %}" class="inline">{% csrf_token %}
+                  <button type="submit" class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="{% if d.is_locked %}Unlock{% else %}Lock{% endif %}">
+                    <span class="material-symbols-outlined text-xl">{% if d.is_locked %}lock_open{% else %}lock{% endif %}</span>
+                  </button>
+                </form>
+                <form method="post" action="{% url 'custom_admin:discussion_delete' d.pk %}" class="inline" onsubmit="return confirm('Delete this discussion?');">{% csrf_token %}
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                    <span class="material-symbols-outlined text-xl">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-6 py-16 text-center"><p class="text-slate-500">No discussions yet</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if discussions.has_other_pages %}
+  <div class="mt-6 flex justify-center gap-2">
+    {% if discussions.has_previous %}<a href="?page={{ discussions.previous_page_number }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Previous</a>{% endif %}
+    <span class="px-4 py-2 text-sm text-slate-500">Page {{ discussions.number }} of {{ discussions.paginator.num_pages }}</span>
+    {% if discussions.has_next %}<a href="?page={{ discussions.next_page_number }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Next</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

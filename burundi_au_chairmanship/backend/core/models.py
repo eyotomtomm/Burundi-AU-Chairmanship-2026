@@ -1415,13 +1415,21 @@ class VerificationRequest(models.Model):
         profile.save()
 
         # Transfer verified data to user profile (don't overwrite existing data)
-        if self.full_name:
+        # Use explicit first/last name fields if available, otherwise parse full_name
+        if self.first_name and not self.user.first_name:
+            self.user.first_name = self.first_name
+        if self.last_name and not self.user.last_name:
+            self.user.last_name = self.last_name
+        if not self.user.first_name and self.full_name:
             parts = self.full_name.split(' ', 1)
-            if not self.user.first_name:
-                self.user.first_name = parts[0]
+            self.user.first_name = parts[0]
             if not self.user.last_name and len(parts) > 1:
                 self.user.last_name = parts[1]
-            self.user.save(update_fields=['first_name', 'last_name'])
+        self.user.save(update_fields=['first_name', 'last_name'])
+
+        if self.email and not self.user.email:
+            self.user.email = self.email
+            self.user.save(update_fields=['email'])
         if self.phone_number and not profile.phone_number:
             profile.phone_number = self.phone_number
         if self.gender and not profile.gender:
@@ -1684,6 +1692,1101 @@ class UserSession(models.Model):
         return f"{user_str} from {self.country_name or self.ip_address} at {self.created_at}"
 
 
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Authentication & Security
+# ══════════════════════════════════════════════════════════════
+
+class LoginHistory(models.Model):
+    """Tracks all login attempts (success and failure) for security auditing."""
+    METHOD_CHOICES = [
+        ('email', 'Email/Password'),
+        ('firebase_google', 'Google (Firebase)'),
+        ('firebase_apple', 'Apple (Firebase)'),
+        ('firebase_email', 'Email (Firebase)'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='login_history', null=True, blank=True)
+    email = models.EmailField(blank=True, help_text='Email used for login attempt')
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='email')
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True)
+    device_type = models.CharField(max_length=50, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    success = models.BooleanField(default=True)
+    failure_reason = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Login History'
+        verbose_name_plural = 'Login History'
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        status = 'Success' if self.success else 'Failed'
+        return f"{self.email or 'unknown'} - {status} - {self.created_at}"
+
+
+class ActiveSession(models.Model):
+    """Tracks active user sessions for multi-device management."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='active_sessions')
+    session_key = models.CharField(max_length=255, unique=True, db_index=True)
+    device_name = models.CharField(max_length=200, blank=True, help_text='e.g. iPhone 15 Pro')
+    device_type = models.CharField(max_length=50, blank=True, help_text='e.g. ios, android, web')
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    location = models.CharField(max_length=200, blank=True)
+    app_version = models.CharField(max_length=20, blank=True)
+    is_current = models.BooleanField(default=False, help_text='Is this the current session?')
+    last_active = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-last_active']
+        verbose_name = 'Active Session'
+        verbose_name_plural = 'Active Sessions'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.device_name or 'Unknown device'}"
+
+
+class PasswordChangeHistory(models.Model):
+    """Tracks password changes for security."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_changes')
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+        verbose_name = 'Password Change'
+        verbose_name_plural = 'Password Changes'
+
+    def __str__(self):
+        return f"{self.user.username} changed password at {self.changed_at}"
+
+
+class IPWhitelist(models.Model):
+    """IP whitelist for admin portal access."""
+    ip_address = models.GenericIPAddressField(unique=True)
+    label = models.CharField(max_length=100, help_text='e.g. Office HQ, VPN')
+    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'IP Whitelist'
+        verbose_name_plural = 'IP Whitelist'
+
+    def __str__(self):
+        return f"{self.ip_address} ({self.label})"
+
+
+class AccountMergeRequest(models.Model):
+    """Request to merge two accounts (e.g., email + social login)."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    primary_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='merge_requests_primary')
+    secondary_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='merge_requests_secondary')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reason = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_merges')
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Account Merge Request'
+        verbose_name_plural = 'Account Merge Requests'
+
+    def __str__(self):
+        return f"Merge {self.secondary_user.username} into {self.primary_user.username}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Content & Media
+# ══════════════════════════════════════════════════════════════
+
+class Bookmark(models.Model):
+    """User bookmarks for articles, magazines, videos, etc."""
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('magazine', 'Magazine'),
+        ('video', 'Video'),
+        ('event', 'Event'),
+        ('feature_card', 'Feature Card'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookmarks')
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    content_id = models.PositiveIntegerField()
+    notes = models.TextField(blank=True, help_text='User notes about this bookmark')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'content_type', 'content_id')
+        ordering = ['-created_at']
+        verbose_name = 'Bookmark'
+        verbose_name_plural = 'Bookmarks'
+        indexes = [
+            models.Index(fields=['user', 'content_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} bookmarked {self.content_type}:{self.content_id}"
+
+
+class Reaction(models.Model):
+    """Emoji reactions on content (articles, magazines, videos)."""
+    REACTION_CHOICES = [
+        ('like', 'Like'),
+        ('love', 'Love'),
+        ('celebrate', 'Celebrate'),
+        ('insightful', 'Insightful'),
+        ('curious', 'Curious'),
+    ]
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('magazine', 'Magazine'),
+        ('video', 'Video'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reactions')
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    content_id = models.PositiveIntegerField()
+    reaction_type = models.CharField(max_length=20, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'content_type', 'content_id')
+        ordering = ['-created_at']
+        verbose_name = 'Reaction'
+        verbose_name_plural = 'Reactions'
+
+    def __str__(self):
+        return f"{self.user.username} reacted {self.reaction_type} on {self.content_type}:{self.content_id}"
+
+
+class ReadingProgress(models.Model):
+    """Track reading progress for articles."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reading_progress')
+    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='reading_progress')
+    progress_percent = models.IntegerField(default=0, help_text='0-100 reading progress')
+    scroll_position = models.IntegerField(default=0, help_text='Pixel scroll position')
+    completed = models.BooleanField(default=False)
+    last_read_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'article')
+        verbose_name = 'Reading Progress'
+        verbose_name_plural = 'Reading Progress'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.article.title[:30]} ({self.progress_percent}%)"
+
+
+class ContentSchedule(models.Model):
+    """Schedule content for future publication."""
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('notification', 'Notification'),
+        ('popup', 'Popup'),
+    ]
+    STATUS_CHOICES = [
+        ('scheduled', 'Scheduled'),
+        ('published', 'Published'),
+        ('cancelled', 'Cancelled'),
+    ]
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    content_id = models.PositiveIntegerField()
+    scheduled_for = models.DateTimeField(db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['scheduled_for']
+        verbose_name = 'Content Schedule'
+        verbose_name_plural = 'Content Schedules'
+
+    def __str__(self):
+        return f"{self.content_type}:{self.content_id} scheduled for {self.scheduled_for}"
+
+
+class ArticleDraft(models.Model):
+    """Draft articles that haven't been published yet."""
+    title = models.CharField(max_length=300)
+    title_fr = models.CharField(max_length=300, blank=True)
+    content = models.TextField()
+    content_fr = models.TextField(blank=True)
+    image = models.ImageField(upload_to='article_drafts/', blank=True, validators=[validate_image_file])
+    author = models.CharField(max_length=100)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='article_drafts')
+    last_edited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='edited_drafts')
+    auto_saved = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        verbose_name = 'Article Draft'
+        verbose_name_plural = 'Article Drafts'
+
+    def __str__(self):
+        return f"[DRAFT] {self.title}"
+
+
+class ContentVersion(models.Model):
+    """Version history for content (articles, feature cards)."""
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('feature_card', 'Feature Card'),
+        ('notification', 'Notification'),
+    ]
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    content_id = models.PositiveIntegerField()
+    version_number = models.PositiveIntegerField()
+    data_snapshot = models.JSONField(help_text='Full JSON snapshot of the content at this version')
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    change_summary = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('content_type', 'content_id', 'version_number')
+        ordering = ['-version_number']
+        verbose_name = 'Content Version'
+        verbose_name_plural = 'Content Versions'
+
+    def __str__(self):
+        return f"{self.content_type}:{self.content_id} v{self.version_number}"
+
+
+class ArticleSeries(models.Model):
+    """Group articles into a series/collection."""
+    title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    description_fr = models.TextField(blank=True)
+    cover_image = models.ImageField(upload_to='article_series/', blank=True, validators=[validate_image_file])
+    articles = models.ManyToManyField(Article, blank=True, related_name='series')
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = 'Article Series'
+        verbose_name_plural = 'Article Series'
+
+    def __str__(self):
+        return self.title
+
+
+class TrendingContent(models.Model):
+    """Tracks trending content based on views and engagement."""
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('magazine', 'Magazine'),
+        ('video', 'Video'),
+    ]
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    content_id = models.PositiveIntegerField()
+    score = models.FloatField(default=0, help_text='Trending score based on views, likes, shares')
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-score']
+        verbose_name = 'Trending Content'
+        verbose_name_plural = 'Trending Content'
+        indexes = [
+            models.Index(fields=['content_type', '-score']),
+        ]
+
+    def __str__(self):
+        return f"{self.content_type}:{self.content_id} score={self.score}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Events & Calendar
+# ══════════════════════════════════════════════════════════════
+
+class EventReminder(models.Model):
+    """User-set reminders for events."""
+    REMINDER_CHOICES = [
+        ('15min', '15 minutes before'),
+        ('30min', '30 minutes before'),
+        ('1hour', '1 hour before'),
+        ('1day', '1 day before'),
+        ('1week', '1 week before'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_reminders')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='reminders', null=True, blank=True)
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='reminders', null=True, blank=True)
+    reminder_type = models.CharField(max_length=10, choices=REMINDER_CHOICES, default='1hour')
+    reminder_time = models.DateTimeField(help_text='Computed time to send reminder')
+    sent = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['reminder_time']
+        verbose_name = 'Event Reminder'
+        verbose_name_plural = 'Event Reminders'
+
+    def __str__(self):
+        event_name = self.event.name if self.event else self.event_registration.event_title if self.event_registration else 'Unknown'
+        return f"{self.user.username} reminder for {event_name}"
+
+
+class EventWaitlist(models.Model):
+    """Waitlist for full-capacity events."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_waitlists')
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='waitlist')
+    position = models.PositiveIntegerField(default=0, help_text='Position in waitlist queue')
+    notified = models.BooleanField(default=False, help_text='User notified of spot opening')
+    promoted = models.BooleanField(default=False, help_text='User promoted from waitlist to registered')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'event_registration')
+        ordering = ['position', 'created_at']
+        verbose_name = 'Event Waitlist'
+        verbose_name_plural = 'Event Waitlists'
+
+    def __str__(self):
+        return f"{self.user.username} waitlisted for {self.event_registration.event_title}"
+
+
+class EventSpeaker(models.Model):
+    """Speaker profiles for events."""
+    name = models.CharField(max_length=200)
+    title = models.CharField(max_length=200, blank=True, help_text='e.g. Minister of Foreign Affairs')
+    bio = models.TextField(blank=True)
+    bio_fr = models.TextField(blank=True)
+    photo = models.ImageField(upload_to='event_speakers/', blank=True, validators=[validate_image_file])
+    organization = models.CharField(max_length=200, blank=True)
+    linkedin_url = models.URLField(blank=True)
+    twitter_handle = models.CharField(max_length=100, blank=True)
+    events = models.ManyToManyField(Event, blank=True, related_name='speakers')
+    event_registrations = models.ManyToManyField(EventRegistration, blank=True, related_name='speakers')
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Event Speaker'
+        verbose_name_plural = 'Event Speakers'
+
+    def __str__(self):
+        return f"{self.name} - {self.title}"
+
+
+class EventFeedback(models.Model):
+    """Post-event feedback and surveys."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_feedback')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='feedback', null=True, blank=True)
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='feedback', null=True, blank=True)
+    overall_rating = models.PositiveSmallIntegerField(help_text='1-5 stars')
+    content_rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    organization_rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    venue_rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    comments = models.TextField(blank=True)
+    would_recommend = models.BooleanField(default=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+        verbose_name = 'Event Feedback'
+        verbose_name_plural = 'Event Feedback'
+
+    def __str__(self):
+        event_name = self.event.name if self.event else self.event_registration.event_title if self.event_registration else 'Unknown'
+        return f"{self.user.username} feedback for {event_name} ({self.overall_rating}/5)"
+
+
+class EventCheckIn(models.Model):
+    """QR code check-in tracking for events."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_checkins')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='checkins', null=True, blank=True)
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='checkins', null=True, blank=True)
+    submission = models.ForeignKey(EventSubmission, on_delete=models.SET_NULL, null=True, blank=True)
+    qr_code = models.CharField(max_length=255, unique=True, db_index=True)
+    checked_in = models.BooleanField(default=False)
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_in_users')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Event Check-In'
+        verbose_name_plural = 'Event Check-Ins'
+
+    def __str__(self):
+        return f"{self.user.username} check-in ({self.qr_code[:8]}...)"
+
+
+class EventPhoto(models.Model):
+    """User-uploaded photos for events."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_photos')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='user_photos', null=True, blank=True)
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='user_photos', null=True, blank=True)
+    image = models.ImageField(upload_to='event_photos/', validators=[validate_image_file])
+    caption = models.CharField(max_length=300, blank=True)
+    is_approved = models.BooleanField(default=False, help_text='Admin must approve before public display')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Event Photo'
+        verbose_name_plural = 'Event Photos'
+
+    def __str__(self):
+        return f"Photo by {self.user.username}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Communication & Social
+# ══════════════════════════════════════════════════════════════
+
+class Conversation(models.Model):
+    """Direct message conversation between two users."""
+    participants = models.ManyToManyField(User, related_name='conversations')
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-last_message_at']
+        verbose_name = 'Conversation'
+        verbose_name_plural = 'Conversations'
+
+    def __str__(self):
+        usernames = ', '.join(u.username for u in self.participants.all()[:3])
+        return f"Conversation: {usernames}"
+
+
+class DirectMessage(models.Model):
+    """Individual message in a conversation."""
+    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    content = models.TextField()
+    attachment = models.ImageField(upload_to='messages/attachments/', blank=True, null=True, validators=[validate_image_file])
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Direct Message'
+        verbose_name_plural = 'Direct Messages'
+
+    def __str__(self):
+        return f"{self.sender.username}: {self.content[:50]}"
+
+
+class Discussion(models.Model):
+    """Forum discussion/thread."""
+    CATEGORY_CHOICES = [
+        ('general', 'General'),
+        ('events', 'Events'),
+        ('culture', 'Culture'),
+        ('politics', 'Politics & Diplomacy'),
+        ('business', 'Business & Trade'),
+        ('announcements', 'Announcements'),
+    ]
+    title = models.CharField(max_length=300)
+    content = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussions')
+    is_pinned = models.BooleanField(default=False)
+    is_locked = models.BooleanField(default=False, help_text='Prevent new replies')
+    view_count = models.PositiveIntegerField(default=0)
+    reply_count = models.PositiveIntegerField(default=0)
+    last_reply_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_pinned', '-last_reply_at', '-created_at']
+        verbose_name = 'Discussion'
+        verbose_name_plural = 'Discussions'
+
+    def __str__(self):
+        return self.title
+
+
+class DiscussionReply(models.Model):
+    """Reply in a discussion thread."""
+    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name='replies')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussion_replies')
+    content = models.TextField()
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
+    like_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Discussion Reply'
+        verbose_name_plural = 'Discussion Replies'
+
+    def __str__(self):
+        return f"Reply by {self.author.username} on {self.discussion.title[:30]}"
+
+
+class Poll(models.Model):
+    """Polls and surveys."""
+    title = models.CharField(max_length=300)
+    title_fr = models.CharField(max_length=300, blank=True)
+    description = models.TextField(blank=True)
+    description_fr = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_polls')
+    is_active = models.BooleanField(default=True)
+    is_anonymous = models.BooleanField(default=False, help_text='Hide voter identity')
+    multiple_choice = models.BooleanField(default=False, help_text='Allow selecting multiple options')
+    expires_at = models.DateTimeField(null=True, blank=True)
+    total_votes = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Poll'
+        verbose_name_plural = 'Polls'
+
+    def __str__(self):
+        return self.title
+
+
+class PollOption(models.Model):
+    """Individual option in a poll."""
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='options')
+    text = models.CharField(max_length=200)
+    text_fr = models.CharField(max_length=200, blank=True)
+    vote_count = models.PositiveIntegerField(default=0)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Poll Option'
+        verbose_name_plural = 'Poll Options'
+
+    def __str__(self):
+        return f"{self.poll.title[:30]} - {self.text}"
+
+
+class PollVote(models.Model):
+    """User vote on a poll option."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_votes')
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='votes')
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='votes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'option')
+        verbose_name = 'Poll Vote'
+        verbose_name_plural = 'Poll Votes'
+
+    def __str__(self):
+        return f"{self.user.username} voted for {self.option.text[:30]}"
+
+
+class NotificationPreference(models.Model):
+    """User notification preferences (per-category toggle)."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preferences')
+    push_enabled = models.BooleanField(default=True)
+    email_enabled = models.BooleanField(default=False)
+    # Category toggles
+    new_articles = models.BooleanField(default=True)
+    new_magazines = models.BooleanField(default=True)
+    event_reminders = models.BooleanField(default=True)
+    event_updates = models.BooleanField(default=True)
+    live_streams = models.BooleanField(default=True)
+    verification_updates = models.BooleanField(default=True)
+    support_replies = models.BooleanField(default=True)
+    polls_surveys = models.BooleanField(default=True)
+    direct_messages = models.BooleanField(default=True)
+    discussion_replies = models.BooleanField(default=True)
+    system_updates = models.BooleanField(default=True)
+    # Quiet hours
+    quiet_hours_enabled = models.BooleanField(default=False)
+    quiet_start = models.TimeField(null=True, blank=True, help_text='e.g. 22:00')
+    quiet_end = models.TimeField(null=True, blank=True, help_text='e.g. 07:00')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Notification Preference'
+        verbose_name_plural = 'Notification Preferences'
+
+    def __str__(self):
+        return f"{self.user.username}'s notification preferences"
+
+
+class AnnouncementBanner(models.Model):
+    """Global announcement banners shown at top of app."""
+    TYPE_CHOICES = [
+        ('info', 'Information'),
+        ('warning', 'Warning'),
+        ('success', 'Success'),
+        ('urgent', 'Urgent'),
+    ]
+    message = models.CharField(max_length=500)
+    message_fr = models.CharField(max_length=500, blank=True)
+    banner_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='info')
+    action_url = models.CharField(max_length=500, blank=True)
+    action_text = models.CharField(max_length=100, blank=True)
+    action_text_fr = models.CharField(max_length=100, blank=True)
+    is_dismissible = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    priority = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-priority', '-created_at']
+        verbose_name = 'Announcement Banner'
+        verbose_name_plural = 'Announcement Banners'
+
+    def __str__(self):
+        return f"[{self.banner_type}] {self.message[:50]}"
+
+
+class ContactDirectory(models.Model):
+    """Contact directory for officials and organizations."""
+    CATEGORY_CHOICES = [
+        ('government', 'Government Official'),
+        ('diplomat', 'Diplomat'),
+        ('organization', 'Organization'),
+        ('media', 'Media'),
+        ('other', 'Other'),
+    ]
+    name = models.CharField(max_length=200)
+    title = models.CharField(max_length=200, blank=True)
+    organization = models.CharField(max_length=200, blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    photo = models.ImageField(upload_to='contacts/', blank=True, validators=[validate_image_file])
+    country = models.CharField(max_length=5, choices=NATIONALITY_CHOICES, blank=True)
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Contact Directory'
+        verbose_name_plural = 'Contact Directory'
+
+    def __str__(self):
+        return f"{self.name} - {self.title}"
+
+
+class LiveQASession(models.Model):
+    """Live Q&A sessions for events."""
+    title = models.CharField(max_length=200)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='qa_sessions', null=True, blank=True)
+    event_registration = models.ForeignKey(EventRegistration, on_delete=models.CASCADE, related_name='qa_sessions', null=True, blank=True)
+    moderator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='moderated_qa')
+    is_active = models.BooleanField(default=False)
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Live Q&A Session'
+        verbose_name_plural = 'Live Q&A Sessions'
+
+    def __str__(self):
+        return self.title
+
+
+class LiveQAQuestion(models.Model):
+    """User-submitted question in a live Q&A session."""
+    session = models.ForeignKey(LiveQASession, on_delete=models.CASCADE, related_name='questions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='qa_questions')
+    question = models.TextField()
+    is_answered = models.BooleanField(default=False)
+    is_approved = models.BooleanField(default=False, help_text='Moderator approved for display')
+    upvote_count = models.PositiveIntegerField(default=0)
+    answer = models.TextField(blank=True)
+    answered_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-upvote_count', '-created_at']
+        verbose_name = 'Q&A Question'
+        verbose_name_plural = 'Q&A Questions'
+
+    def __str__(self):
+        return f"Q: {self.question[:50]}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — User Preferences & Onboarding
+# ══════════════════════════════════════════════════════════════
+
+class UserPreference(models.Model):
+    """User preferences and settings."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+    theme = models.CharField(max_length=10, choices=[('light', 'Light'), ('dark', 'Dark'), ('system', 'System')], default='system')
+    text_size = models.CharField(max_length=10, choices=[('small', 'Small'), ('medium', 'Medium'), ('large', 'Large')], default='medium')
+    auto_play_videos = models.BooleanField(default=True)
+    haptic_feedback = models.BooleanField(default=True)
+    data_saver_mode = models.BooleanField(default=False, help_text='Reduce image quality and disable autoplay')
+    onboarding_completed = models.BooleanField(default=False)
+    onboarding_step = models.IntegerField(default=0)
+    profile_completion = models.IntegerField(default=0, help_text='Profile completion percentage')
+    # Interests for personalized content
+    interests = models.JSONField(default=list, blank=True, help_text='List of interest tags')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'User Preference'
+        verbose_name_plural = 'User Preferences'
+
+    def __str__(self):
+        return f"{self.user.username}'s preferences"
+
+
+class OnboardingStep(models.Model):
+    """Configurable onboarding walkthrough steps."""
+    title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True)
+    description = models.TextField()
+    description_fr = models.TextField(blank=True)
+    image = models.ImageField(upload_to='onboarding/', blank=True, validators=[validate_image_file])
+    icon_name = models.CharField(max_length=50, blank=True, help_text='Material icon name')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Onboarding Step'
+        verbose_name_plural = 'Onboarding Steps'
+
+    def __str__(self):
+        return f"Step {self.order}: {self.title}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Admin & Infrastructure
+# ══════════════════════════════════════════════════════════════
+
+class EmailTemplate(models.Model):
+    """Customizable email templates for various notifications."""
+    KEY_CHOICES = [
+        ('welcome', 'Welcome Email'),
+        ('verification_approved', 'Verification Approved'),
+        ('verification_rejected', 'Verification Rejected'),
+        ('event_confirmation', 'Event Registration Confirmation'),
+        ('event_reminder', 'Event Reminder'),
+        ('password_reset', 'Password Reset'),
+        ('account_deactivated', 'Account Deactivated'),
+        ('account_deletion', 'Account Deletion Scheduled'),
+        ('admin_invite', 'Admin Invitation'),
+        ('newsletter', 'Newsletter'),
+    ]
+    key = models.CharField(max_length=30, unique=True, choices=KEY_CHOICES)
+    subject = models.CharField(max_length=200)
+    subject_fr = models.CharField(max_length=200, blank=True)
+    body_html = models.TextField(help_text='HTML template with {{ variable }} placeholders')
+    body_html_fr = models.TextField(blank=True)
+    body_text = models.TextField(blank=True, help_text='Plain text fallback')
+    body_text_fr = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['key']
+        verbose_name = 'Email Template'
+        verbose_name_plural = 'Email Templates'
+
+    def __str__(self):
+        return f"{self.get_key_display()}"
+
+
+class Webhook(models.Model):
+    """Webhook endpoints for external integrations."""
+    EVENT_CHOICES = [
+        ('user.registered', 'User Registered'),
+        ('user.verified', 'User Verified'),
+        ('event.created', 'Event Created'),
+        ('event.registration', 'Event Registration'),
+        ('article.published', 'Article Published'),
+        ('support.ticket_created', 'Support Ticket Created'),
+    ]
+    name = models.CharField(max_length=200)
+    url = models.URLField(help_text='Endpoint to receive webhook POST')
+    events = models.JSONField(default=list, help_text='List of event keys to trigger')
+    secret_key = models.CharField(max_length=255, blank=True, help_text='Shared secret for signature verification')
+    is_active = models.BooleanField(default=True)
+    last_triggered_at = models.DateTimeField(null=True, blank=True)
+    failure_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Webhook'
+        verbose_name_plural = 'Webhooks'
+
+    def __str__(self):
+        return f"{self.name} - {self.url}"
+
+
+class WebhookLog(models.Model):
+    """Log of webhook delivery attempts."""
+    webhook = models.ForeignKey(Webhook, on_delete=models.CASCADE, related_name='logs')
+    event = models.CharField(max_length=50)
+    payload = models.JSONField()
+    response_status = models.IntegerField(null=True, blank=True)
+    response_body = models.TextField(blank=True)
+    success = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Webhook Log'
+        verbose_name_plural = 'Webhook Logs'
+
+    def __str__(self):
+        return f"{self.webhook.name} - {self.event} - {'OK' if self.success else 'FAIL'}"
+
+
+class ScheduledMaintenance(models.Model):
+    """Scheduled maintenance windows."""
+    title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    description_fr = models.TextField(blank=True)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    show_banner = models.BooleanField(default=True, help_text='Show maintenance banner in app')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-starts_at']
+        verbose_name = 'Scheduled Maintenance'
+        verbose_name_plural = 'Scheduled Maintenance'
+
+    def __str__(self):
+        return f"{self.title} ({self.starts_at} - {self.ends_at})"
+
+
+class ABTest(models.Model):
+    """A/B testing configuration."""
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    variant_a_label = models.CharField(max_length=100, default='Control')
+    variant_b_label = models.CharField(max_length=100, default='Variant')
+    traffic_split = models.IntegerField(default=50, help_text='Percentage of users who see variant B (0-100)')
+    is_active = models.BooleanField(default=False)
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    winner = models.CharField(max_length=1, choices=[('A', 'Variant A'), ('B', 'Variant B')], blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'A/B Test'
+        verbose_name_plural = 'A/B Tests'
+
+    def __str__(self):
+        return self.name
+
+
+class ABTestParticipant(models.Model):
+    """Track which variant a user was assigned."""
+    test = models.ForeignKey(ABTest, on_delete=models.CASCADE, related_name='participants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ab_tests')
+    variant = models.CharField(max_length=1, choices=[('A', 'Variant A'), ('B', 'Variant B')])
+    converted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('test', 'user')
+        verbose_name = 'A/B Test Participant'
+        verbose_name_plural = 'A/B Test Participants'
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Analytics & Reporting
+# ══════════════════════════════════════════════════════════════
+
+class ContentAnalytics(models.Model):
+    """Aggregated content analytics for dashboard."""
+    CONTENT_TYPE_CHOICES = [
+        ('article', 'Article'),
+        ('magazine', 'Magazine'),
+        ('video', 'Video'),
+        ('event', 'Event'),
+    ]
+    content_type = models.CharField(max_length=20, choices=CONTENT_TYPE_CHOICES)
+    content_id = models.PositiveIntegerField()
+    date = models.DateField(db_index=True)
+    views = models.PositiveIntegerField(default=0)
+    likes = models.PositiveIntegerField(default=0)
+    shares = models.PositiveIntegerField(default=0)
+    comments = models.PositiveIntegerField(default=0)
+    bookmarks = models.PositiveIntegerField(default=0)
+    avg_read_time_seconds = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ('content_type', 'content_id', 'date')
+        ordering = ['-date']
+        verbose_name = 'Content Analytics'
+        verbose_name_plural = 'Content Analytics'
+        indexes = [
+            models.Index(fields=['content_type', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.content_type}:{self.content_id} on {self.date}"
+
+
+class EngagementHeatmap(models.Model):
+    """Hourly engagement data for heatmap visualization."""
+    date = models.DateField(db_index=True)
+    hour = models.IntegerField(help_text='0-23')
+    active_users = models.PositiveIntegerField(default=0)
+    page_views = models.PositiveIntegerField(default=0)
+    actions = models.PositiveIntegerField(default=0, help_text='Likes, comments, shares, etc.')
+
+    class Meta:
+        unique_together = ('date', 'hour')
+        ordering = ['-date', 'hour']
+        verbose_name = 'Engagement Heatmap'
+        verbose_name_plural = 'Engagement Heatmaps'
+
+    def __str__(self):
+        return f"{self.date} {self.hour}:00 - {self.active_users} users"
+
+
+class WeeklyReport(models.Model):
+    """Automated weekly analytics reports."""
+    week_start = models.DateField()
+    week_end = models.DateField()
+    report_data = models.JSONField(help_text='Full report data as JSON')
+    new_users = models.PositiveIntegerField(default=0)
+    active_users = models.PositiveIntegerField(default=0)
+    total_views = models.PositiveIntegerField(default=0)
+    total_engagements = models.PositiveIntegerField(default=0)
+    top_content = models.JSONField(default=list, help_text='Top performing content')
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-week_start']
+        verbose_name = 'Weekly Report'
+        verbose_name_plural = 'Weekly Reports'
+        unique_together = ('week_start', 'week_end')
+
+    def __str__(self):
+        return f"Weekly Report {self.week_start} - {self.week_end}"
+
+
+class FunnelStep(models.Model):
+    """Define steps in a conversion funnel."""
+    funnel_name = models.CharField(max_length=100, db_index=True, help_text='e.g. registration, verification, event_signup')
+    step_name = models.CharField(max_length=100)
+    step_order = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('funnel_name', 'step_order')
+        ordering = ['funnel_name', 'step_order']
+        verbose_name = 'Funnel Step'
+        verbose_name_plural = 'Funnel Steps'
+
+    def __str__(self):
+        return f"{self.funnel_name} - Step {self.step_order}: {self.step_name}"
+
+
+class FunnelEvent(models.Model):
+    """Track user progress through funnels."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='funnel_events')
+    funnel_step = models.ForeignKey(FunnelStep, on_delete=models.CASCADE, related_name='events')
+    completed = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Funnel Event'
+        verbose_name_plural = 'Funnel Events'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.funnel_step}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — Localization
+# ══════════════════════════════════════════════════════════════
+
+class TranslationEntry(models.Model):
+    """Translation management for dynamic content."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending Translation'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('reviewed', 'Reviewed'),
+    ]
+    key = models.CharField(max_length=200, unique=True, help_text='Unique translation key')
+    source_text = models.TextField(help_text='Original text (English)')
+    translated_text = models.TextField(blank=True, help_text='Translated text (French)')
+    context = models.CharField(max_length=200, blank=True, help_text='Where this text appears')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    translated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_translations')
+    auto_translated = models.BooleanField(default=False, help_text='Was this auto-translated?')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['key']
+        verbose_name = 'Translation Entry'
+        verbose_name_plural = 'Translation Entries'
+
+    def __str__(self):
+        return f"{self.key}: {self.source_text[:50]}"
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW FEATURE MODELS — What's New & App Updates
+# ══════════════════════════════════════════════════════════════
+
+class AppRelease(models.Model):
+    """Track app releases for What's New dialog and update prompts."""
+    version = models.CharField(max_length=20, unique=True, help_text='e.g. 2.1.0')
+    version_code = models.IntegerField(unique=True, help_text='Integer version code for comparison')
+    title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True)
+    release_notes = models.TextField(help_text='Markdown-formatted release notes')
+    release_notes_fr = models.TextField(blank=True)
+    is_force_update = models.BooleanField(default=False, help_text='Force users to update')
+    min_supported_version = models.CharField(max_length=20, blank=True, help_text='Minimum app version still supported')
+    android_url = models.URLField(blank=True, help_text='Google Play Store URL')
+    ios_url = models.URLField(blank=True, help_text='Apple App Store URL')
+    released_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-version_code']
+        verbose_name = 'App Release'
+        verbose_name_plural = 'App Releases'
+
+    def __str__(self):
+        return f"v{self.version} - {self.title}"
+
+
 # ── Auto-optimize images on upload ────────────────────────────
 def _auto_optimize_image(sender, instance, **kwargs):
     """Convert uploaded images to WebP on save for all core models."""
@@ -1712,5 +2815,8 @@ for _model in [
     EmbassyLocation, Event, LiveFeed, FeatureCard, FeatureCardMedia,
     Notification, PriorityAgenda, GalleryAlbum, GalleryPhoto, Video,
     VerificationRequest, WeatherCity, Popup, UserProfile,
+    # New models with image fields
+    ArticleDraft, ArticleSeries, EventSpeaker, EventPhoto,
+    DirectMessage, ContactDirectory, OnboardingStep,
 ]:
     pre_save.connect(_auto_optimize_image, sender=_model)

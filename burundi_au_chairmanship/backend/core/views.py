@@ -22,6 +22,14 @@ from .models import (
     Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
     WeatherCity, EventRegistration, RegistrationFormField, EventSubmission,
     SupportTicket, TicketMessage, Popup,
+    # New models
+    LoginHistory, ActiveSession, PasswordChangeHistory, Bookmark, Reaction,
+    ReadingProgress, ArticleDraft, ArticleSeries, TrendingContent,
+    EventReminder, EventWaitlist, EventSpeaker, EventFeedback, EventCheckIn, EventPhoto,
+    Conversation, DirectMessage, Discussion, DiscussionReply,
+    Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
+    ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
+    ScheduledMaintenance, AppRelease, ContentAnalytics,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -37,6 +45,18 @@ from .serializers import (
     RegistrationFormFieldSerializer, ProxyRegistrationSerializer,
     SupportTicketListSerializer, SupportTicketDetailSerializer, TicketMessageSerializer,
     PopupSerializer,
+    # New serializers
+    LoginHistorySerializer, ActiveSessionSerializer, PasswordChangeSerializer,
+    BookmarkSerializer, ReactionSerializer, ReadingProgressSerializer,
+    ArticleDraftSerializer, ArticleSeriesSerializer, TrendingContentSerializer,
+    EventReminderSerializer, EventWaitlistSerializer, EventSpeakerSerializer,
+    EventFeedbackSerializer, EventCheckInSerializer, EventPhotoSerializer,
+    ConversationSerializer, DirectMessageSerializer, DiscussionSerializer,
+    DiscussionReplySerializer, PollSerializer, PollOptionSerializer,
+    NotificationPreferenceSerializer, AnnouncementBannerSerializer,
+    ContactDirectorySerializer, LiveQASessionSerializer, LiveQAQuestionSerializer,
+    UserPreferenceSerializer, OnboardingStepSerializer, ScheduledMaintenanceSerializer,
+    AppReleaseSerializer,
 )
 
 
@@ -1831,3 +1851,637 @@ class PopupViewSet(viewsets.ReadOnlyModelViewSet):
         popups = self.get_queryset()
         serializer = self.get_serializer(popups, many=True)
         return Response(serializer.data)
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW VIEWS — Authentication & Security
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def login_history(request):
+    """Return login history for the current user."""
+    entries = LoginHistory.objects.filter(user=request.user)[:50]
+    serializer = LoginHistorySerializer(entries, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def active_sessions(request):
+    """Return active sessions for the current user."""
+    sessions = ActiveSession.objects.filter(user=request.user)
+    serializer = ActiveSessionSerializer(sessions, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def revoke_session(request, session_id):
+    """Revoke (terminate) a specific active session."""
+    try:
+        session = ActiveSession.objects.get(pk=session_id, user=request.user)
+        session.delete()
+        return Response({'message': 'Session revoked successfully'})
+    except ActiveSession.DoesNotExist:
+        return Response({'detail': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Change user password."""
+    serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        # Log password change
+        PasswordChangeHistory.objects.create(
+            user=user,
+            ip_address=request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '')).split(',')[0].strip(),
+        )
+        # Generate new tokens
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'message': 'Password changed successfully',
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+        })
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW VIEWS — Content Features
+# ══════════════════════════════════════════════════════════════
+
+class BookmarkViewSet(viewsets.ModelViewSet):
+    """CRUD bookmarks for authenticated users."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = BookmarkSerializer
+    http_method_names = ['get', 'post', 'delete']
+
+    def get_queryset(self):
+        qs = Bookmark.objects.filter(user=self.request.user)
+        content_type = self.request.query_params.get('content_type')
+        if content_type:
+            qs = qs.filter(content_type=content_type)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='check')
+    def check_bookmark(self, request):
+        """Check if content is bookmarked."""
+        ct = request.query_params.get('content_type')
+        cid = request.query_params.get('content_id')
+        if not ct or not cid:
+            return Response({'detail': 'content_type and content_id required'}, status=400)
+        exists = Bookmark.objects.filter(user=request.user, content_type=ct, content_id=cid).exists()
+        return Response({'is_bookmarked': exists})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_reaction(request):
+    """Toggle a reaction on content."""
+    content_type = request.data.get('content_type')
+    content_id = request.data.get('content_id')
+    reaction_type = request.data.get('reaction_type')
+
+    if not all([content_type, content_id, reaction_type]):
+        return Response({'detail': 'content_type, content_id, and reaction_type required'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    existing = Reaction.objects.filter(
+        user=request.user, content_type=content_type, content_id=content_id
+    ).first()
+
+    if existing:
+        if existing.reaction_type == reaction_type:
+            existing.delete()
+            return Response({'removed': True, 'reaction_type': None})
+        else:
+            existing.reaction_type = reaction_type
+            existing.save()
+            return Response({'changed': True, 'reaction_type': reaction_type})
+    else:
+        Reaction.objects.create(
+            user=request.user, content_type=content_type,
+            content_id=content_id, reaction_type=reaction_type
+        )
+        return Response({'added': True, 'reaction_type': reaction_type})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_reactions(request):
+    """Get reaction counts for a piece of content."""
+    content_type = request.query_params.get('content_type')
+    content_id = request.query_params.get('content_id')
+    if not content_type or not content_id:
+        return Response({'detail': 'content_type and content_id required'}, status=400)
+
+    from django.db.models import Count
+    counts = Reaction.objects.filter(
+        content_type=content_type, content_id=content_id
+    ).values('reaction_type').annotate(count=Count('id'))
+
+    result = {r['reaction_type']: r['count'] for r in counts}
+    user_reaction = None
+    if request.user.is_authenticated:
+        r = Reaction.objects.filter(
+            user=request.user, content_type=content_type, content_id=content_id
+        ).first()
+        user_reaction = r.reaction_type if r else None
+
+    return Response({'reactions': result, 'user_reaction': user_reaction})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_reading_progress(request):
+    """Update reading progress for an article."""
+    article_id = request.data.get('article_id')
+    progress = request.data.get('progress_percent', 0)
+    scroll_pos = request.data.get('scroll_position', 0)
+
+    if not article_id:
+        return Response({'detail': 'article_id required'}, status=400)
+
+    obj, created = ReadingProgress.objects.update_or_create(
+        user=request.user, article_id=article_id,
+        defaults={
+            'progress_percent': min(100, max(0, int(progress))),
+            'scroll_position': int(scroll_pos),
+            'completed': int(progress) >= 90,
+        }
+    )
+    return Response(ReadingProgressSerializer(obj).data)
+
+
+class ArticleSeriesViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: View article series."""
+    permission_classes = [AllowAny]
+    queryset = ArticleSeries.objects.filter(is_active=True).prefetch_related('articles')
+    serializer_class = ArticleSeriesSerializer
+    pagination_class = None
+
+    @action(detail=True, methods=['get'])
+    def articles(self, request, pk=None):
+        """Get articles in this series."""
+        series = self.get_object()
+        articles = series.articles.select_related('category').prefetch_related('media').annotate(
+            comment_count=Count('comments', distinct=True),
+        )
+        if request.user.is_authenticated:
+            articles = articles.annotate(
+                is_liked=Exists(ArticleLike.objects.filter(article=OuterRef('pk'), user=request.user)),
+            )
+        serializer = ArticleSerializer(articles, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def trending_content(request):
+    """Get currently trending content."""
+    content_type = request.query_params.get('type', 'article')
+    limit = min(int(request.query_params.get('limit', 10)), 50)
+    items = TrendingContent.objects.filter(content_type=content_type)[:limit]
+    serializer = TrendingContentSerializer(items, many=True)
+    return Response(serializer.data)
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW VIEWS — Events & Calendar
+# ══════════════════════════════════════════════════════════════
+
+class EventReminderViewSet(viewsets.ModelViewSet):
+    """Manage event reminders for authenticated users."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = EventReminderSerializer
+    http_method_names = ['get', 'post', 'delete']
+
+    def get_queryset(self):
+        return EventReminder.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class EventSpeakerViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: View event speakers."""
+    permission_classes = [AllowAny]
+    queryset = EventSpeaker.objects.filter(is_active=True)
+    serializer_class = EventSpeakerSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = EventSpeaker.objects.filter(is_active=True)
+        event_id = self.request.query_params.get('event')
+        event_reg_id = self.request.query_params.get('event_registration')
+        if event_id:
+            qs = qs.filter(events__id=event_id)
+        elif event_reg_id:
+            qs = qs.filter(event_registrations__id=event_reg_id)
+        return qs
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_event_feedback(request):
+    """Submit post-event feedback."""
+    serializer = EventFeedbackSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def event_checkin(request):
+    """Check in to an event using QR code."""
+    qr_code = request.data.get('qr_code')
+    if not qr_code:
+        return Response({'detail': 'QR code required'}, status=400)
+
+    try:
+        checkin = EventCheckIn.objects.get(qr_code=qr_code)
+        if checkin.checked_in:
+            return Response({'detail': 'Already checked in', 'checked_in_at': checkin.checked_in_at})
+        checkin.checked_in = True
+        checkin.checked_in_at = timezone.now()
+        checkin.checked_in_by = request.user
+        checkin.save()
+        return Response({'message': 'Check-in successful', 'checked_in_at': checkin.checked_in_at})
+    except EventCheckIn.DoesNotExist:
+        return Response({'detail': 'Invalid QR code'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def join_event_waitlist(request):
+    """Join a waitlist for a full event."""
+    event_reg_id = request.data.get('event_registration')
+    if not event_reg_id:
+        return Response({'detail': 'event_registration required'}, status=400)
+
+    try:
+        event_reg = EventRegistration.objects.get(pk=event_reg_id)
+    except EventRegistration.DoesNotExist:
+        return Response({'detail': 'Event not found'}, status=404)
+
+    if EventWaitlist.objects.filter(user=request.user, event_registration=event_reg).exists():
+        return Response({'detail': 'Already on waitlist'}, status=400)
+
+    position = EventWaitlist.objects.filter(event_registration=event_reg).count() + 1
+    waitlist = EventWaitlist.objects.create(
+        user=request.user, event_registration=event_reg, position=position
+    )
+    return Response(EventWaitlistSerializer(waitlist).data, status=201)
+
+
+class EventPhotoViewSet(viewsets.ModelViewSet):
+    """User-uploaded event photos."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = EventPhotoSerializer
+    http_method_names = ['get', 'post']
+
+    def get_queryset(self):
+        qs = EventPhoto.objects.filter(is_approved=True)
+        event_id = self.request.query_params.get('event')
+        event_reg_id = self.request.query_params.get('event_registration')
+        if event_id:
+            qs = qs.filter(event_id=event_id)
+        elif event_reg_id:
+            qs = qs.filter(event_registration_id=event_reg_id)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW VIEWS — Communication & Social
+# ══════════════════════════════════════════════════════════════
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    """In-app messaging conversations."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = ConversationSerializer
+    http_method_names = ['get', 'post']
+
+    def get_queryset(self):
+        return Conversation.objects.filter(participants=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        """Start a new conversation with another user."""
+        recipient_id = request.data.get('recipient_id')
+        if not recipient_id:
+            return Response({'detail': 'recipient_id required'}, status=400)
+        try:
+            recipient = User.objects.get(pk=recipient_id)
+        except User.DoesNotExist:
+            return Response({'detail': 'User not found'}, status=404)
+
+        # Check for existing conversation between these two users
+        existing = Conversation.objects.filter(
+            participants=request.user
+        ).filter(participants=recipient)
+        if existing.exists():
+            serializer = self.get_serializer(existing.first())
+            return Response(serializer.data)
+
+        convo = Conversation.objects.create()
+        convo.participants.add(request.user, recipient)
+        serializer = self.get_serializer(convo)
+        return Response(serializer.data, status=201)
+
+    @action(detail=True, methods=['get', 'post'])
+    def messages(self, request, pk=None):
+        """Get or send messages in a conversation."""
+        convo = self.get_object()
+        if request.method == 'GET':
+            msgs = convo.messages.select_related('sender').all()
+            # Mark messages as read
+            msgs.filter(is_read=False).exclude(sender=request.user).update(is_read=True, read_at=timezone.now())
+            serializer = DirectMessageSerializer(msgs, many=True, context={'request': request})
+            return Response(serializer.data)
+
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'detail': 'Message content required'}, status=400)
+
+        from django.utils.html import escape
+        msg = DirectMessage.objects.create(
+            conversation=convo, sender=request.user, content=escape(content)
+        )
+        convo.last_message_at = msg.created_at
+        convo.save(update_fields=['last_message_at'])
+        return Response(DirectMessageSerializer(msg, context={'request': request}).data, status=201)
+
+
+class DiscussionViewSet(viewsets.ModelViewSet):
+    """Forum discussions."""
+    permission_classes = [AllowAny]
+    serializer_class = DiscussionSerializer
+    filterset_fields = ['category']
+
+    def get_queryset(self):
+        return Discussion.objects.all()
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    @action(detail=True, methods=['get', 'post'])
+    def replies(self, request, pk=None):
+        """Get or post replies to a discussion."""
+        discussion = self.get_object()
+        if request.method == 'GET':
+            replies = discussion.replies.select_related('author').all()
+            serializer = DiscussionReplySerializer(replies, many=True, context={'request': request})
+            return Response(serializer.data)
+
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required'}, status=401)
+        if discussion.is_locked:
+            return Response({'detail': 'Discussion is locked'}, status=400)
+
+        from django.utils.html import escape
+        content = escape(request.data.get('content', '').strip())
+        if not content:
+            return Response({'detail': 'Content required'}, status=400)
+
+        parent_id = request.data.get('parent')
+        reply = DiscussionReply.objects.create(
+            discussion=discussion, author=request.user, content=content,
+            parent_id=parent_id
+        )
+        discussion.reply_count = discussion.replies.count()
+        discussion.last_reply_at = reply.created_at
+        discussion.save(update_fields=['reply_count', 'last_reply_at'])
+
+        return Response(DiscussionReplySerializer(reply, context={'request': request}).data, status=201)
+
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny])
+    def record_view(self, request, pk=None):
+        """Record a view on a discussion."""
+        Discussion.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        return Response({'message': 'View recorded'})
+
+
+class PollViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public endpoint: View active polls. Auth required to vote."""
+    permission_classes = [AllowAny]
+    serializer_class = PollSerializer
+
+    def get_queryset(self):
+        return Poll.objects.filter(is_active=True).prefetch_related('options')
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def vote(self, request, pk=None):
+        """Vote on a poll."""
+        poll = self.get_object()
+        option_id = request.data.get('option_id')
+
+        if not option_id:
+            return Response({'detail': 'option_id required'}, status=400)
+
+        if poll.expires_at and timezone.now() > poll.expires_at:
+            return Response({'detail': 'Poll has expired'}, status=400)
+
+        try:
+            option = PollOption.objects.get(pk=option_id, poll=poll)
+        except PollOption.DoesNotExist:
+            return Response({'detail': 'Invalid option'}, status=404)
+
+        if not poll.multiple_choice:
+            # Single choice - remove existing votes
+            existing = PollVote.objects.filter(user=request.user, poll=poll)
+            if existing.exists():
+                for v in existing:
+                    PollOption.objects.filter(pk=v.option_id).update(vote_count=F('vote_count') - 1)
+                    Poll.objects.filter(pk=poll.pk).update(total_votes=F('total_votes') - 1)
+                existing.delete()
+
+        if PollVote.objects.filter(user=request.user, option=option).exists():
+            return Response({'detail': 'Already voted for this option'}, status=400)
+
+        PollVote.objects.create(user=request.user, poll=poll, option=option)
+        PollOption.objects.filter(pk=option.pk).update(vote_count=F('vote_count') + 1)
+        Poll.objects.filter(pk=poll.pk).update(total_votes=F('total_votes') + 1)
+
+        poll.refresh_from_db()
+        return Response(PollSerializer(poll, context={'request': request}).data)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def notification_preferences(request):
+    """Get or update notification preferences."""
+    prefs, _ = NotificationPreference.objects.get_or_create(user=request.user)
+    if request.method == 'GET':
+        return Response(NotificationPreferenceSerializer(prefs).data)
+    serializer = NotificationPreferenceSerializer(prefs, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+
+class AnnouncementBannerViewSet(viewsets.ReadOnlyModelViewSet):
+    """Active announcement banners."""
+    permission_classes = [AllowAny]
+    serializer_class = AnnouncementBannerSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        now = timezone.now()
+        return AnnouncementBanner.objects.filter(
+            is_active=True
+        ).filter(
+            Q(starts_at__isnull=True) | Q(starts_at__lte=now)
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+        )
+
+
+class ContactDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """Public contact directory."""
+    permission_classes = [AllowAny]
+    serializer_class = ContactDirectorySerializer
+    filterset_fields = ['category', 'country']
+
+    def get_queryset(self):
+        return ContactDirectory.objects.filter(is_active=True)
+
+
+class LiveQAViewSet(viewsets.ReadOnlyModelViewSet):
+    """Live Q&A sessions and questions."""
+    permission_classes = [AllowAny]
+    serializer_class = LiveQASessionSerializer
+
+    def get_queryset(self):
+        return LiveQASession.objects.filter(is_active=True)
+
+    @action(detail=True, methods=['get', 'post'])
+    def questions(self, request, pk=None):
+        """Get approved questions or submit a new question."""
+        session = self.get_object()
+        if request.method == 'GET':
+            questions = session.questions.filter(is_approved=True)
+            return Response(LiveQAQuestionSerializer(questions, many=True, context={'request': request}).data)
+
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required'}, status=401)
+
+        question_text = request.data.get('question', '').strip()
+        if not question_text:
+            return Response({'detail': 'Question text required'}, status=400)
+
+        from django.utils.html import escape
+        q = LiveQAQuestion.objects.create(
+            session=session, user=request.user, question=escape(question_text)
+        )
+        return Response(LiveQAQuestionSerializer(q, context={'request': request}).data, status=201)
+
+    @action(detail=True, methods=['post'], url_path='questions/(?P<question_id>[0-9]+)/upvote',
+            permission_classes=[IsAuthenticated])
+    def upvote_question(self, request, pk=None, question_id=None):
+        """Upvote a Q&A question."""
+        LiveQAQuestion.objects.filter(pk=question_id, session_id=pk).update(
+            upvote_count=F('upvote_count') + 1
+        )
+        return Response({'message': 'Upvoted'})
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW VIEWS — User Preferences & Onboarding
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def user_preferences(request):
+    """Get or update user preferences."""
+    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    if request.method == 'GET':
+        return Response(UserPreferenceSerializer(prefs).data)
+    serializer = UserPreferenceSerializer(prefs, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+
+class OnboardingStepViewSet(viewsets.ReadOnlyModelViewSet):
+    """Onboarding walkthrough steps."""
+    permission_classes = [AllowAny]
+    queryset = OnboardingStep.objects.filter(is_active=True)
+    serializer_class = OnboardingStepSerializer
+    pagination_class = None
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def complete_onboarding(request):
+    """Mark onboarding as completed."""
+    prefs, _ = UserPreference.objects.get_or_create(user=request.user)
+    prefs.onboarding_completed = True
+    prefs.save(update_fields=['onboarding_completed'])
+    return Response({'message': 'Onboarding completed'})
+
+
+# ══════════════════════════════════════════════════════════════
+# NEW VIEWS — Infrastructure
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def maintenance_status(request):
+    """Check if there's an active or upcoming maintenance window."""
+    now = timezone.now()
+    active = ScheduledMaintenance.objects.filter(
+        is_active=True, starts_at__lte=now, ends_at__gt=now
+    ).first()
+    upcoming = ScheduledMaintenance.objects.filter(
+        is_active=True, show_banner=True, starts_at__gt=now
+    ).order_by('starts_at').first()
+    return Response({
+        'in_maintenance': active is not None,
+        'active': ScheduledMaintenanceSerializer(active).data if active else None,
+        'upcoming': ScheduledMaintenanceSerializer(upcoming).data if upcoming else None,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def check_app_update(request):
+    """Check if an app update is available."""
+    current_version = request.query_params.get('version_code', 0)
+    try:
+        current_version = int(current_version)
+    except (TypeError, ValueError):
+        current_version = 0
+
+    latest = AppRelease.objects.order_by('-version_code').first()
+    if not latest:
+        return Response({'update_available': False})
+
+    return Response({
+        'update_available': latest.version_code > current_version,
+        'force_update': latest.is_force_update and latest.version_code > current_version,
+        'latest_version': latest.version,
+        'latest_version_code': latest.version_code,
+        'release_notes': latest.release_notes,
+        'release_notes_fr': latest.release_notes_fr,
+        'android_url': latest.android_url,
+        'ios_url': latest.ios_url,
+    })

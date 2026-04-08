@@ -1,0 +1,70 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Scheduled Maintenance - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">engineering</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Scheduled Maintenance</h1>
+        <p class="text-sm text-slate-500 mt-1">Plan and announce maintenance windows</p>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:maintenance_create' %}" class="inline-flex items-center gap-2 bg-slate-700 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-800 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">add</span>
+      Schedule Maintenance
+    </a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Maintenance</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Starts</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Ends</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for window in windows %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <p class="font-semibold text-slate-900 text-sm">{{ window.title }}</p>
+              {% if window.description %}<p class="text-xs text-slate-500 mt-0.5">{{ window.description|truncatewords:12 }}</p>{% endif %}
+            </td>
+            <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ window.starts_at|date:"M d, Y H:i" }}</span></td>
+            <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ window.ends_at|date:"M d, Y H:i" }}</span></td>
+            <td class="px-6 py-4">
+              {% if window.is_active %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="material-symbols-outlined text-xs">warning</span>Active
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Resolved</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <a href="{% url 'custom_admin:maintenance_edit' window.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">edit</span></a>
+                <form method="post" action="{% url 'custom_admin:maintenance_delete' window.pk %}" class="inline" onsubmit="return confirm('Delete this maintenance window?');">{% csrf_token %}
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">delete</span></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-6 py-16 text-center"><p class="text-slate-500">No maintenance windows scheduled</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

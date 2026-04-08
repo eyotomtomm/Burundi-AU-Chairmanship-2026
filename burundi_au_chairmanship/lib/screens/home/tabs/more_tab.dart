@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -14,6 +15,13 @@ import '../../../providers/language_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../widgets/verified_badge.dart';
+import '../../bookmarks/bookmarks_screen.dart';
+import '../../discussions/discussions_screen.dart';
+import '../../polls/polls_screen.dart';
+import '../../security/login_history_screen.dart';
+import '../../security/active_sessions_screen.dart';
+import '../../security/change_password_screen.dart';
+import '../../settings/notification_preferences_screen.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -393,6 +401,72 @@ class _MoreTabState extends State<MoreTab> {
 
                     return Column(
                       children: [
+                        // Engagement features (for logged in users)
+                        if (isLoggedIn) ...[
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.bookmark_rounded,
+                            iconBgColor: const Color(0xFFFF7043),
+                            title: l10n.translate('bookmarks'),
+                            subtitle: l10n.translate('saved_content'),
+                            isDark: isDark,
+                            isFirst: true,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const BookmarksScreen())),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.forum_rounded,
+                            iconBgColor: const Color(0xFF7E57C2),
+                            title: l10n.translate('discussions'),
+                            subtitle: l10n.translate('community_forums'),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const DiscussionsScreen())),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.ballot_rounded,
+                            iconBgColor: const Color(0xFF5C6BC0),
+                            title: l10n.translate('polls'),
+                            subtitle: l10n.translate('vote_share_opinion'),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const PollsScreen())),
+                          ),
+                        ],
+                        // Security section (for logged in users)
+                        if (isLoggedIn) ...[
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.notifications_rounded,
+                            iconBgColor: const Color(0xFFEC407A),
+                            title: l10n.translate('notification_preferences'),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const NotificationPreferencesScreen())),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.lock_rounded,
+                            iconBgColor: const Color(0xFF8D6E63),
+                            title: l10n.translate('change_password'),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ChangePasswordScreen())),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.history_rounded,
+                            iconBgColor: const Color(0xFF78909C),
+                            title: l10n.translate('login_history'),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const LoginHistoryScreen())),
+                          ),
+                          _buildMenuItem(
+                            context: context,
+                            icon: Icons.devices_rounded,
+                            iconBgColor: const Color(0xFF546E7A),
+                            title: l10n.translate('active_sessions'),
+                            isDark: isDark,
+                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ActiveSessionsScreen())),
+                          ),
+                        ],
                         // Get Verified - Only show if logged in and NOT verified
                         if (showGetVerified)
                           _buildMenuItem(
@@ -402,7 +476,6 @@ class _MoreTabState extends State<MoreTab> {
                             title: l10n.translate('get_verified'),
                             subtitle: l10n.translate('get_verified_desc'),
                             isDark: isDark,
-                            isFirst: true,
                             onTap: () => Navigator.pushNamed(context, '/verification-request'),
                           ),
                         _buildMenuItem(
@@ -412,7 +485,6 @@ class _MoreTabState extends State<MoreTab> {
                           title: l10n.translate('about'),
                           subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
                           isDark: isDark,
-                          isFirst: !showGetVerified,
                           onTap: () => _showAboutDialog(context, l10n),
                         ),
                     _buildMenuItem(

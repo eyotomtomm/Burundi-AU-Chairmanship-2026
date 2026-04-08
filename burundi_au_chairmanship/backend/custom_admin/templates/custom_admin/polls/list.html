@@ -1,0 +1,128 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Polls - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">ballot</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Polls</h1>
+        <p class="text-sm text-slate-500 mt-1">Create and manage community polls</p>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:poll_create' %}" class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">add</span>
+      Create Poll
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Polls</p>
+          <p class="text-2xl font-bold text-slate-900 mt-1">{{ polls.paginator.count }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-indigo-600">ballot</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-emerald-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Active</p>
+          <p class="text-2xl font-bold text-emerald-700 mt-1">{{ active_polls }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-purple-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Total Votes</p>
+          <p class="text-2xl font-bold text-purple-700 mt-1">{{ total_votes }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-purple-600">how_to_vote</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Poll</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Options</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Votes</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Created</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for poll in polls %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <p class="font-semibold text-slate-900 text-sm">{{ poll.title }}</p>
+              {% if poll.description %}<p class="text-xs text-slate-500 mt-0.5">{{ poll.description|truncatewords:12 }}</p>{% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm text-slate-700">{{ poll.options.count }} options</span>
+              {% if poll.multiple_choice %}<span class="ml-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs rounded">Multi</span>{% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm font-semibold text-slate-900">{{ poll.total_votes }}</span>
+            </td>
+            <td class="px-6 py-4">
+              {% if poll.is_active %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Closed</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <p class="text-sm text-slate-700">{{ poll.created_at|date:"M d, Y" }}</p>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <a href="{% url 'custom_admin:poll_edit' poll.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                  <span class="material-symbols-outlined text-xl">edit</span>
+                </a>
+                <form method="post" action="{% url 'custom_admin:poll_delete' poll.pk %}" class="inline" onsubmit="return confirm('Delete this poll?');">
+                  {% csrf_token %}
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                    <span class="material-symbols-outlined text-xl">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-6 py-16 text-center"><p class="text-slate-500">No polls yet</p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if polls.has_other_pages %}
+  <div class="mt-6 flex justify-center gap-2">
+    {% if polls.has_previous %}<a href="?page={{ polls.previous_page_number }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Previous</a>{% endif %}
+    <span class="px-4 py-2 text-sm text-slate-500">Page {{ polls.number }} of {{ polls.paginator.num_pages }}</span>
+    {% if polls.has_next %}<a href="?page={{ polls.next_page_number }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Next</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

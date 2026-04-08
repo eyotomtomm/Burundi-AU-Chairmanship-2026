@@ -20,6 +20,10 @@ from core.models import (
     UserProfile, VerificationRequest,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     AuditLogEntry, SupportTicket, TicketMessage,
+    # New models
+    Poll, PollOption, Discussion, ContactDirectory, AnnouncementBanner,
+    EmailTemplate, EventSpeaker, OnboardingStep, Webhook,
+    ScheduledMaintenance, LoginHistory, Bookmark, Reaction,
 )
 
 
@@ -2381,3 +2385,513 @@ def analytics_export_pdf(request):
     filename = f'burundi_au_{report_type}_report_{month_str or "current"}.pdf'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+# ═══════════════════════════════════════════════════════════════
+#  POLLS MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def polls_list(request):
+    polls = Poll.objects.all().order_by('-created_at')
+    active_polls = polls.filter(is_active=True).count()
+    total_votes = sum(p.total_votes for p in polls)
+    paginator = Paginator(polls, 20)
+    page = request.GET.get('page')
+    polls = paginator.get_page(page)
+    return render(request, 'custom_admin/polls/list.html', {
+        'polls': polls,
+        'active_polls': active_polls,
+        'total_votes': total_votes,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def poll_create(request):
+    if request.method == 'POST':
+        poll = Poll.objects.create(
+            title=request.POST.get('title'),
+            title_fr=request.POST.get('title_fr', ''),
+            description=request.POST.get('description', ''),
+            description_fr=request.POST.get('description_fr', ''),
+            is_anonymous=request.POST.get('is_anonymous') == 'on',
+            multiple_choice=request.POST.get('multiple_choice') == 'on',
+            is_active=request.POST.get('is_active') == 'on',
+            expires_at=request.POST.get('expires_at') or None,
+            created_by=request.user,
+        )
+        # Create options
+        options = request.POST.getlist('options[]')
+        options_fr = request.POST.getlist('options_fr[]')
+        for i, text in enumerate(options):
+            if text.strip():
+                PollOption.objects.create(
+                    poll=poll,
+                    text=text.strip(),
+                    text_fr=options_fr[i].strip() if i < len(options_fr) else '',
+                    display_order=i,
+                )
+        messages.success(request, 'Poll created successfully!')
+        return redirect('custom_admin:polls_list')
+    return render(request, 'custom_admin/polls/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def poll_edit(request, pk):
+    poll = get_object_or_404(Poll, pk=pk)
+    if request.method == 'POST':
+        poll.title = request.POST.get('title')
+        poll.title_fr = request.POST.get('title_fr', '')
+        poll.description = request.POST.get('description', '')
+        poll.description_fr = request.POST.get('description_fr', '')
+        poll.is_anonymous = request.POST.get('is_anonymous') == 'on'
+        poll.multiple_choice = request.POST.get('multiple_choice') == 'on'
+        poll.is_active = request.POST.get('is_active') == 'on'
+        poll.expires_at = request.POST.get('expires_at') or None
+        poll.save()
+        # Update options: delete existing, re-create
+        poll.options.all().delete()
+        options = request.POST.getlist('options[]')
+        options_fr = request.POST.getlist('options_fr[]')
+        for i, text in enumerate(options):
+            if text.strip():
+                PollOption.objects.create(
+                    poll=poll,
+                    text=text.strip(),
+                    text_fr=options_fr[i].strip() if i < len(options_fr) else '',
+                    display_order=i,
+                )
+        messages.success(request, 'Poll updated successfully!')
+        return redirect('custom_admin:polls_list')
+    options = poll.options.order_by('display_order')
+    return render(request, 'custom_admin/polls/form.html', {'poll': poll, 'options': options, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def poll_delete(request, pk):
+    poll = get_object_or_404(Poll, pk=pk)
+    poll.delete()
+    messages.success(request, 'Poll deleted successfully!')
+    return redirect('custom_admin:polls_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DISCUSSIONS / FORUMS MODERATION
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def discussions_list(request):
+    discussions = Discussion.objects.all().select_related('author').order_by('-is_pinned', '-created_at')
+    category_filter = request.GET.get('category')
+    if category_filter:
+        discussions = discussions.filter(category=category_filter)
+    total = discussions.count()
+    pinned = discussions.filter(is_pinned=True).count()
+    locked = discussions.filter(is_locked=True).count()
+    paginator = Paginator(discussions, 20)
+    page = request.GET.get('page')
+    discussions = paginator.get_page(page)
+    return render(request, 'custom_admin/discussions/list.html', {
+        'discussions': discussions,
+        'total': total,
+        'pinned': pinned,
+        'locked': locked,
+        'category_choices': Discussion.CATEGORY_CHOICES,
+        'current_category': category_filter,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def discussion_toggle_pin(request, pk):
+    discussion = get_object_or_404(Discussion, pk=pk)
+    discussion.is_pinned = not discussion.is_pinned
+    discussion.save()
+    action = 'pinned' if discussion.is_pinned else 'unpinned'
+    messages.success(request, f'Discussion {action} successfully!')
+    return redirect('custom_admin:discussions_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def discussion_toggle_lock(request, pk):
+    discussion = get_object_or_404(Discussion, pk=pk)
+    discussion.is_locked = not discussion.is_locked
+    discussion.save()
+    action = 'locked' if discussion.is_locked else 'unlocked'
+    messages.success(request, f'Discussion {action} successfully!')
+    return redirect('custom_admin:discussions_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def discussion_delete(request, pk):
+    discussion = get_object_or_404(Discussion, pk=pk)
+    discussion.delete()
+    messages.success(request, 'Discussion deleted successfully!')
+    return redirect('custom_admin:discussions_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTACT DIRECTORY
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def contact_directory_list(request):
+    contacts = ContactDirectory.objects.all().order_by('department', 'name')
+    departments = contacts.values_list('department', flat=True).distinct()
+    return render(request, 'custom_admin/contact_directory/list.html', {
+        'contacts': contacts,
+        'departments': departments,
+        'total': contacts.count(),
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def contact_directory_create(request):
+    if request.method == 'POST':
+        ContactDirectory.objects.create(
+            name=request.POST.get('name'),
+            name_fr=request.POST.get('name_fr', ''),
+            title=request.POST.get('title', ''),
+            title_fr=request.POST.get('title_fr', ''),
+            department=request.POST.get('department', ''),
+            department_fr=request.POST.get('department_fr', ''),
+            email=request.POST.get('email', ''),
+            phone=request.POST.get('phone', ''),
+            photo=request.FILES.get('photo'),
+            is_active=request.POST.get('is_active') == 'on',
+            display_order=request.POST.get('display_order', 0) or 0,
+        )
+        messages.success(request, 'Contact added successfully!')
+        return redirect('custom_admin:contact_directory_list')
+    return render(request, 'custom_admin/contact_directory/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def contact_directory_edit(request, pk):
+    contact = get_object_or_404(ContactDirectory, pk=pk)
+    if request.method == 'POST':
+        contact.name = request.POST.get('name')
+        contact.name_fr = request.POST.get('name_fr', '')
+        contact.title = request.POST.get('title', '')
+        contact.title_fr = request.POST.get('title_fr', '')
+        contact.department = request.POST.get('department', '')
+        contact.department_fr = request.POST.get('department_fr', '')
+        contact.email = request.POST.get('email', '')
+        contact.phone = request.POST.get('phone', '')
+        if request.FILES.get('photo'):
+            contact.photo = request.FILES.get('photo')
+        contact.is_active = request.POST.get('is_active') == 'on'
+        contact.display_order = request.POST.get('display_order', 0) or 0
+        contact.save()
+        messages.success(request, 'Contact updated successfully!')
+        return redirect('custom_admin:contact_directory_list')
+    return render(request, 'custom_admin/contact_directory/form.html', {'contact': contact, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def contact_directory_delete(request, pk):
+    contact = get_object_or_404(ContactDirectory, pk=pk)
+    contact.delete()
+    messages.success(request, 'Contact deleted successfully!')
+    return redirect('custom_admin:contact_directory_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EMAIL TEMPLATES
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def email_templates_list(request):
+    templates = EmailTemplate.objects.all().order_by('key')
+    return render(request, 'custom_admin/email_templates/list.html', {'templates': templates})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def email_template_edit(request, pk):
+    template = get_object_or_404(EmailTemplate, pk=pk)
+    if request.method == 'POST':
+        template.subject = request.POST.get('subject')
+        template.subject_fr = request.POST.get('subject_fr', '')
+        template.body_html = request.POST.get('body_html')
+        template.body_html_fr = request.POST.get('body_html_fr', '')
+        template.is_active = request.POST.get('is_active') == 'on'
+        template.save()
+        messages.success(request, 'Email template updated successfully!')
+        return redirect('custom_admin:email_templates_list')
+    return render(request, 'custom_admin/email_templates/form.html', {'template': template})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ANNOUNCEMENT BANNERS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def announcements_list(request):
+    banners = AnnouncementBanner.objects.all().order_by('-created_at')
+    active_count = banners.filter(is_active=True).count()
+    return render(request, 'custom_admin/announcements/list.html', {
+        'banners': banners,
+        'active_count': active_count,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def announcement_create(request):
+    if request.method == 'POST':
+        AnnouncementBanner.objects.create(
+            title=request.POST.get('title'),
+            title_fr=request.POST.get('title_fr', ''),
+            message=request.POST.get('message', ''),
+            message_fr=request.POST.get('message_fr', ''),
+            banner_type=request.POST.get('banner_type', 'info'),
+            link_url=request.POST.get('link_url', ''),
+            is_dismissible=request.POST.get('is_dismissible') == 'on',
+            is_active=request.POST.get('is_active') == 'on',
+            starts_at=request.POST.get('starts_at') or None,
+            ends_at=request.POST.get('ends_at') or None,
+        )
+        messages.success(request, 'Announcement created successfully!')
+        return redirect('custom_admin:announcements_list')
+    return render(request, 'custom_admin/announcements/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def announcement_edit(request, pk):
+    banner = get_object_or_404(AnnouncementBanner, pk=pk)
+    if request.method == 'POST':
+        banner.title = request.POST.get('title')
+        banner.title_fr = request.POST.get('title_fr', '')
+        banner.message = request.POST.get('message', '')
+        banner.message_fr = request.POST.get('message_fr', '')
+        banner.banner_type = request.POST.get('banner_type', 'info')
+        banner.link_url = request.POST.get('link_url', '')
+        banner.is_dismissible = request.POST.get('is_dismissible') == 'on'
+        banner.is_active = request.POST.get('is_active') == 'on'
+        banner.starts_at = request.POST.get('starts_at') or None
+        banner.ends_at = request.POST.get('ends_at') or None
+        banner.save()
+        messages.success(request, 'Announcement updated successfully!')
+        return redirect('custom_admin:announcements_list')
+    return render(request, 'custom_admin/announcements/form.html', {'banner': banner, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def announcement_delete(request, pk):
+    banner = get_object_or_404(AnnouncementBanner, pk=pk)
+    banner.delete()
+    messages.success(request, 'Announcement deleted successfully!')
+    return redirect('custom_admin:announcements_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EVENT SPEAKERS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def event_speakers_list(request):
+    speakers = EventSpeaker.objects.all().select_related('event').order_by('-created_at')
+    event_filter = request.GET.get('event')
+    if event_filter:
+        speakers = speakers.filter(event_id=event_filter)
+    events = Event.objects.all().order_by('-date')
+    return render(request, 'custom_admin/event_speakers/list.html', {
+        'speakers': speakers,
+        'events': events,
+        'current_event': event_filter,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def event_speaker_create(request):
+    if request.method == 'POST':
+        EventSpeaker.objects.create(
+            event_id=request.POST.get('event'),
+            name=request.POST.get('name'),
+            title=request.POST.get('title', ''),
+            organization=request.POST.get('organization', ''),
+            bio=request.POST.get('bio', ''),
+            bio_fr=request.POST.get('bio_fr', ''),
+            photo=request.FILES.get('photo'),
+            topic=request.POST.get('topic', ''),
+            topic_fr=request.POST.get('topic_fr', ''),
+            display_order=request.POST.get('display_order', 0) or 0,
+        )
+        messages.success(request, 'Speaker added successfully!')
+        return redirect('custom_admin:event_speakers_list')
+    events = Event.objects.all().order_by('-date')
+    return render(request, 'custom_admin/event_speakers/form.html', {'action': 'Create', 'events': events})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def event_speaker_edit(request, pk):
+    speaker = get_object_or_404(EventSpeaker, pk=pk)
+    if request.method == 'POST':
+        speaker.event_id = request.POST.get('event')
+        speaker.name = request.POST.get('name')
+        speaker.title = request.POST.get('title', '')
+        speaker.organization = request.POST.get('organization', '')
+        speaker.bio = request.POST.get('bio', '')
+        speaker.bio_fr = request.POST.get('bio_fr', '')
+        if request.FILES.get('photo'):
+            speaker.photo = request.FILES.get('photo')
+        speaker.topic = request.POST.get('topic', '')
+        speaker.topic_fr = request.POST.get('topic_fr', '')
+        speaker.display_order = request.POST.get('display_order', 0) or 0
+        speaker.save()
+        messages.success(request, 'Speaker updated successfully!')
+        return redirect('custom_admin:event_speakers_list')
+    events = Event.objects.all().order_by('-date')
+    return render(request, 'custom_admin/event_speakers/form.html', {'speaker': speaker, 'action': 'Edit', 'events': events})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def event_speaker_delete(request, pk):
+    speaker = get_object_or_404(EventSpeaker, pk=pk)
+    speaker.delete()
+    messages.success(request, 'Speaker deleted successfully!')
+    return redirect('custom_admin:event_speakers_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ONBOARDING STEPS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def onboarding_steps_list(request):
+    steps = OnboardingStep.objects.all().order_by('order')
+    return render(request, 'custom_admin/onboarding/list.html', {'steps': steps})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def onboarding_step_create(request):
+    if request.method == 'POST':
+        OnboardingStep.objects.create(
+            title=request.POST.get('title'),
+            title_fr=request.POST.get('title_fr', ''),
+            description=request.POST.get('description', ''),
+            description_fr=request.POST.get('description_fr', ''),
+            image=request.FILES.get('image'),
+            icon=request.POST.get('icon', ''),
+            order=request.POST.get('order', 0) or 0,
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'Onboarding step created successfully!')
+        return redirect('custom_admin:onboarding_steps_list')
+    return render(request, 'custom_admin/onboarding/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def onboarding_step_edit(request, pk):
+    step = get_object_or_404(OnboardingStep, pk=pk)
+    if request.method == 'POST':
+        step.title = request.POST.get('title')
+        step.title_fr = request.POST.get('title_fr', '')
+        step.description = request.POST.get('description', '')
+        step.description_fr = request.POST.get('description_fr', '')
+        if request.FILES.get('image'):
+            step.image = request.FILES.get('image')
+        step.icon = request.POST.get('icon', '')
+        step.order = request.POST.get('order', 0) or 0
+        step.is_active = request.POST.get('is_active') == 'on'
+        step.save()
+        messages.success(request, 'Onboarding step updated successfully!')
+        return redirect('custom_admin:onboarding_steps_list')
+    return render(request, 'custom_admin/onboarding/form.html', {'step': step, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def onboarding_step_delete(request, pk):
+    step = get_object_or_404(OnboardingStep, pk=pk)
+    step.delete()
+    messages.success(request, 'Onboarding step deleted successfully!')
+    return redirect('custom_admin:onboarding_steps_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SCHEDULED MAINTENANCE
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def maintenance_list(request):
+    windows = ScheduledMaintenance.objects.all().order_by('-starts_at')
+    return render(request, 'custom_admin/maintenance/list.html', {'windows': windows})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def maintenance_create(request):
+    if request.method == 'POST':
+        ScheduledMaintenance.objects.create(
+            title=request.POST.get('title'),
+            title_fr=request.POST.get('title_fr', ''),
+            description=request.POST.get('description', ''),
+            description_fr=request.POST.get('description_fr', ''),
+            starts_at=request.POST.get('starts_at'),
+            ends_at=request.POST.get('ends_at'),
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'Maintenance window created successfully!')
+        return redirect('custom_admin:maintenance_list')
+    return render(request, 'custom_admin/maintenance/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def maintenance_edit(request, pk):
+    window = get_object_or_404(ScheduledMaintenance, pk=pk)
+    if request.method == 'POST':
+        window.title = request.POST.get('title')
+        window.title_fr = request.POST.get('title_fr', '')
+        window.description = request.POST.get('description', '')
+        window.description_fr = request.POST.get('description_fr', '')
+        window.starts_at = request.POST.get('starts_at')
+        window.ends_at = request.POST.get('ends_at')
+        window.is_active = request.POST.get('is_active') == 'on'
+        window.save()
+        messages.success(request, 'Maintenance window updated successfully!')
+        return redirect('custom_admin:maintenance_list')
+    return render(request, 'custom_admin/maintenance/form.html', {'window': window, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def maintenance_delete(request, pk):
+    window = get_object_or_404(ScheduledMaintenance, pk=pk)
+    window.delete()
+    messages.success(request, 'Maintenance window deleted successfully!')
+    return redirect('custom_admin:maintenance_list')

@@ -27,6 +27,20 @@ router.register('event-submissions', views.EventSubmissionViewSet, basename='eve
 router.register('support/tickets', views.SupportTicketViewSet, basename='support-ticket')
 router.register('popups', views.PopupViewSet, basename='popup')
 
+# New ViewSet routes
+router.register('bookmarks', views.BookmarkViewSet, basename='bookmark')
+router.register('article-series', views.ArticleSeriesViewSet, basename='article-series')
+router.register('event-reminders', views.EventReminderViewSet, basename='event-reminder')
+router.register('event-speakers', views.EventSpeakerViewSet, basename='event-speaker')
+router.register('event-photos', views.EventPhotoViewSet, basename='event-photo')
+router.register('conversations', views.ConversationViewSet, basename='conversation')
+router.register('discussions', views.DiscussionViewSet, basename='discussion')
+router.register('polls', views.PollViewSet, basename='poll')
+router.register('announcement-banners', views.AnnouncementBannerViewSet, basename='announcement-banner')
+router.register('contact-directory', views.ContactDirectoryViewSet, basename='contact-directory')
+router.register('live-qa', views.LiveQAViewSet, basename='live-qa')
+router.register('onboarding-steps', views.OnboardingStepViewSet, basename='onboarding-step')
+
 urlpatterns = [
     path('', include(router.urls)),
     path('health/', views.health_check, name='health-check'),  # For load balancers/monitoring
@@ -57,6 +71,12 @@ urlpatterns = [
     path('auth/reactivate-account/', views.reactivate_account, name='auth-reactivate-account'),
     path('auth/export-data/', views.export_user_data, name='auth-export-data'),
 
+    # Auth - Security (NEW)
+    path('auth/change-password/', views.change_password, name='auth-change-password'),
+    path('auth/login-history/', views.login_history, name='auth-login-history'),
+    path('auth/active-sessions/', views.active_sessions, name='auth-active-sessions'),
+    path('auth/sessions/<int:session_id>/revoke/', views.revoke_session, name='auth-revoke-session'),
+
     # Sign-Up Email Verification
     path('auth/send-signup-otp/', views.send_signup_otp, name='auth-send-signup-otp'),
     path('auth/verify-signup-otp/', views.verify_signup_otp, name='auth-verify-signup-otp'),
@@ -78,6 +98,28 @@ urlpatterns = [
     path('verification/status/', views.check_verification_status, name='verification-status'),
     path('verification/appeal/', views.submit_verification_appeal, name='verification-appeal'),
     path('verification/admin/<int:request_id>/action/', views.admin_verification_action, name='verification-admin-action'),
+
+    # Content Features (NEW)
+    path('reactions/toggle/', views.toggle_reaction, name='toggle-reaction'),
+    path('reactions/', views.get_reactions, name='get-reactions'),
+    path('reading-progress/', views.update_reading_progress, name='reading-progress'),
+    path('trending/', views.trending_content, name='trending-content'),
+
+    # Events Features (NEW)
+    path('events/feedback/', views.submit_event_feedback, name='event-feedback'),
+    path('events/checkin/', views.event_checkin, name='event-checkin'),
+    path('events/waitlist/', views.join_event_waitlist, name='event-waitlist'),
+
+    # Communication (NEW)
+    path('notification-preferences/', views.notification_preferences, name='notification-preferences'),
+
+    # User Preferences & Onboarding (NEW)
+    path('preferences/', views.user_preferences, name='user-preferences'),
+    path('onboarding/complete/', views.complete_onboarding, name='complete-onboarding'),
+
+    # Infrastructure (NEW)
+    path('maintenance/', views.maintenance_status, name='maintenance-status'),
+    path('app-update/', views.check_app_update, name='check-app-update'),
 
     # Analytics API (admin only)
     path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),

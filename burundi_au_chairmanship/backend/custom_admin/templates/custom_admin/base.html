@@ -151,6 +151,36 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Support Tickets</span>
     </a>
 
+    <!-- Engagement divider -->
+    <div class="pt-6 pb-2 px-4">
+      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Engagement</p>
+    </div>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'poll' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:polls_list' %}">
+      <span class="material-symbols-outlined">ballot</span>
+      <span class="text-sm tracking-wide font-headline">Polls</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'discussion' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:discussions_list' %}">
+      <span class="material-symbols-outlined">forum</span>
+      <span class="text-sm tracking-wide font-headline">Discussions</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'announcement' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:announcements_list' %}">
+      <span class="material-symbols-outlined">campaign</span>
+      <span class="text-sm tracking-wide font-headline">Announcements</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'contact_directory' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:contact_directory_list' %}">
+      <span class="material-symbols-outlined">contacts</span>
+      <span class="text-sm tracking-wide font-headline">Contact Directory</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'event_speaker' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:event_speakers_list' %}">
+      <span class="material-symbols-outlined">record_voice_over</span>
+      <span class="text-sm tracking-wide font-headline">Event Speakers</span>
+    </a>
+
     <!-- Administration divider -->
     <div class="pt-6 pb-2 px-4">
       <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Administration</p>
@@ -241,6 +271,21 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'event_registration' in url_name or 'event_submission' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:event_registrations_list' %}">
       <span class="material-symbols-outlined">how_to_reg</span>
       <span class="text-sm tracking-wide font-headline">Event Registrations</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'onboarding' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:onboarding_steps_list' %}">
+      <span class="material-symbols-outlined">rocket_launch</span>
+      <span class="text-sm tracking-wide font-headline">Onboarding Steps</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'email_template' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:email_templates_list' %}">
+      <span class="material-symbols-outlined">mail</span>
+      <span class="text-sm tracking-wide font-headline">Email Templates</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'maintenance' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:maintenance_list' %}">
+      <span class="material-symbols-outlined">engineering</span>
+      <span class="text-sm tracking-wide font-headline">Maintenance</span>
     </a>
 
     {% endwith %}

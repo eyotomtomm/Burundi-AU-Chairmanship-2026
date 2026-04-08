@@ -437,6 +437,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               File(_cachedFilePath!),
               key: _pdfViewerKey,
               controller: _pdfViewerController,
+              pageLayoutMode: PdfPageLayoutMode.single,
+              scrollDirection: PdfScrollDirection.horizontal,
               canShowScrollHead: true,
               canShowPaginationDialog: true,
               onDocumentLoaded: (details) {

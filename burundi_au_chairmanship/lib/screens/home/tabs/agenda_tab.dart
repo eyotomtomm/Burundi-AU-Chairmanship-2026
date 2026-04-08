@@ -135,9 +135,15 @@ class _AgendaTabState extends State<AgendaTab> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final agenda = _agendas![index];
-                      final title = langCode == 'fr' && agenda['title_fr'] != null && (agenda['title_fr'] as String).isNotEmpty
+                      String rawTitle = langCode == 'fr' && agenda['title_fr'] != null && (agenda['title_fr'] as String).isNotEmpty
                           ? agenda['title_fr'] as String
                           : agenda['title'] as String;
+                      // Format: replace underscores/hyphens with spaces, capitalize words
+                      if (rawTitle.contains('_') || rawTitle.contains('-')) {
+                        rawTitle = rawTitle.replaceAll('_', ' ').replaceAll('-', ' ');
+                        rawTitle = rawTitle.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
+                      }
+                      final title = rawTitle;
                       final description = langCode == 'fr' && agenda['description_fr'] != null && (agenda['description_fr'] as String).isNotEmpty
                           ? agenda['description_fr'] as String
                           : agenda['description'] as String;

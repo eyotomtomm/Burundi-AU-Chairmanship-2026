@@ -37,6 +37,16 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
     }
   }
 
+  bool get _isFr => Localizations.localeOf(context).languageCode == 'fr';
+
+  String _formatTitle(String title) {
+    if (title.contains('_') || title.contains('-')) {
+      title = title.replaceAll('_', ' ').replaceAll('-', ' ');
+      title = title.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
+    }
+    return title;
+  }
+
   String _t(String key) {
     if (agendaData == null) return '';
     final lang = Localizations.localeOf(context).languageCode;
@@ -74,7 +84,7 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
                       children: [
                         // Overview
                         if (_t('overview').isNotEmpty) ...[
-                          _buildSectionTitle('Commitment to Peace'),
+                          _buildSectionTitle(_isFr ? 'Engagement pour la Paix' : 'Commitment to Peace'),
                           const SizedBox(height: 12),
                           _buildContentText(_t('overview')),
                           const SizedBox(height: 24),
@@ -82,7 +92,7 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
 
                         // Objectives
                         if (_tList('objectives').isNotEmpty) ...[
-                          _buildSectionTitle('Priority Actions'),
+                          _buildSectionTitle(_isFr ? 'Actions Prioritaires' : 'Priority Actions'),
                           const SizedBox(height: 12),
                           ..._tList('objectives').map((obj) =>
                             _buildBulletPoint(obj.toString())),
@@ -91,7 +101,7 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
 
                         // Impact Areas
                         if (_tList('impact_areas').isNotEmpty) ...[
-                          _buildSectionTitle('Key Initiatives'),
+                          _buildSectionTitle(_isFr ? 'Initiatives Clés' : 'Key Initiatives'),
                           const SizedBox(height: 12),
                           ..._buildImpactCards(),
                           const SizedBox(height: 24),
@@ -99,7 +109,7 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
 
                         // Current Initiatives
                         if (_t('current_initiatives').isNotEmpty) ...[
-                          _buildSectionTitle('Silencing the Guns'),
+                          _buildSectionTitle(_isFr ? 'Faire Taire les Armes' : 'Silencing the Guns'),
                           const SizedBox(height: 12),
                           _buildContentText(_t('current_initiatives')),
                           const SizedBox(height: 24),
@@ -126,7 +136,7 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
       foregroundColor: Colors.white,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          _t('title').isNotEmpty ? _t('title') : 'Peace & Security',
+          _t('title').isNotEmpty ? _formatTitle(_t('title')) : (_isFr ? 'Paix et Sécurité' : 'Peace & Security'),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,

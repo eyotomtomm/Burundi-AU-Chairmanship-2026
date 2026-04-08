@@ -37,6 +37,16 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
     }
   }
 
+  bool get _isFr => Localizations.localeOf(context).languageCode == 'fr';
+
+  String _formatTitle(String title) {
+    if (title.contains('_') || title.contains('-')) {
+      title = title.replaceAll('_', ' ').replaceAll('-', ' ');
+      title = title.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
+    }
+    return title;
+  }
+
   String _t(String key) {
     if (agendaData == null) return '';
     final lang = Localizations.localeOf(context).languageCode;
@@ -76,7 +86,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
                       children: [
                         // Overview
                         if (_t('overview').isNotEmpty) ...[
-                          _buildSectionTitle('Overview'),
+                          _buildSectionTitle(_isFr ? 'Aperçu' : 'Overview'),
                           const SizedBox(height: 12),
                           _buildContentText(_t('overview')),
                           const SizedBox(height: 24),
@@ -84,7 +94,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
 
                         // Objectives
                         if (_tList('objectives').isNotEmpty) ...[
-                          _buildSectionTitle('Key Objectives'),
+                          _buildSectionTitle(_isFr ? 'Objectifs Clés' : 'Key Objectives'),
                           const SizedBox(height: 12),
                           ..._tList('objectives').map((obj) =>
                             _buildBulletPoint(obj.toString())),
@@ -93,7 +103,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
 
                         // Impact Areas
                         if (_tList('impact_areas').isNotEmpty) ...[
-                          _buildSectionTitle('Impact Areas'),
+                          _buildSectionTitle(_isFr ? "Domaines d'Impact" : 'Impact Areas'),
                           const SizedBox(height: 12),
                           ..._buildImpactCards(),
                           const SizedBox(height: 24),
@@ -101,7 +111,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
 
                         // Current Initiatives
                         if (_t('current_initiatives').isNotEmpty) ...[
-                          _buildSectionTitle('Current Initiatives'),
+                          _buildSectionTitle(_isFr ? 'Initiatives en Cours' : 'Current Initiatives'),
                           const SizedBox(height: 12),
                           _buildContentText(_t('current_initiatives')),
                           const SizedBox(height: 24),
@@ -128,7 +138,7 @@ class _WaterSanitationScreenState extends State<WaterSanitationScreen> {
       foregroundColor: Colors.white,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          _t('title').isNotEmpty ? _t('title') : 'Water & Sanitation',
+          _t('title').isNotEmpty ? _formatTitle(_t('title')) : (_isFr ? 'Eau et Assainissement' : 'Water & Sanitation'),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,

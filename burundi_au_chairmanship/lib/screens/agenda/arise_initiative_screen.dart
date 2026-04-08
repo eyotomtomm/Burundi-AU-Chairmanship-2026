@@ -37,6 +37,16 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
     }
   }
 
+  bool get _isFr => Localizations.localeOf(context).languageCode == 'fr';
+
+  String _formatTitle(String title) {
+    if (title.contains('_') || title.contains('-')) {
+      title = title.replaceAll('_', ' ').replaceAll('-', ' ');
+      title = title.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
+    }
+    return title;
+  }
+
   String _t(String key) {
     if (agendaData == null) return '';
     final lang = Localizations.localeOf(context).languageCode;
@@ -74,7 +84,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
                       children: [
                         // Overview
                         if (_t('overview').isNotEmpty) ...[
-                          _buildSectionTitle('About A-RISE'),
+                          _buildSectionTitle(_isFr ? 'À Propos de A-RISE' : 'About A-RISE'),
                           const SizedBox(height: 12),
                           _buildContentText(_t('overview')),
                           const SizedBox(height: 24),
@@ -82,7 +92,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
 
                         // Objectives
                         if (_tList('objectives').isNotEmpty) ...[
-                          _buildSectionTitle('Strategic Pillars'),
+                          _buildSectionTitle(_isFr ? 'Piliers Stratégiques' : 'Strategic Pillars'),
                           const SizedBox(height: 12),
                           ..._tList('objectives').map((obj) =>
                             _buildBulletPoint(obj.toString())),
@@ -91,7 +101,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
 
                         // Impact Areas
                         if (_tList('impact_areas').isNotEmpty) ...[
-                          _buildSectionTitle('Focus Areas'),
+                          _buildSectionTitle(_isFr ? 'Domaines Prioritaires' : 'Focus Areas'),
                           const SizedBox(height: 12),
                           ..._buildImpactCards(),
                           const SizedBox(height: 24),
@@ -99,7 +109,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
 
                         // Current Initiatives
                         if (_t('current_initiatives').isNotEmpty) ...[
-                          _buildSectionTitle('Expected Outcomes'),
+                          _buildSectionTitle(_isFr ? 'Résultats Attendus' : 'Expected Outcomes'),
                           const SizedBox(height: 12),
                           _buildContentText(_t('current_initiatives')),
                           const SizedBox(height: 24),
@@ -126,7 +136,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
       foregroundColor: Colors.white,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          _t('title').isNotEmpty ? _t('title') : 'A-RISE Initiative',
+          _t('title').isNotEmpty ? _formatTitle(_t('title')) : (_isFr ? 'Initiative A-RISE' : 'A-RISE Initiative'),
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,

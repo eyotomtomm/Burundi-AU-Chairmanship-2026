@@ -59,6 +59,7 @@ class AppLocalizations {
       'latest_news': 'Latest News',
       'upcoming_events': 'Upcoming Events',
       'quick_access': 'Quick Access',
+      'priority_agenda': 'Priority Agenda',
 
       // Features
       'digital_magazine': 'Digital Magazine',
@@ -221,6 +222,7 @@ class AppLocalizations {
       'latest_news': 'Dernières nouvelles',
       'upcoming_events': 'Événements à venir',
       'quick_access': 'Accès rapide',
+      'priority_agenda': 'Agenda Prioritaire',
 
       // Features
       'digital_magazine': 'Magazine numérique',

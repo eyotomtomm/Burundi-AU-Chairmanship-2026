@@ -6,7 +6,13 @@ import '../../providers/verification_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../widgets/verification_dialogs.dart';
 import '../../widgets/popup_dialog.dart';
+import '../../widgets/app_update_dialog.dart';
+import '../../widgets/whats_new_dialog.dart';
+import '../../widgets/offline_banner.dart';
+import '../../widgets/confetti_overlay.dart';
 import '../../services/popup_service.dart';
+import '../../services/haptic_service.dart';
+import '../../config/app_constants.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/magazine_tab.dart';
 import 'tabs/agenda_tab.dart';
@@ -29,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkVerificationStatus();
       _checkAndShowPopups();
+      _checkForAppUpdate();
+      _showWhatsNew();
     });
   }
 
@@ -56,8 +64,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!shouldShow || !mounted) return;
 
     if (status == 'approved') {
-      // Show approval dialog
+      // Show approval dialog with confetti celebration
       final badgeType = verificationProvider.badgeType ?? 'BLUE';
+      HapticService.success();
+      ConfettiOverlay.show(context);
       await showVerificationApprovedDialog(
         context,
         badgeType: badgeType,
@@ -147,18 +157,48 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Check for app updates on home screen load
+  Future<void> _checkForAppUpdate() async {
+    final langCode = Localizations.localeOf(context).languageCode;
+    await AppUpdateDialog.check(
+      context: context,
+      currentVersion: AppConstants.appVersion,
+      langCode: langCode,
+    );
+  }
+
+  /// Show What's New dialog if there's a new version
+  Future<void> _showWhatsNew() async {
+    // Delay slightly so it doesn't compete with other popups
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    final langCode = Localizations.localeOf(context).languageCode;
+    await WhatsNewDialog.showIfNeeded(
+      context: context,
+      currentVersion: AppConstants.appVersion,
+      langCode: langCode,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: Column(
         children: [
-          HomeTab(onSwitchTab: (index) => setState(() => _currentIndex = index)),
-          MagazineTab(),
-          AgendaTab(),
-          MoreTab(),
+          const OfflineBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: [
+                HomeTab(onSwitchTab: (index) => setState(() => _currentIndex = index)),
+                MagazineTab(),
+                AgendaTab(),
+                MoreTab(),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(l10n),

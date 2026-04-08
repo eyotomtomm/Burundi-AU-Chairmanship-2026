@@ -4,6 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../widgets/fullscreen_image_viewer.dart';
+import '../../services/haptic_service.dart';
 import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
@@ -142,7 +144,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       return;
     }
 
-    // Optimistic UI
+    // Optimistic UI with haptic feedback
+    HapticService.light();
     final wasLiked = _article.isLiked;
     setState(() {
       _article = _article.copyWith(
@@ -354,21 +357,36 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: CachedNetworkImage(
-                                  imageUrl: m.imageUrl,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  placeholder: (_, _) => Container(
-                                    height: 200,
-                                    color: AppColors.auGold.withValues(alpha: 0.1),
-                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                  ),
-                                  errorWidget: (_, _, _) => Container(
-                                    height: 200,
-                                    color: AppColors.auGold.withValues(alpha: 0.1),
-                                    child: const Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey),
+                              GestureDetector(
+                                onTap: () {
+                                  HapticService.light();
+                                  final imageUrls = _article.media
+                                      .where((media) => media.isImage && media.imageUrl.isNotEmpty)
+                                      .map((media) => media.imageUrl)
+                                      .toList();
+                                  final index = imageUrls.indexOf(m.imageUrl);
+                                  FullscreenImageViewer.show(
+                                    context,
+                                    imageUrls: imageUrls,
+                                    initialIndex: index >= 0 ? index : 0,
+                                  );
+                                },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CachedNetworkImage(
+                                    imageUrl: m.imageUrl,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, _) => Container(
+                                      height: 200,
+                                      color: AppColors.auGold.withValues(alpha: 0.1),
+                                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                    ),
+                                    errorWidget: (_, _, _) => Container(
+                                      height: 200,
+                                      color: AppColors.auGold.withValues(alpha: 0.1),
+                                      child: const Icon(Icons.broken_image_rounded, size: 40, color: Colors.grey),
+                                    ),
                                   ),
                                 ),
                               ),

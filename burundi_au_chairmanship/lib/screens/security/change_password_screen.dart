@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../services/haptic_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
+import '../../widgets/password_strength_meter.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -18,6 +20,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _loading = false;
   bool _showCurrent = false;
   bool _showNew = false;
+  String _newPassword = '';
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
@@ -25,6 +28,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     try {
       await ApiService().changePassword(_currentPwCtrl.text, _newPwCtrl.text);
       if (mounted) {
+        HapticService.success();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Password changed successfully'), backgroundColor: Colors.green),
         );
@@ -102,6 +106,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     TextFormField(
                       controller: _newPwCtrl,
                       obscureText: !_showNew,
+                      onChanged: (v) => setState(() => _newPassword = v),
                       decoration: InputDecoration(
                         labelText: l10n.translate('new_password'),
                         prefixIcon: const Icon(Icons.lock_outline),
@@ -117,6 +122,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         return null;
                       },
                     ),
+                    PasswordStrengthMeter(password: _newPassword),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPwCtrl,

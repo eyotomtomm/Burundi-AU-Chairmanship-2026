@@ -1,0 +1,258 @@
+<!--
+  Reusable Image Cropper Modal
+  ============================
+  Include this in any form page that has image upload fields.
+
+  Usage:
+    {% include "custom_admin/includes/image_cropper_modal.html" %}
+
+  Then add a "Crop" button next to your image input:
+    <button type="button" class="crop-trigger-btn" data-target="id_image">Crop</button>
+
+  Where data-target is the ID of the file input element.
+
+  The cropped image will replace the file in the form's file input.
+-->
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6/dist/cropper.min.css" />
+
+<!-- Cropper Modal -->
+<div id="cropperModal" class="hidden fixed inset-0 bg-black/60 z-[200] flex items-center justify-center backdrop-blur-sm" style="scrollbar-width: thin;">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col overflow-hidden">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+          <span class="material-symbols-outlined text-amber-600">crop</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900 font-headline">Crop Image</h3>
+          <p class="text-xs text-slate-500">Adjust the crop area and click Apply</p>
+        </div>
+      </div>
+      <button id="cropperModalClose" class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center transition-colors">
+        <span class="material-symbols-outlined text-slate-500">close</span>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="flex-1 overflow-hidden p-6">
+      <div class="bg-slate-900 rounded-xl overflow-hidden" style="max-height: 55vh;">
+        <img id="cropperModalImage" src="" alt="Crop preview" style="max-width: 100%; display: block;" />
+      </div>
+    </div>
+
+    <!-- Modal Toolbar -->
+    <div class="px-6 py-3 border-t border-slate-100 bg-slate-50/50">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <!-- Aspect Ratio -->
+          <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1">
+            <button class="modal-aspect-btn active px-2.5 py-1 text-xs font-medium rounded-md" data-ratio="NaN">Free</button>
+            <button class="modal-aspect-btn px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100" data-ratio="1.7778">16:9</button>
+            <button class="modal-aspect-btn px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100" data-ratio="1">1:1</button>
+            <button class="modal-aspect-btn px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 hover:bg-slate-100" data-ratio="1.3333">4:3</button>
+          </div>
+
+          <div class="w-px h-7 bg-slate-200 mx-1"></div>
+
+          <button id="modalRotateCCW" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100" title="Rotate CCW">
+            <span class="material-symbols-outlined text-base">rotate_left</span>
+          </button>
+          <button id="modalRotateCW" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100" title="Rotate CW">
+            <span class="material-symbols-outlined text-base">rotate_right</span>
+          </button>
+          <button id="modalFlipH" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100" title="Flip H">
+            <span class="material-symbols-outlined text-base">flip</span>
+          </button>
+          <button id="modalFlipV" class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100" title="Flip V" style="transform: rotate(90deg);">
+            <span class="material-symbols-outlined text-base">flip</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-slate-500">Size:</span>
+          <span id="modalCropWidth" class="font-mono text-slate-700">--</span>
+          <span class="text-slate-400">x</span>
+          <span id="modalCropHeight" class="font-mono text-slate-700">--</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
+      <button id="cropperModalCancel" class="px-5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+        Cancel
+      </button>
+      <button id="cropperModalApply" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm">
+        <span class="material-symbols-outlined text-base align-middle mr-1">check</span>
+        Apply Crop
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6/dist/cropper.min.js"></script>
+<script>
+(function() {
+  var modal = document.getElementById('cropperModal');
+  var modalImage = document.getElementById('cropperModalImage');
+  var closeBtn = document.getElementById('cropperModalClose');
+  var cancelBtn = document.getElementById('cropperModalCancel');
+  var applyBtn = document.getElementById('cropperModalApply');
+  var modalCropper = null;
+  var targetInput = null;
+  var modalScaleX = 1;
+  var modalScaleY = 1;
+
+  if (!modal) return;
+
+  function openModal(inputEl) {
+    targetInput = inputEl;
+    var file = inputEl.files[0];
+    if (!file) {
+      alert('Please select an image file first.');
+      return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      modalImage.src = e.target.result;
+      modal.classList.remove('hidden');
+      modalScaleX = 1;
+      modalScaleY = 1;
+
+      // Wait for image to load before initializing cropper
+      modalImage.onload = function() {
+        if (modalCropper) modalCropper.destroy();
+        modalCropper = new Cropper(modalImage, {
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 0.8,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: true,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+          crop: function(ev) {
+            document.getElementById('modalCropWidth').textContent = Math.round(ev.detail.width) + 'px';
+            document.getElementById('modalCropHeight').textContent = Math.round(ev.detail.height) + 'px';
+          }
+        });
+      };
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    if (modalCropper) {
+      modalCropper.destroy();
+      modalCropper = null;
+    }
+    targetInput = null;
+  }
+
+  function applyCrop() {
+    if (!modalCropper || !targetInput) return;
+
+    var canvas = modalCropper.getCroppedCanvas({
+      maxWidth: 4096,
+      maxHeight: 4096,
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high',
+    });
+
+    canvas.toBlob(function(blob) {
+      // Create a new File from the blob
+      var filename = targetInput.files[0] ? targetInput.files[0].name.replace(/\.[^.]+$/, '_cropped.png') : 'cropped.png';
+      var croppedFile = new File([blob], filename, { type: 'image/png' });
+
+      // Replace the file in the input using DataTransfer
+      var dt = new DataTransfer();
+      dt.items.add(croppedFile);
+      targetInput.files = dt.files;
+
+      // Trigger change event so previews update
+      targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      // Update any preview image near the input
+      var container = targetInput.closest('.relative') || targetInput.parentElement;
+      if (container) {
+        var preview = container.querySelector('img');
+        if (preview) {
+          preview.src = URL.createObjectURL(blob);
+        }
+      }
+
+      closeModal();
+    }, 'image/png');
+  }
+
+  // Aspect ratio buttons
+  document.querySelectorAll('.modal-aspect-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!modalCropper) return;
+      document.querySelectorAll('.modal-aspect-btn').forEach(function(b) {
+        b.classList.remove('active', 'bg-slate-900', 'text-white');
+        b.classList.add('text-slate-600');
+      });
+      btn.classList.add('active');
+      btn.classList.remove('text-slate-600');
+      modalCropper.setAspectRatio(parseFloat(btn.getAttribute('data-ratio')));
+    });
+  });
+
+  // Rotate
+  document.getElementById('modalRotateCCW').addEventListener('click', function() {
+    if (modalCropper) modalCropper.rotate(-90);
+  });
+  document.getElementById('modalRotateCW').addEventListener('click', function() {
+    if (modalCropper) modalCropper.rotate(90);
+  });
+
+  // Flip
+  document.getElementById('modalFlipH').addEventListener('click', function() {
+    if (!modalCropper) return;
+    modalScaleX = modalScaleX === 1 ? -1 : 1;
+    modalCropper.scaleX(modalScaleX);
+  });
+  document.getElementById('modalFlipV').addEventListener('click', function() {
+    if (!modalCropper) return;
+    modalScaleY = modalScaleY === 1 ? -1 : 1;
+    modalCropper.scaleY(modalScaleY);
+  });
+
+  // Close handlers
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+  applyBtn.addEventListener('click', applyCrop);
+
+  // Close on backdrop click
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeModal();
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      closeModal();
+    }
+  });
+
+  // Listen for "Crop" button clicks
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.crop-trigger-btn');
+    if (!btn) return;
+
+    var targetId = btn.getAttribute('data-target');
+    var inputEl = document.getElementById(targetId);
+    if (inputEl) {
+      openModal(inputEl);
+    }
+  });
+
+  // Expose globally for programmatic use
+  window.openImageCropperModal = openModal;
+})();
+</script>

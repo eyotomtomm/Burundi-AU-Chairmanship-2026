@@ -1,0 +1,276 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Activity Log - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-on-surface font-headline flex items-center gap-3">
+          <span class="material-symbols-outlined text-4xl text-blue-600">manage_history</span>
+          Admin Activity Log
+        </h1>
+        <p class="mt-2 text-sm text-on-surface-variant">Track all admin staff actions across the portal</p>
+      </div>
+      <a href="?{% if current_user_filter %}user={{ current_user_filter }}&{% endif %}{% if current_action_filter %}action={{ current_action_filter }}&{% endif %}{% if current_model_filter %}model={{ current_model_filter }}&{% endif %}{% if current_date_from %}date_from={{ current_date_from }}&{% endif %}{% if current_date_to %}date_to={{ current_date_to }}&{% endif %}export=csv"
+         class="inline-flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg py-2.5 px-5 font-medium transition-colors text-sm shadow-sm">
+        <span class="material-symbols-outlined text-sm">download</span>
+        Export CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <!-- Admin User Filter -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Admin User</label>
+        <input
+          type="text"
+          name="user"
+          value="{{ current_user_filter }}"
+          placeholder="Username or email..."
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- Action Type Filter -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Action</label>
+        <select name="action" class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm">
+          <option value="">All Actions</option>
+          {% for code, label in action_choices %}
+          <option value="{{ code }}" {% if current_action_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Model Filter -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Model</label>
+        <select name="model" class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm">
+          <option value="">All Models</option>
+          {% for mname in model_names %}
+          <option value="{{ mname }}" {% if current_model_filter == mname %}selected{% endif %}>{{ mname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Date From -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">From Date</label>
+        <input
+          type="date"
+          name="date_from"
+          value="{{ current_date_from }}"
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- Date To -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">To Date</label>
+        <input
+          type="date"
+          name="date_to"
+          value="{{ current_date_to }}"
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- Submit -->
+      <div class="flex items-end gap-2">
+        <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-2.5 px-6 font-medium transition-colors text-sm">
+          <span class="material-symbols-outlined text-sm align-middle mr-1">filter_list</span>
+          Filter
+        </button>
+        <a href="{% url 'custom_admin:activity_log' %}" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-2.5 px-4 font-medium transition-colors text-sm">
+          Clear
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results Count -->
+  {% if logs %}
+  <div class="mb-4 flex items-center justify-between">
+    <p class="text-sm text-on-surface-variant">
+      Showing <span class="font-bold text-on-surface">{{ logs.start_index }}-{{ logs.end_index }}</span>
+      of <span class="font-bold text-on-surface">{{ logs.paginator.count }}</span> entries
+    </p>
+  </div>
+  {% endif %}
+
+  <!-- Log Table -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if logs %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Timestamp</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Admin</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Action</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Model</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Object</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">IP Address</th>
+            <th class="text-center py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Details</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for log in logs %}
+          <tr class="hover:bg-surface-container-low transition-colors cursor-pointer activity-row" data-row-id="{{ log.id }}">
+            <td class="py-4 px-6 text-sm text-on-surface-variant whitespace-nowrap">
+              {{ log.timestamp|date:"M d, Y" }}<br/>
+              <span class="text-xs text-slate-400">{{ log.timestamp|date:"g:i:s A" }}</span>
+            </td>
+            <td class="py-4 px-6">
+              {% if log.user %}
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-primary-container/30 flex items-center justify-center text-xs font-bold text-primary-container">{{ log.user.username|first|upper }}</div>
+                <div>
+                  <p class="text-sm font-medium text-on-surface">{{ log.user.username }}</p>
+                  <p class="text-xs text-slate-400">{{ log.user.email }}</p>
+                </div>
+              </div>
+              {% else %}
+              <span class="text-sm text-slate-400 italic">System</span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold
+                {% if log.action_type == 'create' %}bg-emerald-100 text-emerald-700
+                {% elif log.action_type == 'update' %}bg-blue-100 text-blue-700
+                {% elif log.action_type == 'delete' %}bg-red-100 text-red-700
+                {% elif log.action_type == 'login' %}bg-purple-100 text-purple-700
+                {% elif log.action_type == 'logout' %}bg-slate-100 text-slate-700
+                {% elif log.action_type == 'export' %}bg-amber-100 text-amber-700
+                {% elif log.action_type == 'approve' %}bg-emerald-100 text-emerald-700
+                {% elif log.action_type == 'reject' %}bg-red-100 text-red-700
+                {% elif log.action_type == 'bulk_action' %}bg-indigo-100 text-indigo-700
+                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                <span class="material-symbols-outlined text-sm">
+                  {% if log.action_type == 'create' %}add_circle
+                  {% elif log.action_type == 'update' %}edit
+                  {% elif log.action_type == 'delete' %}delete
+                  {% elif log.action_type == 'login' %}login
+                  {% elif log.action_type == 'logout' %}logout
+                  {% elif log.action_type == 'export' %}download
+                  {% elif log.action_type == 'approve' %}check_circle
+                  {% elif log.action_type == 'reject' %}cancel
+                  {% elif log.action_type == 'bulk_action' %}layers
+                  {% else %}info{% endif %}
+                </span>
+                {{ log.get_action_type_display }}
+              </span>
+            </td>
+            <td class="py-4 px-6 text-sm text-on-surface font-medium">{{ log.model_name|default:"-" }}</td>
+            <td class="py-4 px-6 text-sm text-on-surface-variant max-w-xs truncate">{{ log.object_repr|default:"-" }}</td>
+            <td class="py-4 px-6 text-sm text-on-surface-variant whitespace-nowrap">
+              <code class="text-xs bg-surface-container-low px-2 py-1 rounded">{{ log.ip_address|default:"-" }}</code>
+            </td>
+            <td class="py-4 px-6 text-center">
+              <button onclick="toggleDetails('detail-{{ log.id }}')" class="text-blue-600 hover:text-blue-800 transition-colors" title="View details">
+                <span class="material-symbols-outlined text-sm">expand_more</span>
+              </button>
+            </td>
+          </tr>
+          <!-- Expandable detail row -->
+          <tr id="detail-{{ log.id }}" class="hidden bg-surface-container-low/50">
+            <td colspan="7" class="py-4 px-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                <div>
+                  <p class="font-bold text-on-surface-variant text-xs uppercase tracking-wider mb-2">Request Path</p>
+                  <code class="text-xs bg-surface-container px-3 py-1.5 rounded block break-all">{{ log.path|default:"-" }}</code>
+                </div>
+                <div>
+                  <p class="font-bold text-on-surface-variant text-xs uppercase tracking-wider mb-2">User Agent</p>
+                  <p class="text-xs text-on-surface-variant break-all leading-relaxed">{{ log.user_agent|default:"-"|truncatechars:200 }}</p>
+                </div>
+                <div>
+                  <p class="font-bold text-on-surface-variant text-xs uppercase tracking-wider mb-2">Object ID</p>
+                  <p class="text-xs text-on-surface-variant">{{ log.object_id|default:"N/A" }}</p>
+                </div>
+              </div>
+              {% if log.changes %}
+              <div class="mt-4">
+                <p class="font-bold text-on-surface-variant text-xs uppercase tracking-wider mb-2">Changes</p>
+                <div class="bg-slate-900 text-green-400 rounded-lg p-4 overflow-x-auto">
+                  <pre class="text-xs font-mono whitespace-pre-wrap">{{ log.changes|pprint }}</pre>
+                </div>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+      <span class="material-symbols-outlined text-6xl text-on-surface-variant mb-4">manage_history</span>
+      <p class="text-on-surface-variant text-lg">No activity log entries found</p>
+      <p class="text-sm text-slate-400 mt-2">Admin actions will appear here as they happen</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Pagination -->
+  {% if logs.has_other_pages %}
+  <div class="flex items-center justify-center gap-2 mt-8">
+    {% if logs.has_previous %}
+    <a href="?page={{ logs.previous_page_number }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}"
+       class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium transition-colors">
+      <span class="material-symbols-outlined text-sm align-middle">chevron_left</span>
+      Previous
+    </a>
+    {% endif %}
+
+    <div class="flex items-center gap-1">
+      {% for page_num in logs.paginator.page_range %}
+        {% if page_num == logs.number %}
+          <span class="px-3 py-2 bg-primary-container text-white rounded-lg text-sm font-bold">{{ page_num }}</span>
+        {% elif page_num == 1 or page_num == logs.paginator.num_pages or page_num >= logs.number|add:"-2" and page_num <= logs.number|add:"2" %}
+          <a href="?page={{ page_num }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}"
+             class="px-3 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium transition-colors">
+            {{ page_num }}
+          </a>
+        {% elif page_num == 2 or page_num == logs.paginator.num_pages|add:"-1" %}
+          <span class="px-2 py-2 text-sm text-on-surface-variant">...</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {% if logs.has_next %}
+    <a href="?page={{ logs.next_page_number }}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_action_filter %}&action={{ current_action_filter }}{% endif %}{% if current_model_filter %}&model={{ current_model_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}"
+       class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium transition-colors">
+      Next
+      <span class="material-symbols-outlined text-sm align-middle">chevron_right</span>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleDetails(id) {
+  var el = document.getElementById(id);
+  if (el) {
+    el.classList.toggle('hidden');
+    // Rotate the expand icon
+    var row = el.previousElementSibling;
+    if (row) {
+      var icon = row.querySelector('button .material-symbols-outlined');
+      if (icon) {
+        icon.textContent = el.classList.contains('hidden') ? 'expand_more' : 'expand_less';
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

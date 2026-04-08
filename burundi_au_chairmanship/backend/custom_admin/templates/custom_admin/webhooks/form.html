@@ -1,0 +1,183 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Webhook - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:webhook_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+      <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+    </a>
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 font-headline">{{ action }} Webhook</h1>
+      <p class="text-sm text-slate-500 mt-1">{% if action == 'Create' %}Configure a new webhook integration{% else %}Update webhook configuration{% endif %}</p>
+    </div>
+  </div>
+
+  <form method="post" id="webhookForm" class="space-y-6">
+    {% csrf_token %}
+
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-cyan-500">info</span>
+        Basic Configuration
+      </h3>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Name <span class="text-red-500">*</span></label>
+        <input type="text" name="name" required value="{{ webhook.name|default:'' }}" placeholder="e.g. Slack Notifications" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">URL <span class="text-red-500">*</span></label>
+        <input type="url" name="url" required value="{{ webhook.url|default:'' }}" placeholder="https://hooks.slack.com/services/..." class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Service Type</label>
+          <select name="service_type" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+            <option value="slack" {% if webhook.service_type == 'slack' %}selected{% endif %}>Slack</option>
+            <option value="teams" {% if webhook.service_type == 'teams' %}selected{% endif %}>Microsoft Teams</option>
+            <option value="discord" {% if webhook.service_type == 'discord' %}selected{% endif %}>Discord</option>
+            <option value="custom" {% if webhook.service_type == 'custom' or not webhook %}selected{% endif %}>Custom</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Secret Key <span class="text-slate-400 text-xs">(optional)</span></label>
+          <div class="relative">
+            <input type="password" name="secret_key" id="secretKeyInput" value="{{ webhook.secret_key|default:'' }}" placeholder="Shared secret for signature verification" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 pr-10 text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+            <button type="button" onclick="toggleSecret()" class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
+              <span class="material-symbols-outlined text-sm" id="secretToggleIcon">visibility</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-cyan-500">notifications</span>
+        Events
+      </h3>
+      <p class="text-sm text-slate-500">Select the events that should trigger this webhook.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {% for event_key, event_label in event_choices %}
+        <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-cyan-300 hover:bg-cyan-50/30 cursor-pointer transition-all">
+          <input type="checkbox" name="events" value="{{ event_key }}" {% if event_key in selected_events %}checked{% endif %} class="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500">
+          <div>
+            <span class="text-sm font-medium text-slate-800">{{ event_label }}</span>
+            <span class="block text-xs text-slate-400 font-mono">{{ event_key }}</span>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-cyan-500">code</span>
+        Custom Headers <span class="text-xs text-slate-400 font-normal">(optional)</span>
+      </h3>
+
+      <div id="headersContainer" class="space-y-3">
+        {% if webhook.custom_headers %}
+          {% for key, value in webhook.custom_headers.items %}
+          <div class="header-row flex gap-3 items-center">
+            <input type="text" name="header_keys[]" value="{{ key }}" placeholder="Header name" class="flex-1 border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+            <input type="text" name="header_values[]" value="{{ value }}" placeholder="Header value" class="flex-1 border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+            <button type="button" onclick="this.parentElement.remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg"><span class="material-symbols-outlined">close</span></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <button type="button" onclick="addHeader()" class="inline-flex items-center gap-2 text-sm text-cyan-600 hover:text-cyan-700 font-semibold">
+        <span class="material-symbols-outlined text-sm">add_circle</span>Add Header
+      </button>
+    </div>
+
+    {% if webhook.pk %}
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100">
+      <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
+        <span class="material-symbols-outlined text-cyan-500">send</span>
+        Test Webhook
+      </h3>
+      <p class="text-sm text-slate-500 mb-4">Send a test payload to verify the webhook is working correctly.</p>
+      <button type="button" onclick="testWebhook()" id="testBtn" class="inline-flex items-center gap-2 bg-cyan-100 text-cyan-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-cyan-200 transition-all">
+        <span class="material-symbols-outlined text-sm">send</span>
+        Send Test Payload
+      </button>
+      <div id="testResult" class="hidden mt-4 p-4 rounded-lg text-sm"></div>
+    </div>
+    {% endif %}
+
+    <div class="flex gap-3">
+      <a href="{% url 'custom_admin:webhook_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50 transition-all">Cancel</a>
+      <button type="submit" class="bg-cyan-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-cyan-700 transition-all shadow-sm">{{ action }} Webhook</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleSecret() {
+  const input = document.getElementById('secretKeyInput');
+  const icon = document.getElementById('secretToggleIcon');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.textContent = 'visibility_off';
+  } else {
+    input.type = 'password';
+    icon.textContent = 'visibility';
+  }
+}
+
+function addHeader() {
+  const container = document.getElementById('headersContainer');
+  const row = document.createElement('div');
+  row.className = 'header-row flex gap-3 items-center';
+  row.innerHTML = '<input type="text" name="header_keys[]" placeholder="Header name" class="flex-1 border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent">' +
+    '<input type="text" name="header_values[]" placeholder="Header value" class="flex-1 border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-cyan-500 focus:border-transparent">' +
+    '<button type="button" onclick="this.parentElement.remove()" class="p-2 text-red-500 hover:bg-red-50 rounded-lg"><span class="material-symbols-outlined">close</span></button>';
+  container.appendChild(row);
+}
+
+{% if webhook.pk %}
+function testWebhook() {
+  const btn = document.getElementById('testBtn');
+  const result = document.getElementById('testResult');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Sending...';
+
+  fetch("{% url 'custom_admin:webhook_test' webhook.pk %}", {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    result.classList.remove('hidden');
+    if (data.success) {
+      result.className = 'mt-4 p-4 rounded-lg text-sm bg-emerald-50 text-emerald-800 border border-emerald-200';
+      result.innerHTML = '<span class="font-bold">Success!</span> Webhook responded with status ' + (data.status_code || '200') + '.';
+    } else {
+      result.className = 'mt-4 p-4 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200';
+      result.innerHTML = '<span class="font-bold">Failed.</span> ' + (data.error || 'Could not reach the webhook endpoint.');
+    }
+  })
+  .catch(function(err) {
+    result.classList.remove('hidden');
+    result.className = 'mt-4 p-4 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200';
+    result.innerHTML = '<span class="font-bold">Error.</span> Network error occurred.';
+  })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm">send</span> Send Test Payload';
+  });
+}
+{% endif %}
+</script>
+{% endblock %}

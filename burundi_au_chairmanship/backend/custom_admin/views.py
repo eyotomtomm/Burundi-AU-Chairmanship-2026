@@ -1,15 +1,22 @@
 import csv
+import io
+import json
 import logging
+import os
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 from core.models import (
@@ -23,9 +30,13 @@ from core.models import (
     AuditLogEntry, SupportTicket, TicketMessage,
     # New models
     Poll, PollOption, Discussion, ContactDirectory, AnnouncementBanner,
-    EmailTemplate, EventSpeaker, OnboardingStep, Webhook,
+    EmailTemplate, EventSpeaker, OnboardingStep, Webhook, WebhookLog,
     ScheduledMaintenance, LoginHistory, Bookmark, Reaction,
     TranslationEntry, RateLimitLog,
+    AdminActivityLog, DatabaseBackup,
+    UserSegment, UserSegmentMembership,
+    AdminNotification,
+    ABTest, ABTestParticipant,
 )
 
 
@@ -3288,12 +3299,15 @@ def bulk_content_action(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def admin_global_search(request):
+    """Full-page search results view."""
     query = request.GET.get('q', '').strip()
     results = {
         'users': [],
         'articles': [],
         'events': [],
+        'magazines': [],
         'tickets': [],
+        'videos': [],
     }
 
     if query and len(query) >= 2:
@@ -3318,11 +3332,23 @@ def admin_global_search(request):
             Q(address__icontains=query)
         )[:20]
 
+        results['magazines'] = MagazineEdition.objects.filter(
+            Q(title__icontains=query) |
+            Q(title_fr__icontains=query) |
+            Q(description__icontains=query)
+        )[:20]
+
         results['tickets'] = SupportTicket.objects.filter(
             Q(subject__icontains=query) |
             Q(user__username__icontains=query) |
             Q(user__email__icontains=query)
         ).select_related('user')[:20]
+
+        results['videos'] = Video.objects.filter(
+            Q(title__icontains=query) |
+            Q(title_fr__icontains=query) |
+            Q(description__icontains=query)
+        )[:20]
 
     total_results = sum(len(v) for v in results.values())
 
@@ -3331,6 +3357,142 @@ def admin_global_search(request):
         'results': results,
         'total_results': total_results,
     })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def admin_global_search_api(request):
+    """JSON API endpoint for live search dropdown in the top navigation bar.
+    Returns categorized results with max 5 per category, 20 total."""
+    query = request.GET.get('q', '').strip()
+
+    if not query or len(query) < 2:
+        return JsonResponse({'results': []})
+
+    categories = []
+    total_count = 0
+    max_per_category = 5
+    max_total = 20
+
+    # --- Users ---
+    users = User.objects.filter(
+        Q(username__icontains=query) |
+        Q(email__icontains=query) |
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query)
+    )[:max_per_category]
+    if users:
+        items = []
+        for u in users:
+            full_name = f"{u.first_name} {u.last_name}".strip()
+            items.append({
+                'title': u.username,
+                'subtitle': full_name if full_name else u.email,
+                'url': f'/admin/users/{u.pk}/edit/',
+                'icon': 'person',
+            })
+        categories.append({'category': 'Users', 'items': items})
+        total_count += len(items)
+
+    # --- Articles ---
+    if total_count < max_total:
+        articles = Article.objects.filter(
+            Q(title__icontains=query) |
+            Q(title_fr__icontains=query)
+        )[:max_per_category]
+        if articles:
+            items = []
+            for a in articles:
+                items.append({
+                    'title': a.title,
+                    'subtitle': f"By {a.author}" if a.author else (a.title_fr or ''),
+                    'url': f'/admin/articles/{a.pk}/edit/',
+                    'icon': 'article',
+                })
+            categories.append({'category': 'Articles', 'items': items})
+            total_count += len(items)
+
+    # --- Events ---
+    if total_count < max_total:
+        events = Event.objects.filter(
+            Q(name__icontains=query) |
+            Q(name_fr__icontains=query)
+        )[:max_per_category]
+        if events:
+            items = []
+            for e in events:
+                date_str = e.event_date.strftime('%b %d, %Y') if e.event_date else ''
+                items.append({
+                    'title': e.name,
+                    'subtitle': date_str,
+                    'url': f'/admin/events/{e.pk}/edit/',
+                    'icon': 'event',
+                })
+            categories.append({'category': 'Events', 'items': items})
+            total_count += len(items)
+
+    # --- Magazines ---
+    if total_count < max_total:
+        magazines = MagazineEdition.objects.filter(
+            Q(title__icontains=query) |
+            Q(title_fr__icontains=query)
+        )[:max_per_category]
+        if magazines:
+            items = []
+            for m in magazines:
+                subtitle = m.title_fr or ''
+                if not subtitle and m.publish_date:
+                    subtitle = f"Published {m.publish_date.strftime('%b %Y')}"
+                items.append({
+                    'title': m.title,
+                    'subtitle': subtitle,
+                    'url': f'/admin/magazines/{m.pk}/edit/',
+                    'icon': 'menu_book',
+                })
+            categories.append({'category': 'Magazines', 'items': items})
+            total_count += len(items)
+
+    # --- Support Tickets ---
+    if total_count < max_total:
+        tickets = SupportTicket.objects.filter(
+            Q(subject__icontains=query) |
+            Q(user__username__icontains=query) |
+            Q(user__email__icontains=query)
+        ).select_related('user')[:max_per_category]
+        if tickets:
+            items = []
+            for t in tickets:
+                items.append({
+                    'title': t.subject,
+                    'subtitle': f"{t.get_status_display()} - {t.user.username}",
+                    'url': f'/admin/support/{t.pk}/',
+                    'icon': 'support_agent',
+                })
+            categories.append({'category': 'Support Tickets', 'items': items})
+            total_count += len(items)
+
+    # --- Videos ---
+    if total_count < max_total:
+        videos = Video.objects.filter(
+            Q(title__icontains=query) |
+            Q(title_fr__icontains=query)
+        )[:max_per_category]
+        if videos:
+            items = []
+            for v in videos:
+                subtitle = v.title_fr or ''
+                if not subtitle and hasattr(v, 'get_category_display'):
+                    subtitle = v.get_category_display()
+                items.append({
+                    'title': v.title,
+                    'subtitle': subtitle,
+                    'url': f'/admin/videos/{v.pk}/edit/',
+                    'icon': 'videocam',
+                })
+            categories.append({'category': 'Videos', 'items': items})
+            total_count += len(items)
+
+    return JsonResponse({'results': categories})
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -3607,3 +3769,2213 @@ def rate_limiting_dashboard(request):
         'recent_logs': recent_logs_page,
     }
     return render(request, 'custom_admin/analytics/rate_limiting.html', context)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def analytics_charts(request):
+    """Deep-dive interactive Chart.js dashboard with 8 chart types."""
+    import json
+    from datetime import timedelta
+    from django.db.models import Sum, Count, Q
+    from django.db.models.functions import (
+        TruncDate, TruncWeek, TruncMonth, ExtractHour,
+    )
+
+    now = timezone.now()
+
+    # Period filter (default 30 days)
+    period_param = request.GET.get('period', '30')
+    try:
+        period_days = int(period_param)
+    except (ValueError, TypeError):
+        period_days = 30
+    if period_days not in (7, 30, 90):
+        period_days = 30
+    period_start = now - timedelta(days=period_days)
+
+    # ──────────────────────────────────────────────────────
+    # 1. USER GROWTH (line chart) — registrations per day
+    # ──────────────────────────────────────────────────────
+    user_growth_qs = (
+        User.objects.filter(date_joined__gte=period_start)
+        .annotate(day=TruncDate('date_joined'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .order_by('day')
+    )
+    user_growth_labels = [g['day'].strftime('%b %d') for g in user_growth_qs]
+    user_growth_data = [g['count'] for g in user_growth_qs]
+
+    # ──────────────────────────────────────────────────────
+    # 2. CONTENT PUBLISHED (stacked bar) — per week, last 12 weeks
+    # ──────────────────────────────────────────────────────
+    content_weeks = 12
+    content_start = now - timedelta(weeks=content_weeks)
+
+    articles_by_week = dict(
+        Article.objects.filter(created_at__gte=content_start)
+        .annotate(week=TruncWeek('created_at'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('week', 'count')
+    )
+    magazines_by_week = dict(
+        MagazineEdition.objects.filter(created_at__gte=content_start)
+        .annotate(week=TruncWeek('created_at'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('week', 'count')
+    )
+    videos_by_week = dict(
+        Video.objects.filter(created_at__gte=content_start)
+        .annotate(week=TruncWeek('created_at'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('week', 'count')
+    )
+
+    # Build unified week labels
+    content_week_labels = []
+    content_articles = []
+    content_magazines = []
+    content_videos = []
+    for i in range(content_weeks - 1, -1, -1):
+        week_date = (now - timedelta(weeks=i)).date()
+        # TruncWeek returns Monday of each week
+        from datetime import date as date_type
+        monday = week_date - timedelta(days=week_date.weekday())
+        label = monday.strftime('%b %d')
+        content_week_labels.append(label)
+        from django.utils.timezone import make_aware
+        from datetime import datetime as dt_type
+        week_key = make_aware(dt_type.combine(monday, dt_type.min.time()))
+        content_articles.append(articles_by_week.get(week_key, 0))
+        content_magazines.append(magazines_by_week.get(week_key, 0))
+        content_videos.append(videos_by_week.get(week_key, 0))
+
+    # ──────────────────────────────────────────────────────
+    # 3. ENGAGEMENT METRICS (multi-line) — daily over period
+    # ──────────────────────────────────────────────────────
+    engagement_days = min(period_days, 30)
+    engagement_start = now - timedelta(days=engagement_days)
+
+    # Article views by day — use ArticleLike/ArticleComment created_at as proxies
+    likes_by_day = dict(
+        ArticleLike.objects.filter(created_at__gte=engagement_start)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .values_list('day', 'count')
+    )
+    comments_by_day = dict(
+        ArticleComment.objects.filter(created_at__gte=engagement_start)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .values_list('day', 'count')
+    )
+    reactions_by_day = dict(
+        Reaction.objects.filter(created_at__gte=engagement_start)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .values_list('day', 'count')
+    )
+    bookmarks_by_day = dict(
+        Bookmark.objects.filter(created_at__gte=engagement_start)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .values_list('day', 'count')
+    )
+
+    engagement_labels = []
+    engagement_likes = []
+    engagement_comments = []
+    engagement_reactions = []
+    engagement_bookmarks = []
+    for i in range(engagement_days - 1, -1, -1):
+        day = (now - timedelta(days=i)).date()
+        engagement_labels.append(day.strftime('%b %d'))
+        engagement_likes.append(likes_by_day.get(day, 0))
+        engagement_comments.append(comments_by_day.get(day, 0))
+        engagement_reactions.append(reactions_by_day.get(day, 0))
+        engagement_bookmarks.append(bookmarks_by_day.get(day, 0))
+
+    # ──────────────────────────────────────────────────────
+    # 4. USER DEMOGRAPHICS (doughnut) — by nationality top 10
+    # ──────────────────────────────────────────────────────
+    nationality_data = list(
+        UserProfile.objects.exclude(nationality='')
+        .values('nationality')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:10]
+    )
+    nationality_labels = [d['nationality'] for d in nationality_data]
+    nationality_counts = [d['count'] for d in nationality_data]
+    # Add "Other" bucket
+    top_10_total = sum(nationality_counts)
+    total_with_nationality = UserProfile.objects.exclude(nationality='').count()
+    other_count = total_with_nationality - top_10_total
+    if other_count > 0:
+        nationality_labels.append('Other')
+        nationality_counts.append(other_count)
+
+    # ──────────────────────────────────────────────────────
+    # 5. EVENT ACTIVITY (bar chart) — registrations per event, top 10
+    # ──────────────────────────────────────────────────────
+    event_activity = list(
+        EventRegistration.objects.annotate(
+            sub_count=Count('submissions')
+        ).filter(sub_count__gt=0)
+        .order_by('-sub_count')[:10]
+    )
+    event_labels = [e.event_title[:40] for e in event_activity]
+    event_counts = [e.sub_count for e in event_activity]
+
+    # ──────────────────────────────────────────────────────
+    # 6. SUPPORT TICKETS (line chart) — opened vs closed per week
+    # ──────────────────────────────────────────────────────
+    ticket_weeks = 8
+    ticket_start = now - timedelta(weeks=ticket_weeks)
+
+    tickets_opened_by_week = dict(
+        SupportTicket.objects.filter(created_at__gte=ticket_start)
+        .annotate(week=TruncWeek('created_at'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('week', 'count')
+    )
+    tickets_closed_by_week = dict(
+        SupportTicket.objects.filter(
+            resolved_at__gte=ticket_start,
+            status__in=['resolved', 'closed']
+        )
+        .annotate(week=TruncWeek('resolved_at'))
+        .values('week')
+        .annotate(count=Count('id'))
+        .values_list('week', 'count')
+    )
+
+    ticket_labels = []
+    ticket_opened = []
+    ticket_closed = []
+    for i in range(ticket_weeks - 1, -1, -1):
+        week_date = (now - timedelta(weeks=i)).date()
+        monday = week_date - timedelta(days=week_date.weekday())
+        label = monday.strftime('%b %d')
+        ticket_labels.append(label)
+        week_key = make_aware(dt_type.combine(monday, dt_type.min.time()))
+        ticket_opened.append(tickets_opened_by_week.get(week_key, 0))
+        ticket_closed.append(tickets_closed_by_week.get(week_key, 0))
+
+    # ──────────────────────────────────────────────────────
+    # 7. TRAFFIC BY HOUR (area chart) — login activity averaged over last 7 days
+    # ──────────────────────────────────────────────────────
+    traffic_start = now - timedelta(days=7)
+    hourly_logins = dict(
+        LoginHistory.objects.filter(created_at__gte=traffic_start, success=True)
+        .annotate(hour=ExtractHour('created_at'))
+        .values('hour')
+        .annotate(count=Count('id'))
+        .values_list('hour', 'count')
+    )
+    traffic_labels = [f'{h:02d}:00' for h in range(24)]
+    traffic_data = [round(hourly_logins.get(h, 0) / 7, 1) for h in range(24)]
+
+    # ──────────────────────────────────────────────────────
+    # 8. BADGE DISTRIBUTION (pie chart)
+    # ──────────────────────────────────────────────────────
+    gold_count = UserProfile.objects.filter(badge_type='GOLD').count()
+    blue_count = UserProfile.objects.filter(badge_type='BLUE').count()
+    no_badge_count = UserProfile.objects.filter(
+        Q(badge_type__isnull=True) | Q(badge_type='')
+    ).count()
+    badge_labels = ['Gold Badge', 'Blue Badge', 'No Badge']
+    badge_data = [gold_count, blue_count, no_badge_count]
+
+    # ──────────────────────────────────────────────────────
+    # Build context with JSON-safe data
+    # ──────────────────────────────────────────────────────
+    context = {
+        'period': period_days,
+        # 1. User Growth
+        'user_growth_labels': json.dumps(user_growth_labels),
+        'user_growth_data': json.dumps(user_growth_data),
+        # 2. Content Published
+        'content_week_labels': json.dumps(content_week_labels),
+        'content_articles': json.dumps(content_articles),
+        'content_magazines': json.dumps(content_magazines),
+        'content_videos': json.dumps(content_videos),
+        # 3. Engagement
+        'engagement_labels': json.dumps(engagement_labels),
+        'engagement_likes': json.dumps(engagement_likes),
+        'engagement_comments': json.dumps(engagement_comments),
+        'engagement_reactions': json.dumps(engagement_reactions),
+        'engagement_bookmarks': json.dumps(engagement_bookmarks),
+        # 4. Demographics
+        'nationality_labels': json.dumps(nationality_labels),
+        'nationality_counts': json.dumps(nationality_counts),
+        # 5. Event Activity
+        'event_labels': json.dumps(event_labels),
+        'event_counts': json.dumps(event_counts),
+        # 6. Support Tickets
+        'ticket_labels': json.dumps(ticket_labels),
+        'ticket_opened': json.dumps(ticket_opened),
+        'ticket_closed': json.dumps(ticket_closed),
+        # 7. Traffic by Hour
+        'traffic_labels': json.dumps(traffic_labels),
+        'traffic_data': json.dumps(traffic_data),
+        # 8. Badge Distribution
+        'badge_labels': json.dumps(badge_labels),
+        'badge_data': json.dumps(badge_data),
+    }
+    return render(request, 'custom_admin/analytics/charts.html', context)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ADMIN ACTIVITY LOG
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def activity_log(request):
+    """View and filter admin activity logs with CSV export support."""
+    import json as json_mod
+    from datetime import timedelta
+
+    logs = AdminActivityLog.objects.all().select_related('user').order_by('-timestamp')
+
+    # ── Filters ──
+    user_filter = request.GET.get('user', '').strip()
+    action_filter = request.GET.get('action', '').strip()
+    model_filter = request.GET.get('model', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    if user_filter:
+        logs = logs.filter(
+            Q(user__username__icontains=user_filter) |
+            Q(user__email__icontains=user_filter) |
+            Q(user__first_name__icontains=user_filter) |
+            Q(user__last_name__icontains=user_filter)
+        )
+    if action_filter:
+        logs = logs.filter(action_type=action_filter)
+    if model_filter:
+        logs = logs.filter(model_name__icontains=model_filter)
+    if date_from:
+        try:
+            from datetime import datetime as dt
+            from_date = dt.strptime(date_from, '%Y-%m-%d')
+            logs = logs.filter(timestamp__date__gte=from_date.date())
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            from datetime import datetime as dt
+            to_date = dt.strptime(date_to, '%Y-%m-%d')
+            logs = logs.filter(timestamp__date__lte=to_date.date())
+        except ValueError:
+            pass
+
+    # ── CSV Export ──
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="admin_activity_log.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Timestamp', 'Admin', 'Action', 'Model', 'Object ID', 'Object', 'IP Address', 'Path', 'Changes'])
+        for log in logs[:5000]:  # Limit CSV rows
+            writer.writerow([
+                log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                log.user.username if log.user else 'Unknown',
+                log.get_action_type_display(),
+                log.model_name,
+                log.object_id or '',
+                log.object_repr,
+                log.ip_address or '',
+                log.path,
+                json_mod.dumps(log.changes) if log.changes else '',
+            ])
+        return response
+
+    # ── Filter dropdown data ──
+    action_choices = AdminActivityLog.ACTION_TYPE_CHOICES
+    model_names = (
+        AdminActivityLog.objects.exclude(model_name='')
+        .values_list('model_name', flat=True)
+        .distinct()
+        .order_by('model_name')
+    )
+    admin_users = (
+        User.objects.filter(is_staff=True)
+        .values_list('username', flat=True)
+        .order_by('username')
+    )
+
+    # ── Pagination ──
+    paginator = Paginator(logs, 50)
+    page = request.GET.get('page')
+    logs_page = paginator.get_page(page)
+
+    return render(request, 'custom_admin/activity_log.html', {
+        'logs': logs_page,
+        'action_choices': action_choices,
+        'model_names': model_names,
+        'admin_users': admin_users,
+        'current_user_filter': user_filter,
+        'current_action_filter': action_filter,
+        'current_model_filter': model_filter,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  USER SEGMENTS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def segment_list(request):
+    """List all user segments."""
+    segments = UserSegment.objects.all().select_related('created_by')
+    # Annotate each segment with its member count
+    segment_data = []
+    for seg in segments:
+        segment_data.append({
+            'segment': seg,
+            'member_count': seg.get_member_count(),
+        })
+    return render(request, 'custom_admin/segments/list.html', {
+        'segment_data': segment_data,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def segment_create(request):
+    """Create a new user segment."""
+    import json as json_mod
+    from core.models import NATIONALITY_CHOICES
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_dynamic = request.POST.get('is_dynamic') == 'on'
+
+        if not name:
+            messages.error(request, 'Segment name is required.')
+            return render(request, 'custom_admin/segments/form.html', {
+                'action': 'Create',
+                'nationality_choices': NATIONALITY_CHOICES,
+            })
+
+        filters = {}
+        if is_dynamic:
+            filters = _build_segment_filters(request)
+
+        segment = UserSegment.objects.create(
+            name=name,
+            description=description,
+            filters=filters,
+            is_dynamic=is_dynamic,
+            created_by=request.user,
+        )
+
+        # For static segments, add selected users
+        if not is_dynamic:
+            user_ids = request.POST.getlist('static_users')
+            for uid in user_ids:
+                try:
+                    UserSegmentMembership.objects.create(
+                        segment=segment,
+                        user_id=int(uid),
+                    )
+                except (ValueError, Exception):
+                    pass
+
+        messages.success(request, f'Segment "{name}" created successfully!')
+        return redirect('custom_admin:segment_detail', pk=segment.pk)
+
+    return render(request, 'custom_admin/segments/form.html', {
+        'action': 'Create',
+        'nationality_choices': NATIONALITY_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def segment_edit(request, pk):
+    """Edit an existing user segment."""
+    import json as json_mod
+    from core.models import NATIONALITY_CHOICES
+
+    segment = get_object_or_404(UserSegment, pk=pk)
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_dynamic = request.POST.get('is_dynamic') == 'on'
+
+        if not name:
+            messages.error(request, 'Segment name is required.')
+            return render(request, 'custom_admin/segments/form.html', {
+                'action': 'Edit',
+                'segment': segment,
+                'nationality_choices': NATIONALITY_CHOICES,
+            })
+
+        segment.name = name
+        segment.description = description
+        segment.is_dynamic = is_dynamic
+
+        if is_dynamic:
+            segment.filters = _build_segment_filters(request)
+            # Clear any static memberships when switching to dynamic
+            segment.memberships.all().delete()
+        else:
+            segment.filters = {}
+            # Update static membership
+            segment.memberships.all().delete()
+            user_ids = request.POST.getlist('static_users')
+            for uid in user_ids:
+                try:
+                    UserSegmentMembership.objects.create(
+                        segment=segment,
+                        user_id=int(uid),
+                    )
+                except (ValueError, Exception):
+                    pass
+
+        segment.save()
+        messages.success(request, f'Segment "{name}" updated successfully!')
+        return redirect('custom_admin:segment_detail', pk=segment.pk)
+
+    return render(request, 'custom_admin/segments/form.html', {
+        'action': 'Edit',
+        'segment': segment,
+        'nationality_choices': NATIONALITY_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def segment_detail(request, pk):
+    """View segment details with paginated member list."""
+    segment = get_object_or_404(UserSegment, pk=pk)
+    users = segment.get_users().select_related('profile').order_by('-date_joined')
+    member_count = users.count()
+
+    paginator = Paginator(users, 25)
+    page = request.GET.get('page')
+    users_page = paginator.get_page(page)
+
+    return render(request, 'custom_admin/segments/detail.html', {
+        'segment': segment,
+        'users': users_page,
+        'member_count': member_count,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def segment_delete(request, pk):
+    """Delete a user segment."""
+    segment = get_object_or_404(UserSegment, pk=pk)
+    name = segment.name
+    segment.delete()
+    messages.success(request, f'Segment "{name}" deleted successfully.')
+    return redirect('custom_admin:segment_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def segment_preview(request):
+    """AJAX endpoint: return user count for given filter criteria."""
+    import json as json_mod
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        body = json_mod.loads(request.body)
+    except (json_mod.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    # Build a temporary in-memory segment to compute preview
+    temp_segment = UserSegment(filters=body, is_dynamic=True)
+    count = temp_segment.get_users().count()
+    return JsonResponse({'count': count})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def segment_export(request, pk):
+    """Export segment members as a CSV download."""
+    segment = get_object_or_404(UserSegment, pk=pk)
+    users = segment.get_users().select_related('profile').order_by('username')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="segment_{segment.pk}_{segment.name}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Username', 'Email', 'First Name', 'Last Name', 'Nationality', 'Gender', 'Badge', 'Date Joined', 'Email Verified', 'Active'])
+
+    for user in users:
+        profile = getattr(user, 'profile', None)
+        writer.writerow([
+            user.username,
+            user.email,
+            user.first_name,
+            user.last_name,
+            profile.get_nationality_display() if profile and profile.nationality else '',
+            profile.get_gender_display() if profile and profile.gender else '',
+            profile.get_badge_type_display() if profile and profile.badge_type else 'None',
+            user.date_joined.strftime('%Y-%m-%d %H:%M'),
+            'Yes' if profile and profile.is_email_verified else 'No',
+            'Yes' if user.is_active else 'No',
+        ])
+
+    return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def segment_notify(request, pk):
+    """Send a push notification to all members of a segment."""
+    segment = get_object_or_404(UserSegment, pk=pk)
+    title = request.POST.get('notify_title', '').strip()
+    body = request.POST.get('notify_body', '').strip()
+
+    if not title or not body:
+        messages.error(request, 'Both notification title and body are required.')
+        return redirect('custom_admin:segment_detail', pk=pk)
+
+    # Create a notification targeting the segment members
+    users = segment.get_users()
+    notification = Notification.objects.create(
+        title=title,
+        message=body,
+        notification_type='general',
+        is_global=False,
+    )
+    notification.target_users.set(users)
+
+    try:
+        from core.push_service import send_push_notification
+        success, failure = send_push_notification(notification)
+        messages.success(
+            request,
+            f'Notification sent to segment "{segment.name}": '
+            f'{success} delivered'
+            + (f', {failure} failed' if failure else '')
+        )
+    except Exception as e:
+        messages.error(request, f'Failed to send notification: {e}')
+
+    return redirect('custom_admin:segment_detail', pk=pk)
+
+
+def _build_segment_filters(request):
+    """
+    Helper: extract filter criteria from the POST form and return a dict
+    suitable for storing in UserSegment.filters JSONField.
+    """
+    filters = {}
+
+    # Nationalities (multi-select)
+    nationalities = request.POST.getlist('filter_nationality')
+    if nationalities:
+        filters['nationality'] = nationalities
+
+    # Gender (checkboxes)
+    genders = request.POST.getlist('filter_gender')
+    if genders:
+        filters['gender'] = genders
+
+    # Badge type (checkboxes)
+    badge_types = request.POST.getlist('filter_badge_type')
+    if badge_types:
+        filters['badge_type'] = badge_types
+
+    # Age range
+    age_min = request.POST.get('filter_age_min', '').strip()
+    age_max = request.POST.get('filter_age_max', '').strip()
+    if age_min or age_max:
+        age_range = {}
+        if age_min:
+            try:
+                age_range['min'] = int(age_min)
+            except ValueError:
+                pass
+        if age_max:
+            try:
+                age_range['max'] = int(age_max)
+            except ValueError:
+                pass
+        if age_range:
+            filters['age_range'] = age_range
+
+    # Registration date filters
+    registered_after = request.POST.get('filter_registered_after', '').strip()
+    if registered_after:
+        filters['registered_after'] = registered_after
+
+    registered_before = request.POST.get('filter_registered_before', '').strip()
+    if registered_before:
+        filters['registered_before'] = registered_before
+
+    # Email verified
+    email_verified = request.POST.get('filter_email_verified', 'any')
+    if email_verified == 'yes':
+        filters['has_verified_email'] = True
+    elif email_verified == 'no':
+        filters['has_verified_email'] = False
+
+    # Active status
+    active_status = request.POST.get('filter_active_status', 'any')
+    if active_status == 'active':
+        filters['is_active'] = True
+    elif active_status == 'inactive':
+        filters['is_active'] = False
+
+    return filters
+
+
+# =============================================================================
+# System Health Dashboard
+# =============================================================================
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def system_health_dashboard(request):
+    """Render the system health dashboard page."""
+    return render(request, 'custom_admin/system_health.html')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def system_health_api(request):
+    """Return system health data as JSON for AJAX refresh."""
+    import time
+    from django.db import connection
+    from django.conf import settings
+
+    data = {}
+
+    # ── CPU / Memory / Disk (psutil) ──
+    try:
+        import psutil
+        data['cpu_percent'] = psutil.cpu_percent(interval=0.5)
+
+        mem = psutil.virtual_memory()
+        data['memory_percent'] = mem.percent
+        data['memory_used_gb'] = round(mem.used / (1024 ** 3), 2)
+        data['memory_total_gb'] = round(mem.total / (1024 ** 3), 2)
+
+        disk = psutil.disk_usage('/')
+        data['disk_percent'] = disk.percent
+        data['disk_used_gb'] = round(disk.used / (1024 ** 3), 2)
+        data['disk_total_gb'] = round(disk.total / (1024 ** 3), 2)
+
+        boot_time = psutil.boot_time()
+        uptime_seconds = time.time() - boot_time
+        uptime_days = int(uptime_seconds // 86400)
+        uptime_hours = int((uptime_seconds % 86400) // 3600)
+        data['uptime_days'] = uptime_days
+        data['uptime_hours'] = uptime_hours
+
+        data['psutil_available'] = True
+    except ImportError:
+        data['cpu_percent'] = 0
+        data['memory_percent'] = 0
+        data['memory_used_gb'] = 0
+        data['memory_total_gb'] = 0
+        data['disk_percent'] = 0
+        data['disk_used_gb'] = 0
+        data['disk_total_gb'] = 0
+        data['uptime_days'] = 0
+        data['uptime_hours'] = 0
+        data['psutil_available'] = False
+
+    # ── Database connectivity & latency ──
+    try:
+        start = time.time()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        latency_ms = round((time.time() - start) * 1000, 1)
+        data['db_connected'] = True
+        data['db_latency_ms'] = latency_ms
+    except Exception:
+        data['db_connected'] = False
+        data['db_latency_ms'] = 0
+
+    # ── Cache connectivity ──
+    try:
+        from django.core.cache import cache
+        cache.set('_health_check', 'ok', 10)
+        val = cache.get('_health_check')
+        data['cache_connected'] = val == 'ok'
+    except Exception:
+        data['cache_connected'] = False
+
+    # ── Email configured ──
+    email_backend = getattr(settings, 'EMAIL_BACKEND', '')
+    data['email_configured'] = bool(
+        email_backend and 'console' not in email_backend.lower()
+        and getattr(settings, 'EMAIL_HOST', '')
+    )
+
+    # ── Database stats ──
+    try:
+        db_engine = settings.DATABASES['default']['ENGINE']
+        db_name = settings.DATABASES['default']['NAME']
+        data['db_engine'] = db_engine.split('.')[-1]
+        data['db_name'] = db_name.split('/')[-1] if '/' in str(db_name) else str(db_name)
+
+        with connection.cursor() as cursor:
+            # Table count
+            if 'postgresql' in db_engine or 'postgis' in db_engine:
+                cursor.execute(
+                    "SELECT count(*) FROM information_schema.tables "
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+                )
+                data['table_count'] = cursor.fetchone()[0]
+                cursor.execute(
+                    "SELECT sum(n_live_tup) FROM pg_stat_user_tables"
+                )
+                row_result = cursor.fetchone()[0]
+                data['row_count'] = int(row_result) if row_result else 0
+                cursor.execute(
+                    "SELECT pg_size_pretty(pg_database_size(current_database()))"
+                )
+                data['db_size'] = cursor.fetchone()[0]
+            elif 'sqlite' in db_engine:
+                cursor.execute(
+                    "SELECT count(*) FROM sqlite_master WHERE type='table'"
+                )
+                data['table_count'] = cursor.fetchone()[0]
+                data['row_count'] = 0
+                import os
+                if os.path.exists(str(db_name)):
+                    size_bytes = os.path.getsize(str(db_name))
+                    if size_bytes < 1024 * 1024:
+                        data['db_size'] = f"{round(size_bytes / 1024, 1)} KB"
+                    else:
+                        data['db_size'] = f"{round(size_bytes / (1024 * 1024), 2)} MB"
+                else:
+                    data['db_size'] = 'N/A'
+            else:
+                data['table_count'] = 0
+                data['row_count'] = 0
+                data['db_size'] = 'N/A'
+    except Exception:
+        data['db_engine'] = 'Unknown'
+        data['db_name'] = 'Unknown'
+        data['table_count'] = 0
+        data['row_count'] = 0
+        data['db_size'] = 'N/A'
+
+    # ── Recent admin logins ──
+    try:
+        recent_logins = LoginHistory.objects.select_related('user').order_by('-logged_in_at')[:10]
+        data['recent_logins'] = [
+            {
+                'username': lh.user.username if lh.user else 'Unknown',
+                'ip_address': lh.ip_address or 'N/A',
+                'logged_in_at': lh.logged_in_at.strftime('%Y-%m-%d %H:%M') if lh.logged_in_at else 'N/A',
+            }
+            for lh in recent_logins
+        ]
+    except Exception:
+        data['recent_logins'] = []
+
+    return JsonResponse(data)
+
+
+# =============================================================================
+# Database Backup UI
+# =============================================================================
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def database_backup_page(request):
+    """Render the database backup management page."""
+    from django.conf import settings as django_settings
+
+    backups = DatabaseBackup.objects.select_related('created_by').order_by('-created_at')
+
+    db_engine = django_settings.DATABASES['default']['ENGINE'].split('.')[-1]
+    db_name_raw = django_settings.DATABASES['default']['NAME']
+    db_name = str(db_name_raw).split('/')[-1] if '/' in str(db_name_raw) else str(db_name_raw)
+
+    # Estimate DB size
+    db_size = 'N/A'
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            engine_full = django_settings.DATABASES['default']['ENGINE']
+            if 'postgresql' in engine_full or 'postgis' in engine_full:
+                cursor.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
+                db_size = cursor.fetchone()[0]
+            elif 'sqlite' in engine_full:
+                import os
+                if os.path.exists(str(db_name_raw)):
+                    size_bytes = os.path.getsize(str(db_name_raw))
+                    if size_bytes < 1024 * 1024:
+                        db_size = f"{round(size_bytes / 1024, 1)} KB"
+                    else:
+                        db_size = f"{round(size_bytes / (1024 * 1024), 2)} MB"
+    except Exception:
+        pass
+
+    context = {
+        'backups': backups,
+        'db_engine': db_engine,
+        'db_name': db_name,
+        'db_size': db_size,
+    }
+    return render(request, 'custom_admin/database_backup.html', context)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def create_backup(request):
+    """Create a new database backup using Django dumpdata."""
+    import io
+    import os
+    from django.conf import settings as django_settings
+    from django.core.management import call_command
+    from datetime import datetime
+
+    backup_type = request.POST.get('backup_type', 'full')
+    notes = request.POST.get('notes', '').strip()
+
+    # Create backups/ directory if needed
+    backup_dir = os.path.join(django_settings.BASE_DIR, 'backups')
+    os.makedirs(backup_dir, exist_ok=True)
+
+    filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    filepath = os.path.join(backup_dir, filename)
+
+    # Create the DatabaseBackup record first
+    backup_record = DatabaseBackup.objects.create(
+        filename=filename,
+        file_path=filepath,
+        backup_type=backup_type,
+        status='in_progress',
+        created_by=request.user,
+        notes=notes,
+    )
+
+    try:
+        output = io.StringIO()
+        cmd_kwargs = {
+            'stdout': output,
+            'verbosity': 0,
+        }
+
+        if backup_type == 'data_only':
+            call_command(
+                'dumpdata',
+                '--natural-foreign',
+                '--natural-primary',
+                '--exclude=contenttypes',
+                '--exclude=auth.permission',
+                **cmd_kwargs,
+            )
+        else:
+            # Full backup
+            call_command(
+                'dumpdata',
+                '--natural-foreign',
+                '--natural-primary',
+                '--exclude=contenttypes',
+                '--exclude=auth.permission',
+                **cmd_kwargs,
+            )
+
+        with open(filepath, 'w') as f:
+            f.write(output.getvalue())
+
+        file_size = os.path.getsize(filepath)
+        backup_record.file_size = file_size
+        backup_record.status = 'completed'
+        backup_record.save()
+
+        messages.success(request, f'Backup "{filename}" created successfully ({_format_file_size(file_size)}).')
+    except Exception as e:
+        backup_record.status = 'failed'
+        backup_record.error_message = str(e)
+        backup_record.save()
+        messages.error(request, f'Backup failed: {str(e)}')
+
+    return redirect('custom_admin:database_backup')
+
+
+def _format_file_size(size_bytes):
+    """Format bytes into human-readable size."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{round(size_bytes / 1024, 1)} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{round(size_bytes / (1024 * 1024), 2)} MB"
+    else:
+        return f"{round(size_bytes / (1024 * 1024 * 1024), 2)} GB"
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def download_backup(request, pk):
+    """Serve a backup file for download."""
+    import os
+    from django.http import FileResponse
+
+    backup = get_object_or_404(DatabaseBackup, pk=pk)
+
+    if not os.path.exists(backup.file_path):
+        messages.error(request, 'Backup file not found on disk.')
+        return redirect('custom_admin:database_backup')
+
+    response = FileResponse(
+        open(backup.file_path, 'rb'),
+        content_type='application/json',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{backup.filename}"'
+    return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def delete_backup(request, pk):
+    """Delete a backup record and its file from disk."""
+    import os
+
+    backup = get_object_or_404(DatabaseBackup, pk=pk)
+    filename = backup.filename
+
+    # Delete file from disk if it exists
+    if backup.file_path and os.path.exists(backup.file_path):
+        try:
+            os.remove(backup.file_path)
+        except OSError:
+            pass
+
+    backup.delete()
+    messages.success(request, f'Backup "{filename}" deleted.')
+    return redirect('custom_admin:database_backup')
+
+
+# =============================================================================
+# Admin Notifications (Bell icon in header)
+# =============================================================================
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def admin_notifications_api(request):
+    """JSON API for notification bell dropdown. Returns unread count + recent notifications."""
+    notifications = AdminNotification.objects.order_by('-created_at')[:20]
+    unread_count = AdminNotification.objects.filter(is_read=False).count()
+
+    data = {
+        'unread_count': unread_count,
+        'notifications': [
+            {
+                'id': n.id,
+                'notification_type': n.notification_type,
+                'title': n.title,
+                'message': n.message,
+                'link': n.link,
+                'icon': n.icon,
+                'is_read': n.is_read,
+                'created_at': n.created_at.isoformat(),
+                'time_ago': _time_ago(n.created_at),
+            }
+            for n in notifications
+        ],
+    }
+    return JsonResponse(data)
+
+
+def _time_ago(dt):
+    """Return a human-readable 'time ago' string."""
+    now = timezone.now()
+    diff = now - dt
+    seconds = int(diff.total_seconds())
+    if seconds < 60:
+        return 'just now'
+    minutes = seconds // 60
+    if minutes < 60:
+        return f'{minutes}m ago'
+    hours = minutes // 60
+    if hours < 24:
+        return f'{hours}h ago'
+    days = hours // 24
+    if days < 30:
+        return f'{days}d ago'
+    months = days // 30
+    return f'{months}mo ago'
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def admin_notification_mark_read(request):
+    """POST: mark notifications as read. Accepts JSON {"ids": [1,2,3]} or {"all": true}."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    if body.get('all'):
+        AdminNotification.objects.filter(is_read=False).update(is_read=True)
+    elif body.get('ids'):
+        ids = body['ids']
+        if isinstance(ids, list):
+            AdminNotification.objects.filter(id__in=ids, is_read=False).update(is_read=True)
+    else:
+        return JsonResponse({'error': 'Provide "ids" or "all"'}, status=400)
+
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def admin_notifications_page(request):
+    """Full page view of all admin notifications with filtering and pagination."""
+    filter_status = request.GET.get('status', 'all')
+    qs = AdminNotification.objects.order_by('-created_at')
+
+    if filter_status == 'unread':
+        qs = qs.filter(is_read=False)
+    elif filter_status == 'read':
+        qs = qs.filter(is_read=True)
+
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    unread_count = AdminNotification.objects.filter(is_read=False).count()
+
+    return render(request, 'custom_admin/admin_notifications.html', {
+        'page_obj': page_obj,
+        'filter_status': filter_status,
+        'unread_count': unread_count,
+    })
+
+
+# =============================================================================
+# Image Editor / Cropper
+# =============================================================================
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def image_editor(request):
+    """Renders the standalone image editor page with Cropper.js."""
+    image_url = request.GET.get('image', '')
+    return render(request, 'custom_admin/image_editor.html', {
+        'image_url': image_url,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def image_crop_save(request):
+    """POST: receives cropped image (multipart), saves as WebP, returns new URL."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    image_file = request.FILES.get('image')
+    original_path = request.POST.get('original_path', '')
+
+    if not image_file:
+        return JsonResponse({'error': 'No image file provided'}, status=400)
+
+    try:
+        from PIL import Image as PILImage
+
+        img = PILImage.open(image_file)
+
+        # Convert to RGB if necessary (handles RGBA, P, etc.)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = PILImage.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Save as WebP to buffer
+        buffer = io.BytesIO()
+        img.save(buffer, format='WEBP', quality=85, method=4)
+        buffer.seek(0)
+
+        # Generate filename
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        if original_path:
+            base_name = os.path.splitext(os.path.basename(original_path))[0]
+            filename = f'cropped/{base_name}_cropped_{timestamp}.webp'
+        else:
+            filename = f'cropped/cropped_{timestamp}.webp'
+
+        # Save using Django storage
+        saved_path = default_storage.save(filename, ContentFile(buffer.read()))
+        new_url = default_storage.url(saved_path)
+
+        return JsonResponse({
+            'success': True,
+            'url': new_url,
+            'path': saved_path,
+        })
+
+    except ImportError:
+        return JsonResponse({'error': 'Pillow is not installed'}, status=500)
+    except Exception as e:
+        logger.error(f'Image crop save error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DASHBOARD WIDGET DATA (AJAX / Lazy Loading)
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def widget_data(request):
+    """GET returns JSON data for a specific dashboard widget (lazy loading)."""
+    import time
+    from django.db import connection
+
+    widget = request.GET.get('widget', '')
+
+    if widget == 'verification_queue':
+        pending = VerificationRequest.objects.filter(status='pending').count()
+        recent = list(
+            VerificationRequest.objects.filter(status='pending')
+            .select_related('user')
+            .order_by('-submitted_at')[:5]
+        )
+        items = []
+        for vr in recent:
+            items.append({
+                'username': vr.user.username if vr.user else 'Unknown',
+                'email': vr.user.email if vr.user else '',
+                'submitted_at': vr.submitted_at.strftime('%b %d, %Y') if vr.submitted_at else '',
+                'badge_type': vr.badge_type or 'N/A',
+            })
+        return JsonResponse({
+            'pending_count': pending,
+            'items': items,
+        })
+
+    elif widget == 'system_status':
+        # DB connection check
+        db_ok = False
+        db_latency = 0
+        try:
+            start = time.time()
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+            db_latency = round((time.time() - start) * 1000, 1)
+            db_ok = True
+        except Exception:
+            pass
+
+        # Last backup time
+        last_backup = None
+        try:
+            backup = DatabaseBackup.objects.filter(status='completed').order_by('-created_at').first()
+            if backup:
+                last_backup = backup.created_at.strftime('%b %d, %Y %H:%M')
+        except Exception:
+            pass
+
+        # Disk usage
+        disk_percent = 0
+        try:
+            import shutil
+            total, used, free = shutil.disk_usage('/')
+            disk_percent = round((used / total) * 100, 1)
+        except Exception:
+            pass
+
+        return JsonResponse({
+            'db_connected': db_ok,
+            'db_latency_ms': db_latency,
+            'last_backup': last_backup,
+            'disk_percent': disk_percent,
+        })
+
+    elif widget == 'upcoming_events':
+        now = timezone.now()
+        upcoming = (
+            Event.objects.filter(event_date__gte=now, is_active=True)
+            .order_by('event_date')[:5]
+        )
+        items = []
+        for event in upcoming:
+            # Count registrations by matching event title
+            reg_count = EventSubmission.objects.filter(
+                event_registration__event_title__icontains=event.name[:50]
+            ).count()
+            items.append({
+                'name': event.name,
+                'date': event.event_date.strftime('%b %d, %Y %H:%M') if event.event_date else '',
+                'address': (event.address[:50] + '...') if len(event.address) > 50 else event.address,
+                'is_active': event.is_active,
+                'registration_count': reg_count,
+            })
+        return JsonResponse({'items': items})
+
+    return JsonResponse({'error': 'Unknown widget type'}, status=400)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EMAIL TEMPLATE PREVIEW & SEND TEST (AJAX endpoints)
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def email_template_preview(request, pk):
+    """POST returns rendered HTML with sample data for live preview."""
+    import re as re_module
+
+    template = get_object_or_404(EmailTemplate, pk=pk)
+    body_html = request.POST.get('body_html', template.body_html)
+
+    sample_context = {
+        'username': 'John Doe',
+        'user_name': 'John Doe',
+        'user_email': 'john@example.com',
+        'otp_code': '123456',
+        'expiry_minutes': '10',
+        'app_name': 'Burundi AU Chairmanship',
+        'badge_type': 'Gold',
+        'event_name': 'Sample Event',
+        'event_date': 'April 15, 2026',
+        'ticket_number': 'TK-001',
+        'reset_link': 'https://burundi4africa.com/reset',
+        'action_url': 'https://burundi4africa.com',
+    }
+
+    rendered = body_html
+    for key, val in sample_context.items():
+        rendered = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, rendered)
+
+    return JsonResponse({
+        'html': rendered,
+        'subject': template.subject,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def email_template_send_test(request, pk):
+    """POST sends a test email to specified address using template with sample data."""
+    import re as re_module
+
+    template = get_object_or_404(EmailTemplate, pk=pk)
+    recipient_email = request.POST.get('recipient_email', request.user.email)
+
+    if not recipient_email:
+        return JsonResponse({'success': False, 'error': 'No recipient email provided'}, status=400)
+
+    sample_context = {
+        'username': request.user.get_full_name() or request.user.username,
+        'user_name': request.user.get_full_name() or request.user.username,
+        'user_email': request.user.email,
+        'otp_code': '123456',
+        'expiry_minutes': '10',
+        'app_name': 'Burundi AU Chairmanship',
+        'badge_type': 'Gold',
+        'event_name': 'AU Summit 2026',
+        'event_date': 'April 15, 2026',
+        'ticket_number': 'TK-001',
+        'reset_link': 'https://burundi4africa.com/reset',
+        'action_url': 'https://burundi4africa.com',
+    }
+
+    body_html = template.body_html
+    subject = template.subject
+    for key, val in sample_context.items():
+        body_html = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, body_html)
+        subject = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, subject)
+
+    try:
+        from django.core.mail import send_mail
+        send_mail(
+            subject=f'[TEST] {subject}',
+            message='',
+            html_message=body_html,
+            from_email=None,
+            recipient_list=[recipient_email],
+            fail_silently=False,
+        )
+        return JsonResponse({'success': True, 'message': f'Test email sent to {recipient_email}'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTENT CALENDAR
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def content_calendar(request):
+    import json
+    import calendar as cal_module
+    from datetime import date, timedelta
+
+    # Parse month query param (format: YYYY-MM), default to current month
+    month_param = request.GET.get('month', '')
+    today = date.today()
+    try:
+        year, month = [int(x) for x in month_param.split('-')]
+        current_date = date(year, month, 1)
+    except (ValueError, TypeError):
+        current_date = date(today.year, today.month, 1)
+
+    year = current_date.year
+    month = current_date.month
+
+    # Calculate first and last day of month
+    _, days_in_month = cal_module.monthrange(year, month)
+    month_start = date(year, month, 1)
+    month_end = date(year, month, days_in_month)
+
+    # Build calendar grid (includes days from prev/next months to fill the grid)
+    # Find the Sunday that starts the calendar grid
+    first_weekday = month_start.weekday()  # Monday=0, Sunday=6
+    # Convert to Sunday-based: Sunday=0
+    first_weekday_sunday = (first_weekday + 1) % 7
+    grid_start = month_start - timedelta(days=first_weekday_sunday)
+
+    # Find the Saturday that ends the calendar grid
+    last_weekday = month_end.weekday()
+    last_weekday_sunday = (last_weekday + 1) % 7
+    grid_end = month_end + timedelta(days=(6 - last_weekday_sunday))
+
+    # Build calendar_days list
+    calendar_days = []
+    d = grid_start
+    while d <= grid_end:
+        calendar_days.append({
+            'date': d.strftime('%Y-%m-%d'),
+            'day': d.day,
+            'current_month': d.month == month and d.year == year,
+            'date_label': d.strftime('%A, %B %d, %Y'),
+        })
+        d += timedelta(days=1)
+
+    # Query content for the grid date range (use timezone-aware datetimes)
+    from django.utils.timezone import make_aware
+    from datetime import datetime
+    grid_start_dt = make_aware(datetime.combine(grid_start, datetime.min.time()))
+    grid_end_dt = make_aware(datetime.combine(grid_end, datetime.max.time()))
+
+    items = []
+
+    # Articles (publish_date is DateTimeField)
+    for a in Article.objects.filter(publish_date__range=(grid_start_dt, grid_end_dt)):
+        items.append({
+            'type': 'article',
+            'title': a.title,
+            'id': a.pk,
+            'date': a.publish_date.strftime('%Y-%m-%d'),
+            'time': a.publish_date.strftime('%H:%M'),
+        })
+
+    # Events (event_date is DateTimeField)
+    for e in Event.objects.filter(event_date__range=(grid_start_dt, grid_end_dt)):
+        items.append({
+            'type': 'event',
+            'title': e.name,
+            'id': e.pk,
+            'date': e.event_date.strftime('%Y-%m-%d'),
+            'time': e.event_date.strftime('%H:%M'),
+        })
+
+    # Magazines (publish_date is DateField)
+    for m in MagazineEdition.objects.filter(publish_date__range=(grid_start, grid_end)):
+        items.append({
+            'type': 'magazine',
+            'title': m.title,
+            'id': m.pk,
+            'date': m.publish_date.strftime('%Y-%m-%d'),
+            'time': '',
+        })
+
+    # Live Feeds (scheduled_time is DateTimeField, nullable)
+    live_feeds_qs = LiveFeed.objects.filter(
+        scheduled_time__range=(grid_start_dt, grid_end_dt)
+    )
+    for lf in live_feeds_qs:
+        items.append({
+            'type': 'livefeed',
+            'title': lf.title,
+            'id': lf.pk,
+            'date': lf.scheduled_time.strftime('%Y-%m-%d'),
+            'time': lf.scheduled_time.strftime('%H:%M'),
+        })
+    # Also include live feeds without scheduled_time using created_at
+    live_feeds_no_sched = LiveFeed.objects.filter(
+        scheduled_time__isnull=True,
+        created_at__range=(grid_start_dt, grid_end_dt),
+    )
+    for lf in live_feeds_no_sched:
+        items.append({
+            'type': 'livefeed',
+            'title': lf.title,
+            'id': lf.pk,
+            'date': lf.created_at.strftime('%Y-%m-%d'),
+            'time': lf.created_at.strftime('%H:%M'),
+        })
+
+    # Videos (publish_date is DateTimeField)
+    for v in Video.objects.filter(publish_date__range=(grid_start_dt, grid_end_dt)):
+        items.append({
+            'type': 'video',
+            'title': v.title,
+            'id': v.pk,
+            'date': v.publish_date.strftime('%Y-%m-%d'),
+            'time': v.publish_date.strftime('%H:%M'),
+        })
+
+    # Scheduled Maintenance (starts_at is DateTimeField)
+    for sm in ScheduledMaintenance.objects.filter(starts_at__range=(grid_start_dt, grid_end_dt)):
+        items.append({
+            'type': 'maintenance',
+            'title': sm.title,
+            'id': sm.pk,
+            'date': sm.starts_at.strftime('%Y-%m-%d'),
+            'time': sm.starts_at.strftime('%H:%M'),
+        })
+
+    # Build calendar data JSON for the template
+    calendar_data_json = {
+        'items': items,
+        'calendar_days': calendar_days,
+        'today': today.strftime('%Y-%m-%d'),
+    }
+
+    # Month navigation
+    if month == 1:
+        prev_month = f'{year - 1}-12'
+    else:
+        prev_month = f'{year}-{month - 1:02d}'
+    if month == 12:
+        next_month = f'{year + 1}-01'
+    else:
+        next_month = f'{year}-{month + 1:02d}'
+
+    current_month_str = f'{year}-{month:02d}'
+    today_month = f'{today.year}-{today.month:02d}'
+
+    # Month picker options (12 months back, 12 months forward)
+    month_options = []
+    for offset in range(-12, 13):
+        m = today.month + offset
+        y = today.year
+        while m < 1:
+            m += 12
+            y -= 1
+        while m > 12:
+            m -= 12
+            y += 1
+        val = f'{y}-{m:02d}'
+        label = date(y, m, 1).strftime('%B %Y')
+        month_options.append({'value': val, 'label': label})
+
+    display_month = current_date.strftime('%B %Y')
+
+    context = {
+        'calendar_data_json': calendar_data_json,
+        'prev_month': prev_month,
+        'next_month': next_month,
+        'current_month': current_month_str,
+        'today_month': today_month,
+        'month_options': month_options,
+        'display_month': display_month,
+    }
+    return render(request, 'custom_admin/content_calendar.html', context)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  DRAG & DROP REORDER
+# ═══════════════════════════════════════════════════════════════
+
+# Map of model keys to configuration for the reorder page
+REORDER_MODEL_CONFIG = {
+    'hero_slides': {
+        'model': HeroSlide,
+        'order_field': 'order',
+        'title_field': 'label',
+        'image_method': lambda obj: obj.image.url if obj.image else None,
+        'display_name': 'Hero Slides',
+        'back_url': 'custom_admin:hero_slides_list',
+        'has_active': True,
+        'active_field': 'is_active',
+        'icon': 'view_carousel',
+    },
+    'feature_cards': {
+        'model': FeatureCard,
+        'order_field': 'order',
+        'title_field': 'title',
+        'image_method': lambda obj: obj.image.url if obj.image else None,
+        'display_name': 'Feature Cards',
+        'back_url': 'custom_admin:feature_cards_list',
+        'has_active': True,
+        'active_field': 'is_active',
+        'icon': 'auto_awesome',
+    },
+    'onboarding_steps': {
+        'model': OnboardingStep,
+        'order_field': 'order',
+        'title_field': 'title',
+        'image_method': lambda obj: obj.image.url if obj.image else None,
+        'display_name': 'Onboarding Steps',
+        'back_url': 'custom_admin:onboarding_steps_list',
+        'has_active': True,
+        'active_field': 'is_active',
+        'icon': 'rocket_launch',
+    },
+    'gallery_albums': {
+        'model': GalleryAlbum,
+        'order_field': 'display_order',
+        'title_field': 'title',
+        'image_method': lambda obj: obj.cover_image.url if obj.cover_image else None,
+        'display_name': 'Gallery Albums',
+        'back_url': 'custom_admin:gallery_list',
+        'has_active': False,
+        'active_field': None,
+        'icon': 'photo_library',
+    },
+    'quick_access': {
+        'model': QuickAccessMenuItem,
+        'order_field': 'order',
+        'title_field': 'title_en',
+        'image_method': lambda obj: None,
+        'display_name': 'Quick Access Menu',
+        'back_url': 'custom_admin:quick_access_list',
+        'has_active': True,
+        'active_field': 'is_active',
+        'icon': 'bolt',
+    },
+}
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def reorder_page(request):
+    from django.urls import reverse
+
+    model_key = request.GET.get('model', '')
+    config = REORDER_MODEL_CONFIG.get(model_key)
+
+    if not config:
+        messages.error(request, f'Unknown model: {model_key}. Valid models: {", ".join(REORDER_MODEL_CONFIG.keys())}')
+        return redirect('custom_admin:dashboard')
+
+    Model = config['model']
+    order_field = config['order_field']
+    items_qs = Model.objects.all().order_by(order_field)
+
+    items = []
+    for obj in items_qs:
+        item = {
+            'id': obj.pk,
+            'title': getattr(obj, config['title_field'], ''),
+            'image_url': config['image_method'](obj),
+            'current_order': getattr(obj, order_field),
+            'icon': config.get('icon', 'image'),
+            'subtitle': None,
+            'is_active': None,
+        }
+        if config['has_active'] and config['active_field']:
+            item['is_active'] = getattr(obj, config['active_field'], None)
+        items.append(item)
+
+    context = {
+        'model_key': model_key,
+        'model_display_name': config['display_name'],
+        'items': items,
+        'back_url': reverse(config['back_url']),
+    }
+    return render(request, 'custom_admin/reorder.html', context)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def reorder_save(request):
+    import json as json_module
+
+    try:
+        data = json_module.loads(request.body)
+    except (json_module.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    model_key = data.get('model', '')
+    config = REORDER_MODEL_CONFIG.get(model_key)
+
+    if not config:
+        return JsonResponse({'success': False, 'error': f'Unknown model: {model_key}'}, status=400)
+
+    Model = config['model']
+    order_field = config['order_field']
+    items_data = data.get('items', [])
+
+    if not items_data:
+        return JsonResponse({'success': False, 'error': 'No items provided'}, status=400)
+
+    # Update order for each item
+    for item in items_data:
+        item_id = item.get('id')
+        new_order = item.get('order')
+        if item_id is not None and new_order is not None:
+            try:
+                obj = Model.objects.get(pk=item_id)
+                setattr(obj, order_field, new_order)
+                obj.save(update_fields=[order_field])
+            except Model.DoesNotExist:
+                continue
+
+    return JsonResponse({'success': True, 'message': 'Order saved successfully'})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SCHEDULED MAINTENANCE MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def maintenance_management(request):
+    now = timezone.now()
+
+    # Determine active maintenance window
+    active_window = ScheduledMaintenance.objects.filter(
+        is_active=True,
+        starts_at__lte=now,
+        ends_at__gte=now,
+    ).first()
+
+    is_maintenance_active = active_window is not None
+
+    # Upcoming windows (future, ordered by start time)
+    upcoming_windows = list(ScheduledMaintenance.objects.filter(
+        starts_at__gt=now,
+    ).order_by('starts_at'))
+
+    # Next upcoming (for countdown)
+    next_upcoming = upcoming_windows[0] if upcoming_windows else None
+
+    # Past windows (ended, ordered by most recent first)
+    past_windows = list(ScheduledMaintenance.objects.filter(
+        ends_at__lt=now,
+    ).order_by('-ends_at'))
+
+    # Total count
+    total_count = ScheduledMaintenance.objects.count()
+
+    # Service choices for the form
+    service_choices = ScheduledMaintenance.AFFECTED_SERVICES_CHOICES
+
+    # Check if editing an existing window
+    editing_window = None
+    edit_pk = request.GET.get('edit')
+    if edit_pk:
+        try:
+            editing_window = ScheduledMaintenance.objects.get(pk=edit_pk)
+        except ScheduledMaintenance.DoesNotExist:
+            pass
+
+    context = {
+        'is_maintenance_active': is_maintenance_active,
+        'active_window': active_window,
+        'upcoming_windows': upcoming_windows,
+        'next_upcoming': next_upcoming,
+        'past_windows': past_windows,
+        'total_count': total_count,
+        'service_choices': service_choices,
+        'editing_window': editing_window,
+    }
+    return render(request, 'custom_admin/maintenance/management.html', context)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def maintenance_toggle(request):
+    now = timezone.now()
+
+    # Find currently active maintenance window
+    active_window = ScheduledMaintenance.objects.filter(
+        is_active=True,
+        starts_at__lte=now,
+        ends_at__gte=now,
+    ).first()
+
+    if active_window:
+        # Disable: deactivate the current window
+        active_window.is_active = False
+        active_window.save(update_fields=['is_active'])
+        messages.success(request, f'Maintenance mode disabled. "{active_window.title}" has been deactivated.')
+    else:
+        # Enable: create an immediate maintenance window (4 hours default)
+        from datetime import timedelta as td
+        ScheduledMaintenance.objects.create(
+            title='Emergency Maintenance',
+            title_fr='Maintenance d\'urgence',
+            description='Maintenance mode enabled via quick toggle.',
+            description_fr='Mode maintenance active via le bouton rapide.',
+            starts_at=now,
+            ends_at=now + td(hours=4),
+            is_active=True,
+            show_banner=True,
+            severity='major',
+            affected_services='all',
+        )
+        messages.success(request, 'Maintenance mode enabled. A 4-hour maintenance window has been created.')
+
+    return redirect('custom_admin:maintenance_management')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def maintenance_schedule(request):
+    title = request.POST.get('title', '').strip()
+    title_fr = request.POST.get('title_fr', '').strip()
+    description = request.POST.get('description', '').strip()
+    description_fr = request.POST.get('description_fr', '').strip()
+    starts_at = request.POST.get('starts_at', '')
+    ends_at = request.POST.get('ends_at', '')
+    contact_email = request.POST.get('contact_email', '').strip()
+    severity = request.POST.get('severity', 'minor')
+    is_active = request.POST.get('is_active') == 'on'
+    show_banner = request.POST.get('show_banner') == 'on'
+    auto_activate = request.POST.get('auto_activate') == 'on'
+
+    # Affected services (multi-checkbox)
+    affected_services_list = request.POST.getlist('affected_services')
+    affected_services = ','.join(affected_services_list) if affected_services_list else 'all'
+
+    if not title or not starts_at or not ends_at:
+        messages.error(request, 'Title, start date, and end date are required.')
+        return redirect('custom_admin:maintenance_management')
+
+    # Check if editing existing window
+    pk = request.POST.get('pk')
+    if pk:
+        try:
+            window = ScheduledMaintenance.objects.get(pk=pk)
+            window.title = title
+            window.title_fr = title_fr
+            window.description = description
+            window.description_fr = description_fr
+            window.starts_at = starts_at
+            window.ends_at = ends_at
+            window.contact_email = contact_email
+            window.severity = severity
+            window.is_active = is_active
+            window.show_banner = show_banner
+            window.auto_activate = auto_activate
+            window.affected_services = affected_services
+            window.save()
+            messages.success(request, f'Maintenance window "{title}" updated successfully.')
+        except ScheduledMaintenance.DoesNotExist:
+            messages.error(request, 'Maintenance window not found.')
+    else:
+        ScheduledMaintenance.objects.create(
+            title=title,
+            title_fr=title_fr,
+            description=description,
+            description_fr=description_fr,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            contact_email=contact_email,
+            severity=severity,
+            is_active=is_active,
+            show_banner=show_banner,
+            auto_activate=auto_activate,
+            affected_services=affected_services,
+        )
+        messages.success(request, f'Maintenance window "{title}" scheduled successfully.')
+
+    return redirect('custom_admin:maintenance_management')
+
+
+# ══════════════════════════════════════════════════════════════
+# A/B TESTING MANAGEMENT
+# ══════════════════════════════════════════════════════════════
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def ab_test_list(request):
+    """List all A/B tests."""
+    tests_qs = ABTest.objects.annotate(participant_count=Count('participants'))
+    paginator = Paginator(tests_qs, 20)
+    page = request.GET.get('page')
+    tests = paginator.get_page(page)
+
+    context = {
+        'tests': tests,
+        'total_tests': tests_qs.count(),
+        'running_tests': tests_qs.filter(status='running').count(),
+        'draft_tests': tests_qs.filter(status='draft').count(),
+        'completed_tests': tests_qs.filter(status='completed').count(),
+    }
+    return render(request, 'custom_admin/ab_tests/list.html', context)
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def ab_test_create(request):
+    """Create a new A/B test."""
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        test_type = request.POST.get('test_type', 'content')
+        status = request.POST.get('status', 'draft')
+        traffic_split = int(request.POST.get('traffic_split', 50))
+        variant_a_label = request.POST.get('variant_a_label', 'Control').strip()
+        variant_b_label = request.POST.get('variant_b_label', 'Variant').strip()
+        variant_a_content_id = request.POST.get('variant_a_content_id', '').strip()
+        variant_b_content_id = request.POST.get('variant_b_content_id', '').strip()
+        started_at = request.POST.get('started_at', '').strip()
+        ended_at = request.POST.get('ended_at', '').strip()
+
+        if not name:
+            messages.error(request, 'Name is required.')
+            return render(request, 'custom_admin/ab_tests/form.html', {
+                'action': 'Create', 'test': None,
+            })
+
+        test = ABTest.objects.create(
+            name=name,
+            description=description,
+            test_type=test_type,
+            status=status,
+            traffic_split=max(0, min(100, traffic_split)),
+            variant_a_label=variant_a_label or 'Control',
+            variant_b_label=variant_b_label or 'Variant',
+            variant_a_content_id=int(variant_a_content_id) if variant_a_content_id else None,
+            variant_b_content_id=int(variant_b_content_id) if variant_b_content_id else None,
+            is_active=(status == 'running'),
+            started_at=started_at or None,
+            ended_at=ended_at or None,
+        )
+        messages.success(request, f'A/B test "{name}" created successfully.')
+        return redirect('custom_admin:ab_test_list')
+
+    return render(request, 'custom_admin/ab_tests/form.html', {
+        'action': 'Create', 'test': None,
+    })
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def ab_test_edit(request, pk):
+    """Edit an existing A/B test."""
+    test = get_object_or_404(ABTest, pk=pk)
+
+    if request.method == 'POST':
+        test.name = request.POST.get('name', test.name).strip()
+        test.description = request.POST.get('description', test.description).strip()
+        test.test_type = request.POST.get('test_type', test.test_type)
+        test.status = request.POST.get('status', test.status)
+        test.traffic_split = max(0, min(100, int(request.POST.get('traffic_split', test.traffic_split))))
+        test.variant_a_label = request.POST.get('variant_a_label', test.variant_a_label).strip() or 'Control'
+        test.variant_b_label = request.POST.get('variant_b_label', test.variant_b_label).strip() or 'Variant'
+
+        variant_a_content_id = request.POST.get('variant_a_content_id', '').strip()
+        variant_b_content_id = request.POST.get('variant_b_content_id', '').strip()
+        test.variant_a_content_id = int(variant_a_content_id) if variant_a_content_id else None
+        test.variant_b_content_id = int(variant_b_content_id) if variant_b_content_id else None
+
+        started_at = request.POST.get('started_at', '').strip()
+        ended_at = request.POST.get('ended_at', '').strip()
+        if started_at:
+            test.started_at = started_at
+        if ended_at:
+            test.ended_at = ended_at
+
+        # Auto-set started_at when transitioning to running
+        if test.status == 'running' and not test.started_at:
+            test.started_at = timezone.now()
+        # Auto-set ended_at when completing
+        if test.status == 'completed' and not test.ended_at:
+            test.ended_at = timezone.now()
+
+        test.is_active = (test.status == 'running')
+        test.save()
+
+        messages.success(request, f'A/B test "{test.name}" updated successfully.')
+
+        # Support redirect back to detail page
+        if request.POST.get('_redirect') == 'detail':
+            return redirect('custom_admin:ab_test_detail', pk=pk)
+        return redirect('custom_admin:ab_test_list')
+
+    return render(request, 'custom_admin/ab_tests/form.html', {
+        'action': 'Edit', 'test': test,
+    })
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def ab_test_detail(request, pk):
+    """View A/B test details and results."""
+    test = get_object_or_404(ABTest, pk=pk)
+
+    variant_a_participants = test.participants.filter(variant='A')
+    variant_b_participants = test.participants.filter(variant='B')
+
+    variant_a_count = variant_a_participants.count()
+    variant_b_count = variant_b_participants.count()
+    variant_a_conversions = variant_a_participants.filter(converted=True).count()
+    variant_b_conversions = variant_b_participants.filter(converted=True).count()
+
+    total_participants = variant_a_count + variant_b_count
+    total_conversions = variant_a_conversions + variant_b_conversions
+
+    variant_a_rate = round((variant_a_conversions / variant_a_count * 100), 1) if variant_a_count > 0 else 0
+    variant_b_rate = round((variant_b_conversions / variant_b_count * 100), 1) if variant_b_count > 0 else 0
+
+    context = {
+        'test': test,
+        'variant_a_count': variant_a_count,
+        'variant_b_count': variant_b_count,
+        'variant_a_conversions': variant_a_conversions,
+        'variant_b_conversions': variant_b_conversions,
+        'variant_a_rate': variant_a_rate,
+        'variant_b_rate': variant_b_rate,
+        'variant_a_pct': 100 - test.traffic_split,
+        'total_participants': total_participants,
+        'total_conversions': total_conversions,
+    }
+    return render(request, 'custom_admin/ab_tests/detail.html', context)
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+@require_POST
+def ab_test_delete(request, pk):
+    """Delete an A/B test."""
+    test = get_object_or_404(ABTest, pk=pk)
+    name = test.name
+    test.delete()
+    messages.success(request, f'A/B test "{name}" deleted.')
+    return redirect('custom_admin:ab_test_list')
+
+
+# ══════════════════════════════════════════════════════════════
+# WEBHOOK INTEGRATIONS MANAGEMENT
+# ══════════════════════════════════════════════════════════════
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def webhook_list(request):
+    """List all webhooks."""
+    webhooks_qs = Webhook.objects.all()
+
+    # Add masked URL property to each webhook for display
+    webhook_items = list(webhooks_qs)
+    for wh in webhook_items:
+        wh.masked_url = _mask_url(wh.url)
+
+    paginator = Paginator(webhook_items, 20)
+    page = request.GET.get('page')
+    webhooks = paginator.get_page(page)
+
+    context = {
+        'webhooks': webhooks,
+        'total_webhooks': webhooks_qs.count(),
+        'active_webhooks': webhooks_qs.filter(is_active=True).count(),
+        'failing_webhooks': webhooks_qs.filter(failure_count__gt=3).count(),
+    }
+    return render(request, 'custom_admin/webhooks/list.html', context)
+
+
+def _mask_url(url):
+    """Partially mask a webhook URL for display."""
+    if not url:
+        return ''
+    if len(url) <= 30:
+        return url
+    return url[:25] + '...' + url[-8:]
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def webhook_create(request):
+    """Create a new webhook."""
+    event_choices = Webhook.EVENT_CHOICES
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        url = request.POST.get('url', '').strip()
+        service_type = request.POST.get('service_type', 'custom')
+        secret_key = request.POST.get('secret_key', '').strip()
+        events = request.POST.getlist('events')
+
+        # Build custom headers from key-value pairs
+        header_keys = request.POST.getlist('header_keys[]')
+        header_values = request.POST.getlist('header_values[]')
+        custom_headers = {}
+        for k, v in zip(header_keys, header_values):
+            k = k.strip()
+            v = v.strip()
+            if k:
+                custom_headers[k] = v
+
+        if not name or not url:
+            messages.error(request, 'Name and URL are required.')
+            return render(request, 'custom_admin/webhooks/form.html', {
+                'action': 'Create', 'webhook': None,
+                'event_choices': event_choices, 'selected_events': events,
+            })
+
+        Webhook.objects.create(
+            name=name,
+            url=url,
+            service_type=service_type,
+            events=events,
+            secret_key=secret_key,
+            custom_headers=custom_headers,
+        )
+        messages.success(request, f'Webhook "{name}" created successfully.')
+        return redirect('custom_admin:webhook_list')
+
+    return render(request, 'custom_admin/webhooks/form.html', {
+        'action': 'Create', 'webhook': None,
+        'event_choices': event_choices, 'selected_events': [],
+    })
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def webhook_edit(request, pk):
+    """Edit an existing webhook."""
+    webhook = get_object_or_404(Webhook, pk=pk)
+    event_choices = Webhook.EVENT_CHOICES
+
+    if request.method == 'POST':
+        webhook.name = request.POST.get('name', webhook.name).strip()
+        webhook.url = request.POST.get('url', webhook.url).strip()
+        webhook.service_type = request.POST.get('service_type', webhook.service_type)
+        webhook.secret_key = request.POST.get('secret_key', webhook.secret_key).strip()
+        webhook.events = request.POST.getlist('events')
+
+        # Build custom headers from key-value pairs
+        header_keys = request.POST.getlist('header_keys[]')
+        header_values = request.POST.getlist('header_values[]')
+        custom_headers = {}
+        for k, v in zip(header_keys, header_values):
+            k = k.strip()
+            v = v.strip()
+            if k:
+                custom_headers[k] = v
+        webhook.custom_headers = custom_headers
+
+        webhook.save()
+        messages.success(request, f'Webhook "{webhook.name}" updated successfully.')
+        return redirect('custom_admin:webhook_list')
+
+    selected_events = webhook.events if isinstance(webhook.events, list) else []
+    return render(request, 'custom_admin/webhooks/form.html', {
+        'action': 'Edit', 'webhook': webhook,
+        'event_choices': event_choices, 'selected_events': selected_events,
+    })
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+@require_POST
+def webhook_delete(request, pk):
+    """Delete a webhook."""
+    webhook = get_object_or_404(Webhook, pk=pk)
+    name = webhook.name
+    webhook.delete()
+    messages.success(request, f'Webhook "{name}" deleted.')
+    return redirect('custom_admin:webhook_list')
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+@require_POST
+def webhook_toggle(request, pk):
+    """Toggle a webhook active/inactive."""
+    webhook = get_object_or_404(Webhook, pk=pk)
+    webhook.is_active = not webhook.is_active
+    webhook.save(update_fields=['is_active'])
+    status_str = 'activated' if webhook.is_active else 'deactivated'
+    messages.success(request, f'Webhook "{webhook.name}" {status_str}.')
+    return redirect('custom_admin:webhook_list')
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+def webhook_logs(request, pk):
+    """View delivery logs for a webhook."""
+    webhook = get_object_or_404(Webhook, pk=pk)
+    logs_qs = webhook.logs.all()
+
+    # Add pretty-printed payload to each log for template use
+    log_items = list(logs_qs)
+    for log in log_items:
+        try:
+            log.payload_pretty = json.dumps(log.payload, indent=2, default=str)
+        except (TypeError, ValueError):
+            log.payload_pretty = str(log.payload)
+
+    paginator = Paginator(log_items, 25)
+    page = request.GET.get('page')
+    logs = paginator.get_page(page)
+
+    context = {
+        'webhook': webhook,
+        'logs': logs,
+        'success_count': logs_qs.filter(success=True).count(),
+        'fail_count': logs_qs.filter(success=False).count(),
+    }
+    return render(request, 'custom_admin/webhooks/logs.html', context)
+
+
+@login_required(login_url='/portal/')
+@user_passes_test(is_staff, login_url='/portal/')
+@require_POST
+def webhook_test(request, pk):
+    """Send a test payload to a webhook."""
+    webhook = get_object_or_404(Webhook, pk=pk)
+
+    from core.webhooks import send_test_webhook
+    success, status_code, error = send_test_webhook(webhook)
+
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': success,
+            'status_code': status_code,
+            'error': error,
+        })
+
+    if success:
+        messages.success(request, f'Test webhook sent successfully (HTTP {status_code}).')
+    else:
+        messages.error(request, f'Test webhook failed: {error}')
+
+    return redirect('custom_admin:webhook_list')

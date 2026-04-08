@@ -1,0 +1,442 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Interactive Charts - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  <div>
+    <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Data Intelligence</span>
+    <h1 class="text-3xl font-extrabold text-on-surface font-headline">Interactive Charts</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Deep-dive analytics with interactive visualizations</p>
+  </div>
+  <!-- Period Filter Buttons -->
+  <div class="flex items-center gap-2">
+    <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mr-2">Period:</span>
+    <a href="?period=7"
+       class="px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 {% if period == 7 %}bg-primary-container text-white shadow-md{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/30{% endif %}">
+      7 Days
+    </a>
+    <a href="?period=30"
+       class="px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 {% if period == 30 %}bg-primary-container text-white shadow-md{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/30{% endif %}">
+      30 Days
+    </a>
+    <a href="?period=90"
+       class="px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 {% if period == 90 %}bg-primary-container text-white shadow-md{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/30{% endif %}">
+      90 Days
+    </a>
+  </div>
+</div>
+
+<!-- Charts Grid: 2 per row on desktop, 1 on mobile -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+  <!-- 1. User Growth (Line Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-blue-600 text-[20px]">trending_up</span>
+        <h3 class="text-lg font-bold font-headline">User Growth</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">New user registrations per day over the last {{ period }} days</p>
+    </div>
+    <canvas id="userGrowthChart" height="220"></canvas>
+  </div>
+
+  <!-- 2. Content Published (Stacked Bar Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-emerald-600 text-[20px]">edit_note</span>
+        <h3 class="text-lg font-bold font-headline">Content Published</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Articles, magazines, and videos published per week over the last 12 weeks</p>
+    </div>
+    <canvas id="contentChart" height="220"></canvas>
+  </div>
+
+  <!-- 3. Engagement Metrics (Multi-Line Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-violet-600 text-[20px]">favorite</span>
+        <h3 class="text-lg font-bold font-headline">Engagement Metrics</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Daily likes, comments, reactions, and bookmarks over the last {{ period|default:"30" }} days</p>
+    </div>
+    <canvas id="engagementChart" height="220"></canvas>
+  </div>
+
+  <!-- 4. User Demographics (Doughnut Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-amber-600 text-[20px]">public</span>
+        <h3 class="text-lg font-bold font-headline">User Demographics</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Users by nationality (top 10 + Other)</p>
+    </div>
+    <canvas id="demographicsChart" height="220"></canvas>
+  </div>
+
+  <!-- 5. Event Activity (Bar Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-indigo-600 text-[20px]">how_to_reg</span>
+        <h3 class="text-lg font-bold font-headline">Event Activity</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Registrations per event (top 10 events by submissions)</p>
+    </div>
+    <canvas id="eventChart" height="220"></canvas>
+  </div>
+
+  <!-- 6. Support Tickets (Line Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-red-600 text-[20px]">support_agent</span>
+        <h3 class="text-lg font-bold font-headline">Support Tickets</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Tickets opened vs resolved per week over the last 8 weeks</p>
+    </div>
+    <canvas id="ticketChart" height="220"></canvas>
+  </div>
+
+  <!-- 7. Traffic by Hour (Area Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-cyan-600 text-[20px]">schedule</span>
+        <h3 class="text-lg font-bold font-headline">Traffic by Hour</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Average successful logins by hour of day (last 7 days)</p>
+    </div>
+    <canvas id="trafficChart" height="220"></canvas>
+  </div>
+
+  <!-- 8. Badge Distribution (Pie Chart) -->
+  <div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/10">
+    <div class="mb-4">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="material-symbols-outlined text-secondary text-[20px]">verified</span>
+        <h3 class="text-lg font-bold font-headline">Badge Distribution</h3>
+      </div>
+      <p class="text-xs text-on-surface-variant">Users by verification badge type (Gold, Blue, None)</p>
+    </div>
+    <canvas id="badgeChart" height="220"></canvas>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+// ============================================================
+// Shared config
+// ============================================================
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.9)';
+Chart.defaults.plugins.tooltip.cornerRadius = 8;
+Chart.defaults.plugins.tooltip.titleFont = { weight: 'bold', size: 13 };
+Chart.defaults.plugins.tooltip.padding = 10;
+
+const gridColor = '#f1f5f9';
+const baseOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { intersect: false, mode: 'index' },
+  plugins: {
+    legend: { labels: { font: { size: 11 }, padding: 16, usePointStyle: true, pointStyleWidth: 12 } },
+  },
+  scales: {
+    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { font: { size: 11 } } },
+    x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+  }
+};
+
+// Deep merge helper
+function mergeOptions(overrides) {
+  return JSON.parse(JSON.stringify(Object.assign({}, baseOptions, overrides)));
+}
+
+// ============================================================
+// 1. User Growth (Line Chart)
+// ============================================================
+const ugLabels = {{ user_growth_labels|safe }};
+const ugData = {{ user_growth_data|safe }};
+
+new Chart(document.getElementById('userGrowthChart'), {
+  type: 'line',
+  data: {
+    labels: ugLabels,
+    datasets: [{
+      label: 'New Users',
+      data: ugData,
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      tension: 0.4,
+      fill: true,
+      pointBackgroundColor: '#3b82f6',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+    }]
+  },
+  options: {
+    ...baseOptions,
+    plugins: { ...baseOptions.plugins, legend: { display: false } },
+  }
+});
+
+// ============================================================
+// 2. Content Published (Stacked Bar Chart)
+// ============================================================
+const cwLabels = {{ content_week_labels|safe }};
+const cwArticles = {{ content_articles|safe }};
+const cwMagazines = {{ content_magazines|safe }};
+const cwVideos = {{ content_videos|safe }};
+
+new Chart(document.getElementById('contentChart'), {
+  type: 'bar',
+  data: {
+    labels: cwLabels,
+    datasets: [
+      { label: 'Articles', data: cwArticles, backgroundColor: '#3b82f6', borderRadius: 3 },
+      { label: 'Magazines', data: cwMagazines, backgroundColor: '#f59e0b', borderRadius: 3 },
+      { label: 'Videos', data: cwVideos, backgroundColor: '#ef4444', borderRadius: 3 },
+    ]
+  },
+  options: {
+    ...baseOptions,
+    scales: {
+      ...baseOptions.scales,
+      x: { ...baseOptions.scales.x, stacked: true },
+      y: { ...baseOptions.scales.y, stacked: true },
+    },
+  }
+});
+
+// ============================================================
+// 3. Engagement Metrics (Multi-Line Chart)
+// ============================================================
+const engLabels = {{ engagement_labels|safe }};
+const engLikes = {{ engagement_likes|safe }};
+const engComments = {{ engagement_comments|safe }};
+const engReactions = {{ engagement_reactions|safe }};
+const engBookmarks = {{ engagement_bookmarks|safe }};
+
+new Chart(document.getElementById('engagementChart'), {
+  type: 'line',
+  data: {
+    labels: engLabels,
+    datasets: [
+      { label: 'Likes', data: engLikes, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.06)', tension: 0.4, fill: false, pointRadius: 2, pointHoverRadius: 5 },
+      { label: 'Comments', data: engComments, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.06)', tension: 0.4, fill: false, pointRadius: 2, pointHoverRadius: 5 },
+      { label: 'Reactions', data: engReactions, borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.06)', tension: 0.4, fill: false, pointRadius: 2, pointHoverRadius: 5 },
+      { label: 'Bookmarks', data: engBookmarks, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.06)', tension: 0.4, fill: false, pointRadius: 2, pointHoverRadius: 5 },
+    ]
+  },
+  options: baseOptions,
+});
+
+// ============================================================
+// 4. User Demographics (Doughnut Chart)
+// ============================================================
+const demoLabels = {{ nationality_labels|safe }};
+const demoCounts = {{ nationality_counts|safe }};
+
+const doughnutColors = [
+  '#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#64748b',
+  '#a1a1aa',
+];
+
+if (demoLabels.length > 0) {
+  new Chart(document.getElementById('demographicsChart'), {
+    type: 'doughnut',
+    data: {
+      labels: demoLabels,
+      datasets: [{
+        data: demoCounts,
+        backgroundColor: doughnutColors.slice(0, demoLabels.length),
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 10, usePointStyle: true, pointStyleWidth: 10 },
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+              return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+} else {
+  document.getElementById('demographicsChart').parentElement.innerHTML +=
+    '<p class="text-sm text-center text-on-surface-variant mt-4">No nationality data available yet</p>';
+}
+
+// ============================================================
+// 5. Event Activity (Bar Chart)
+// ============================================================
+const evLabels = {{ event_labels|safe }};
+const evCounts = {{ event_counts|safe }};
+
+if (evLabels.length > 0) {
+  new Chart(document.getElementById('eventChart'), {
+    type: 'bar',
+    data: {
+      labels: evLabels,
+      datasets: [{
+        label: 'Registrations',
+        data: evCounts,
+        backgroundColor: '#6366f1',
+        borderRadius: 4,
+        hoverBackgroundColor: '#4f46e5',
+      }]
+    },
+    options: {
+      ...baseOptions,
+      indexAxis: 'y',
+      plugins: { ...baseOptions.plugins, legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: gridColor }, ticks: { font: { size: 11 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      },
+    }
+  });
+} else {
+  document.getElementById('eventChart').parentElement.innerHTML +=
+    '<p class="text-sm text-center text-on-surface-variant mt-4">No event registrations yet</p>';
+}
+
+// ============================================================
+// 6. Support Tickets (Line Chart)
+// ============================================================
+const tkLabels = {{ ticket_labels|safe }};
+const tkOpened = {{ ticket_opened|safe }};
+const tkClosed = {{ ticket_closed|safe }};
+
+new Chart(document.getElementById('ticketChart'), {
+  type: 'line',
+  data: {
+    labels: tkLabels,
+    datasets: [
+      {
+        label: 'Opened',
+        data: tkOpened,
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239,68,68,0.08)',
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#ef4444',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+      },
+      {
+        label: 'Resolved / Closed',
+        data: tkClosed,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.08)',
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#22c55e',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+      }
+    ]
+  },
+  options: baseOptions,
+});
+
+// ============================================================
+// 7. Traffic by Hour (Area Chart)
+// ============================================================
+const trLabels = {{ traffic_labels|safe }};
+const trData = {{ traffic_data|safe }};
+
+new Chart(document.getElementById('trafficChart'), {
+  type: 'line',
+  data: {
+    labels: trLabels,
+    datasets: [{
+      label: 'Avg Logins',
+      data: trData,
+      borderColor: '#06b6d4',
+      backgroundColor: 'rgba(6,182,212,0.12)',
+      tension: 0.4,
+      fill: true,
+      pointBackgroundColor: '#06b6d4',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+    }]
+  },
+  options: {
+    ...baseOptions,
+    plugins: { ...baseOptions.plugins, legend: { display: false } },
+  }
+});
+
+// ============================================================
+// 8. Badge Distribution (Pie Chart)
+// ============================================================
+const bgLabels = {{ badge_labels|safe }};
+const bgData = {{ badge_data|safe }};
+
+new Chart(document.getElementById('badgeChart'), {
+  type: 'pie',
+  data: {
+    labels: bgLabels,
+    datasets: [{
+      data: bgData,
+      backgroundColor: ['#f59e0b', '#3b82f6', '#e2e8f0'],
+      borderWidth: 2,
+      borderColor: '#fff',
+      hoverOffset: 8,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: { font: { size: 12 }, padding: 14, usePointStyle: true, pointStyleWidth: 12 },
+      },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+            const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+            return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+{% endblock %}

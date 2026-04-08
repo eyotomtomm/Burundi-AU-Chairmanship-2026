@@ -1,0 +1,169 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}A/B Tests - AU Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">science</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">A/B Tests</h1>
+        <p class="text-sm text-slate-500 mt-1">Create and manage experiments</p>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:ab_test_create' %}" class="inline-flex items-center gap-2 bg-violet-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-violet-700 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">add</span>
+      Create Test
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Tests</p>
+          <p class="text-2xl font-bold text-slate-900 mt-1">{{ total_tests }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-violet-600">science</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-emerald-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Running</p>
+          <p class="text-2xl font-bold text-emerald-700 mt-1">{{ running_tests }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-emerald-600">play_circle</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-amber-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Draft</p>
+          <p class="text-2xl font-bold text-amber-700 mt-1">{{ draft_tests }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-amber-600">edit_note</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-blue-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Completed</p>
+          <p class="text-2xl font-bold text-blue-700 mt-1">{{ completed_tests }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-blue-600">check_circle</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Name</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Type</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Traffic Split</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Start / End</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Participants</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for test in tests %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <a href="{% url 'custom_admin:ab_test_detail' test.pk %}" class="font-semibold text-slate-900 text-sm hover:text-violet-600 transition-colors">{{ test.name }}</a>
+              {% if test.description %}<p class="text-xs text-slate-500 mt-0.5">{{ test.description|truncatewords:12 }}</p>{% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 capitalize">{{ test.get_test_type_display }}</span>
+            </td>
+            <td class="px-6 py-4">
+              {% if test.status == 'draft' %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Draft
+              </span>
+              {% elif test.status == 'running' %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Running
+              </span>
+              {% elif test.status == 'paused' %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Paused
+              </span>
+              {% elif test.status == 'completed' %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>Completed
+              </span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
+                  <div class="h-full bg-violet-500 rounded-full" style="width: {{ test.traffic_split }}%"></div>
+                </div>
+                <span class="text-xs font-semibold text-slate-600">{{ test.traffic_split }}%</span>
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <p class="text-sm text-slate-700">{{ test.started_at|date:"M d, Y"|default:"-" }}</p>
+              <p class="text-xs text-slate-500">{{ test.ended_at|date:"M d, Y"|default:"-" }}</p>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm font-semibold text-slate-900">{{ test.participant_count }}</span>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <a href="{% url 'custom_admin:ab_test_detail' test.pk %}" class="p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="View Details">
+                  <span class="material-symbols-outlined text-xl">visibility</span>
+                </a>
+                <a href="{% url 'custom_admin:ab_test_edit' test.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                  <span class="material-symbols-outlined text-xl">edit</span>
+                </a>
+                <form method="post" action="{% url 'custom_admin:ab_test_delete' test.pk %}" class="inline" onsubmit="return confirm('Delete this A/B test? This action cannot be undone.');">
+                  {% csrf_token %}
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                    <span class="material-symbols-outlined text-xl">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="px-6 py-16 text-center">
+              <div class="flex flex-col items-center gap-2">
+                <span class="material-symbols-outlined text-4xl text-slate-300">science</span>
+                <p class="text-slate-500">No A/B tests yet</p>
+                <a href="{% url 'custom_admin:ab_test_create' %}" class="text-sm text-violet-600 hover:text-violet-700 font-semibold">Create your first test</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if tests.has_other_pages %}
+  <div class="mt-6 flex justify-center gap-2">
+    {% if tests.has_previous %}<a href="?page={{ tests.previous_page_number }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Previous</a>{% endif %}
+    <span class="px-4 py-2 text-sm text-slate-500">Page {{ tests.number }} of {{ tests.paginator.num_pages }}</span>
+    {% if tests.has_next %}<a href="?page={{ tests.next_page_number }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-slate-50">Next</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

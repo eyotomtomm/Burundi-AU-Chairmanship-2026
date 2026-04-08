@@ -81,6 +81,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.rate_limit_logger.RateLimitLoggingMiddleware',  # Log 429 throttled requests
+    'custom_admin.middleware.activity_logger.AdminActivityLoggerMiddleware',  # Log admin staff actions
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -451,3 +452,6 @@ CHANNEL_LAYERS = {
 # Download GeoLite2-City.mmdb from MaxMind and place in backend/geoip/
 GEOIP_PATH = os.path.join(BASE_DIR, 'geoip')
 GEOIP_CITY = 'GeoLite2-City.mmdb'
+
+# ─── Database Backup Configuration ────────────────────────────
+BACKUP_DIR = os.path.join(BASE_DIR, 'backups')

@@ -1,0 +1,200 @@
+{% extends "custom_admin/base.html" %}
+
+{% block title %}Admin Notifications | Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+  <!-- Page Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 font-headline">Admin Notifications</h1>
+      <p class="text-sm text-slate-500 mt-1">
+        {{ page_obj.paginator.count }} total notification{{ page_obj.paginator.count|pluralize }}
+        {% if unread_count %}&middot; <span class="text-amber-600 font-semibold">{{ unread_count }} unread</span>{% endif %}
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if unread_count %}
+      <button id="markAllReadBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-sm font-medium transition-colors border border-amber-200">
+        <span class="material-symbols-outlined text-base">done_all</span>
+        Mark all as read
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="flex items-center gap-1 mb-6 bg-slate-100 rounded-lg p-1 w-fit">
+    <a href="?status=all" class="px-4 py-2 text-sm font-medium rounded-md transition-all {% if filter_status == 'all' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-500 hover:text-slate-700{% endif %}">
+      All
+    </a>
+    <a href="?status=unread" class="px-4 py-2 text-sm font-medium rounded-md transition-all {% if filter_status == 'unread' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-500 hover:text-slate-700{% endif %}">
+      Unread
+    </a>
+    <a href="?status=read" class="px-4 py-2 text-sm font-medium rounded-md transition-all {% if filter_status == 'read' %}bg-white text-slate-900 shadow-sm{% else %}text-slate-500 hover:text-slate-700{% endif %}">
+      Read
+    </a>
+  </div>
+
+  <!-- Notifications List -->
+  <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+    {% if page_obj.object_list %}
+    <div class="divide-y divide-slate-100">
+      {% for notification in page_obj %}
+      <div class="flex items-start gap-4 px-6 py-4 hover:bg-slate-50 transition-colors {% if not notification.is_read %}bg-amber-50/30{% endif %}" data-notif-id="{{ notification.id }}">
+        <!-- Icon -->
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5
+          {% if notification.notification_type == 'new_ticket' %}bg-blue-100 text-blue-600
+          {% elif notification.notification_type == 'new_verification' %}bg-purple-100 text-purple-600
+          {% elif notification.notification_type == 'new_user' %}bg-emerald-100 text-emerald-600
+          {% elif notification.notification_type == 'ticket_reply' %}bg-amber-100 text-amber-600
+          {% elif notification.notification_type == 'system_alert' %}bg-red-100 text-red-600
+          {% elif notification.notification_type == 'content_flagged' %}bg-orange-100 text-orange-600
+          {% else %}bg-slate-100 text-slate-600{% endif %}">
+          <span class="material-symbols-outlined text-xl">
+            {% if notification.notification_type == 'new_ticket' %}support_agent
+            {% elif notification.notification_type == 'new_verification' %}verified
+            {% elif notification.notification_type == 'new_user' %}person_add
+            {% elif notification.notification_type == 'ticket_reply' %}reply
+            {% elif notification.notification_type == 'system_alert' %}warning
+            {% elif notification.notification_type == 'content_flagged' %}flag
+            {% else %}{{ notification.icon }}{% endif %}
+          </span>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-sm font-semibold text-slate-800 {% if not notification.is_read %}font-bold{% endif %}">{{ notification.title }}</p>
+              <p class="text-sm text-slate-600 mt-0.5">{{ notification.message }}</p>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              {% if not notification.is_read %}
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <p class="text-xs text-slate-400">{{ notification.created_at|timesince }} ago</p>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider
+              {% if notification.notification_type == 'new_ticket' %}bg-blue-50 text-blue-600
+              {% elif notification.notification_type == 'new_verification' %}bg-purple-50 text-purple-600
+              {% elif notification.notification_type == 'new_user' %}bg-emerald-50 text-emerald-600
+              {% else %}bg-slate-50 text-slate-500{% endif %}">
+              {{ notification.get_notification_type_display }}
+            </span>
+            {% if not notification.is_read %}
+            <button class="mark-read-btn text-xs text-amber-600 hover:text-amber-700 font-medium" data-id="{{ notification.id }}">Mark as read</button>
+            {% endif %}
+            {% if notification.link %}
+            <a href="{{ notification.link }}" class="text-xs text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-0.5">
+              View <span class="material-symbols-outlined text-xs">arrow_forward</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-12 text-center">
+      <span class="material-symbols-outlined text-5xl text-slate-300 mb-3">notifications_off</span>
+      <p class="text-slate-500 font-medium">No notifications found</p>
+      <p class="text-sm text-slate-400 mt-1">
+        {% if filter_status == 'unread' %}All caught up! No unread notifications.
+        {% elif filter_status == 'read' %}No read notifications yet.
+        {% else %}Admin notifications will appear here when triggered by system events.{% endif %}
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="flex items-center justify-between mt-6">
+    <p class="text-sm text-slate-500">
+      Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+    </p>
+    <div class="flex items-center gap-1">
+      {% if page_obj.has_previous %}
+      <a href="?status={{ filter_status }}&page={{ page_obj.previous_page_number }}" class="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+        <span class="material-symbols-outlined text-base align-middle">chevron_left</span> Prev
+      </a>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <span class="px-3 py-2 text-sm font-bold text-amber-600 bg-amber-50 rounded-lg">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <a href="?status={{ filter_status }}&page={{ num }}" class="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+      <a href="?status={{ filter_status }}&page={{ page_obj.next_page_number }}" class="px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+        Next <span class="material-symbols-outlined text-base align-middle">chevron_right</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  // Mark individual as read
+  document.querySelectorAll('.mark-read-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var id = parseInt(btn.getAttribute('data-id'));
+      fetch('{% url "custom_admin:admin_notification_mark_read" %}', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ ids: [id] }),
+      })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        var row = btn.closest('[data-notif-id]');
+        if (row) {
+          row.classList.remove('bg-amber-50/30');
+          var dot = row.querySelector('.bg-amber-500');
+          if (dot) dot.remove();
+          btn.remove();
+        }
+      });
+    });
+  });
+
+  // Mark all as read
+  var markAllBtn = document.getElementById('markAllReadBtn');
+  if (markAllBtn) {
+    markAllBtn.addEventListener('click', function() {
+      fetch('{% url "custom_admin:admin_notification_mark_read" %}', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ all: true }),
+      })
+      .then(function() {
+        window.location.reload();
+      });
+    });
+  }
+
+  function getCsrfToken() {
+    var cookie = document.cookie.split(';').find(function(c) { return c.trim().startsWith('csrftoken='); });
+    return cookie ? cookie.split('=')[1] : '';
+  }
+})();
+</script>
+{% endblock %}

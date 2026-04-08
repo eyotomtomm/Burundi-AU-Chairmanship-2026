@@ -146,6 +146,7 @@ urlpatterns = [
     path('analytics/export-pdf/', views.analytics_export_pdf, name='analytics_export_pdf'),
     path('analytics/nationality/', views.nationality_map, name='nationality_map'),
     path('analytics/rate-limiting/', views.rate_limiting_dashboard, name='rate_limiting'),
+    path('analytics/charts/', views.analytics_charts, name='analytics_charts'),
 
     # Polls
     path('polls/', views.polls_list, name='polls_list'),
@@ -202,6 +203,7 @@ urlpatterns = [
 
     # Global Search
     path('search/', views.admin_global_search, name='global_search'),
+    path('search/api/', views.admin_global_search_api, name='global_search_api'),
 
     # Export Reports
     path('export/users-csv/', views.export_users_csv, name='export_users_csv'),
@@ -209,4 +211,72 @@ urlpatterns = [
 
     # Translation Manager
     path('translations/', views.translation_manager, name='translation_manager'),
+
+    # Activity Log
+    path('activity-log/', views.activity_log, name='activity_log'),
+
+    # User Segments
+    path('segments/', views.segment_list, name='segment_list'),
+    path('segments/create/', views.segment_create, name='segment_create'),
+    path('segments/<int:pk>/', views.segment_detail, name='segment_detail'),
+    path('segments/<int:pk>/edit/', views.segment_edit, name='segment_edit'),
+    path('segments/<int:pk>/delete/', views.segment_delete, name='segment_delete'),
+    path('segments/preview/', views.segment_preview, name='segment_preview'),
+    path('segments/<int:pk>/export/', views.segment_export, name='segment_export'),
+    path('segments/<int:pk>/notify/', views.segment_notify, name='segment_notify'),
+
+    # System Health
+    path('system-health/', views.system_health_dashboard, name='system_health'),
+    path('system-health/api/', views.system_health_api, name='system_health_api'),
+
+    # Database Backups
+    path('database/backups/', views.database_backup_page, name='database_backup'),
+    path('database/backups/create/', views.create_backup, name='create_backup'),
+    path('database/backups/<int:pk>/download/', views.download_backup, name='download_backup'),
+    path('database/backups/<int:pk>/delete/', views.delete_backup, name='delete_backup'),
+
+    # Admin Notifications (Bell)
+    path('admin-notifications/', views.admin_notifications_page, name='admin_notifications'),
+    path('admin-notifications/api/', views.admin_notifications_api, name='admin_notifications_api'),
+    path('admin-notifications/mark-read/', views.admin_notification_mark_read, name='admin_notification_mark_read'),
+
+    # Image Editor / Cropper
+    path('image-editor/', views.image_editor, name='image_editor'),
+    path('image-editor/save/', views.image_crop_save, name='image_crop_save'),
+
+    # Dashboard Widget Data (AJAX)
+    path('dashboard/widget/', views.widget_data, name='widget_data'),
+
+    # Email Template Preview & Send Test (AJAX)
+    path('email-templates/<int:pk>/preview/', views.email_template_preview, name='email_template_preview'),
+    path('email-templates/<int:pk>/send-test/', views.email_template_send_test, name='email_template_send_test'),
+
+    # Content Calendar
+    path('content-calendar/', views.content_calendar, name='content_calendar'),
+
+    # Drag & Drop Reorder
+    path('reorder/', views.reorder_page, name='reorder'),
+    path('reorder/save/', views.reorder_save, name='reorder_save'),
+
+    # Scheduled Maintenance Management
+    path('maintenance/management/', views.maintenance_management, name='maintenance_management'),
+    path('maintenance/management/', views.maintenance_management, name='maintenance'),  # alias used by template
+    path('maintenance/toggle/', views.maintenance_toggle, name='maintenance_toggle'),
+    path('maintenance/schedule/', views.maintenance_schedule, name='maintenance_schedule'),
+
+    # A/B Tests
+    path('ab-tests/', views.ab_test_list, name='ab_test_list'),
+    path('ab-tests/create/', views.ab_test_create, name='ab_test_create'),
+    path('ab-tests/<int:pk>/', views.ab_test_detail, name='ab_test_detail'),
+    path('ab-tests/<int:pk>/edit/', views.ab_test_edit, name='ab_test_edit'),
+    path('ab-tests/<int:pk>/delete/', views.ab_test_delete, name='ab_test_delete'),
+
+    # Webhooks
+    path('webhooks/', views.webhook_list, name='webhook_list'),
+    path('webhooks/create/', views.webhook_create, name='webhook_create'),
+    path('webhooks/<int:pk>/edit/', views.webhook_edit, name='webhook_edit'),
+    path('webhooks/<int:pk>/delete/', views.webhook_delete, name='webhook_delete'),
+    path('webhooks/<int:pk>/toggle/', views.webhook_toggle, name='webhook_toggle'),
+    path('webhooks/<int:pk>/logs/', views.webhook_logs, name='webhook_logs'),
+    path('webhooks/<int:pk>/test/', views.webhook_test, name='webhook_test'),
 ]

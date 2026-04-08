@@ -2628,10 +2628,18 @@ class Webhook(models.Model):
         ('article.published', 'Article Published'),
         ('support.ticket_created', 'Support Ticket Created'),
     ]
+    SERVICE_TYPE_CHOICES = [
+        ('slack', 'Slack'),
+        ('teams', 'Microsoft Teams'),
+        ('discord', 'Discord'),
+        ('custom', 'Custom'),
+    ]
     name = models.CharField(max_length=200)
     url = models.URLField(help_text='Endpoint to receive webhook POST')
+    service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES, default='custom')
     events = models.JSONField(default=list, help_text='List of event keys to trigger')
     secret_key = models.CharField(max_length=255, blank=True, help_text='Shared secret for signature verification')
+    custom_headers = models.JSONField(default=dict, blank=True, help_text='Custom HTTP headers as key-value pairs')
     is_active = models.BooleanField(default=True)
     last_triggered_at = models.DateTimeField(null=True, blank=True)
     failure_count = models.IntegerField(default=0)
@@ -2654,6 +2662,7 @@ class WebhookLog(models.Model):
     response_status = models.IntegerField(null=True, blank=True)
     response_body = models.TextField(blank=True)
     success = models.BooleanField(default=False)
+    duration_ms = models.IntegerField(null=True, blank=True, help_text='Request duration in milliseconds')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -2667,6 +2676,21 @@ class WebhookLog(models.Model):
 
 class ScheduledMaintenance(models.Model):
     """Scheduled maintenance windows."""
+
+    SEVERITY_CHOICES = [
+        ('minor', 'Minor'),
+        ('major', 'Major'),
+        ('critical', 'Critical'),
+    ]
+
+    AFFECTED_SERVICES_CHOICES = [
+        ('api', 'API'),
+        ('auth', 'Authentication'),
+        ('payments', 'Payments'),
+        ('media', 'Media'),
+        ('all', 'All Services'),
+    ]
+
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
@@ -2675,6 +2699,10 @@ class ScheduledMaintenance(models.Model):
     ends_at = models.DateTimeField()
     is_active = models.BooleanField(default=True)
     show_banner = models.BooleanField(default=True, help_text='Show maintenance banner in app')
+    contact_email = models.EmailField(blank=True, help_text='Contact email for users during maintenance')
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='minor')
+    affected_services = models.CharField(max_length=200, blank=True, default='all', help_text='Comma-separated list of affected services')
+    auto_activate = models.BooleanField(default=False, help_text='Automatically enable maintenance at start time')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -2685,16 +2713,65 @@ class ScheduledMaintenance(models.Model):
             models.Index(fields=['is_active', 'starts_at', 'ends_at']),
         ]
 
+    @property
+    def is_currently_active(self):
+        """Check if maintenance is currently in effect (active and within time window)."""
+        now = timezone.now()
+        return self.is_active and self.starts_at <= now <= self.ends_at
+
+    @property
+    def is_upcoming(self):
+        """Check if maintenance is scheduled for the future."""
+        return self.starts_at > timezone.now()
+
+    @property
+    def is_past(self):
+        """Check if maintenance window has ended."""
+        return self.ends_at < timezone.now()
+
+    @property
+    def duration_display(self):
+        """Return human-readable duration."""
+        delta = self.ends_at - self.starts_at
+        hours, remainder = divmod(int(delta.total_seconds()), 3600)
+        minutes = remainder // 60
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
+
+    @property
+    def affected_services_list(self):
+        """Return affected services as a list."""
+        if not self.affected_services:
+            return []
+        return [s.strip() for s in self.affected_services.split(',') if s.strip()]
+
     def __str__(self):
         return f"{self.title} ({self.starts_at} - {self.ends_at})"
 
 
 class ABTest(models.Model):
     """A/B testing configuration."""
+    TEST_TYPE_CHOICES = [
+        ('content', 'Content'),
+        ('layout', 'Layout'),
+        ('feature', 'Feature Flag'),
+        ('notification', 'Notification'),
+    ]
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('running', 'Running'),
+        ('paused', 'Paused'),
+        ('completed', 'Completed'),
+    ]
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    test_type = models.CharField(max_length=20, choices=TEST_TYPE_CHOICES, default='content')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     variant_a_label = models.CharField(max_length=100, default='Control')
     variant_b_label = models.CharField(max_length=100, default='Variant')
+    variant_a_content_id = models.PositiveIntegerField(null=True, blank=True, help_text='Content ID for variant A')
+    variant_b_content_id = models.PositiveIntegerField(null=True, blank=True, help_text='Content ID for variant B')
     traffic_split = models.IntegerField(default=50, help_text='Percentage of users who see variant B (0-100)')
     is_active = models.BooleanField(default=False)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -2916,6 +2993,288 @@ class RateLimitLog(models.Model):
 
     def __str__(self):
         return f"[{self.request_method}] {self.endpoint} from {self.ip_address} at {self.timestamp}"
+
+
+class AdminActivityLog(models.Model):
+    """Tracks all admin staff actions for the activity log page."""
+    ACTION_TYPE_CHOICES = [
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('login', 'Login'),
+        ('logout', 'Logout'),
+        ('export', 'Export'),
+        ('approve', 'Approve'),
+        ('reject', 'Reject'),
+        ('bulk_action', 'Bulk Action'),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='admin_activity_logs'
+    )
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES)
+    model_name = models.CharField(max_length=100, blank=True, help_text='e.g. Article, User, Event')
+    object_id = models.IntegerField(null=True, blank=True, help_text='PK of the affected object')
+    object_repr = models.CharField(max_length=255, blank=True, help_text='String representation of the object')
+    changes = models.JSONField(default=dict, blank=True, help_text='Dict of field changes {field: {old: x, new: y}}')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    path = models.CharField(max_length=500, blank=True, help_text='Request URL path')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Admin Activity Log'
+        verbose_name_plural = 'Admin Activity Logs'
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['action_type', '-timestamp']),
+        ]
+
+    def __str__(self):
+        user_str = self.user.username if self.user else 'Unknown'
+        return f"{user_str} {self.action_type} {self.model_name} ({self.object_repr})"
+
+
+# ── Database Backup Tracking ─────────────────────────────────
+class DatabaseBackup(models.Model):
+    """Tracks database backup files created through the admin portal."""
+    BACKUP_TYPE_CHOICES = [
+        ('full', 'Full Backup'),
+        ('data_only', 'Data Only'),
+        ('schema_only', 'Schema Only'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    ]
+
+    filename = models.CharField(max_length=255)
+    file_path = models.CharField(max_length=500)
+    file_size = models.BigIntegerField(default=0)
+    backup_type = models.CharField(max_length=20, choices=BACKUP_TYPE_CHOICES, default='full')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='database_backups')
+    created_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Database Backup'
+        verbose_name_plural = 'Database Backups'
+
+    def __str__(self):
+        return f"{self.filename} ({self.get_status_display()})"
+
+
+# ── User Segmentation ────────────────────────────────────────
+class UserSegment(models.Model):
+    """
+    Defines a user segment for targeted notifications and analytics.
+    Segments can be dynamic (filter-based, recalculated on access) or
+    static (manually curated membership list).
+    """
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    filters = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='JSON filter criteria: nationality, gender, badge_type, age_range, registered_after/before, has_verified_email, is_active'
+    )
+    is_dynamic = models.BooleanField(
+        default=True,
+        help_text='Dynamic segments recalculate members from filters on every access'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='created_segments'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'User Segment'
+        verbose_name_plural = 'User Segments'
+
+    def __str__(self):
+        return self.name
+
+    def get_users(self):
+        """
+        Return a User queryset matching this segment.
+        Dynamic segments build a queryset from the JSON filters.
+        Static segments return users from UserSegmentMembership.
+        """
+        from datetime import date, timedelta
+        from django.db.models import Q
+
+        if not self.is_dynamic:
+            user_ids = self.memberships.values_list('user_id', flat=True)
+            return User.objects.filter(pk__in=user_ids)
+
+        filters = self.filters or {}
+        qs = User.objects.all().select_related('profile')
+
+        # Nationality filter (list of ISO codes)
+        nationalities = filters.get('nationality', [])
+        if nationalities:
+            qs = qs.filter(profile__nationality__in=nationalities)
+
+        # Gender filter (list)
+        genders = filters.get('gender', [])
+        if genders:
+            qs = qs.filter(profile__gender__in=genders)
+
+        # Badge type filter (list)
+        badge_types = filters.get('badge_type', [])
+        if badge_types:
+            badge_q = Q()
+            normalized = [b.upper() for b in badge_types]
+            if 'NONE' in normalized:
+                badge_q |= Q(profile__badge_type__isnull=True) | Q(profile__badge_type='')
+                normalized = [b for b in normalized if b != 'NONE']
+            if normalized:
+                badge_q |= Q(profile__badge_type__in=normalized)
+            qs = qs.filter(badge_q)
+
+        # Age range filter
+        age_range = filters.get('age_range', {})
+        if age_range:
+            today = date.today()
+            age_min = age_range.get('min')
+            age_max = age_range.get('max')
+            if age_min is not None:
+                max_dob = today.replace(year=today.year - int(age_min))
+                qs = qs.filter(profile__date_of_birth__lte=max_dob)
+            if age_max is not None:
+                min_dob = today.replace(year=today.year - int(age_max) - 1)
+                qs = qs.filter(profile__date_of_birth__gte=min_dob)
+
+        # Registration date filters
+        registered_after = filters.get('registered_after')
+        if registered_after:
+            qs = qs.filter(date_joined__date__gte=registered_after)
+
+        registered_before = filters.get('registered_before')
+        if registered_before:
+            qs = qs.filter(date_joined__date__lte=registered_before)
+
+        # Email verified filter
+        has_verified_email = filters.get('has_verified_email')
+        if has_verified_email is True:
+            qs = qs.filter(profile__is_email_verified=True)
+        elif has_verified_email is False:
+            qs = qs.filter(profile__is_email_verified=False)
+
+        # Active status filter
+        is_active = filters.get('is_active')
+        if is_active is True:
+            qs = qs.filter(is_active=True)
+        elif is_active is False:
+            qs = qs.filter(is_active=False)
+
+        return qs.distinct()
+
+    def get_member_count(self):
+        """Return the number of users in this segment."""
+        return self.get_users().count()
+
+
+class UserSegmentMembership(models.Model):
+    """
+    Tracks manual membership for static (non-dynamic) segments.
+    """
+    segment = models.ForeignKey(
+        UserSegment, on_delete=models.CASCADE, related_name='memberships'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='segment_memberships'
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('segment', 'user')
+        ordering = ['-added_at']
+        verbose_name = 'Segment Membership'
+        verbose_name_plural = 'Segment Memberships'
+
+    def __str__(self):
+        return f"{self.user.username} in {self.segment.name}"
+
+
+# ══════════════════════════════════════════════════════════════
+# Admin Portal Real-Time Notifications
+# ══════════════════════════════════════════════════════════════
+
+class AdminNotification(models.Model):
+    """Real-time notifications for admin staff in the admin portal."""
+    NOTIFICATION_TYPE_CHOICES = [
+        ('new_ticket', 'New Support Ticket'),
+        ('new_verification', 'New Verification Request'),
+        ('new_user', 'New User Registration'),
+        ('ticket_reply', 'Ticket Reply'),
+        ('system_alert', 'System Alert'),
+        ('content_flagged', 'Content Flagged'),
+    ]
+
+    notification_type = models.CharField(
+        max_length=20,
+        choices=NOTIFICATION_TYPE_CHOICES,
+        help_text='Category of admin notification'
+    )
+    title = models.CharField(max_length=200, help_text='Short notification title')
+    message = models.TextField(help_text='Notification detail message')
+    link = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text='URL to navigate to when notification is clicked'
+    )
+    icon = models.CharField(
+        max_length=50,
+        default='notifications',
+        help_text='Material Symbols icon name'
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Admin Notification'
+        verbose_name_plural = 'Admin Notifications'
+        indexes = [
+            models.Index(fields=['is_read', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"[{self.get_notification_type_display()}] {self.title}"
+
+    @property
+    def time_ago(self):
+        """Return a human-readable relative time string."""
+        from django.utils import timezone
+        now = timezone.now()
+        diff = now - self.created_at
+        seconds = int(diff.total_seconds())
+        if seconds < 60:
+            return 'just now'
+        minutes = seconds // 60
+        if minutes < 60:
+            return f'{minutes}m ago'
+        hours = minutes // 60
+        if hours < 24:
+            return f'{hours}h ago'
+        days = hours // 24
+        if days < 7:
+            return f'{days}d ago'
+        weeks = days // 7
+        if weeks < 4:
+            return f'{weeks}w ago'
+        return self.created_at.strftime('%b %d')
 
 
 # ── Auto-optimize images on upload ────────────────────────────

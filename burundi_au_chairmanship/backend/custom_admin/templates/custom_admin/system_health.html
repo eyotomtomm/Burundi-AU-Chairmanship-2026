@@ -1,0 +1,344 @@
+{% extends "custom_admin/base.html" %}
+{% block title %}System Health | Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-2xl font-black text-slate-900 font-headline">System Health</h1>
+    <p class="text-sm text-slate-500 mt-1">Real-time server monitoring &amp; diagnostics</p>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="lastUpdated" class="text-xs text-slate-400"></span>
+    <span id="autoRefreshDot" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Auto-refreshing every 30s"></span>
+  </div>
+</div>
+
+<!-- No-psutil warning banner (hidden by default) -->
+<div id="psutilWarning" class="hidden mb-6 flex items-center gap-3 p-4 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+  <span class="material-symbols-outlined text-sm">warning</span>
+  <span class="text-sm font-medium">psutil is not installed. CPU, memory, disk, and uptime data are unavailable. Install with: <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono">pip install psutil</code></span>
+</div>
+
+<!-- Server Status Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+  <!-- CPU Usage -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 flex flex-col items-center">
+    <svg id="cpuRing" class="w-28 h-28 mb-3" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+      <circle id="cpuArc" cx="60" cy="60" r="52" fill="none" stroke="#22c55e" stroke-width="10"
+              stroke-dasharray="326.73" stroke-dashoffset="326.73"
+              stroke-linecap="round" transform="rotate(-90 60 60)" style="transition: stroke-dashoffset 0.8s ease, stroke 0.4s ease;"/>
+      <text x="60" y="60" text-anchor="middle" dominant-baseline="central" class="font-headline" fill="#0f172a" font-size="22" font-weight="800">
+        <tspan id="cpuText">--%</tspan>
+      </text>
+    </svg>
+    <p class="text-sm font-bold text-slate-700 font-headline">CPU Usage</p>
+  </div>
+
+  <!-- Memory Usage -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 flex flex-col items-center">
+    <svg class="w-28 h-28 mb-3" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+      <circle id="memArc" cx="60" cy="60" r="52" fill="none" stroke="#22c55e" stroke-width="10"
+              stroke-dasharray="326.73" stroke-dashoffset="326.73"
+              stroke-linecap="round" transform="rotate(-90 60 60)" style="transition: stroke-dashoffset 0.8s ease, stroke 0.4s ease;"/>
+      <text x="60" y="55" text-anchor="middle" dominant-baseline="central" class="font-headline" fill="#0f172a" font-size="22" font-weight="800">
+        <tspan id="memText">--%</tspan>
+      </text>
+      <text x="60" y="78" text-anchor="middle" fill="#94a3b8" font-size="10">
+        <tspan id="memDetail">-- / -- GB</tspan>
+      </text>
+    </svg>
+    <p class="text-sm font-bold text-slate-700 font-headline">Memory Usage</p>
+  </div>
+
+  <!-- Disk Usage -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 flex flex-col items-center">
+    <svg class="w-28 h-28 mb-3" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="52" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+      <circle id="diskArc" cx="60" cy="60" r="52" fill="none" stroke="#22c55e" stroke-width="10"
+              stroke-dasharray="326.73" stroke-dashoffset="326.73"
+              stroke-linecap="round" transform="rotate(-90 60 60)" style="transition: stroke-dashoffset 0.8s ease, stroke 0.4s ease;"/>
+      <text x="60" y="55" text-anchor="middle" dominant-baseline="central" class="font-headline" fill="#0f172a" font-size="22" font-weight="800">
+        <tspan id="diskText">--%</tspan>
+      </text>
+      <text x="60" y="78" text-anchor="middle" fill="#94a3b8" font-size="10">
+        <tspan id="diskDetail">-- / -- GB</tspan>
+      </text>
+    </svg>
+    <p class="text-sm font-bold text-slate-700 font-headline">Disk Usage</p>
+  </div>
+
+  <!-- System Uptime -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 flex flex-col items-center justify-center">
+    <div class="w-28 h-28 mb-3 flex flex-col items-center justify-center">
+      <span class="material-symbols-outlined text-4xl text-blue-500 mb-2">schedule</span>
+      <p id="uptimeText" class="text-2xl font-black text-slate-900 font-headline">--d --h</p>
+    </div>
+    <p class="text-sm font-bold text-slate-700 font-headline">System Uptime</p>
+  </div>
+</div>
+
+<!-- Services Status -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-8">
+  <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Services Status</h2>
+  <div class="flex flex-wrap gap-4">
+
+    <!-- Database -->
+    <div id="svcDb" class="flex items-center gap-3 bg-slate-50 rounded-xl px-5 py-3 border border-slate-200/60">
+      <span class="material-symbols-outlined text-xl text-slate-400">storage</span>
+      <div>
+        <p class="text-sm font-bold text-slate-700">Database</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span id="dbBadge" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-500">
+            <span id="dbDot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            <span id="dbStatusText">Checking...</span>
+          </span>
+          <span id="dbLatency" class="text-[10px] text-slate-400"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cache -->
+    <div id="svcCache" class="flex items-center gap-3 bg-slate-50 rounded-xl px-5 py-3 border border-slate-200/60">
+      <span class="material-symbols-outlined text-xl text-slate-400">memory</span>
+      <div>
+        <p class="text-sm font-bold text-slate-700">Cache</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span id="cacheBadge" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-500">
+            <span id="cacheDot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            <span id="cacheStatusText">Checking...</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div id="svcEmail" class="flex items-center gap-3 bg-slate-50 rounded-xl px-5 py-3 border border-slate-200/60">
+      <span class="material-symbols-outlined text-xl text-slate-400">email</span>
+      <div>
+        <p class="text-sm font-bold text-slate-700">Email</p>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span id="emailBadge" class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-500">
+            <span id="emailDot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            <span id="emailStatusText">Checking...</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Database Stats + Recent Logins -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- Database Stats -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
+    <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Database Statistics</h2>
+    <div class="space-y-4">
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Engine</span>
+        <span id="statEngine" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Database Name</span>
+        <span id="statDbName" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Tables</span>
+        <span id="statTables" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Estimated Rows</span>
+        <span id="statRows" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3">
+        <span class="text-sm text-slate-500">Database Size</span>
+        <span id="statSize" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Admin Logins -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
+    <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Recent Activity</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+            <th class="pb-3 pr-4">User</th>
+            <th class="pb-3 pr-4">IP Address</th>
+            <th class="pb-3">Login Time</th>
+          </tr>
+        </thead>
+        <tbody id="loginsTable">
+          <tr><td colspan="3" class="py-6 text-center text-slate-400">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const CIRCUMFERENCE = 2 * Math.PI * 52; // 326.73
+  const API_URL = "{% url 'custom_admin:system_health_api' %}";
+  let refreshTimer = null;
+
+  function getColor(percent) {
+    if (percent < 60) return '#22c55e'; // green
+    if (percent <= 85) return '#eab308'; // yellow
+    return '#ef4444'; // red
+  }
+
+  function setRing(arcEl, textEl, percent) {
+    const offset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
+    arcEl.setAttribute('stroke-dashoffset', offset);
+    arcEl.setAttribute('stroke', getColor(percent));
+    textEl.textContent = Math.round(percent) + '%';
+  }
+
+  function setBadge(dotEl, textEl, badgeEl, connected, label, downLabel) {
+    if (connected) {
+      dotEl.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500';
+      textEl.textContent = label;
+      badgeEl.className = 'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+    } else {
+      dotEl.className = 'w-1.5 h-1.5 rounded-full bg-red-500';
+      textEl.textContent = downLabel;
+      badgeEl.className = 'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700';
+    }
+  }
+
+  function formatNumber(n) {
+    if (n === undefined || n === null) return '--';
+    return n.toLocaleString();
+  }
+
+  function updateDashboard(data) {
+    // psutil warning
+    if (!data.psutil_available) {
+      document.getElementById('psutilWarning').classList.remove('hidden');
+    } else {
+      document.getElementById('psutilWarning').classList.add('hidden');
+    }
+
+    // CPU
+    setRing(
+      document.getElementById('cpuArc'),
+      document.getElementById('cpuText'),
+      data.cpu_percent || 0
+    );
+
+    // Memory
+    setRing(
+      document.getElementById('memArc'),
+      document.getElementById('memText'),
+      data.memory_percent || 0
+    );
+    document.getElementById('memDetail').textContent =
+      (data.memory_used_gb || 0) + ' / ' + (data.memory_total_gb || 0) + ' GB';
+
+    // Disk
+    setRing(
+      document.getElementById('diskArc'),
+      document.getElementById('diskText'),
+      data.disk_percent || 0
+    );
+    document.getElementById('diskDetail').textContent =
+      (data.disk_used_gb || 0) + ' / ' + (data.disk_total_gb || 0) + ' GB';
+
+    // Uptime
+    document.getElementById('uptimeText').textContent =
+      (data.uptime_days || 0) + 'd ' + (data.uptime_hours || 0) + 'h';
+
+    // Services
+    setBadge(
+      document.getElementById('dbDot'),
+      document.getElementById('dbStatusText'),
+      document.getElementById('dbBadge'),
+      data.db_connected,
+      'Connected', 'Down'
+    );
+    document.getElementById('dbLatency').textContent =
+      data.db_connected ? (data.db_latency_ms + ' ms') : '';
+
+    setBadge(
+      document.getElementById('cacheDot'),
+      document.getElementById('cacheStatusText'),
+      document.getElementById('cacheBadge'),
+      data.cache_connected,
+      'Connected', 'Down'
+    );
+
+    setBadge(
+      document.getElementById('emailDot'),
+      document.getElementById('emailStatusText'),
+      document.getElementById('emailBadge'),
+      data.email_configured,
+      'Configured', 'Not configured'
+    );
+
+    // DB Stats
+    document.getElementById('statEngine').textContent = data.db_engine || '--';
+    document.getElementById('statDbName').textContent = data.db_name || '--';
+    document.getElementById('statTables').textContent = formatNumber(data.table_count);
+    document.getElementById('statRows').textContent = formatNumber(data.row_count);
+    document.getElementById('statSize').textContent = data.db_size || '--';
+
+    // Recent logins
+    var tbody = document.getElementById('loginsTable');
+    if (data.recent_logins && data.recent_logins.length > 0) {
+      var html = '';
+      data.recent_logins.forEach(function(entry) {
+        html += '<tr class="border-b border-slate-50">' +
+          '<td class="py-2.5 pr-4 font-medium text-slate-700">' + escapeHtml(entry.username) + '</td>' +
+          '<td class="py-2.5 pr-4 text-slate-500 font-mono text-xs">' + escapeHtml(entry.ip_address) + '</td>' +
+          '<td class="py-2.5 text-slate-500">' + escapeHtml(entry.logged_in_at) + '</td>' +
+          '</tr>';
+      });
+      tbody.innerHTML = html;
+    } else {
+      tbody.innerHTML = '<tr><td colspan="3" class="py-6 text-center text-slate-400">No recent logins</td></tr>';
+    }
+
+    // Timestamp
+    var now = new Date();
+    document.getElementById('lastUpdated').textContent =
+      'Updated ' + now.toLocaleTimeString();
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  function fetchHealth() {
+    fetch(API_URL, { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) { updateDashboard(data); })
+      .catch(function(err) {
+        console.error('Health check failed:', err);
+      });
+  }
+
+  // Initial load
+  fetchHealth();
+
+  // Auto-refresh every 30 seconds
+  refreshTimer = setInterval(fetchHealth, 30000);
+
+  // Clean up on page unload
+  window.addEventListener('beforeunload', function() {
+    if (refreshTimer) clearInterval(refreshTimer);
+  });
+})();
+</script>
+{% endblock %}

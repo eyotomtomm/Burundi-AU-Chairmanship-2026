@@ -1,9 +1,18 @@
 {% load static %}<!DOCTYPE html>
-<html class="light" lang="en">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>{% block title %}Diplomatic Portal | AU Chairmanship 2026–2027{% endblock %}</title>
+<!-- Dark mode detection: runs before any rendering to prevent flash of wrong theme -->
+<script>
+(function() {
+  var theme = localStorage.getItem('admin-theme');
+  if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+</script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -73,6 +82,7 @@ tailwind.config = {
 }
 </script>
 <style>
+/* === Base Styles === */
 .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 body { font-family: 'Inter', sans-serif; }
@@ -80,18 +90,222 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 .sidebar-scroll::-webkit-scrollbar { width: 4px; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
 .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* === Dark Mode Theme Overrides === */
+.dark body { background-color: #111827; color: #F9FAFB; }
+
+/* Sidebar dark mode */
+.dark .sidebar { background-color: #0F172A; }
+.dark .sidebar .sidebar-divider-text { color: #64748B; }
+
+/* Cards, panels, containers */
+.dark .card, .dark .panel { background-color: #1F2937; border-color: #374151; }
+
+/* Tables */
+.dark table th { background-color: #374151; color: #F9FAFB; }
+.dark table td { border-color: #374151; color: #D1D5DB; }
+.dark table tr:hover { background-color: #374151; }
+.dark table { border-color: #374151; }
+.dark thead { border-color: #374151; }
+
+/* Form elements */
+.dark input, .dark select, .dark textarea {
+  background-color: #374151; color: #F9FAFB; border-color: #4B5563;
+}
+.dark input::placeholder, .dark textarea::placeholder { color: #9CA3AF; }
+.dark input:focus, .dark select:focus, .dark textarea:focus {
+  border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+/* Buttons */
+.dark .btn-secondary { background-color: #374151; color: #F9FAFB; border-color: #4B5563; }
+
+/* Links */
+.dark a:not(.sidebar a):not([class*="bg-"]):not([class*="btn"]) { color: #60A5FA; }
+
+/* Header bar */
+.dark .top-header { background-color: rgba(17, 24, 39, 0.85); border-color: rgba(55, 65, 81, 0.5); }
+.dark .top-header h2 { color: #F9FAFB; }
+.dark .top-header .header-search-input {
+  background-color: #1F2937; border-color: #374151; color: #F9FAFB;
+}
+.dark .top-header .header-search-input::placeholder { color: #6B7280; }
+.dark .top-header .header-search-input:focus { background-color: #1F2937; border-color: rgba(245, 158, 11, 0.4); }
+.dark .top-header kbd { background-color: rgba(55, 65, 81, 0.6); border-color: rgba(75, 85, 99, 0.5); color: #6B7280; }
+
+/* Search dropdown dark */
+.dark #globalSearchDropdown { background-color: #1F2937; border-color: #374151; }
+.dark #globalSearchDropdown .search-result-item { border-color: rgba(55, 65, 81, 0.5); }
+.dark #globalSearchDropdown .search-result-item:hover { background-color: #374151; }
+.dark #globalSearchDropdown .search-result-item p.text-slate-800,
+.dark #globalSearchDropdown .search-result-item .text-sm.font-medium { color: #F9FAFB; }
+.dark #globalSearchDropdown .search-result-item p.text-slate-400,
+.dark #globalSearchDropdown .search-result-item .text-xs { color: #9CA3AF; }
+.dark #globalSearchDropdown .search-result-item .text-slate-300 { color: #6B7280; }
+.dark #globalSearchDropdown #searchViewAll { border-color: #374151; }
+.dark #globalSearchDropdown #searchViewAll a { color: #F59E0B; }
+.dark #globalSearchDropdown #searchViewAll a:hover { background-color: rgba(245, 158, 11, 0.1); }
+.dark #globalSearchDropdown [class*="bg-slate-50"] { background-color: #111827; }
+
+/* Session warning modal dark */
+.dark #sessionWarning .bg-white { background-color: #1F2937 !important; }
+.dark #sessionWarning .text-slate-900 { color: #F9FAFB !important; }
+.dark #sessionWarning .text-slate-600 { color: #D1D5DB !important; }
+.dark #sessionWarning .text-slate-500 { color: #9CA3AF !important; }
+.dark #sessionWarning .bg-white.border { background-color: #374151 !important; border-color: #4B5563 !important; }
+
+/* Tailwind class overrides for dark mode */
+.dark .bg-white { background-color: #1F2937 !important; }
+.dark .bg-gray-50, .dark .bg-slate-50 { background-color: #111827 !important; }
+.dark .bg-gray-100, .dark .bg-slate-100 { background-color: #1F2937 !important; }
+.dark .bg-surface { background-color: #111827 !important; }
+.dark .text-gray-900, .dark .text-slate-900 { color: #F9FAFB !important; }
+.dark .text-gray-800, .dark .text-slate-800 { color: #E5E7EB !important; }
+.dark .text-gray-700, .dark .text-slate-700 { color: #D1D5DB !important; }
+.dark .text-gray-600, .dark .text-slate-600 { color: #9CA3AF !important; }
+.dark .text-gray-500, .dark .text-slate-500 { color: #9CA3AF !important; }
+.dark .text-on-surface { color: #F9FAFB !important; }
+.dark .text-on-background { color: #F9FAFB !important; }
+.dark .border-gray-200, .dark .border-slate-200 { border-color: #374151 !important; }
+.dark .border-gray-300, .dark .border-slate-300 { border-color: #4B5563 !important; }
+.dark .divide-gray-200 > * + *, .dark .divide-slate-200 > * + * { border-color: #374151 !important; }
+.dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
+.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3) !important; }
+.dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; }
+.dark .ring-1 { --tw-ring-color: #4B5563 !important; }
+
+/* Footer dark */
+.dark footer .bg-slate-200 { background-color: #374151 !important; }
+.dark footer .text-slate-400 { color: #6B7280 !important; }
+
+/* Messages/alerts dark mode */
+.dark .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.3) !important; border-color: rgba(5, 150, 105, 0.4) !important; }
+.dark .bg-red-50 { background-color: rgba(127, 29, 29, 0.3) !important; border-color: rgba(239, 68, 68, 0.4) !important; }
+.dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.3) !important; border-color: rgba(245, 158, 11, 0.4) !important; }
+.dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.3) !important; border-color: rgba(59, 130, 246, 0.4) !important; }
+.dark .text-emerald-800 { color: #6EE7B7 !important; }
+.dark .text-red-800 { color: #FCA5A5 !important; }
+.dark .text-amber-800 { color: #FCD34D !important; }
+.dark .text-blue-800 { color: #93C5FD !important; }
+
+/* Dark mode toggle icon switching */
+.dark .dark-icon-sun { display: inline-flex; }
+.dark .dark-icon-moon { display: none; }
+.dark-icon-sun { display: none; }
+.dark-icon-moon { display: inline-flex; }
+
+/* === Mobile Responsive Styles === */
+
+/* Mobile sidebar overlay */
+#sidebarOverlay {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+#sidebarOverlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mobile sidebar behaviour */
+@media (max-width: 1023px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: 272px;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  .top-header {
+    width: 100% !important;
+    left: 0 !important;
+  }
+  /* Adjust content padding for mobile */
+  .content-area {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    padding-top: 6rem !important;
+  }
+  /* Header padding on mobile */
+  .top-header {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  /* Reduce header title on mobile */
+  .header-title {
+    font-size: 1rem !important;
+  }
+  /* Hide search bar KBD shortcut on mobile */
+  .top-header kbd {
+    display: none !important;
+  }
+}
+
+/* Smaller mobile screens */
+@media (max-width: 640px) {
+  /* Stack stats grid to 2 columns */
+  .stats-grid { grid-template-columns: 1fr 1fr !important; }
+  /* Stack form elements */
+  .form-grid { grid-template-columns: 1fr !important; }
+  /* Content area tighter padding */
+  .content-area {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  .top-header {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  /* Search bar hidden on very small, show on focus */
+  .header-search-wrapper {
+    max-width: none !important;
+    margin-left: 0.5rem !important;
+    margin-right: 0.5rem !important;
+  }
+}
+
+/* Tables scroll horizontally on mobile */
+.table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 1023px) {
+  button, a.btn, .clickable { min-height: 44px; min-width: 44px; }
+  input, select, textarea { font-size: 16px !important; } /* Prevent zoom on iOS */
+}
+
+/* Footer responsive */
+@media (max-width: 640px) {
+  footer { padding: 1.5rem 1rem !important; }
+}
 </style>
 {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-surface text-on-surface">
 
 {% if user.is_authenticated %}
+<!-- Mobile Sidebar Overlay -->
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
+
 <!-- Sidebar -->
-<aside class="h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-900 z-50 flex flex-col py-8 px-4 shadow-2xl sidebar-scroll">
+<aside id="sidebar" class="sidebar h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-900 z-50 flex flex-col py-8 px-4 shadow-2xl sidebar-scroll">
   <div class="mb-10 px-4">
     <div class="flex items-center gap-3 mb-2">
       <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold text-lg">AU</div>
-      <span class="text-lg font-bold text-white tracking-tight font-headline">AU Chairmanship</span>
+      <span class="text-lg font-bold text-white tracking-tight font-headline flex-1">AU Chairmanship</span>
+      <!-- Mobile close button -->
+      <button id="sidebarClose" class="lg:hidden text-slate-400 hover:text-white transition-colors p-1" aria-label="Close sidebar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
     </div>
     <p class="text-slate-400 text-xs tracking-widest uppercase ml-13 font-label">2026-2027</p>
   </div>
@@ -118,6 +332,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Dashboard</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'content_calendar' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:content_calendar' %}">
+      <span class="material-symbols-outlined">calendar_month</span>
+      <span class="text-sm tracking-wide font-headline">Content Calendar</span>
+    </a>
+
     <!-- Content -->
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'hero_slide' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:hero_slides_list' %}">
       <span class="material-symbols-outlined">view_carousel</span>
@@ -142,6 +361,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'live_feed' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:live_feeds_list' %}">
       <span class="material-symbols-outlined">live_tv</span>
       <span class="text-sm tracking-wide font-headline">Live Feeds</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'ab_test' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:ab_test_list' %}">
+      <span class="material-symbols-outlined">science</span>
+      <span class="text-sm tracking-wide font-headline">A/B Tests</span>
     </a>
 
     <!-- Services divider -->
@@ -211,9 +435,19 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     </a>
     {% endif %}
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'webhook' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:webhook_list' %}">
+      <span class="material-symbols-outlined">webhook</span>
+      <span class="text-sm tracking-wide font-headline">Webhooks</span>
+    </a>
+
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics' %}">
       <span class="material-symbols-outlined">analytics</span>
       <span class="text-sm tracking-wide font-headline">Analytics</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics_charts' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics_charts' %}">
+      <span class="material-symbols-outlined">bar_chart</span>
+      <span class="text-sm tracking-wide font-headline">Charts</span>
     </a>
 
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'rate_limiting' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:rate_limiting' %}">
@@ -226,6 +460,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Audit Log</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'activity_log' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:activity_log' %}">
+      <span class="material-symbols-outlined">manage_history</span>
+      <span class="text-sm tracking-wide font-headline">Activity Log</span>
+    </a>
+
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'translation_manager' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:translation_manager' %}">
       <span class="material-symbols-outlined">translate</span>
       <span class="text-sm tracking-wide font-headline">Translations</span>
@@ -236,10 +475,25 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Settings</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'system_health' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:system_health' %}">
+      <span class="material-symbols-outlined">monitor_heart</span>
+      <span class="text-sm tracking-wide font-headline">System Health</span>
+    </a>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'database_backup' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:database_backup' %}">
+      <span class="material-symbols-outlined">database</span>
+      <span class="text-sm tracking-wide font-headline">Database</span>
+    </a>
+
     <!-- More (collapsed) -->
     <div class="pt-6 pb-2 px-4">
       <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">More</p>
     </div>
+
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'reorder' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:reorder' %}?model=hero_slides">
+      <span class="material-symbols-outlined">reorder</span>
+      <span class="text-sm tracking-wide font-headline">Reorder Items</span>
+    </a>
 
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'hero_text' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:hero_text_list' %}">
       <span class="material-symbols-outlined">text_fields</span>
@@ -330,16 +584,124 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 </aside>
 
 <!-- Main Content -->
-<main class="ml-72 min-h-screen relative">
+<main class="main-content ml-72 min-h-screen relative">
   <!-- Top Bar -->
-  <header class="fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
-    <div class="flex items-center gap-8">
-      <h2 class="text-xl font-black text-slate-900 font-headline">Diplomatic Portal</h2>
-    </div>
-    <div class="flex items-center gap-6">
-      <button id="darkModeToggle" class="text-slate-500 hover:text-amber-600 transition-colors" onclick="document.documentElement.classList.toggle('dark');localStorage.setItem('darkMode',document.documentElement.classList.contains('dark'))">
-        <span class="material-symbols-outlined">dark_mode</span>
+  <header class="top-header fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+    <div class="flex items-center gap-4 lg:gap-8">
+      <!-- Hamburger button (mobile only) -->
+      <button id="sidebarToggle" class="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors" aria-label="Open sidebar">
+        <span class="material-symbols-outlined text-2xl">menu</span>
       </button>
+      <h2 class="header-title text-xl font-black text-slate-900 font-headline">Diplomatic Portal</h2>
+    </div>
+
+    <!-- Global Search Bar -->
+    <div id="globalSearchWrapper" class="header-search-wrapper relative flex-1 max-w-lg mx-8">
+      <form id="globalSearchForm" method="get" action="{% url 'custom_admin:global_search' %}" class="relative">
+        <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xl pointer-events-none">search</span>
+        <input
+          id="globalSearchInput"
+          type="text"
+          name="q"
+          placeholder="Search users, articles, events..."
+          autocomplete="off"
+          class="header-search-input w-full bg-slate-100 border border-slate-200 rounded-xl py-2.5 pl-11 pr-10 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 focus:bg-white focus:outline-none transition-all duration-200"
+        />
+        <kbd id="globalSearchKbd" class="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-slate-200/60 rounded border border-slate-300/50 pointer-events-none">/</kbd>
+      </form>
+
+      <!-- Dropdown Results Panel -->
+      <div id="globalSearchDropdown" class="hidden absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 max-h-[28rem] overflow-y-auto" style="scrollbar-width: thin;">
+
+        <!-- Loading State -->
+        <div id="searchLoading" class="hidden p-6 text-center">
+          <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Searching...
+          </div>
+        </div>
+
+        <!-- No Results State -->
+        <div id="searchNoResults" class="hidden p-6 text-center">
+          <span class="material-symbols-outlined text-3xl text-slate-300 mb-2">search_off</span>
+          <p class="text-sm text-slate-500">No results found</p>
+          <p class="text-xs text-slate-400 mt-1">Try different keywords</p>
+        </div>
+
+        <!-- Results Container -->
+        <div id="searchResultsContainer"></div>
+
+        <!-- View All Link -->
+        <div id="searchViewAll" class="hidden border-t border-slate-100">
+          <a id="searchViewAllLink" href="#" class="flex items-center justify-center gap-2 py-3 text-sm font-medium text-amber-600 hover:bg-amber-50 transition-colors">
+            <span>View all results</span>
+            <span class="material-symbols-outlined text-base">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-6">
+      <button id="darkModeToggle" class="text-slate-500 hover:text-amber-600 dark:text-slate-300 dark:hover:text-amber-400 transition-colors" onclick="toggleDarkMode()" title="Toggle dark mode">
+        <span class="material-symbols-outlined dark-icon-moon">dark_mode</span>
+        <span class="material-symbols-outlined dark-icon-sun">light_mode</span>
+      </button>
+
+      <!-- Image Editor Quick Access -->
+      <a href="{% url 'custom_admin:image_editor' %}" class="text-slate-500 hover:text-amber-600 transition-colors" title="Image Editor">
+        <span class="material-symbols-outlined">crop</span>
+      </a>
+
+      <!-- Notification Bell -->
+      <div id="notifBellWrapper" class="relative">
+        <button id="notifBellBtn" class="relative text-slate-500 hover:text-amber-600 transition-colors focus:outline-none" title="Admin Notifications">
+          <span class="material-symbols-outlined text-2xl">notifications</span>
+          <span id="notifBadge" class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none shadow-sm">0</span>
+        </button>
+
+        <!-- Notification Dropdown -->
+        <div id="notifDropdown" class="hidden absolute right-0 top-full mt-3 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50 transition-all duration-200 ease-out opacity-0 translate-y-1" style="scrollbar-width: thin;">
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80">
+            <h3 class="text-sm font-bold text-slate-800 font-headline">Notifications</h3>
+            <div class="flex items-center gap-3">
+              <button id="notifMarkAllRead" class="text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors">Mark all read</button>
+              <a href="{% url 'custom_admin:admin_notifications' %}" class="text-xs font-medium text-slate-500 hover:text-slate-700 transition-colors">View all</a>
+            </div>
+          </div>
+
+          <!-- Notifications List -->
+          <div id="notifList" class="max-h-[26rem] overflow-y-auto divide-y divide-slate-50">
+            <div id="notifLoading" class="p-8 text-center">
+              <div class="inline-flex items-center gap-2 text-sm text-slate-400">
+                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading...
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="notifEmpty" class="hidden p-8 text-center">
+            <span class="material-symbols-outlined text-3xl text-slate-300 mb-2">notifications_off</span>
+            <p class="text-sm text-slate-500">No notifications yet</p>
+          </div>
+
+          <!-- Footer -->
+          <div class="border-t border-slate-100">
+            <a href="{% url 'custom_admin:admin_notifications' %}" class="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors">
+              <span>See all notifications</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
       <div class="flex items-center gap-3 pl-6 border-l border-slate-200">
         <div class="text-right">
           <p class="text-xs font-bold text-slate-900">{{ user.get_full_name|default:user.username }}</p>
@@ -351,7 +713,7 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
   </header>
 
   <!-- Content Area -->
-  <section class="pt-32 px-12 pb-12 bg-surface min-h-screen">
+  <section class="content-area pt-32 px-12 pb-12 bg-surface min-h-screen">
     <!-- Django Messages -->
     {% if messages %}
     <div class="mb-8 space-y-3">
@@ -380,8 +742,20 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 {% endif %}
 
 <script>
-// Dark mode persistence
-if(localStorage.getItem('darkMode')==='true'){document.documentElement.classList.add('dark')}
+// Dark mode toggle function
+function toggleDarkMode() {
+  document.documentElement.classList.toggle('dark');
+  localStorage.setItem('admin-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+}
+
+// Migrate old darkMode key to admin-theme if needed
+(function() {
+  if (!localStorage.getItem('admin-theme') && localStorage.getItem('darkMode') === 'true') {
+    localStorage.setItem('admin-theme', 'dark');
+    document.documentElement.classList.add('dark');
+    localStorage.removeItem('darkMode');
+  }
+})();
 
 // Sidebar scroll position persistence
 (function() {
@@ -408,6 +782,70 @@ if(localStorage.getItem('darkMode')==='true'){document.documentElement.classList
       sessionStorage.setItem(STORAGE_KEY, sidebar.scrollTop);
     }, 100);
   }, { passive: true });
+})();
+
+// Mobile sidebar toggle
+(function() {
+  var sidebarToggle = document.getElementById('sidebarToggle');
+  var sidebarClose = document.getElementById('sidebarClose');
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
+
+  function openSidebar() {
+    if (!sidebar || !overlay) return;
+    sidebar.classList.add('open');
+    overlay.classList.remove('hidden');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    if (!sidebar || !overlay) return;
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+    // Wait for transition before hiding
+    setTimeout(function() {
+      if (!sidebar.classList.contains('open')) {
+        overlay.classList.add('hidden');
+      }
+    }, 300);
+    document.body.style.overflow = '';
+  }
+
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', openSidebar);
+  }
+
+  if (sidebarClose) {
+    sidebarClose.addEventListener('click', closeSidebar);
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', closeSidebar);
+  }
+
+  // Close sidebar when a nav link is clicked (mobile)
+  if (sidebar) {
+    sidebar.querySelectorAll('nav a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        if (window.innerWidth < 1024) {
+          closeSidebar();
+        }
+      });
+    });
+  }
+
+  // Close sidebar on resize to desktop
+  window.addEventListener('resize', function() {
+    if (window.innerWidth >= 1024 && sidebar) {
+      sidebar.classList.remove('open');
+      if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('active');
+      }
+      document.body.style.overflow = '';
+    }
+  });
 })();
 </script>
 
@@ -492,6 +930,450 @@ if(localStorage.getItem('darkMode')==='true'){document.documentElement.classList
 
   // Check every 10 seconds
   setInterval(checkSession, 10000);
+})();
+</script>
+{% endif %}
+
+{% if user.is_authenticated %}
+<!-- Global Search Script -->
+<script>
+(function() {
+  const input = document.getElementById('globalSearchInput');
+  const form = document.getElementById('globalSearchForm');
+  const dropdown = document.getElementById('globalSearchDropdown');
+  const loading = document.getElementById('searchLoading');
+  const noResults = document.getElementById('searchNoResults');
+  const container = document.getElementById('searchResultsContainer');
+  const viewAll = document.getElementById('searchViewAll');
+  const viewAllLink = document.getElementById('searchViewAllLink');
+  const wrapper = document.getElementById('globalSearchWrapper');
+
+  if (!input || !dropdown) return;
+
+  let debounceTimer = null;
+  let activeIndex = -1;
+  let currentItems = [];
+  let abortController = null;
+
+  // Category icon colors
+  const categoryColors = {
+    'Users': 'bg-blue-100 text-blue-600',
+    'Articles': 'bg-amber-100 text-amber-600',
+    'Events': 'bg-purple-100 text-purple-600',
+    'Magazines': 'bg-emerald-100 text-emerald-600',
+    'Support Tickets': 'bg-red-100 text-red-600',
+    'Videos': 'bg-indigo-100 text-indigo-600',
+  };
+
+  function showDropdown() {
+    dropdown.classList.remove('hidden');
+  }
+
+  function hideDropdown() {
+    dropdown.classList.add('hidden');
+    activeIndex = -1;
+    clearHighlight();
+  }
+
+  function showLoading() {
+    loading.classList.remove('hidden');
+    noResults.classList.add('hidden');
+    container.innerHTML = '';
+    viewAll.classList.add('hidden');
+    showDropdown();
+  }
+
+  function showNoResults() {
+    loading.classList.add('hidden');
+    noResults.classList.remove('hidden');
+    container.innerHTML = '';
+    viewAll.classList.add('hidden');
+  }
+
+  function clearHighlight() {
+    document.querySelectorAll('.search-result-item').forEach(function(el) {
+      el.classList.remove('bg-amber-50');
+    });
+  }
+
+  function highlightItem(index) {
+    clearHighlight();
+    const items = document.querySelectorAll('.search-result-item');
+    if (index >= 0 && index < items.length) {
+      items[index].classList.add('bg-amber-50');
+      items[index].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function renderResults(data) {
+    loading.classList.add('hidden');
+    noResults.classList.add('hidden');
+    container.innerHTML = '';
+    currentItems = [];
+
+    if (!data.results || data.results.length === 0) {
+      showNoResults();
+      return;
+    }
+
+    data.results.forEach(function(category) {
+      // Category header
+      var header = document.createElement('div');
+      header.className = 'px-4 py-2 bg-slate-50 border-b border-slate-100';
+      header.innerHTML = '<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">' + escapeHtml(category.category) + '</p>';
+      container.appendChild(header);
+
+      // Items
+      category.items.forEach(function(item) {
+        currentItems.push(item);
+        var colorClass = categoryColors[category.category] || 'bg-slate-100 text-slate-600';
+
+        var link = document.createElement('a');
+        link.href = item.url;
+        link.className = 'search-result-item flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50 transition-colors duration-150 cursor-pointer border-b border-slate-50';
+        link.innerHTML =
+          '<div class="w-8 h-8 rounded-lg ' + colorClass + ' flex items-center justify-center flex-shrink-0">' +
+            '<span class="material-symbols-outlined text-base">' + escapeHtml(item.icon) + '</span>' +
+          '</div>' +
+          '<div class="flex-1 min-w-0">' +
+            '<p class="text-sm font-medium text-slate-800 truncate">' + escapeHtml(item.title) + '</p>' +
+            '<p class="text-xs text-slate-400 truncate">' + escapeHtml(item.subtitle) + '</p>' +
+          '</div>' +
+          '<span class="material-symbols-outlined text-slate-300 text-base flex-shrink-0">arrow_forward</span>';
+        container.appendChild(link);
+      });
+    });
+
+    // Show "View all results" link
+    var query = input.value.trim();
+    viewAllLink.href = '{% url "custom_admin:global_search" %}?q=' + encodeURIComponent(query);
+    viewAll.classList.remove('hidden');
+
+    showDropdown();
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  function doSearch(query) {
+    if (abortController) {
+      abortController.abort();
+    }
+    abortController = new AbortController();
+
+    showLoading();
+
+    fetch('{% url "custom_admin:global_search_api" %}?q=' + encodeURIComponent(query), {
+      credentials: 'same-origin',
+      signal: abortController.signal,
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) { renderResults(data); })
+    .catch(function(err) {
+      if (err.name !== 'AbortError') {
+        loading.classList.add('hidden');
+        noResults.classList.remove('hidden');
+      }
+    });
+  }
+
+  // Input event with 300ms debounce
+  input.addEventListener('input', function() {
+    var query = input.value.trim();
+    clearTimeout(debounceTimer);
+    activeIndex = -1;
+
+    if (query.length < 2) {
+      hideDropdown();
+      return;
+    }
+
+    debounceTimer = setTimeout(function() {
+      doSearch(query);
+    }, 300);
+  });
+
+  // Focus shows dropdown if there are results
+  input.addEventListener('focus', function() {
+    if (input.value.trim().length >= 2 && container.innerHTML) {
+      showDropdown();
+    }
+  });
+
+  // Keyboard navigation
+  input.addEventListener('keydown', function(e) {
+    var items = document.querySelectorAll('.search-result-item');
+    if (!items.length) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIndex = Math.min(activeIndex + 1, items.length - 1);
+      highlightItem(activeIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIndex = Math.max(activeIndex - 1, 0);
+      highlightItem(activeIndex);
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      items[activeIndex].click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      hideDropdown();
+      input.blur();
+    }
+  });
+
+  // Click outside to close
+  document.addEventListener('click', function(e) {
+    if (!wrapper.contains(e.target)) {
+      hideDropdown();
+    }
+  });
+
+  // "/" keyboard shortcut to focus search
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+      e.preventDefault();
+      input.focus();
+      input.select();
+    }
+  });
+
+  // Form submit goes to full results page
+  form.addEventListener('submit', function(e) {
+    var query = input.value.trim();
+    if (query.length < 2) {
+      e.preventDefault();
+      return;
+    }
+    hideDropdown();
+  });
+})();
+</script>
+{% endif %}
+
+{% if user.is_authenticated %}
+<!-- Admin Notification Bell Script -->
+<script>
+(function() {
+  const bellBtn = document.getElementById('notifBellBtn');
+  const dropdown = document.getElementById('notifDropdown');
+  const badge = document.getElementById('notifBadge');
+  const notifList = document.getElementById('notifList');
+  const notifLoading = document.getElementById('notifLoading');
+  const notifEmpty = document.getElementById('notifEmpty');
+  const markAllBtn = document.getElementById('notifMarkAllRead');
+  const wrapper = document.getElementById('notifBellWrapper');
+
+  if (!bellBtn || !dropdown) return;
+
+  let isOpen = false;
+
+  // Icon mapping for notification types
+  const typeIcons = {
+    'new_ticket': 'support_agent',
+    'new_verification': 'verified',
+    'new_user': 'person_add',
+    'ticket_reply': 'reply',
+    'system_alert': 'warning',
+    'content_flagged': 'flag',
+  };
+
+  const typeColors = {
+    'new_ticket': 'bg-blue-100 text-blue-600',
+    'new_verification': 'bg-purple-100 text-purple-600',
+    'new_user': 'bg-emerald-100 text-emerald-600',
+    'ticket_reply': 'bg-amber-100 text-amber-600',
+    'system_alert': 'bg-red-100 text-red-600',
+    'content_flagged': 'bg-orange-100 text-orange-600',
+  };
+
+  function toggleDropdown() {
+    if (isOpen) {
+      closeDropdown();
+    } else {
+      openDropdown();
+    }
+  }
+
+  function openDropdown() {
+    dropdown.classList.remove('hidden');
+    // Trigger transition
+    requestAnimationFrame(function() {
+      dropdown.classList.remove('opacity-0', 'translate-y-1');
+      dropdown.classList.add('opacity-100', 'translate-y-0');
+    });
+    isOpen = true;
+    fetchNotifications();
+  }
+
+  function closeDropdown() {
+    dropdown.classList.add('opacity-0', 'translate-y-1');
+    dropdown.classList.remove('opacity-100', 'translate-y-0');
+    setTimeout(function() {
+      dropdown.classList.add('hidden');
+    }, 200);
+    isOpen = false;
+  }
+
+  function fetchNotifications() {
+    notifLoading.classList.remove('hidden');
+    notifEmpty.classList.add('hidden');
+
+    fetch('{% url "custom_admin:admin_notifications_api" %}', {
+      credentials: 'same-origin',
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      updateBadge(data.unread_count);
+      renderNotifications(data.notifications);
+    })
+    .catch(function() {
+      notifLoading.classList.add('hidden');
+    });
+  }
+
+  function updateBadge(count) {
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  function renderNotifications(notifications) {
+    notifLoading.classList.add('hidden');
+    notifList.innerHTML = '';
+
+    if (!notifications || notifications.length === 0) {
+      notifEmpty.classList.remove('hidden');
+      return;
+    }
+
+    notifEmpty.classList.add('hidden');
+
+    notifications.slice(0, 10).forEach(function(n) {
+      var iconName = typeIcons[n.notification_type] || n.icon || 'notifications';
+      var colorClass = typeColors[n.notification_type] || 'bg-slate-100 text-slate-600';
+
+      var item = document.createElement('div');
+      item.className = 'flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer ' + (n.is_read ? 'opacity-60' : '');
+      item.setAttribute('data-notif-id', n.id);
+
+      item.innerHTML =
+        '<div class="w-9 h-9 rounded-lg ' + colorClass + ' flex items-center justify-center flex-shrink-0 mt-0.5">' +
+          '<span class="material-symbols-outlined text-lg">' + escapeHtml(iconName) + '</span>' +
+        '</div>' +
+        '<div class="flex-1 min-w-0">' +
+          '<p class="text-sm font-medium text-slate-800 leading-snug">' + escapeHtml(n.title) + '</p>' +
+          '<p class="text-xs text-slate-500 mt-0.5 truncate">' + escapeHtml(n.message) + '</p>' +
+          '<p class="text-[10px] text-slate-400 mt-1">' + escapeHtml(n.time_ago) + '</p>' +
+        '</div>' +
+        (!n.is_read ? '<div class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0 mt-2"></div>' : '');
+
+      // Click to mark as read (dismiss)
+      item.addEventListener('click', function() {
+        markRead([n.id]);
+        item.classList.add('opacity-60');
+        var dot = item.querySelector('.bg-amber-500');
+        if (dot) dot.remove();
+        if (n.link) {
+          window.location.href = n.link;
+        }
+      });
+
+      notifList.appendChild(item);
+    });
+  }
+
+  function markRead(ids) {
+    fetch('{% url "custom_admin:admin_notification_mark_read" %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ ids: ids }),
+    })
+    .then(function() {
+      // Refresh badge count
+      fetchBadgeOnly();
+    });
+  }
+
+  function markAllRead() {
+    fetch('{% url "custom_admin:admin_notification_mark_read" %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ all: true }),
+    })
+    .then(function() {
+      updateBadge(0);
+      // Mark all items in dropdown as read
+      document.querySelectorAll('[data-notif-id]').forEach(function(el) {
+        el.classList.add('opacity-60');
+        var dot = el.querySelector('.bg-amber-500');
+        if (dot) dot.remove();
+      });
+    });
+  }
+
+  function fetchBadgeOnly() {
+    fetch('{% url "custom_admin:admin_notifications_api" %}', {
+      credentials: 'same-origin',
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      updateBadge(data.unread_count);
+    })
+    .catch(function() {});
+  }
+
+  function getCsrfToken() {
+    var cookie = document.cookie.split(';').find(function(c) { return c.trim().startsWith('csrftoken='); });
+    return cookie ? cookie.split('=')[1] : '';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // Event listeners
+  bellBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleDropdown();
+  });
+
+  markAllBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    markAllRead();
+  });
+
+  // Click outside to close
+  document.addEventListener('click', function(e) {
+    if (isOpen && !wrapper.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+
+  // Poll every 30 seconds for new notifications
+  fetchBadgeOnly();
+  setInterval(fetchBadgeOnly, 30000);
 })();
 </script>
 {% endif %}

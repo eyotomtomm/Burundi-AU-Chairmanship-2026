@@ -2,128 +2,232 @@
 
 {% block title %}Edit Email Template - AU Chairmanship Admin{% endblock %}
 
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+<style>
+  /* Line numbers for textarea */
+  .editor-wrapper {
+    position: relative;
+    display: flex;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .line-numbers {
+    padding: 12px 8px 12px 12px;
+    background: #1e293b;
+    color: #64748b;
+    text-align: right;
+    user-select: none;
+    overflow: hidden;
+    min-width: 40px;
+    border-radius: 8px 0 0 8px;
+  }
+  .line-numbers span {
+    display: block;
+  }
+  .code-textarea {
+    flex: 1;
+    padding: 12px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    border: none;
+    outline: none;
+    resize: vertical;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 0 8px 8px 0;
+    tab-size: 2;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+  }
+  .code-textarea::placeholder {
+    color: #475569;
+  }
+  .code-textarea:focus {
+    box-shadow: inset 0 0 0 2px rgba(234, 179, 8, 0.3);
+  }
+  /* Preview iframe styles */
+  .preview-mobile { width: 375px; margin: 0 auto; }
+  .preview-desktop { width: 100%; }
+  /* Send test email modal */
+  .modal-backdrop { background: rgba(0,0,0,0.5); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-5xl mx-auto">
+<div class="max-w-[90rem] mx-auto">
   <div class="flex items-center gap-4 mb-8">
     <a href="{% url 'custom_admin:email_templates_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
       <span class="material-symbols-outlined text-slate-600">arrow_back</span>
     </a>
     <div>
       <h1 class="text-3xl font-bold text-slate-900 font-headline">Edit Email Template</h1>
-      <p class="text-sm text-slate-500 mt-1">{{ template.get_key_display }} ({{ template.key }})</p>
+      <p class="text-sm text-slate-500 mt-1">{{ template.get_key_display }} <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded ml-1">{{ template.key }}</span></p>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Form Column -->
-    <div class="lg:col-span-2">
+  <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+    <!-- Form Column (left) -->
+    <div class="xl:col-span-7">
       <form method="post" class="space-y-6" id="emailTemplateForm">
         {% csrf_token %}
         <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+          <!-- Subject fields -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subject (EN)</label>
-              <input type="text" name="subject" value="{{ template.subject }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent">
+              <input type="text" name="subject" value="{{ template.subject }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
             </div>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subject (FR)</label>
-              <input type="text" name="subject_fr" value="{{ template.subject_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent">
+              <input type="text" name="subject_fr" value="{{ template.subject_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
             </div>
           </div>
+
+          <!-- Body HTML (EN) with line numbers -->
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <label class="block text-sm font-semibold text-slate-700">Body HTML (EN)</label>
-              <button type="button" onclick="updatePreview()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">visibility</span>
-                Update Preview
-              </button>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider">Lines: <span id="lineCountEn">0</span></span>
+                <button type="button" onclick="updateServerPreview()" class="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1 ml-3">
+                  <span class="material-symbols-outlined text-sm">visibility</span>
+                  Server Preview
+                </button>
+              </div>
             </div>
-            <textarea name="body_html" id="bodyHtmlEn" rows="12" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-transparent" oninput="updatePreview()">{{ template.body_html }}</textarea>
+            <div class="editor-wrapper rounded-lg overflow-hidden shadow-inner border border-slate-700">
+              <div class="line-numbers" id="lineNumbersEn"></div>
+              <textarea name="body_html" id="bodyHtmlEn" rows="18" class="code-textarea" oninput="updateLineNumbers('En'); updatePreview()" onscroll="syncScroll('En')" placeholder="<html>&#10;  <body>&#10;    <h1>Hello {{ user_name }}</h1>&#10;  </body>&#10;</html>">{{ template.body_html }}</textarea>
+            </div>
           </div>
+
+          <!-- Body HTML (FR) with line numbers -->
           <div>
-            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Body HTML (FR)</label>
-            <textarea name="body_html_fr" id="bodyHtmlFr" rows="12" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-transparent">{{ template.body_html_fr|default:'' }}</textarea>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-sm font-semibold text-slate-700">Body HTML (FR)</label>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider">Lines: <span id="lineCountFr">0</span></span>
+            </div>
+            <div class="editor-wrapper rounded-lg overflow-hidden shadow-inner border border-slate-700">
+              <div class="line-numbers" id="lineNumbersFr"></div>
+              <textarea name="body_html_fr" id="bodyHtmlFr" rows="18" class="code-textarea" oninput="updateLineNumbers('Fr'); updatePreview()" onscroll="syncScroll('Fr')" placeholder="<html>&#10;  <body>&#10;    <h1>Bonjour {{ user_name }}</h1>&#10;  </body>&#10;</html>">{{ template.body_html_fr|default:'' }}</textarea>
+            </div>
           </div>
+
           <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="is_active" {% if template.is_active %}checked{% endif %} class="rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+            <input type="checkbox" name="is_active" {% if template.is_active %}checked{% endif %} class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
             <span class="text-sm text-slate-700">Active</span>
           </label>
         </div>
-        <div class="flex gap-3">
+
+        <!-- Action buttons -->
+        <div class="flex flex-wrap gap-3">
           <a href="{% url 'custom_admin:email_templates_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
-          <button type="submit" class="bg-rose-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-rose-700 transition-all shadow-sm">Save Template</button>
-          <button type="button" onclick="sendTestEmail()" class="bg-white border border-blue-300 text-blue-600 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-blue-50 transition-all flex items-center gap-2">
+          <button type="submit" class="bg-amber-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-amber-700 transition-all shadow-sm">Save Template</button>
+          <button type="button" onclick="openSendTestModal()" class="bg-white border border-blue-300 text-blue-600 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-blue-50 transition-all flex items-center gap-2">
             <span class="material-symbols-outlined text-sm">send</span>
-            Send Test
+            Send Test Email
           </button>
         </div>
       </form>
     </div>
 
-    <!-- Sidebar: Variables & Preview -->
-    <div class="space-y-6">
+    <!-- Sidebar: Variables & Preview (right) -->
+    <div class="xl:col-span-5 space-y-6">
       <!-- Available Variables -->
       <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
         <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <span class="material-symbols-outlined text-sm text-rose-500">code</span>
-          Template Variables
+          <span class="material-symbols-outlined text-sm text-amber-500">code</span>
+          Available Variables
         </h3>
-        <div class="space-y-2">
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('user_name')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} user_name {% templatetag closevariable %}</code>
+        <p class="text-[10px] text-slate-400 mb-3">Click a variable to insert it at cursor position in the active editor</p>
+        <div class="grid grid-cols-1 gap-1.5">
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('username')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} username {% templatetag closevariable %}</code>
             <span class="text-[10px] text-slate-500">User's full name</span>
           </div>
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('user_email')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} user_email {% templatetag closevariable %}</code>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('user_name')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} user_name {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">User's display name</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('user_email')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} user_email {% templatetag closevariable %}</code>
             <span class="text-[10px] text-slate-500">User's email</span>
           </div>
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('app_name')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} app_name {% templatetag closevariable %}</code>
-            <span class="text-[10px] text-slate-500">App name</span>
-          </div>
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('action_url')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} action_url {% templatetag closevariable %}</code>
-            <span class="text-[10px] text-slate-500">Call-to-action link</span>
-          </div>
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('otp_code')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} otp_code {% templatetag closevariable %}</code>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('otp_code')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} otp_code {% templatetag closevariable %}</code>
             <span class="text-[10px] text-slate-500">OTP verification code</span>
           </div>
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('event_name')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} event_name {% templatetag closevariable %}</code>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('expiry_minutes')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} expiry_minutes {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Code expiry minutes</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('app_name')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} app_name {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">App name</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('badge_type')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} badge_type {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Verification badge type</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('event_name')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} event_name {% templatetag closevariable %}</code>
             <span class="text-[10px] text-slate-500">Event title</span>
           </div>
-          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('event_date')">
-            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} event_date {% templatetag closevariable %}</code>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('event_date')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} event_date {% templatetag closevariable %}</code>
             <span class="text-[10px] text-slate-500">Event date</span>
           </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('ticket_number')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} ticket_number {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Support ticket number</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('reset_link')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} reset_link {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Password reset link</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-amber-50 hover:border-amber-200 border border-transparent transition-colors" onclick="insertVariable('action_url')">
+            <code class="text-xs text-amber-700 font-mono font-bold">{% templatetag openvariable %} action_url {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Call-to-action link</span>
+          </div>
         </div>
-        <p class="text-[10px] text-slate-400 mt-3">Click a variable to insert it at cursor position</p>
       </div>
 
       <!-- Live Preview -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden sticky top-24">
         <div class="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
             <span class="material-symbols-outlined text-sm text-blue-500">preview</span>
             Live Preview
           </h3>
-          <div class="flex gap-1">
-            <button type="button" onclick="switchPreviewLang('en')" class="px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700" id="previewLangEn">EN</button>
-            <button type="button" onclick="switchPreviewLang('fr')" class="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-500" id="previewLangFr">FR</button>
+          <div class="flex gap-1.5">
+            <button type="button" onclick="switchPreviewLang('en')" class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors" id="previewLangEn" style="background: #dbeafe; color: #1d4ed8;">EN</button>
+            <button type="button" onclick="switchPreviewLang('fr')" class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors bg-slate-100 text-slate-500" id="previewLangFr">FR</button>
+            <div class="w-px bg-slate-200 mx-1"></div>
+            <button type="button" onclick="switchPreviewMode('html')" class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors" id="previewModeHtml" style="background: #dbeafe; color: #1d4ed8;">HTML</button>
+            <button type="button" onclick="switchPreviewMode('text')" class="px-2.5 py-1 text-[10px] font-bold rounded-lg transition-colors bg-slate-100 text-slate-500" id="previewModeText">Text</button>
+            <div class="w-px bg-slate-200 mx-1"></div>
+            <button type="button" onclick="toggleMobilePreview()" class="px-2 py-1 text-[10px] font-bold rounded-lg transition-colors bg-slate-100 text-slate-500 flex items-center gap-1" id="mobileToggleBtn" title="Toggle mobile width">
+              <span class="material-symbols-outlined text-xs">smartphone</span>
+            </button>
           </div>
         </div>
-        <div class="p-4 bg-slate-50">
-          <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-            <!-- Email header preview -->
-            <div class="bg-gradient-to-r from-green-700 to-green-600 p-4 text-center">
-              <p class="text-white font-bold text-sm">Burundi AU Chairmanship 2026</p>
-            </div>
-            <div class="p-4" id="emailPreviewBody">
-              <p class="text-sm text-slate-400 italic">Type in the Body HTML field to see preview...</p>
-            </div>
-            <div class="bg-slate-50 p-3 text-center border-t border-slate-200">
-              <p class="text-[10px] text-slate-400">&copy; 2026 Burundi AU Chairmanship</p>
+        <div class="p-4 bg-slate-50" id="previewContainer">
+          <div class="transition-all duration-300" id="previewFrame">
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+              <!-- Email header preview -->
+              <div class="bg-gradient-to-r from-green-800 to-green-700 p-4 text-center">
+                <p class="text-white font-bold text-sm">Burundi AU Chairmanship 2026</p>
+              </div>
+              <div class="p-4" id="emailPreviewBody" style="max-height: 500px; overflow-y: auto;">
+                <p class="text-sm text-slate-400 italic">Type in the Body HTML field to see preview...</p>
+              </div>
+              <div class="bg-slate-50 p-3 text-center border-t border-slate-200">
+                <p class="text-[10px] text-slate-400">&copy; 2026 Burundi AU Chairmanship</p>
+              </div>
             </div>
           </div>
         </div>
@@ -131,95 +235,296 @@
     </div>
   </div>
 </div>
+
+<!-- Send Test Email Modal -->
+<div id="sendTestModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center modal-backdrop">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-blue-500">send</span>
+        Send Test Email
+      </h3>
+      <button onclick="closeSendTestModal()" class="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+        <span class="material-symbols-outlined text-slate-400">close</span>
+      </button>
+    </div>
+    <p class="text-sm text-slate-600 mb-4">Send a preview of this template with sample data to the specified email address.</p>
+    <div class="mb-4">
+      <label class="block text-sm font-semibold text-slate-700 mb-1.5">Recipient Email</label>
+      <input type="email" id="testEmailRecipient" value="{{ request.user.email }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="test@example.com">
+    </div>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeSendTestModal()" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50">Cancel</button>
+      <button onclick="sendTestEmail()" id="sendTestBtn" class="bg-blue-600 text-white font-semibold rounded-lg py-2.5 px-6 text-sm hover:bg-blue-700 transition-all flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">send</span>
+        Send Test
+      </button>
+    </div>
+    <div id="sendTestResult" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"></script>
 <script>
-// Sample data for preview
-const sampleData = {
-  user_name: 'Jean Pierre',
-  user_email: 'jean@example.com',
+// ═══════════════════════════════════════════════════════════
+//  SAMPLE DATA & STATE
+// ═══════════════════════════════════════════════════════════
+
+var sampleData = {
+  username: 'John Doe',
+  user_name: 'John Doe',
+  user_email: 'john@example.com',
+  otp_code: '123456',
+  expiry_minutes: '10',
   app_name: 'Burundi AU Chairmanship',
-  action_url: 'https://burundi4africa.com',
-  otp_code: '847291',
+  badge_type: 'Gold',
   event_name: 'AU Summit 2026',
-  event_date: 'January 15, 2026',
+  event_date: 'April 15, 2026',
+  ticket_number: 'TK-001',
+  reset_link: 'https://burundi4africa.com/reset',
+  action_url: 'https://burundi4africa.com',
 };
 
-let previewLang = 'en';
+var previewLang = 'en';
+var previewMode = 'html';
+var isMobilePreview = false;
+
+// ═══════════════════════════════════════════════════════════
+//  LINE NUMBERS
+// ═══════════════════════════════════════════════════════════
+
+function updateLineNumbers(lang) {
+  var textarea = document.getElementById('bodyHtml' + lang);
+  var lineNumbersEl = document.getElementById('lineNumbers' + lang);
+  var lineCountEl = document.getElementById('lineCount' + lang);
+  if (!textarea || !lineNumbersEl) return;
+
+  var lines = textarea.value.split('\n');
+  var count = lines.length;
+  var html = '';
+  for (var i = 1; i <= count; i++) {
+    html += '<span>' + i + '</span>';
+  }
+  lineNumbersEl.innerHTML = html;
+  if (lineCountEl) lineCountEl.textContent = count;
+}
+
+function syncScroll(lang) {
+  var textarea = document.getElementById('bodyHtml' + lang);
+  var lineNumbersEl = document.getElementById('lineNumbers' + lang);
+  if (textarea && lineNumbersEl) {
+    lineNumbersEl.scrollTop = textarea.scrollTop;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LIVE PREVIEW (client-side)
+// ═══════════════════════════════════════════════════════════
 
 function updatePreview() {
-  const textarea = previewLang === 'en'
+  var textarea = previewLang === 'en'
     ? document.getElementById('bodyHtmlEn')
     : document.getElementById('bodyHtmlFr');
-  let html = textarea.value || '';
+  var html = textarea ? textarea.value : '';
 
-  // Replace template variables with sample data
-  Object.keys(sampleData).forEach(function(key) {
-    // Handle both {{ var }} and {{var}} formats
-    const patterns = [
-      new RegExp('\\{\\{\\s*' + key + '\\s*\\}\\}', 'g'),
-    ];
-    patterns.forEach(function(re) {
-      html = html.replace(re, '<span class="bg-yellow-100 text-yellow-800 px-1 rounded font-semibold">' + sampleData[key] + '</span>');
+  if (previewMode === 'text') {
+    // Show as plain text
+    var temp = document.createElement('div');
+    temp.innerHTML = html;
+    var plainText = temp.textContent || temp.innerText || '';
+    // Replace variables in plain text
+    Object.keys(sampleData).forEach(function(key) {
+      var re = new RegExp('\\{\\{\\s*' + key + '\\s*\\}\\}', 'g');
+      plainText = plainText.replace(re, sampleData[key]);
     });
+    document.getElementById('emailPreviewBody').innerHTML = '<pre style="white-space: pre-wrap; font-size: 13px; color: #334155; font-family: monospace;">' + escapeHtml(plainText) + '</pre>';
+    return;
+  }
+
+  // HTML preview - replace template variables with highlighted sample data
+  Object.keys(sampleData).forEach(function(key) {
+    var re = new RegExp('\\{\\{\\s*' + key + '\\s*\\}\\}', 'g');
+    html = html.replace(re, '<span style="background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:3px;font-weight:600;">' + sampleData[key] + '</span>');
   });
 
   document.getElementById('emailPreviewBody').innerHTML = html || '<p class="text-sm text-slate-400 italic">Type in the Body HTML field to see preview...</p>';
 }
 
-function switchPreviewLang(lang) {
-  previewLang = lang;
-  document.getElementById('previewLangEn').className = lang === 'en'
-    ? 'px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700'
-    : 'px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-500';
-  document.getElementById('previewLangFr').className = lang === 'fr'
-    ? 'px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700'
-    : 'px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-500';
-  updatePreview();
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(text));
+  return div.innerHTML;
 }
 
-function insertVariable(name) {
-  const textarea = document.getElementById(previewLang === 'en' ? 'bodyHtmlEn' : 'bodyHtmlFr');
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const text = textarea.value;
-  const variable = '{{ ' + name + ' }}';
-  textarea.value = text.substring(0, start) + variable + text.substring(end);
-  textarea.selectionStart = textarea.selectionEnd = start + variable.length;
-  textarea.focus();
-  updatePreview();
-}
+// ═══════════════════════════════════════════════════════════
+//  SERVER-SIDE PREVIEW (via AJAX)
+// ═══════════════════════════════════════════════════════════
 
-function sendTestEmail() {
-  const email = prompt('Send test email to:', '{{ request.user.email }}');
-  if (!email) return;
+function updateServerPreview() {
+  var textarea = document.getElementById('bodyHtmlEn');
+  var formData = new FormData();
+  formData.append('body_html', textarea.value);
+  formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
 
-  const form = document.getElementById('emailTemplateForm');
-  const formData = new FormData(form);
-  formData.append('send_test', '1');
-  formData.append('test_email', email);
-
-  fetch(window.location.href, {
+  fetch('{% url "custom_admin:email_template_preview" template.pk %}', {
     method: 'POST',
     body: formData,
     credentials: 'same-origin',
   })
   .then(function(resp) { return resp.json(); })
   .then(function(data) {
-    if (data.success) {
-      alert('Test email sent to ' + email);
-    } else {
-      alert('Failed: ' + (data.error || 'Unknown error'));
+    if (data.html) {
+      document.getElementById('emailPreviewBody').innerHTML = data.html;
     }
   })
-  .catch(function() {
-    alert('Test email request sent. Check your inbox.');
-    window.location.reload();
+  .catch(function(err) {
+    console.error('Preview error:', err);
   });
 }
 
-// Initial preview
-document.addEventListener('DOMContentLoaded', updatePreview);
+// ═══════════════════════════════════════════════════════════
+//  PREVIEW CONTROLS
+// ═══════════════════════════════════════════════════════════
+
+function switchPreviewLang(lang) {
+  previewLang = lang;
+  document.getElementById('previewLangEn').style.background = lang === 'en' ? '#dbeafe' : '#f1f5f9';
+  document.getElementById('previewLangEn').style.color = lang === 'en' ? '#1d4ed8' : '#64748b';
+  document.getElementById('previewLangFr').style.background = lang === 'fr' ? '#dbeafe' : '#f1f5f9';
+  document.getElementById('previewLangFr').style.color = lang === 'fr' ? '#1d4ed8' : '#64748b';
+  updatePreview();
+}
+
+function switchPreviewMode(mode) {
+  previewMode = mode;
+  document.getElementById('previewModeHtml').style.background = mode === 'html' ? '#dbeafe' : '#f1f5f9';
+  document.getElementById('previewModeHtml').style.color = mode === 'html' ? '#1d4ed8' : '#64748b';
+  document.getElementById('previewModeText').style.background = mode === 'text' ? '#dbeafe' : '#f1f5f9';
+  document.getElementById('previewModeText').style.color = mode === 'text' ? '#1d4ed8' : '#64748b';
+  updatePreview();
+}
+
+function toggleMobilePreview() {
+  isMobilePreview = !isMobilePreview;
+  var frame = document.getElementById('previewFrame');
+  var btn = document.getElementById('mobileToggleBtn');
+  if (isMobilePreview) {
+    frame.style.maxWidth = '375px';
+    frame.style.margin = '0 auto';
+    btn.style.background = '#dbeafe';
+    btn.style.color = '#1d4ed8';
+  } else {
+    frame.style.maxWidth = '';
+    frame.style.margin = '';
+    btn.style.background = '#f1f5f9';
+    btn.style.color = '#64748b';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INSERT VARIABLE AT CURSOR
+// ═══════════════════════════════════════════════════════════
+
+function insertVariable(name) {
+  var textarea = document.getElementById(previewLang === 'en' ? 'bodyHtmlEn' : 'bodyHtmlFr');
+  if (!textarea) return;
+  var start = textarea.selectionStart;
+  var end = textarea.selectionEnd;
+  var text = textarea.value;
+  var variable = '{{ ' + name + ' }}';
+  textarea.value = text.substring(0, start) + variable + text.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+  textarea.focus();
+  var lang = previewLang === 'en' ? 'En' : 'Fr';
+  updateLineNumbers(lang);
+  updatePreview();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SEND TEST EMAIL
+// ═══════════════════════════════════════════════════════════
+
+function openSendTestModal() {
+  document.getElementById('sendTestModal').classList.remove('hidden');
+  document.getElementById('sendTestResult').classList.add('hidden');
+}
+
+function closeSendTestModal() {
+  document.getElementById('sendTestModal').classList.add('hidden');
+}
+
+function sendTestEmail() {
+  var email = document.getElementById('testEmailRecipient').value.trim();
+  if (!email) {
+    showSendTestResult('Please enter an email address.', false);
+    return;
+  }
+
+  var btn = document.getElementById('sendTestBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div> Sending...';
+
+  var formData = new FormData();
+  formData.append('recipient_email', email);
+  formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+  fetch('{% url "custom_admin:email_template_send_test" template.pk %}', {
+    method: 'POST',
+    body: formData,
+    credentials: 'same-origin',
+  })
+  .then(function(resp) { return resp.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm">send</span> Send Test';
+    if (data.success) {
+      showSendTestResult('Test email sent successfully to ' + email, true);
+    } else {
+      showSendTestResult('Failed: ' + (data.error || 'Unknown error'), false);
+    }
+  })
+  .catch(function(err) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-sm">send</span> Send Test';
+    showSendTestResult('Network error. Please try again.', false);
+  });
+}
+
+function showSendTestResult(message, success) {
+  var el = document.getElementById('sendTestResult');
+  el.classList.remove('hidden');
+  el.className = 'mt-4 p-3 rounded-lg text-sm ' + (success ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200');
+  el.textContent = message;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INITIALIZE
+// ═══════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+  updateLineNumbers('En');
+  updateLineNumbers('Fr');
+  updatePreview();
+
+  // Tab key inserts spaces in textareas
+  ['bodyHtmlEn', 'bodyHtmlFr'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        var start = this.selectionStart;
+        var end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 2;
+        var lang = id.endsWith('En') ? 'En' : 'Fr';
+        updateLineNumbers(lang);
+      }
+    });
+  });
+});
 </script>
 {% endblock %}

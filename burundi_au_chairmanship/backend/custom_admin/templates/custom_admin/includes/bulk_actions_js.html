@@ -1,0 +1,295 @@
+{% comment %}
+Reusable Bulk Actions JavaScript
+Include at the bottom of any list page that uses bulk actions.
+Required template variables:
+  - bulk_model: string identifier e.g. "user", "article", "event", "ticket"
+  - bulk_checkbox_class: CSS class for row checkboxes e.g. "bulk-user-cb"
+
+Usage:
+  {% include 'custom_admin/includes/bulk_actions_js.html' with bulk_model='user' bulk_checkbox_class='bulk-user-cb' %}
+{% endcomment %}
+
+<script>
+(function() {
+    const MODEL = '{{ bulk_model }}';
+    const CB_CLASS = '{{ bulk_checkbox_class }}';
+    const CSRF = document.querySelector('meta[name="csrf-token"]')?.content
+                 || document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                 || '{{ csrf_token }}';
+    const BULK_URL = '{% url "custom_admin:bulk_action" %}';
+    let pendingAction = null;
+
+    // ── Checkbox Handling ───────────────────────────────────────
+    function getCheckboxes() {
+        return document.querySelectorAll('.' + CB_CLASS);
+    }
+
+    function getCheckedIds() {
+        var ids = [];
+        getCheckboxes().forEach(function(cb) {
+            if (cb.checked) ids.push(cb.value);
+        });
+        return ids;
+    }
+
+    function updateBar() {
+        var ids = getCheckedIds();
+        var bar = document.getElementById('bulkActionBar_' + MODEL);
+        var count = document.getElementById('bulkCount_' + MODEL);
+        if (ids.length > 0) {
+            bar.classList.remove('translate-y-full');
+            bar.classList.add('translate-y-0');
+            count.textContent = ids.length;
+        } else {
+            bar.classList.add('translate-y-full');
+            bar.classList.remove('translate-y-0');
+        }
+        // Update "Select All" checkbox state
+        var selectAll = document.getElementById('bulkSelectAll_' + MODEL);
+        if (selectAll) {
+            var allBoxes = getCheckboxes();
+            selectAll.checked = allBoxes.length > 0 && ids.length === allBoxes.length;
+            selectAll.indeterminate = ids.length > 0 && ids.length < allBoxes.length;
+        }
+    }
+
+    // Expose to global scope for inline handlers
+    window['bulkToggleAll_' + MODEL] = function(el) {
+        getCheckboxes().forEach(function(cb) { cb.checked = el.checked; });
+        updateBar();
+    };
+
+    window['bulkSelectAll_' + MODEL] = function() {
+        getCheckboxes().forEach(function(cb) { cb.checked = true; });
+        var selectAll = document.getElementById('bulkSelectAll_' + MODEL);
+        if (selectAll) selectAll.checked = true;
+        updateBar();
+    };
+
+    window['bulkDeselectAll_' + MODEL] = function() {
+        getCheckboxes().forEach(function(cb) { cb.checked = false; });
+        var selectAll = document.getElementById('bulkSelectAll_' + MODEL);
+        if (selectAll) selectAll.checked = false;
+        updateBar();
+    };
+
+    window['bulkRowToggle_' + MODEL] = function() {
+        updateBar();
+    };
+
+    // ── Confirmation Modal ──────────────────────────────────────
+    function showModal(action, ids) {
+        var modal = document.getElementById('bulkConfirmModal_' + MODEL);
+        var msgEl = document.getElementById('bulkModalMessage_' + MODEL);
+        var iconWrap = document.getElementById('bulkModalIcon_' + MODEL);
+        var confirmBtn = document.getElementById('bulkModalConfirmBtn_' + MODEL);
+        var progressWrap = document.getElementById('bulkProgressWrap_' + MODEL);
+        var actionsDiv = document.getElementById('bulkModalActions_' + MODEL);
+
+        // Reset state
+        progressWrap.classList.add('hidden');
+        actionsDiv.classList.remove('hidden');
+        confirmBtn.disabled = false;
+
+        // Set message based on action
+        var actionLabel = action.charAt(0).toUpperCase() + action.slice(1);
+        var count = ids.length;
+        var isDestructive = (action === 'delete');
+
+        if (isDestructive) {
+            msgEl.textContent = 'Are you sure you want to permanently delete ' + count + ' ' + MODEL + '(s)? This action cannot be undone.';
+            iconWrap.className = 'w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center';
+            iconWrap.querySelector('span').textContent = 'delete_forever';
+            iconWrap.querySelector('span').className = 'material-symbols-outlined text-2xl text-red-600 dark:text-red-400';
+            confirmBtn.className = 'px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm shadow-sm';
+            confirmBtn.textContent = 'Delete Permanently';
+        } else {
+            msgEl.textContent = 'Apply "' + actionLabel + '" to ' + count + ' ' + MODEL + '(s)?';
+            iconWrap.className = 'w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center';
+            iconWrap.querySelector('span').textContent = 'warning';
+            iconWrap.querySelector('span').className = 'material-symbols-outlined text-2xl text-blue-600 dark:text-blue-400';
+            confirmBtn.className = 'px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-sm shadow-sm';
+            confirmBtn.textContent = 'Confirm';
+        }
+
+        pendingAction = { action: action, ids: ids };
+        modal.classList.remove('hidden');
+    }
+
+    window['bulkModalCancel_' + MODEL] = function() {
+        var modal = document.getElementById('bulkConfirmModal_' + MODEL);
+        modal.classList.add('hidden');
+        pendingAction = null;
+    };
+
+    window['bulkModalConfirm_' + MODEL] = function() {
+        if (!pendingAction) return;
+        executeBulkAction(pendingAction.action, pendingAction.ids);
+    };
+
+    // ── Apply Action ────────────────────────────────────────────
+    window['bulkApply_' + MODEL] = function() {
+        var select = document.getElementById('bulkActionSelect_' + MODEL);
+        var action = select.value;
+        var ids = getCheckedIds();
+
+        if (!action) {
+            showToast('Please select an action.', 'warning');
+            return;
+        }
+        if (ids.length === 0) {
+            showToast('No items selected.', 'warning');
+            return;
+        }
+
+        showModal(action, ids);
+    };
+
+    // ── Export Selected ─────────────────────────────────────────
+    window['bulkExport_' + MODEL] = function() {
+        var ids = getCheckedIds();
+        if (ids.length === 0) {
+            showToast('No items selected for export.', 'warning');
+            return;
+        }
+        executeBulkAction('export', ids);
+    };
+
+    // ── AJAX Submission ─────────────────────────────────────────
+    function executeBulkAction(action, ids) {
+        var confirmBtn = document.getElementById('bulkModalConfirmBtn_' + MODEL);
+        var progressWrap = document.getElementById('bulkProgressWrap_' + MODEL);
+        var progressBar = document.getElementById('bulkProgressBar_' + MODEL);
+        var progressText = document.getElementById('bulkProgressText_' + MODEL);
+        var actionsDiv = document.getElementById('bulkModalActions_' + MODEL);
+        var modal = document.getElementById('bulkConfirmModal_' + MODEL);
+
+        // Show progress for non-export actions
+        if (action !== 'export') {
+            if (confirmBtn) confirmBtn.disabled = true;
+            progressWrap.classList.remove('hidden');
+            actionsDiv.classList.add('hidden');
+            progressBar.style.width = '30%';
+            progressText.textContent = 'Processing ' + ids.length + ' item(s)...';
+        }
+
+        var formData = new FormData();
+        formData.append('model', MODEL);
+        formData.append('action', action);
+        ids.forEach(function(id) {
+            formData.append('ids', id);
+        });
+
+        fetch(BULK_URL, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': CSRF,
+            },
+            body: formData,
+            credentials: 'same-origin',
+        })
+        .then(function(response) {
+            // Handle CSV export as file download
+            var contentType = response.headers.get('Content-Type') || '';
+            if (contentType.indexOf('text/csv') !== -1) {
+                var disposition = response.headers.get('Content-Disposition') || '';
+                var filename = 'export.csv';
+                var match = disposition.match(/filename="?([^"]+)"?/);
+                if (match) filename = match[1];
+
+                return response.blob().then(function(blob) {
+                    var url = window.URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    modal.classList.add('hidden');
+                    showToast('Export downloaded successfully!', 'success');
+                    pendingAction = null;
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (!data) return; // was a blob download
+            if (action !== 'export') {
+                progressBar.style.width = '100%';
+            }
+
+            if (data.status === 'success') {
+                progressText.textContent = 'Done!';
+                setTimeout(function() {
+                    modal.classList.add('hidden');
+                    showToast(data.message || (data.count + ' item(s) processed successfully.'), 'success');
+                    // Reload to show updated list
+                    setTimeout(function() { window.location.reload(); }, 800);
+                }, 500);
+            } else {
+                modal.classList.add('hidden');
+                showToast(data.message || 'An error occurred.', 'error');
+            }
+            pendingAction = null;
+        })
+        .catch(function(err) {
+            modal.classList.add('hidden');
+            showToast('Network error: ' + err.message, 'error');
+            pendingAction = null;
+        });
+    }
+
+    // ── Toast Notifications ─────────────────────────────────────
+    function showToast(message, type) {
+        var container = document.getElementById('bulkToastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'bulkToastContainer';
+            container.className = 'fixed top-24 right-6 z-[200] flex flex-col gap-2';
+            document.body.appendChild(container);
+        }
+
+        var colors = {
+            success: 'bg-emerald-600 text-white',
+            error: 'bg-red-600 text-white',
+            warning: 'bg-amber-500 text-white',
+            info: 'bg-blue-600 text-white',
+        };
+        var icons = {
+            success: 'check_circle',
+            error: 'error',
+            warning: 'warning',
+            info: 'info',
+        };
+
+        var toast = document.createElement('div');
+        toast.className = 'flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl transform translate-x-full transition-transform duration-300 ' + (colors[type] || colors.info);
+        toast.innerHTML = '<span class="material-symbols-outlined text-lg">' + (icons[type] || icons.info) + '</span>'
+                        + '<span class="text-sm font-medium">' + message + '</span>';
+
+        container.appendChild(toast);
+
+        // Animate in
+        requestAnimationFrame(function() {
+            toast.classList.remove('translate-x-full');
+            toast.classList.add('translate-x-0');
+        });
+
+        // Auto dismiss after 4s
+        setTimeout(function() {
+            toast.classList.remove('translate-x-0');
+            toast.classList.add('translate-x-full');
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 4000);
+    }
+
+    // ── Attach listeners on DOMContentLoaded ────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        // Bind change events to all checkboxes
+        getCheckboxes().forEach(function(cb) {
+            cb.addEventListener('change', updateBar);
+        });
+    });
+})();
+</script>

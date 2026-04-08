@@ -26,7 +26,7 @@
           type="text"
           name="q"
           value="{{ query }}"
-          placeholder="Search across users, articles, events, tickets..."
+          placeholder="Search across users, articles, events, magazines, videos, tickets..."
           class="w-full bg-surface-container-low border-0 rounded-lg py-3 pl-12 pr-4 focus:ring-2 focus:ring-secondary text-sm"
           autofocus
         />
@@ -45,12 +45,23 @@
   </div>
   {% endif %}
 
+  {% if not query %}
+  <div class="text-center py-16 bg-surface-container-lowest rounded-xl shadow-sm">
+    <span class="material-symbols-outlined text-6xl text-slate-300 mb-4">manage_search</span>
+    <p class="text-lg text-slate-500">Enter a search term to get started</p>
+    <p class="text-sm text-slate-400 mt-2">Search across users, articles, events, magazines, videos, and support tickets</p>
+  </div>
+  {% endif %}
+
   {% if results.users %}
   <!-- Users Section -->
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-4">
-      <span class="material-symbols-outlined text-blue-600">group</span>
-      <h2 class="text-lg font-bold text-on-surface font-headline">Users ({{ results.users|length }})</h2>
+      <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-blue-600 text-lg">group</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Users</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">{{ results.users|length }}</span>
     </div>
     <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
       <table class="w-full">
@@ -97,8 +108,11 @@
   <!-- Articles Section -->
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-4">
-      <span class="material-symbols-outlined text-amber-600">article</span>
-      <h2 class="text-lg font-bold text-on-surface font-headline">Articles ({{ results.articles|length }})</h2>
+      <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-amber-600 text-lg">article</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Articles</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">{{ results.articles|length }}</span>
     </div>
     <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
       <table class="w-full">
@@ -134,8 +148,11 @@
   <!-- Events Section -->
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-4">
-      <span class="material-symbols-outlined text-purple-600">event</span>
-      <h2 class="text-lg font-bold text-on-surface font-headline">Events ({{ results.events|length }})</h2>
+      <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-purple-600 text-lg">event</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Events</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600">{{ results.events|length }}</span>
     </div>
     <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
       <table class="w-full">
@@ -173,12 +190,55 @@
   </div>
   {% endif %}
 
+  {% if results.magazines %}
+  <!-- Magazines Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-emerald-600 text-lg">menu_book</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Magazines</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">{{ results.magazines|length }}</span>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Title</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Published</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Views</th>
+            <th class="text-right py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for magazine in results.magazines %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-6">
+              <p class="text-sm font-medium text-on-surface">{{ magazine.title }}</p>
+              {% if magazine.title_fr %}<p class="text-xs text-slate-400">{{ magazine.title_fr }}</p>{% endif %}
+            </td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ magazine.publish_date|date:"M d, Y" }}</td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ magazine.view_count }}</td>
+            <td class="py-3 px-6 text-right">
+              <a href="{% url 'custom_admin:magazine_edit' magazine.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
   {% if results.tickets %}
   <!-- Tickets Section -->
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-4">
-      <span class="material-symbols-outlined text-red-600">support_agent</span>
-      <h2 class="text-lg font-bold text-on-surface font-headline">Support Tickets ({{ results.tickets|length }})</h2>
+      <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-red-600 text-lg">support_agent</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Support Tickets</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600">{{ results.tickets|length }}</span>
     </div>
     <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
       <table class="w-full">
@@ -206,6 +266,46 @@
             </td>
             <td class="py-3 px-6 text-right">
               <a href="{% url 'custom_admin:support_ticket_detail' ticket.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if results.videos %}
+  <!-- Videos Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-indigo-600 text-lg">videocam</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Videos</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600">{{ results.videos|length }}</span>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Title</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Category</th>
+            <th class="text-left py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Created</th>
+            <th class="text-right py-3 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for video in results.videos %}
+          <tr class="hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-6">
+              <p class="text-sm font-medium text-on-surface">{{ video.title }}</p>
+              {% if video.title_fr %}<p class="text-xs text-slate-400">{{ video.title_fr }}</p>{% endif %}
+            </td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ video.get_category_display }}</td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ video.created_at|date:"M d, Y" }}</td>
+            <td class="py-3 px-6 text-right">
+              <a href="{% url 'custom_admin:video_edit' video.pk %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</a>
             </td>
           </tr>
           {% endfor %}

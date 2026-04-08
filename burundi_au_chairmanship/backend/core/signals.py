@@ -121,3 +121,85 @@ def register_thumbnail_signals():
                 dispatch_uid=f'thumbnail_gen_{model.__name__}',
             )
             logger.debug("Registered thumbnail signal for %s", model.__name__)
+
+
+# ── Admin Notification signals ───────────────────────────────────
+# Auto-create AdminNotification entries when key events happen.
+
+def _on_support_ticket_created(sender, instance, created, **kwargs):
+    """Create an admin notification when a new support ticket is submitted."""
+    if not created:
+        return
+    from .models import AdminNotification
+    try:
+        AdminNotification.objects.create(
+            notification_type='new_ticket',
+            title='New support ticket',
+            message=instance.subject,
+            link=f'/portal/support/{instance.pk}/',
+            icon='support_agent',
+        )
+    except Exception:
+        logger.exception("Failed to create admin notification for SupportTicket %s", instance.pk)
+
+
+def _on_verification_request_created(sender, instance, created, **kwargs):
+    """Create an admin notification when a new verification request is submitted."""
+    if not created:
+        return
+    from .models import AdminNotification
+    try:
+        username = instance.user.username if instance.user else 'Unknown'
+        AdminNotification.objects.create(
+            notification_type='new_verification',
+            title='New verification request',
+            message=f'from {username}',
+            link=f'/portal/verification-requests/{instance.pk}/review/',
+            icon='verified',
+        )
+    except Exception:
+        logger.exception("Failed to create admin notification for VerificationRequest %s", instance.pk)
+
+
+def _on_user_created(sender, instance, created, **kwargs):
+    """Create an admin notification when a new user registers."""
+    if not created:
+        return
+    from .models import AdminNotification
+    try:
+        AdminNotification.objects.create(
+            notification_type='new_user',
+            title='New user registered',
+            message=instance.username,
+            link=f'/portal/users/{instance.pk}/edit/',
+            icon='person_add',
+        )
+    except Exception:
+        logger.exception("Failed to create admin notification for User %s", instance.pk)
+
+
+def register_admin_notification_signals():
+    """
+    Connect post_save signals to auto-create AdminNotification entries.
+
+    Called from ``CoreConfig.ready()`` after model loading is complete.
+    """
+    from . import models as m
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    post_save.connect(
+        _on_support_ticket_created,
+        sender=m.SupportTicket,
+        dispatch_uid='admin_notif_support_ticket',
+    )
+    post_save.connect(
+        _on_verification_request_created,
+        sender=m.VerificationRequest,
+        dispatch_uid='admin_notif_verification_request',
+    )
+    post_save.connect(
+        _on_user_created,
+        sender=User,
+        dispatch_uid='admin_notif_user_created',
+    )

@@ -1,0 +1,671 @@
+{% extends 'custom_admin/base.html' %}
+{% load media_tags %}
+
+{% block title %}Reorder {{ model_display_name }} - AU Chairmanship Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  .sortable-item {
+    cursor: default;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .sortable-item .drag-handle {
+    cursor: grab;
+    touch-action: none;
+  }
+  .sortable-item .drag-handle:active {
+    cursor: grabbing;
+  }
+  .sortable-item.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+    box-shadow: none;
+  }
+  .sortable-item.drag-over-above {
+    border-top: 3px solid #f59e0b !important;
+    margin-top: -3px;
+  }
+  .sortable-item.drag-over-below {
+    border-bottom: 3px solid #f59e0b !important;
+    margin-bottom: -3px;
+  }
+  .sortable-ghost {
+    background: #fffbeb;
+    border: 2px dashed #f59e0b;
+    border-radius: 0.75rem;
+    min-height: 72px;
+  }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 9999;
+    transform: translateY(120%);
+    transition: transform 0.3s ease;
+    max-width: 400px;
+  }
+  .toast.show {
+    transform: translateY(0);
+  }
+
+  /* Order number animation */
+  .order-number {
+    transition: background-color 0.3s ease;
+  }
+  .order-number.updated {
+    background-color: #fef3c7;
+  }
+
+  /* Auto-save indicator */
+  .autosave-indicator {
+    transition: opacity 0.3s ease;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="{{ back_url }}" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+          <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+        </a>
+        <div>
+          <h1 class="text-3xl font-headline font-bold text-slate-900">Reorder {{ model_display_name }}</h1>
+          <p class="text-sm text-slate-500 mt-1">Drag items to rearrange their display order</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Auto-save toggle -->
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <span class="text-sm text-slate-500">Auto-save</span>
+          <div class="relative">
+            <input type="checkbox" id="autoSaveToggle" class="sr-only peer">
+            <div class="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:bg-amber-500 transition-colors"></div>
+            <div class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm peer-checked:translate-x-4 transition-transform"></div>
+          </div>
+        </label>
+
+        <!-- Auto-save spinner (hidden by default) -->
+        <div id="autosaveIndicator" class="autosave-indicator opacity-0 flex items-center gap-1 text-sm text-amber-600">
+          <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Saving...</span>
+        </div>
+
+        <!-- Reset button -->
+        <button id="resetBtn" onclick="resetOrder()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          <span class="material-symbols-outlined text-lg">undo</span>
+          Reset
+        </button>
+
+        <!-- Save button -->
+        <button id="saveBtn" onclick="saveOrder()" class="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          <span class="material-symbols-outlined text-lg">save</span>
+          Save Order
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item count -->
+  <div class="flex items-center justify-between mb-4">
+    <p class="text-sm text-slate-500">
+      <span class="font-medium text-slate-700">{{ items|length }}</span> item{{ items|length|pluralize }}
+    </p>
+    <p id="unsavedBadge" class="hidden text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+      Unsaved changes
+    </p>
+  </div>
+
+  <!-- Sortable Container -->
+  <div id="sortableContainer" class="space-y-2">
+    {% for item in items %}
+    <div class="sortable-item bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center gap-4 px-4 py-3"
+         data-id="{{ item.id }}"
+         data-original-order="{{ item.current_order }}">
+
+      <!-- Drag Handle -->
+      <div class="drag-handle flex flex-col items-center justify-center w-8 h-10 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+           draggable="true">
+        <span class="text-lg leading-none tracking-widest select-none" style="letter-spacing: 3px;">&#8942;&#8942;</span>
+      </div>
+
+      <!-- Order Number -->
+      <div class="order-number w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 flex-shrink-0">
+        {{ item.current_order }}
+      </div>
+
+      <!-- Thumbnail -->
+      {% if item.image_url %}
+      <img src="{{ item.image_url }}"
+           alt="{{ item.title }}"
+           class="w-14 h-10 object-cover rounded-lg flex-shrink-0 bg-slate-100">
+      {% else %}
+      <div class="w-14 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+        <span class="material-symbols-outlined text-slate-400 text-xl">{{ item.icon|default:"image" }}</span>
+      </div>
+      {% endif %}
+
+      <!-- Title -->
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-slate-800 truncate">{{ item.title }}</p>
+        {% if item.subtitle %}
+        <p class="text-xs text-slate-400 truncate">{{ item.subtitle }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Status -->
+      {% if item.is_active is not None %}
+      <div class="flex-shrink-0">
+        {% if item.is_active %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          Active
+        </span>
+        {% else %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+          Hidden
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Grip indicator -->
+      <div class="flex-shrink-0 text-slate-300">
+        <span class="material-symbols-outlined text-lg">drag_indicator</span>
+      </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-16 bg-white rounded-xl border border-slate-200">
+      <span class="material-symbols-outlined text-5xl text-slate-300 mb-3">reorder</span>
+      <p class="text-slate-500 font-medium">No items to reorder</p>
+      <a href="{{ back_url }}" class="mt-4 inline-flex items-center gap-2 text-sm text-amber-600 hover:text-amber-700 font-medium">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>
+        Go back and create items first
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast">
+  <div id="toastContent" class="flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border">
+    <span id="toastIcon" class="material-symbols-outlined text-xl"></span>
+    <span id="toastMessage" class="text-sm font-medium"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  // ── Configuration ──
+  const SAVE_URL = '{% url "custom_admin:reorder_save" %}';
+  const MODEL_KEY = '{{ model_key }}';
+  const CSRF_TOKEN = '{{ csrf_token }}';
+
+  // ── State ──
+  let originalOrder = [];
+  let hasChanges = false;
+  let autoSave = false;
+  let autoSaveTimer = null;
+  let isSaving = false;
+
+  const container = document.getElementById('sortableContainer');
+  const saveBtn = document.getElementById('saveBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const unsavedBadge = document.getElementById('unsavedBadge');
+  const autoSaveToggle = document.getElementById('autoSaveToggle');
+  const autosaveIndicator = document.getElementById('autosaveIndicator');
+
+  // ── Initialize ──
+  function init() {
+    // Store original order
+    document.querySelectorAll('.sortable-item').forEach(function(el) {
+      originalOrder.push(el.dataset.id);
+    });
+
+    // Set up drag events on handles
+    setupDragEvents();
+    setupTouchEvents();
+
+    // Auto-save toggle
+    autoSaveToggle.addEventListener('change', function() {
+      autoSave = this.checked;
+      if (autoSave && hasChanges) {
+        triggerAutoSave();
+      }
+    });
+  }
+
+  // ── HTML5 Drag & Drop ──
+  let draggedEl = null;
+  let draggedIndex = -1;
+
+  function setupDragEvents() {
+    container.addEventListener('dragstart', function(e) {
+      var handle = e.target.closest('.drag-handle');
+      if (!handle) {
+        e.preventDefault();
+        return;
+      }
+      draggedEl = handle.closest('.sortable-item');
+      if (!draggedEl) { e.preventDefault(); return; }
+      draggedIndex = getIndex(draggedEl);
+
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedEl.dataset.id);
+
+      // Use timeout to allow the drag image to be captured before adding class
+      setTimeout(function() {
+        draggedEl.classList.add('dragging');
+      }, 0);
+    });
+
+    container.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      var target = e.target.closest('.sortable-item');
+      if (!target || target === draggedEl) return;
+
+      // Clear all indicators
+      clearDragIndicators();
+
+      // Determine if above or below center
+      var rect = target.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+
+      if (e.clientY < midY) {
+        target.classList.add('drag-over-above');
+      } else {
+        target.classList.add('drag-over-below');
+      }
+    });
+
+    container.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+    });
+
+    container.addEventListener('dragleave', function(e) {
+      var target = e.target.closest('.sortable-item');
+      if (target) {
+        target.classList.remove('drag-over-above', 'drag-over-below');
+      }
+    });
+
+    container.addEventListener('drop', function(e) {
+      e.preventDefault();
+      clearDragIndicators();
+
+      var target = e.target.closest('.sortable-item');
+      if (!target || !draggedEl || target === draggedEl) return;
+
+      var rect = target.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+
+      if (e.clientY < midY) {
+        container.insertBefore(draggedEl, target);
+      } else {
+        container.insertBefore(draggedEl, target.nextSibling);
+      }
+
+      updateOrderNumbers();
+      markChanged();
+    });
+
+    container.addEventListener('dragend', function(e) {
+      if (draggedEl) {
+        draggedEl.classList.remove('dragging');
+      }
+      clearDragIndicators();
+      draggedEl = null;
+      draggedIndex = -1;
+    });
+  }
+
+  // ── Touch Support ──
+  function setupTouchEvents() {
+    var touchEl = null;
+    var touchClone = null;
+    var touchStartY = 0;
+    var touchOffsetY = 0;
+    var scrollSpeed = 0;
+    var scrollRAF = null;
+
+    container.addEventListener('touchstart', function(e) {
+      var handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+
+      touchEl = handle.closest('.sortable-item');
+      if (!touchEl) return;
+
+      var touch = e.touches[0];
+      var rect = touchEl.getBoundingClientRect();
+      touchStartY = touch.clientY;
+      touchOffsetY = touch.clientY - rect.top;
+
+      // Create visual clone
+      touchClone = touchEl.cloneNode(true);
+      touchClone.style.position = 'fixed';
+      touchClone.style.left = rect.left + 'px';
+      touchClone.style.top = rect.top + 'px';
+      touchClone.style.width = rect.width + 'px';
+      touchClone.style.zIndex = '10000';
+      touchClone.style.opacity = '0.9';
+      touchClone.style.boxShadow = '0 10px 40px rgba(0,0,0,0.15)';
+      touchClone.style.pointerEvents = 'none';
+      touchClone.style.transition = 'none';
+      document.body.appendChild(touchClone);
+
+      touchEl.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+
+    container.addEventListener('touchmove', function(e) {
+      if (!touchEl || !touchClone) return;
+      e.preventDefault();
+
+      var touch = e.touches[0];
+      var newTop = touch.clientY - touchOffsetY;
+      touchClone.style.top = newTop + 'px';
+
+      // Auto-scroll near edges
+      var viewportHeight = window.innerHeight;
+      var scrollThreshold = 80;
+      if (touch.clientY < scrollThreshold) {
+        scrollSpeed = -5;
+      } else if (touch.clientY > viewportHeight - scrollThreshold) {
+        scrollSpeed = 5;
+      } else {
+        scrollSpeed = 0;
+      }
+      if (scrollSpeed !== 0 && !scrollRAF) {
+        autoScroll();
+      }
+
+      // Find element under touch
+      clearDragIndicators();
+      var elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (elemBelow) {
+        var target = elemBelow.closest('.sortable-item');
+        if (target && target !== touchEl) {
+          var rect = target.getBoundingClientRect();
+          var midY = rect.top + rect.height / 2;
+          if (touch.clientY < midY) {
+            target.classList.add('drag-over-above');
+          } else {
+            target.classList.add('drag-over-below');
+          }
+        }
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchend', function(e) {
+      if (!touchEl || !touchClone) return;
+
+      scrollSpeed = 0;
+      if (scrollRAF) {
+        cancelAnimationFrame(scrollRAF);
+        scrollRAF = null;
+      }
+
+      // Find drop target
+      var lastTouch = e.changedTouches[0];
+      var elemBelow = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY);
+      if (elemBelow) {
+        var target = elemBelow.closest('.sortable-item');
+        if (target && target !== touchEl) {
+          var rect = target.getBoundingClientRect();
+          var midY = rect.top + rect.height / 2;
+          if (lastTouch.clientY < midY) {
+            container.insertBefore(touchEl, target);
+          } else {
+            container.insertBefore(touchEl, target.nextSibling);
+          }
+          updateOrderNumbers();
+          markChanged();
+        }
+      }
+
+      // Cleanup
+      touchEl.classList.remove('dragging');
+      clearDragIndicators();
+      if (touchClone && touchClone.parentNode) {
+        touchClone.parentNode.removeChild(touchClone);
+      }
+      touchEl = null;
+      touchClone = null;
+    });
+
+    function autoScroll() {
+      if (scrollSpeed === 0) {
+        scrollRAF = null;
+        return;
+      }
+      window.scrollBy(0, scrollSpeed);
+      scrollRAF = requestAnimationFrame(autoScroll);
+    }
+  }
+
+  // ── Utility Functions ──
+  function getIndex(el) {
+    var items = container.querySelectorAll('.sortable-item');
+    for (var i = 0; i < items.length; i++) {
+      if (items[i] === el) return i;
+    }
+    return -1;
+  }
+
+  function clearDragIndicators() {
+    container.querySelectorAll('.sortable-item').forEach(function(el) {
+      el.classList.remove('drag-over-above', 'drag-over-below');
+    });
+  }
+
+  function updateOrderNumbers() {
+    var items = container.querySelectorAll('.sortable-item');
+    items.forEach(function(el, idx) {
+      var numEl = el.querySelector('.order-number');
+      if (numEl) {
+        numEl.textContent = idx;
+        numEl.classList.add('updated');
+        setTimeout(function() { numEl.classList.remove('updated'); }, 600);
+      }
+    });
+  }
+
+  function markChanged() {
+    var currentOrder = getCurrentOrder();
+    hasChanges = !arraysEqual(currentOrder, originalOrder);
+
+    saveBtn.disabled = !hasChanges;
+    resetBtn.disabled = !hasChanges;
+
+    if (hasChanges) {
+      unsavedBadge.classList.remove('hidden');
+    } else {
+      unsavedBadge.classList.add('hidden');
+    }
+
+    if (autoSave && hasChanges) {
+      triggerAutoSave();
+    }
+  }
+
+  function getCurrentOrder() {
+    var items = container.querySelectorAll('.sortable-item');
+    var order = [];
+    items.forEach(function(el) {
+      order.push(el.dataset.id);
+    });
+    return order;
+  }
+
+  function arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  function triggerAutoSave() {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(function() {
+      saveOrder(true);
+    }, 800);
+  }
+
+  // ── Save Order ──
+  window.saveOrder = function(isAutoSave) {
+    if (isSaving) return;
+    isSaving = true;
+
+    var items = container.querySelectorAll('.sortable-item');
+    var payload = {
+      model: MODEL_KEY,
+      items: []
+    };
+
+    items.forEach(function(el, idx) {
+      payload.items.push({
+        id: parseInt(el.dataset.id),
+        order: idx
+      });
+    });
+
+    // Show saving state
+    if (isAutoSave) {
+      autosaveIndicator.style.opacity = '1';
+    } else {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...';
+    }
+
+    fetch(SAVE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF_TOKEN,
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      isSaving = false;
+
+      if (data.success) {
+        // Update original order to reflect saved state
+        originalOrder = getCurrentOrder();
+        hasChanges = false;
+        saveBtn.disabled = true;
+        resetBtn.disabled = true;
+        unsavedBadge.classList.add('hidden');
+
+        if (isAutoSave) {
+          autosaveIndicator.style.opacity = '0';
+        } else {
+          saveBtn.innerHTML = '<span class="material-symbols-outlined text-lg">save</span> Save Order';
+        }
+
+        showToast('Order saved successfully', 'success');
+      } else {
+        throw new Error(data.error || 'Save failed');
+      }
+    })
+    .catch(function(err) {
+      isSaving = false;
+      autosaveIndicator.style.opacity = '0';
+      saveBtn.innerHTML = '<span class="material-symbols-outlined text-lg">save</span> Save Order';
+      saveBtn.disabled = false;
+      showToast('Failed to save: ' + err.message, 'error');
+    });
+  };
+
+  // ── Reset Order ──
+  window.resetOrder = function() {
+    // Rearrange items back to original order
+    originalOrder.forEach(function(id) {
+      var el = container.querySelector('[data-id="' + id + '"]');
+      if (el) {
+        container.appendChild(el);
+      }
+    });
+
+    updateOrderNumbers();
+    hasChanges = false;
+    saveBtn.disabled = true;
+    resetBtn.disabled = true;
+    unsavedBadge.classList.add('hidden');
+    showToast('Order reset to last saved state', 'info');
+  };
+
+  // ── Toast Notification ──
+  var toastTimer = null;
+
+  function showToast(message, type) {
+    var toast = document.getElementById('toast');
+    var content = document.getElementById('toastContent');
+    var icon = document.getElementById('toastIcon');
+    var msg = document.getElementById('toastMessage');
+
+    msg.textContent = message;
+
+    // Reset classes
+    content.className = 'flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border';
+
+    if (type === 'success') {
+      content.classList.add('bg-emerald-50', 'text-emerald-800', 'border-emerald-200');
+      icon.textContent = 'check_circle';
+    } else if (type === 'error') {
+      content.classList.add('bg-red-50', 'text-red-800', 'border-red-200');
+      icon.textContent = 'error';
+    } else {
+      content.classList.add('bg-blue-50', 'text-blue-800', 'border-blue-200');
+      icon.textContent = 'info';
+    }
+
+    toast.classList.add('show');
+
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+      toast.classList.remove('show');
+    }, 3000);
+  }
+
+  // ── Keyboard shortcut: Ctrl+S to save ──
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (hasChanges && !isSaving) {
+        saveOrder(false);
+      }
+    }
+  });
+
+  // ── Warn before leaving with unsaved changes ──
+  window.addEventListener('beforeunload', function(e) {
+    if (hasChanges) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // Initialize
+  init();
+})();
+</script>
+{% endblock %}

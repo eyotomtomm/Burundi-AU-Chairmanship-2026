@@ -1,0 +1,533 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Maintenance Mode - AU Chairmanship Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+  .severity-minor { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+  .severity-major { background: #fffbeb; color: #92400e; border-color: #fcd34d; }
+  .severity-critical { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+  .severity-dot-minor { background: #10b981; }
+  .severity-dot-major { background: #f59e0b; }
+  .severity-dot-critical { background: #ef4444; }
+  .pulse-active { animation: pulse-ring 2s cubic-bezier(0.455,0.03,0.515,0.955) infinite; }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 70% { box-shadow: 0 0 0 12px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
+  .service-chip { transition: all 0.15s ease; }
+  .service-chip input:checked + span { background: #1e293b; color: #fff; border-color: #1e293b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-8">
+
+  <!-- ── Header ── -->
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">engineering</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Maintenance Mode</h1>
+        <p class="text-sm text-slate-500 mt-1">Monitor, schedule, and control maintenance windows</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       CURRENT STATUS BANNER + QUICK TOGGLE
+       ══════════════════════════════════════════════════════════════ -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Status Banner -->
+    <div class="lg:col-span-2 {% if is_maintenance_active %}bg-red-50 border-red-200{% else %}bg-emerald-50 border-emerald-200{% endif %} border rounded-2xl p-6 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-2xl {% if is_maintenance_active %}bg-red-100 pulse-active{% else %}bg-emerald-100{% endif %} flex items-center justify-center">
+          <span class="material-symbols-outlined text-3xl {% if is_maintenance_active %}text-red-600{% else %}text-emerald-600{% endif %}">
+            {% if is_maintenance_active %}warning{% else %}check_circle{% endif %}
+          </span>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold {% if is_maintenance_active %}text-red-800{% else %}text-emerald-800{% endif %} font-headline">
+            {% if is_maintenance_active %}Maintenance Active{% else %}All Systems Operational{% endif %}
+          </h2>
+          {% if active_window %}
+          <p class="text-sm {% if is_maintenance_active %}text-red-600{% else %}text-emerald-600{% endif %} mt-0.5">
+            {{ active_window.title }} &mdash; ends {{ active_window.ends_at|date:"M d, Y H:i" }}
+          </p>
+          {% else %}
+          <p class="text-sm text-emerald-600 mt-0.5">No active maintenance windows at this time</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Toggle Card -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Quick Toggle</p>
+      <form method="post" action="{% url 'custom_admin:maintenance_toggle' %}">
+        {% csrf_token %}
+        <button type="submit"
+          class="w-20 h-20 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-105 {% if is_maintenance_active %}bg-red-600 hover:bg-red-700{% else %}bg-emerald-600 hover:bg-emerald-700{% endif %}"
+          onclick="return confirm('{% if is_maintenance_active %}Disable maintenance mode? The app will become accessible again.{% else %}Enable maintenance mode NOW? Users will see a maintenance screen.{% endif %}')">
+          <span class="material-symbols-outlined text-4xl text-white">
+            {% if is_maintenance_active %}toggle_on{% else %}toggle_off{% endif %}
+          </span>
+        </button>
+      </form>
+      <p class="text-xs text-slate-500 mt-3">
+        {% if is_maintenance_active %}Click to disable{% else %}Click to enable{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       STATS CARDS
+       ══════════════════════════════════════════════════════════════ -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl border border-slate-100 p-5">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-blue-600">schedule</span>
+        </div>
+        <span class="text-2xl font-bold text-slate-900">{{ upcoming_windows|length }}</span>
+      </div>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Upcoming</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-100 p-5">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-red-600">warning</span>
+        </div>
+        <span class="text-2xl font-bold text-slate-900">{% if active_window %}1{% else %}0{% endif %}</span>
+      </div>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Currently Active</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-100 p-5">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+        </div>
+        <span class="text-2xl font-bold text-slate-900">{{ past_windows|length }}</span>
+      </div>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Past (Completed)</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-100 p-5">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-amber-600">event</span>
+        </div>
+        <span class="text-2xl font-bold text-slate-900">{{ total_count }}</span>
+      </div>
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total All Time</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       COUNTDOWN PREVIEW
+       ══════════════════════════════════════════════════════════════ -->
+  {% if active_window or next_upcoming %}
+  <div class="bg-white border border-slate-200 rounded-2xl p-6">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-slate-600">timer</span>
+      <h3 class="text-lg font-bold text-slate-900 font-headline">Countdown Preview</h3>
+      <span class="text-xs text-slate-500 ml-2">(what users see)</span>
+    </div>
+    {% if active_window %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+      <p class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Maintenance In Progress</p>
+      <p class="text-lg font-bold text-red-800 mb-1">{{ active_window.title }}</p>
+      <div id="countdown-active" class="text-3xl font-bold text-red-700 font-headline my-4" data-end="{{ active_window.ends_at|date:'c' }}">
+        --:--:--
+      </div>
+      <p class="text-sm text-red-600">Estimated time remaining</p>
+    </div>
+    {% elif next_upcoming %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
+      <p class="text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">Upcoming Maintenance</p>
+      <p class="text-lg font-bold text-amber-800 mb-1">{{ next_upcoming.title }}</p>
+      <div id="countdown-upcoming" class="text-3xl font-bold text-amber-700 font-headline my-4" data-start="{{ next_upcoming.starts_at|date:'c' }}">
+        --:--:--
+      </div>
+      <p class="text-sm text-amber-600">Until maintenance begins</p>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCHEDULE FORM
+       ══════════════════════════════════════════════════════════════ -->
+  <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-slate-600">add_circle</span>
+        <h3 class="text-lg font-bold text-slate-900 font-headline">
+          {% if editing_window %}Edit Maintenance Window{% else %}Schedule New Maintenance{% endif %}
+        </h3>
+      </div>
+      {% if editing_window %}
+      <a href="{% url 'custom_admin:maintenance' %}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">close</span> Cancel Edit
+      </a>
+      {% endif %}
+    </div>
+
+    <form method="post" action="{% url 'custom_admin:maintenance_schedule' %}" class="p-6 space-y-6">
+      {% csrf_token %}
+      {% if editing_window %}
+      <input type="hidden" name="pk" value="{{ editing_window.pk }}">
+      {% endif %}
+
+      <!-- Titles -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Title (EN) <span class="text-red-500">*</span></label>
+          <input type="text" name="title" required value="{{ editing_window.title|default:'' }}"
+            placeholder="e.g. Server Upgrade"
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Title (FR)</label>
+          <input type="text" name="title_fr" value="{{ editing_window.title_fr|default:'' }}"
+            placeholder="e.g. Mise a jour du serveur"
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <!-- Descriptions -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Description / Message (EN)</label>
+          <textarea name="description" rows="3"
+            placeholder="Describe what is being maintained..."
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">{{ editing_window.description|default:'' }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Description / Message (FR)</label>
+          <textarea name="description_fr" rows="3"
+            placeholder="Decrivez ce qui est en maintenance..."
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">{{ editing_window.description_fr|default:'' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Date / Time -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Start Date & Time <span class="text-red-500">*</span></label>
+          <input type="datetime-local" name="starts_at" required
+            value="{{ editing_window.starts_at|date:'Y-m-d\TH:i'|default:'' }}"
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">End Date & Time (Estimated) <span class="text-red-500">*</span></label>
+          <input type="datetime-local" name="ends_at" required
+            value="{{ editing_window.ends_at|date:'Y-m-d\TH:i'|default:'' }}"
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <!-- Contact Email + Severity -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Contact Email</label>
+          <input type="email" name="contact_email" value="{{ editing_window.contact_email|default:'' }}"
+            placeholder="support@burundi4africa.com"
+            class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+          <p class="text-xs text-slate-400 mt-1">Displayed to users so they can reach out during maintenance</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Severity Level</label>
+          <div class="flex gap-3 mt-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="severity" value="minor" {% if not editing_window or editing_window.severity == 'minor' %}checked{% endif %}
+                class="text-emerald-600 focus:ring-emerald-500">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold severity-minor border">
+                <span class="w-2 h-2 rounded-full severity-dot-minor"></span> Minor
+              </span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="severity" value="major" {% if editing_window.severity == 'major' %}checked{% endif %}
+                class="text-amber-600 focus:ring-amber-500">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold severity-major border">
+                <span class="w-2 h-2 rounded-full severity-dot-major"></span> Major
+              </span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="severity" value="critical" {% if editing_window.severity == 'critical' %}checked{% endif %}
+                class="text-red-600 focus:ring-red-500">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold severity-critical border">
+                <span class="w-2 h-2 rounded-full severity-dot-critical"></span> Critical
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Affected Services -->
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-2">Affected Services</label>
+        <div class="flex flex-wrap gap-2">
+          {% for value, label in service_choices %}
+          <label class="service-chip cursor-pointer">
+            <input type="checkbox" name="affected_services" value="{{ value }}" class="hidden peer"
+              {% if editing_window and value in editing_window.affected_services_list %}checked{% endif %}
+              {% if not editing_window and value == 'all' %}checked{% endif %}>
+            <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border border-slate-200 bg-slate-50 text-slate-700 peer-checked:bg-slate-800 peer-checked:text-white peer-checked:border-slate-800 transition-all">
+              <span class="material-symbols-outlined text-sm">
+                {% if value == 'api' %}api{% elif value == 'auth' %}lock{% elif value == 'payments' %}payments{% elif value == 'media' %}perm_media{% else %}select_all{% endif %}
+              </span>
+              {{ label }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Toggles Row -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+        <label class="flex items-center gap-3 cursor-pointer bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-slate-200 transition-colors">
+          <input type="checkbox" name="is_active"
+            {% if editing_window.is_active or not editing_window %}checked{% endif %}
+            class="rounded border-slate-300 text-slate-700 focus:ring-slate-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700 block">Active</span>
+            <span class="text-xs text-slate-500">Show maintenance notice to users</span>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-slate-200 transition-colors">
+          <input type="checkbox" name="show_banner"
+            {% if editing_window.show_banner or not editing_window %}checked{% endif %}
+            class="rounded border-slate-300 text-slate-700 focus:ring-slate-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700 block">Show Banner</span>
+            <span class="text-xs text-slate-500">Display banner in the app</span>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 cursor-pointer bg-blue-50 rounded-xl p-4 border border-blue-100 hover:border-blue-200 transition-colors">
+          <input type="checkbox" name="auto_activate"
+            {% if editing_window.auto_activate %}checked{% endif %}
+            class="rounded border-blue-300 text-blue-700 focus:ring-blue-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-blue-700 block">Auto-Activate</span>
+            <span class="text-xs text-blue-500">Enable automatically at start time</span>
+          </div>
+        </label>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex gap-3 pt-2">
+        {% if editing_window %}
+        <a href="{% url 'custom_admin:maintenance' %}"
+          class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50 transition-all">Cancel</a>
+        {% endif %}
+        <button type="submit" class="bg-slate-700 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-slate-800 transition-all shadow-sm flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm">{% if editing_window %}save{% else %}add{% endif %}</span>
+          {% if editing_window %}Update Maintenance{% else %}Schedule Maintenance{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       UPCOMING SCHEDULED
+       ══════════════════════════════════════════════════════════════ -->
+  {% if upcoming_windows %}
+  <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <div class="p-6 border-b border-slate-100 flex items-center gap-2">
+      <span class="material-symbols-outlined text-blue-600">upcoming</span>
+      <h3 class="text-lg font-bold text-slate-900 font-headline">Upcoming Scheduled Maintenance</h3>
+      <span class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{{ upcoming_windows|length }}</span>
+    </div>
+    <div class="divide-y divide-slate-100">
+      {% for window in upcoming_windows %}
+      <div class="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center
+            {% if window.severity == 'critical' %}bg-red-100{% elif window.severity == 'major' %}bg-amber-100{% else %}bg-blue-100{% endif %}">
+            <span class="material-symbols-outlined text-xl
+              {% if window.severity == 'critical' %}text-red-600{% elif window.severity == 'major' %}text-amber-600{% else %}text-blue-600{% endif %}">
+              {% if window.severity == 'critical' %}error{% elif window.severity == 'major' %}warning{% else %}info{% endif %}
+            </span>
+          </div>
+          <div>
+            <p class="font-semibold text-slate-900 text-sm">{{ window.title }}</p>
+            <div class="flex items-center gap-3 mt-1">
+              <span class="text-xs text-slate-500">{{ window.starts_at|date:"M d, Y H:i" }} - {{ window.ends_at|date:"M d, Y H:i" }}</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider severity-{{ window.severity }} border">
+                <span class="w-1.5 h-1.5 rounded-full severity-dot-{{ window.severity }}"></span>
+                {{ window.severity }}
+              </span>
+              {% if window.auto_activate %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <span class="material-symbols-outlined text-[10px]">auto_mode</span> Auto
+              </span>
+              {% endif %}
+            </div>
+            {% if window.affected_services %}
+            <div class="flex gap-1 mt-1.5">
+              {% for svc in window.affected_services_list %}
+              <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">{{ svc }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <a href="{% url 'custom_admin:maintenance' %}?edit={{ window.pk }}"
+            class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+            <span class="material-symbols-outlined text-xl">edit</span>
+          </a>
+          <form method="post" action="{% url 'custom_admin:maintenance_delete' window.pk %}" class="inline"
+            onsubmit="return confirm('Delete this scheduled maintenance?');">
+            {% csrf_token %}
+            <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+              <span class="material-symbols-outlined text-xl">delete</span>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════════════════════════
+       MAINTENANCE HISTORY
+       ══════════════════════════════════════════════════════════════ -->
+  <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <div class="p-6 border-b border-slate-100 flex items-center gap-2">
+      <span class="material-symbols-outlined text-slate-600">history</span>
+      <h3 class="text-lg font-bold text-slate-900 font-headline">Maintenance History</h3>
+      <span class="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">{{ past_windows|length }}</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Maintenance</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Period</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Duration</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Severity</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Services</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for window in past_windows %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <p class="font-semibold text-slate-900 text-sm">{{ window.title }}</p>
+              {% if window.description %}<p class="text-xs text-slate-500 mt-0.5">{{ window.description|truncatewords:10 }}</p>{% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <p class="text-sm text-slate-700">{{ window.starts_at|date:"M d, Y H:i" }}</p>
+              <p class="text-xs text-slate-500">to {{ window.ends_at|date:"M d, Y H:i" }}</p>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm text-slate-700 font-medium">{{ window.duration_display }}</span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold severity-{{ window.severity }} border">
+                <span class="w-1.5 h-1.5 rounded-full severity-dot-{{ window.severity }}"></span>
+                {{ window.get_severity_display }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <div class="flex flex-wrap gap-1">
+                {% for svc in window.affected_services_list %}
+                <span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">{{ svc }}</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <a href="{% url 'custom_admin:maintenance' %}?edit={{ window.pk }}"
+                  class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                  <span class="material-symbols-outlined text-xl">edit</span>
+                </a>
+                <form method="post" action="{% url 'custom_admin:maintenance_delete' window.pk %}" class="inline"
+                  onsubmit="return confirm('Delete this maintenance record?');">
+                  {% csrf_token %}
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                    <span class="material-symbols-outlined text-xl">delete</span>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="px-6 py-12 text-center">
+              <span class="material-symbols-outlined text-4xl text-slate-300 mb-2">history</span>
+              <p class="text-sm text-slate-500">No past maintenance records</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Countdown timer logic
+function updateCountdown(elementId, targetDate, isEndTime) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const target = new Date(targetDate).getTime();
+
+  function tick() {
+    const now = Date.now();
+    const diff = target - now;
+
+    if (diff <= 0) {
+      el.textContent = isEndTime ? 'Maintenance Complete' : 'Starting Now...';
+      // Reload the page after a short delay to reflect new status
+      setTimeout(() => window.location.reload(), 3000);
+      return;
+    }
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+    let display = '';
+    if (days > 0) display += days + 'd ';
+    display += String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    el.textContent = display;
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// Active maintenance countdown (time remaining)
+const activeEl = document.getElementById('countdown-active');
+if (activeEl) {
+  updateCountdown('countdown-active', activeEl.dataset.end, true);
+}
+
+// Upcoming maintenance countdown (time until start)
+const upcomingEl = document.getElementById('countdown-upcoming');
+if (upcomingEl) {
+  updateCountdown('countdown-upcoming', upcomingEl.dataset.start, false);
+}
+
+// "All" checkbox logic: when "All" is checked, uncheck others; when others are checked, uncheck "All"
+document.querySelectorAll('input[name="affected_services"]').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    if (this.value === 'all' && this.checked) {
+      document.querySelectorAll('input[name="affected_services"]').forEach(function(other) {
+        if (other.value !== 'all') other.checked = false;
+      });
+    } else if (this.value !== 'all' && this.checked) {
+      const allCb = document.querySelector('input[name="affected_services"][value="all"]');
+      if (allCb) allCb.checked = false;
+    }
+  });
+});
+</script>
+{% endblock %}

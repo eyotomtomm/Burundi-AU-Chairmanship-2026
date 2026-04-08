@@ -1005,7 +1005,10 @@ def verification_requests_list(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def verification_request_review(request, pk):
-    ver_request = get_object_or_404(VerificationRequest, pk=pk)
+    ver_request = get_object_or_404(
+        VerificationRequest.objects.select_related('user', 'reviewed_by').prefetch_related('social_media_profiles'),
+        pk=pk
+    )
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'approve':

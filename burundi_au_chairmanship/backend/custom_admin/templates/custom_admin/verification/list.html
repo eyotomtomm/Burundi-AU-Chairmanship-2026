@@ -81,6 +81,10 @@
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'pending' %}bg-amber-500 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Pending
     </a>
+    <a href="{% url 'custom_admin:verification_requests_list' %}?status=appealed"
+       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'appealed' %}bg-blue-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+      Appealed
+    </a>
     <a href="{% url 'custom_admin:verification_requests_list' %}?status=approved"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'approved' %}bg-emerald-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Approved
@@ -122,27 +126,32 @@
             </td>
             <td class="px-6 py-4 text-sm text-slate-700 font-medium">{{ ver.full_name }}</td>
             <td class="px-6 py-4">
+              {% if ver.badge_type %}
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
                 {% if ver.badge_type == 'BLUE' %}bg-blue-50 text-blue-700 border border-blue-200
                 {% elif ver.badge_type == 'GOLD' %}bg-amber-50 text-amber-700 border border-amber-200
-                {% elif ver.badge_type == 'GOVERNMENT' %}bg-purple-50 text-purple-700 border border-purple-200
                 {% endif %}">
                 <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1">
-                  {% if ver.badge_type == 'BLUE' %}verified{% elif ver.badge_type == 'GOLD' %}workspace_premium{% elif ver.badge_type == 'GOVERNMENT' %}shield{% endif %}
+                  {% if ver.badge_type == 'BLUE' %}verified{% elif ver.badge_type == 'GOLD' %}workspace_premium{% endif %}
                 </span>
                 {{ ver.get_badge_type_display }}
               </span>
+              {% else %}
+              <span class="text-xs text-slate-400">--</span>
+              {% endif %}
             </td>
             <td class="px-6 py-4">
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
                 {% if ver.status == 'pending' %}bg-amber-50 text-amber-700 border border-amber-200
                 {% elif ver.status == 'approved' %}bg-emerald-50 text-emerald-700 border border-emerald-200
                 {% elif ver.status == 'rejected' %}bg-red-50 text-red-700 border border-red-200
+                {% elif ver.status == 'appealed' %}bg-blue-50 text-blue-700 border border-blue-200
                 {% endif %}">
                 <span class="material-symbols-outlined text-sm">
                   {% if ver.status == 'pending' %}schedule
                   {% elif ver.status == 'approved' %}check_circle
                   {% elif ver.status == 'rejected' %}cancel
+                  {% elif ver.status == 'appealed' %}gavel
                   {% endif %}
                 </span>
                 {{ ver.get_status_display }}

@@ -41,7 +41,7 @@ from .models import (
     WeeklyReport, UserSession, FunnelStep, EngagementHeatmap,
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
     EventComment, CommentMention, NewsletterEdition,
-    Podcast, EventAgendaItem,
+    EventAgendaItem,
 )
 from .serializers import (
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
@@ -73,7 +73,7 @@ from .serializers import (
     AccountMergeRequestSerializer,
     ArticleRevisionSerializer, TranslationRequestSerializer,
     EventCommentSerializer, NewsletterEditionSerializer, EventAttendeeSerializer,
-    PodcastSerializer, EventAgendaItemSerializer,
+    EventAgendaItemSerializer,
 )
 
 
@@ -3367,18 +3367,6 @@ def generate_weekly_report(request):
         top_content={},
     )
     return Response(WeeklyReportSerializer(report).data, status=201)
-
-
-# ══════════════════════════════════════════════════════════════
-# Podcast ViewSet
-# ══════════════════════════════════════════════════════════════
-
-class PodcastViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: list and retrieve active podcast episodes."""
-    permission_classes = [AllowAny]
-    queryset = Podcast.objects.filter(is_active=True)
-    serializer_class = PodcastSerializer
-    pagination_class = PageNumberPagination
 
 
 # ══════════════════════════════════════════════════════════════

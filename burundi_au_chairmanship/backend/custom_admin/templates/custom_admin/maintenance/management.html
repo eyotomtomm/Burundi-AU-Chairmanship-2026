@@ -14,6 +14,12 @@
   @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 70% { box-shadow: 0 0 0 12px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
   .service-chip { transition: all 0.15s ease; }
   .service-chip input:checked + span { background: #1e293b; color: #fff; border-color: #1e293b; }
+
+  /* Dark mode overrides for hardcoded colors */
+  .dark .severity-minor { background: rgba(6, 78, 59, 0.3); color: #6EE7B7; border-color: rgba(5, 150, 105, 0.4); }
+  .dark .severity-major { background: rgba(120, 53, 15, 0.3); color: #FCD34D; border-color: rgba(245, 158, 11, 0.4); }
+  .dark .severity-critical { background: rgba(127, 29, 29, 0.3); color: #FCA5A5; border-color: rgba(239, 68, 68, 0.4); }
+  .dark .service-chip input:checked + span { background: #F59E0B; color: #fff; border-color: #F59E0B; }
 </style>
 {% endblock %}
 

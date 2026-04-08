@@ -3466,29 +3466,6 @@ class TranslationRequest(models.Model):
         return f"{self.content_type}:{self.object_id} ({self.source_language}->{self.target_language}) [{self.status}]"
 
 
-# ── Podcast Model ─────────────────────────────────────────────
-class Podcast(models.Model):
-    """Audio podcast episodes with cover art and metadata."""
-    title = models.CharField(max_length=300)
-    title_fr = models.CharField(max_length=300, blank=True)
-    description = models.TextField(blank=True)
-    description_fr = models.TextField(blank=True)
-    audio_file = models.FileField(upload_to='podcasts/')
-    cover_image = models.ImageField(upload_to='podcast_covers/', null=True, blank=True, validators=[validate_image_file])
-    duration_seconds = models.PositiveIntegerField(default=0)
-    episode_number = models.PositiveIntegerField(default=1)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = 'Podcast'
-        verbose_name_plural = 'Podcasts'
-
-    def __str__(self):
-        return f"Ep. {self.episode_number}: {self.title}"
-
-
 # ── Event Agenda Item Model ───────────────────────────────────
 class EventAgendaItem(models.Model):
     """Individual agenda items/sessions within an event, supporting multi-track schedules."""
@@ -3599,6 +3576,6 @@ for _model in [
     VerificationRequest, WeatherCity, Popup, UserProfile,
     # New models with image fields
     ArticleDraft, ArticleSeries, EventSpeaker, EventPhoto,
-    DirectMessage, ContactDirectory, OnboardingStep, Podcast,
+    DirectMessage, ContactDirectory, OnboardingStep,
 ]:
     pre_save.connect(_auto_optimize_image, sender=_model)

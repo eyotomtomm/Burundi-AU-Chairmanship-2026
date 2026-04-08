@@ -954,12 +954,6 @@ class ApiService {
     return await _post('admin/auto-translate/', {'text': text, 'source': source, 'target': target}, auth: true);
   }
 
-  // ── Podcasts ────────────────────────────────────────────
-  Future<List<Map<String, dynamic>>> getPodcasts() async {
-    final data = await _get('podcasts/');
-    return _extractResults(data).cast<Map<String, dynamic>>();
-  }
-
   // ── Event Agenda Items ──────────────────────────────────
   Future<List<Map<String, dynamic>>> getEventAgendaItems(int eventId) async {
     final data = await _get('event-agenda-items/?event=$eventId');

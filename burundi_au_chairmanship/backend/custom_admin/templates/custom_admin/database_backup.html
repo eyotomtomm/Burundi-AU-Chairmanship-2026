@@ -112,12 +112,14 @@
           </td>
           <td class="py-3 pr-4 text-slate-600 font-mono text-xs">
             {% if backup.file_size > 0 %}
+              {% widthratio backup.file_size 1024 1 as size_kb %}
               {% if backup.file_size < 1024 %}
                 {{ backup.file_size }} B
               {% elif backup.file_size < 1048576 %}
-                {{ backup.file_size|floatformat:0 }} KB
+                {{ size_kb }} KB
               {% else %}
-                {{ backup.file_size|floatformat:0 }} MB
+                {% widthratio backup.file_size 1048576 1 as size_mb %}
+                {{ size_mb }} MB
               {% endif %}
             {% else %}
               --

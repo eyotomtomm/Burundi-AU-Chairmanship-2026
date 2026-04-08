@@ -39,7 +39,6 @@ router.register('announcement-banners', views.AnnouncementBannerViewSet, basenam
 router.register('contact-directory', views.ContactDirectoryViewSet, basename='contact-directory')
 router.register('live-qa', views.LiveQAViewSet, basename='live-qa')
 router.register('onboarding-steps', views.OnboardingStepViewSet, basename='onboarding-step')
-router.register('podcasts', views.PodcastViewSet, basename='podcast')
 router.register('event-agenda-items', views.EventAgendaItemViewSet, basename='event-agenda-item')
 
 urlpatterns = [

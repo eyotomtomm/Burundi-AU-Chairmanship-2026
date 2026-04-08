@@ -22,7 +22,7 @@ from .models import (
     AuditLogEntry, AccountMergeRequest, FunnelStep,
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
     EventComment, CommentMention, NewsletterEdition,
-    Podcast, EventAgendaItem,
+    EventAgendaItem,
 )
 
 
@@ -1393,14 +1393,6 @@ class TranslationRequestSerializer(serializers.ModelSerializer):
         if obj.assigned_to:
             return obj.assigned_to.get_full_name() or obj.assigned_to.username
         return None
-
-
-class PodcastSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Podcast
-        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'audio_file', 'cover_image', 'duration_seconds',
-                  'episode_number', 'is_active', 'created_at']
 
 
 class EventAgendaItemSerializer(serializers.ModelSerializer):

@@ -3,7 +3,7 @@
 {% block title %}Edit Email Template - AU Chairmanship Admin{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div class="max-w-5xl mx-auto">
   <div class="flex items-center gap-4 mb-8">
     <a href="{% url 'custom_admin:email_templates_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
       <span class="material-symbols-outlined text-slate-600">arrow_back</span>
@@ -14,37 +14,212 @@
     </div>
   </div>
 
-  <form method="post" class="space-y-6">
-    {% csrf_token %}
-    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subject (EN)</label>
-          <input type="text" name="subject" value="{{ template.subject }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Form Column -->
+    <div class="lg:col-span-2">
+      <form method="post" class="space-y-6" id="emailTemplateForm">
+        {% csrf_token %}
+        <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subject (EN)</label>
+              <input type="text" name="subject" value="{{ template.subject }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subject (FR)</label>
+              <input type="text" name="subject_fr" value="{{ template.subject_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent">
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-sm font-semibold text-slate-700">Body HTML (EN)</label>
+              <button type="button" onclick="updatePreview()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">visibility</span>
+                Update Preview
+              </button>
+            </div>
+            <textarea name="body_html" id="bodyHtmlEn" rows="12" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-transparent" oninput="updatePreview()">{{ template.body_html }}</textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Body HTML (FR)</label>
+            <textarea name="body_html_fr" id="bodyHtmlFr" rows="12" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-transparent">{{ template.body_html_fr|default:'' }}</textarea>
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="is_active" {% if template.is_active %}checked{% endif %} class="rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+            <span class="text-sm text-slate-700">Active</span>
+          </label>
         </div>
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Subject (FR)</label>
-          <input type="text" name="subject_fr" value="{{ template.subject_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent">
+        <div class="flex gap-3">
+          <a href="{% url 'custom_admin:email_templates_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
+          <button type="submit" class="bg-rose-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-rose-700 transition-all shadow-sm">Save Template</button>
+          <button type="button" onclick="sendTestEmail()" class="bg-white border border-blue-300 text-blue-600 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-blue-50 transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">send</span>
+            Send Test
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Sidebar: Variables & Preview -->
+    <div class="space-y-6">
+      <!-- Available Variables -->
+      <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm text-rose-500">code</span>
+          Template Variables
+        </h3>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('user_name')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} user_name {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">User's full name</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('user_email')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} user_email {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">User's email</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('app_name')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} app_name {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">App name</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('action_url')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} action_url {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Call-to-action link</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('otp_code')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} otp_code {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">OTP verification code</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('event_name')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} event_name {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Event title</span>
+          </div>
+          <div class="flex items-center justify-between p-2 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors" onclick="insertVariable('event_date')">
+            <code class="text-xs text-rose-600 font-mono">{% templatetag openvariable %} event_date {% templatetag closevariable %}</code>
+            <span class="text-[10px] text-slate-500">Event date</span>
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-3">Click a variable to insert it at cursor position</p>
+      </div>
+
+      <!-- Live Preview -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm text-blue-500">preview</span>
+            Live Preview
+          </h3>
+          <div class="flex gap-1">
+            <button type="button" onclick="switchPreviewLang('en')" class="px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700" id="previewLangEn">EN</button>
+            <button type="button" onclick="switchPreviewLang('fr')" class="px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-500" id="previewLangFr">FR</button>
+          </div>
+        </div>
+        <div class="p-4 bg-slate-50">
+          <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <!-- Email header preview -->
+            <div class="bg-gradient-to-r from-green-700 to-green-600 p-4 text-center">
+              <p class="text-white font-bold text-sm">Burundi AU Chairmanship 2026</p>
+            </div>
+            <div class="p-4" id="emailPreviewBody">
+              <p class="text-sm text-slate-400 italic">Type in the Body HTML field to see preview...</p>
+            </div>
+            <div class="bg-slate-50 p-3 text-center border-t border-slate-200">
+              <p class="text-[10px] text-slate-400">&copy; 2026 Burundi AU Chairmanship</p>
+            </div>
+          </div>
         </div>
       </div>
-      <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Body HTML (EN)</label>
-        <textarea name="body_html" rows="12" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-transparent">{{ template.body_html }}</textarea>
-        <p class="text-xs text-slate-500 mt-1">Available variables: {{ '{{' }}user_name{{ '}}' }}, {{ '{{' }}app_name{{ '}}' }}, {{ '{{' }}action_url{{ '}}' }}</p>
-      </div>
-      <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Body HTML (FR)</label>
-        <textarea name="body_html_fr" rows="12" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm font-mono focus:ring-2 focus:ring-rose-500 focus:border-transparent">{{ template.body_html_fr|default:'' }}</textarea>
-      </div>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="is_active" {% if template.is_active %}checked{% endif %} class="rounded border-slate-300 text-rose-600 focus:ring-rose-500">
-        <span class="text-sm text-slate-700">Active</span>
-      </label>
     </div>
-    <div class="flex gap-3">
-      <a href="{% url 'custom_admin:email_templates_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
-      <button type="submit" class="bg-rose-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-rose-700 transition-all shadow-sm">Save Template</button>
-    </div>
-  </form>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Sample data for preview
+const sampleData = {
+  user_name: 'Jean Pierre',
+  user_email: 'jean@example.com',
+  app_name: 'Burundi AU Chairmanship',
+  action_url: 'https://burundi4africa.com',
+  otp_code: '847291',
+  event_name: 'AU Summit 2026',
+  event_date: 'January 15, 2026',
+};
+
+let previewLang = 'en';
+
+function updatePreview() {
+  const textarea = previewLang === 'en'
+    ? document.getElementById('bodyHtmlEn')
+    : document.getElementById('bodyHtmlFr');
+  let html = textarea.value || '';
+
+  // Replace template variables with sample data
+  Object.keys(sampleData).forEach(function(key) {
+    // Handle both {{ var }} and {{var}} formats
+    const patterns = [
+      new RegExp('\\{\\{\\s*' + key + '\\s*\\}\\}', 'g'),
+    ];
+    patterns.forEach(function(re) {
+      html = html.replace(re, '<span class="bg-yellow-100 text-yellow-800 px-1 rounded font-semibold">' + sampleData[key] + '</span>');
+    });
+  });
+
+  document.getElementById('emailPreviewBody').innerHTML = html || '<p class="text-sm text-slate-400 italic">Type in the Body HTML field to see preview...</p>';
+}
+
+function switchPreviewLang(lang) {
+  previewLang = lang;
+  document.getElementById('previewLangEn').className = lang === 'en'
+    ? 'px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700'
+    : 'px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-500';
+  document.getElementById('previewLangFr').className = lang === 'fr'
+    ? 'px-2 py-1 text-[10px] font-bold rounded bg-blue-100 text-blue-700'
+    : 'px-2 py-1 text-[10px] font-bold rounded bg-slate-100 text-slate-500';
+  updatePreview();
+}
+
+function insertVariable(name) {
+  const textarea = document.getElementById(previewLang === 'en' ? 'bodyHtmlEn' : 'bodyHtmlFr');
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  const variable = '{{ ' + name + ' }}';
+  textarea.value = text.substring(0, start) + variable + text.substring(end);
+  textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+  textarea.focus();
+  updatePreview();
+}
+
+function sendTestEmail() {
+  const email = prompt('Send test email to:', '{{ request.user.email }}');
+  if (!email) return;
+
+  const form = document.getElementById('emailTemplateForm');
+  const formData = new FormData(form);
+  formData.append('send_test', '1');
+  formData.append('test_email', email);
+
+  fetch(window.location.href, {
+    method: 'POST',
+    body: formData,
+    credentials: 'same-origin',
+  })
+  .then(function(resp) { return resp.json(); })
+  .then(function(data) {
+    if (data.success) {
+      alert('Test email sent to ' + email);
+    } else {
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  })
+  .catch(function() {
+    alert('Test email request sent. Check your inbox.');
+    window.location.reload();
+  });
+}
+
+// Initial preview
+document.addEventListener('DOMContentLoaded', updatePreview);
+</script>
 {% endblock %}

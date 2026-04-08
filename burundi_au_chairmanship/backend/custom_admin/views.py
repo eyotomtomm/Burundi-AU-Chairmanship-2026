@@ -25,7 +25,7 @@ from core.models import (
     Poll, PollOption, Discussion, ContactDirectory, AnnouncementBanner,
     EmailTemplate, EventSpeaker, OnboardingStep, Webhook,
     ScheduledMaintenance, LoginHistory, Bookmark, Reaction,
-    TranslationEntry,
+    TranslationEntry, RateLimitLog,
 )
 
 
@@ -2281,6 +2281,83 @@ def analytics_dashboard(request):
     os_labels = [d['device_os'] for d in os_data]
     os_counts = [d['count'] for d in os_data]
 
+    # ─── ADVANCED ANALYTICS (features 131-140) ───
+
+    # --- 132. Funnel Analysis ---
+    total_registered = total_users
+    verified_users = UserProfile.objects.filter(is_verified=True).count()
+    try:
+        event_registered_users = EventSubmission.objects.values('user').distinct().count()
+    except Exception:
+        event_registered_users = 0
+    funnel_verify_pct = round(verified_users / max(total_registered, 1) * 100, 1)
+    funnel_event_pct = round(event_registered_users / max(total_registered, 1) * 100, 1)
+
+    # --- 133. Cohort Analysis (monthly, last 6 months) ---
+    cohort_data = list(
+        User.objects.filter(date_joined__gte=now - timedelta(days=180))
+        .annotate(cohort=TruncMonth('date_joined'))
+        .values('cohort')
+        .annotate(
+            total=Count('id'),
+            retained=Count('id', filter=Q(last_login__gte=now - timedelta(days=30)))
+        )
+        .order_by('cohort')
+    )
+    # Format cohort dates for template
+    for c in cohort_data:
+        c['cohort_label'] = c['cohort'].strftime('%b %Y')
+        c['retention_pct'] = round(c['retained'] / max(c['total'], 1) * 100, 1)
+
+    # --- 135. Device Analytics (device_type breakdown) ---
+    device_type_data = list(
+        UserProfile.objects.exclude(device_type='')
+        .values('device_type')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:10]
+    )
+    device_type_labels = [d['device_type'] for d in device_type_data]
+    device_type_counts = [d['count'] for d in device_type_data]
+
+    # --- 137. Event Attendance ---
+    try:
+        from core.models import EventCheckIn
+        total_checkins = EventCheckIn.objects.filter(checked_in=True).count()
+    except Exception:
+        total_checkins = 0
+
+    total_event_submissions = EventSubmission.objects.count()
+
+    # Per-event registration stats (EventRegistration cards with submission counts)
+    event_attendance = list(
+        EventRegistration.objects.annotate(
+            sub_count=Count('submissions'),
+        ).filter(sub_count__gt=0).order_by('-created_at')[:10]
+    )
+
+    # --- 138. Admin KPI Dashboard ---
+    dau = active_today
+    mau = active_30d
+    content_published_30d = Article.objects.filter(created_at__gte=now - timedelta(days=30)).count()
+    try:
+        tickets_resolved_30d = SupportTicket.objects.filter(
+            status='resolved',
+            updated_at__gte=now - timedelta(days=30)
+        ).count()
+    except Exception:
+        tickets_resolved_30d = 0
+    try:
+        open_tickets = SupportTicket.objects.filter(status='open').count()
+    except Exception:
+        open_tickets = 0
+
+    # Staff email recipients for weekly report config
+    staff_emails = list(
+        User.objects.filter(Q(is_staff=True) | Q(is_superuser=True))
+        .exclude(email='')
+        .values_list('email', flat=True)
+    )
+
     context = {
         # User metrics
         'total_users': total_users,
@@ -2322,6 +2399,37 @@ def analytics_dashboard(request):
         # Device stats
         'os_labels_json': os_labels,
         'os_counts_json': os_counts,
+
+        # --- Advanced Analytics ---
+
+        # Funnel Analysis (132)
+        'total_registered': total_registered,
+        'verified_users': verified_users,
+        'event_registered_users': event_registered_users,
+        'funnel_verify_pct': funnel_verify_pct,
+        'funnel_event_pct': funnel_event_pct,
+
+        # Cohort Analysis (133)
+        'cohort_data': cohort_data,
+
+        # Device Analytics (135)
+        'device_type_labels_json': device_type_labels,
+        'device_type_counts_json': device_type_counts,
+
+        # Event Attendance (137)
+        'total_event_submissions': total_event_submissions,
+        'total_checkins': total_checkins,
+        'event_attendance': event_attendance,
+
+        # Admin KPI (138)
+        'dau': dau,
+        'mau': mau,
+        'content_published_30d': content_published_30d,
+        'tickets_resolved_30d': tickets_resolved_30d,
+        'open_tickets': open_tickets,
+
+        # Weekly Report config (139)
+        'staff_emails': staff_emails,
     }
     return render(request, 'custom_admin/analytics/dashboard.html', context)
 
@@ -2359,6 +2467,162 @@ def analytics_export_pdf(request):
     filename = f'burundi_au_{report_type}_report_{month_str or "current"}.pdf'
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+# ═══════════════════════════════════════════════════════════════
+#  NATIONALITY MAP / HEATMAP
+# ═══════════════════════════════════════════════════════════════
+
+AFRICAN_REGIONS = {
+    'North Africa': {
+        'color': '#3b82f6',
+        'countries': [
+            'Algeria', 'Egypt', 'Libya', 'Mauritania', 'Morocco',
+            'Sahrawi Republic', 'Sudan', 'Tunisia',
+        ],
+    },
+    'West Africa': {
+        'color': '#22c55e',
+        'countries': [
+            'Benin', 'Burkina Faso', 'Cape Verde', 'Cabo Verde',
+            "Cote d'Ivoire", "Ivory Coast", 'Gambia', 'Ghana', 'Guinea',
+            'Guinea-Bissau', 'Liberia', 'Mali', 'Niger', 'Nigeria',
+            'Senegal', 'Sierra Leone', 'Togo',
+        ],
+    },
+    'East Africa': {
+        'color': '#f97316',
+        'countries': [
+            'Burundi', 'Comoros', 'Djibouti', 'Eritrea', 'Ethiopia',
+            'Kenya', 'Madagascar', 'Mauritius', 'Rwanda', 'Seychelles',
+            'Somalia', 'South Sudan', 'Tanzania', 'Uganda',
+        ],
+    },
+    'Central Africa': {
+        'color': '#a855f7',
+        'countries': [
+            'Cameroon', 'Central African Republic', 'Chad', 'Congo',
+            'Republic of the Congo', 'Democratic Republic of the Congo',
+            'DR Congo', 'DRC', 'Equatorial Guinea', 'Gabon',
+            'Sao Tome and Principe',
+        ],
+    },
+    'Southern Africa': {
+        'color': '#ef4444',
+        'countries': [
+            'Angola', 'Botswana', 'Eswatini', 'Swaziland', 'Lesotho',
+            'Malawi', 'Mozambique', 'Namibia', 'South Africa', 'Zambia',
+            'Zimbabwe',
+        ],
+    },
+}
+
+
+def _get_region(country_name):
+    """Return the African region for a country, or 'Other' if not found."""
+    name_lower = country_name.lower().strip()
+    for region_name, info in AFRICAN_REGIONS.items():
+        for c in info['countries']:
+            if c.lower() == name_lower:
+                return region_name
+    return 'Other'
+
+
+def _get_region_color(region_name):
+    """Return the colour for a region."""
+    if region_name in AFRICAN_REGIONS:
+        return AFRICAN_REGIONS[region_name]['color']
+    return '#64748b'  # slate for "Other"
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def nationality_map(request):
+    """Detailed nationality analytics with regional grouping."""
+    import json
+
+    total_users = User.objects.count()
+
+    # Full nationality data (no limit)
+    raw_data = list(
+        UserProfile.objects.exclude(nationality='')
+        .exclude(nationality__isnull=True)
+        .values('nationality')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+
+    total_with_nationality = sum(d['count'] for d in raw_data)
+    max_count = raw_data[0]['count'] if raw_data else 1
+
+    # Build enriched nationality list
+    nationality_data = []
+    for d in raw_data:
+        region = _get_region(d['nationality'])
+        region_color = _get_region_color(region)
+        pct = round(d['count'] / total_with_nationality * 100, 1) if total_with_nationality else 0
+        bar_width = round(d['count'] / max_count * 100, 1) if max_count else 0
+        nationality_data.append({
+            'nationality': d['nationality'],
+            'count': d['count'],
+            'percentage': pct,
+            'bar_width': bar_width,
+            'region': region,
+            'region_color': region_color,
+        })
+
+    # Aggregate by region
+    region_agg = {}
+    for item in nationality_data:
+        r = item['region']
+        if r not in region_agg:
+            region_agg[r] = {'count': 0, 'countries': 0, 'country_list': []}
+        region_agg[r]['count'] += item['count']
+        region_agg[r]['countries'] += 1
+        region_agg[r]['country_list'].append({
+            'name': item['nationality'],
+            'count': item['count'],
+        })
+
+    # Build ordered region list
+    region_order = ['East Africa', 'West Africa', 'North Africa', 'Central Africa', 'Southern Africa', 'Other']
+    regions = []
+    for rname in region_order:
+        if rname not in region_agg:
+            continue
+        info = region_agg[rname]
+        pct = round(info['count'] / total_with_nationality * 100, 1) if total_with_nationality else 0
+        # Calculate bar widths within region
+        region_max = max((c['count'] for c in info['country_list']), default=1)
+        for c in info['country_list']:
+            c['region_bar_width'] = round(c['count'] / region_max * 100, 1) if region_max else 0
+        regions.append({
+            'name': rname,
+            'color': _get_region_color(rname),
+            'count': info['count'],
+            'countries': info['countries'],
+            'percentage': pct,
+            'country_list': sorted(info['country_list'], key=lambda x: x['count'], reverse=True),
+        })
+
+    # Summary values
+    top_nationality = raw_data[0]['nationality'] if raw_data else 'N/A'
+    top_nationality_count = raw_data[0]['count'] if raw_data else 0
+    coverage_pct = round(total_with_nationality / total_users * 100, 1) if total_users else 0
+
+    context = {
+        'nationality_data': nationality_data,
+        'regions': regions,
+        'total_nationalities': len(raw_data),
+        'total_with_nationality': total_with_nationality,
+        'total_users': total_users,
+        'top_nationality': top_nationality,
+        'top_nationality_count': top_nationality_count,
+        'coverage_pct': coverage_pct,
+        'nat_labels_json': json.dumps([d['nationality'] for d in nationality_data]),
+        'nat_counts_json': json.dumps([d['count'] for d in nationality_data]),
+    }
+    return render(request, 'custom_admin/analytics/nationality_map.html', context)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -2600,8 +2864,41 @@ def email_templates_list(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def email_template_edit(request, pk):
+    import re as re_module
     template = get_object_or_404(EmailTemplate, pk=pk)
     if request.method == 'POST':
+        # Check if this is a test email send request
+        if request.POST.get('send_test'):
+            test_email = request.POST.get('test_email', request.user.email)
+            body_html = request.POST.get('body_html', template.body_html)
+            subject = request.POST.get('subject', template.subject)
+            # Replace template variables with sample data
+            sample_data = {
+                'user_name': request.user.get_full_name() or request.user.username,
+                'user_email': request.user.email,
+                'app_name': 'Burundi AU Chairmanship',
+                'action_url': 'https://burundi4africa.com',
+                'otp_code': '123456',
+                'event_name': 'Sample Event',
+                'event_date': 'January 15, 2026',
+            }
+            for key, val in sample_data.items():
+                body_html = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, body_html)
+                subject = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, subject)
+            try:
+                from django.core.mail import send_mail
+                send_mail(
+                    subject=f'[TEST] {subject}',
+                    message='',
+                    html_message=body_html,
+                    from_email=None,
+                    recipient_list=[test_email],
+                    fail_silently=False,
+                )
+                return JsonResponse({'success': True})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)})
+
         template.subject = request.POST.get('subject')
         template.subject_fr = request.POST.get('subject_fr', '')
         template.body_html = request.POST.get('body_html')
@@ -3191,3 +3488,122 @@ def translation_manager(request):
         'current_status': status_filter or '',
         'current_search': search or '',
     })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RATE LIMITING DASHBOARD
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def rate_limiting_dashboard(request):
+    """Admin dashboard showing throttled requests, top offending IPs, and endpoint stats."""
+    import json
+    from datetime import timedelta
+    from django.db.models import Count, Min, Max
+    from django.db.models.functions import TruncHour, TruncDate
+
+    now = timezone.now()
+    period = request.GET.get('period', '24h')
+
+    # Determine time range
+    if period == '1h':
+        since = now - timedelta(hours=1)
+        period_label = 'Last Hour'
+    elif period == '7d':
+        since = now - timedelta(days=7)
+        period_label = 'Last 7 Days'
+    elif period == '30d':
+        since = now - timedelta(days=30)
+        period_label = 'Last 30 Days'
+    else:
+        since = now - timedelta(hours=24)
+        period = '24h'
+        period_label = 'Last 24 Hours'
+
+    base_qs = RateLimitLog.objects.filter(timestamp__gte=since)
+
+    # ── Summary counts ──
+    total_blocked = base_qs.count()
+    unique_ips = base_qs.values('ip_address').distinct().count()
+    unique_endpoints = base_qs.values('endpoint').distinct().count()
+    unique_users = base_qs.exclude(user__isnull=True).values('user').distinct().count()
+
+    # ── Top offending IPs ──
+    top_ips = list(
+        base_qs.values('ip_address')
+        .annotate(
+            block_count=Count('id'),
+            first_seen=Min('timestamp'),
+            last_seen=Max('timestamp'),
+        )
+        .order_by('-block_count')[:15]
+    )
+
+    # ── Top throttled endpoints ──
+    top_endpoints = list(
+        base_qs.values('endpoint')
+        .annotate(
+            block_count=Count('id'),
+            unique_ips=Count('ip_address', distinct=True),
+        )
+        .order_by('-block_count')[:15]
+    )
+
+    # ── Top throttle classes ──
+    top_throttle_classes = list(
+        base_qs.exclude(throttle_class='')
+        .values('throttle_class')
+        .annotate(block_count=Count('id'))
+        .order_by('-block_count')[:10]
+    )
+
+    # ── HTTP method breakdown ──
+    method_breakdown = list(
+        base_qs.values('request_method')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+
+    # ── Timeline chart (hourly for <=24h, daily for longer) ──
+    if period in ('1h', '24h'):
+        timeline_qs = (
+            base_qs.annotate(bucket=TruncHour('timestamp'))
+            .values('bucket')
+            .annotate(count=Count('id'))
+            .order_by('bucket')
+        )
+        timeline_labels = [t['bucket'].strftime('%H:%M') for t in timeline_qs]
+    else:
+        timeline_qs = (
+            base_qs.annotate(bucket=TruncDate('timestamp'))
+            .values('bucket')
+            .annotate(count=Count('id'))
+            .order_by('bucket')
+        )
+        timeline_labels = [t['bucket'].strftime('%b %d') for t in timeline_qs]
+
+    timeline_data = [t['count'] for t in timeline_qs]
+
+    # ── Recent blocked requests (paginated) ──
+    recent_logs = base_qs.select_related('user').order_by('-timestamp')
+    paginator = Paginator(recent_logs, 25)
+    page = request.GET.get('page')
+    recent_logs_page = paginator.get_page(page)
+
+    context = {
+        'period': period,
+        'period_label': period_label,
+        'total_blocked': total_blocked,
+        'unique_ips': unique_ips,
+        'unique_endpoints': unique_endpoints,
+        'unique_users': unique_users,
+        'top_ips': top_ips,
+        'top_endpoints': top_endpoints,
+        'top_throttle_classes': top_throttle_classes,
+        'method_breakdown': method_breakdown,
+        'timeline_labels_json': json.dumps(timeline_labels),
+        'timeline_data_json': json.dumps(timeline_data),
+        'recent_logs': recent_logs_page,
+    }
+    return render(request, 'custom_admin/analytics/rate_limiting.html', context)

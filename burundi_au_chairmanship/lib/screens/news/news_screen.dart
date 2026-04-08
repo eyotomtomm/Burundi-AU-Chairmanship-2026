@@ -9,6 +9,7 @@ import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/translate_button.dart';
 import 'article_detail_screen.dart';
 
 class NewsScreen extends StatefulWidget {
@@ -156,6 +157,7 @@ class _NewsScreenState extends State<NewsScreen> {
         icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
         onPressed: () => Navigator.pop(context),
       ),
+      actions: const [TranslateButton()],
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
           l10n.translate('news'),

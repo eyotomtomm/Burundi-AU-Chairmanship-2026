@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/verified_badge.dart';
 import '../../services/api_service.dart';
+import '../../widgets/translate_button.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -64,6 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
+                actions: const [TranslateButton()],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: const BoxDecoration(

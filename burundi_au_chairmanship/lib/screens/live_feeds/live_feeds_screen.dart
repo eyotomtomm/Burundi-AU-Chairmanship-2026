@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/translate_button.dart';
 import 'video_player_screen.dart';
 import 'youtube_player_screen.dart';
 import 'in_app_webview_screen.dart';
@@ -215,6 +216,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       pinned: true,
       backgroundColor: isDark ? AppColors.darkSurface : AppColors.burundiGreen,
       foregroundColor: Colors.white,
+      actions: const [TranslateButton()],
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
           l10n.liveFeeds,

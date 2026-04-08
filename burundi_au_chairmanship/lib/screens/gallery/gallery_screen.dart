@@ -6,6 +6,7 @@ import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/translate_button.dart';
 import 'album_detail_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -59,6 +60,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     expandedHeight: 120,
                     pinned: true,
                     backgroundColor: AppColors.burundiGreen,
+                    actions: const [TranslateButton()],
                     flexibleSpace: FlexibleSpaceBar(
                       title: const Text(
                         'Photo Gallery',

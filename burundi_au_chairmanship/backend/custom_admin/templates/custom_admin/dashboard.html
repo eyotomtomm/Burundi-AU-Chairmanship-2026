@@ -253,34 +253,30 @@
   <!-- Quick Actions -->
   <div class="col-span-12 lg:col-span-5 bg-surface-container-highest rounded-xl p-8 shadow-sm">
     <h4 class="text-lg font-bold mb-6">Quick Actions</h4>
-    <div class="grid grid-cols-1 gap-4">
-      <a href="{% url 'custom_admin:article_create' %}" class="flex items-center justify-between p-4 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all group no-underline">
-        <span class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-secondary">add_circle</span>
-          <span class="text-sm font-bold">New Article</span>
-        </span>
-        <span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+    <div class="grid grid-cols-2 gap-4">
+      <a href="{% url 'custom_admin:article_create' %}" class="flex flex-col items-center gap-3 p-5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all group no-underline text-center">
+        <span class="material-symbols-outlined text-3xl text-secondary">add_circle</span>
+        <span class="text-sm font-bold">New Article</span>
       </a>
-      <a href="{% url 'custom_admin:event_create' %}" class="flex items-center justify-between p-4 bg-white text-primary rounded-lg border border-slate-200 hover:border-secondary transition-all group no-underline">
-        <span class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-secondary">calendar_month</span>
-          <span class="text-sm font-bold">New Event</span>
-        </span>
-        <span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+      <a href="{% url 'custom_admin:event_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+        <span class="material-symbols-outlined text-3xl text-secondary">calendar_month</span>
+        <span class="text-sm font-bold">New Event</span>
       </a>
-      <a href="{% url 'custom_admin:live_feed_create' %}" class="flex items-center justify-between p-4 bg-white text-primary rounded-lg border border-slate-200 hover:border-secondary transition-all group no-underline">
-        <span class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-secondary">sensors</span>
-          <span class="text-sm font-bold">Schedule Live Feed</span>
-        </span>
-        <span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+      <a href="{% url 'custom_admin:live_feed_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+        <span class="material-symbols-outlined text-3xl text-secondary">sensors</span>
+        <span class="text-sm font-bold">Schedule Live Feed</span>
       </a>
-      <a href="{% url 'custom_admin:magazine_create' %}" class="flex items-center justify-between p-4 bg-white text-primary rounded-lg border border-slate-200 hover:border-secondary transition-all group no-underline">
-        <span class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-secondary">upload_file</span>
-          <span class="text-sm font-bold">Upload Magazine</span>
-        </span>
-        <span class="material-symbols-outlined text-xs opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+      <a href="{% url 'custom_admin:magazine_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+        <span class="material-symbols-outlined text-3xl text-secondary">upload_file</span>
+        <span class="text-sm font-bold">Upload Magazine</span>
+      </a>
+      <a href="{% url 'custom_admin:notification_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+        <span class="material-symbols-outlined text-3xl text-secondary">notifications_active</span>
+        <span class="text-sm font-bold">Push Notification</span>
+      </a>
+      <a href="{% url 'custom_admin:resource_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+        <span class="material-symbols-outlined text-3xl text-secondary">folder_open</span>
+        <span class="text-sm font-bold">New Resource</span>
       </a>
     </div>
   </div>

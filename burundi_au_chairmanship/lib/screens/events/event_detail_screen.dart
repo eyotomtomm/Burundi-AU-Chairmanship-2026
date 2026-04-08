@@ -11,6 +11,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/events/event_countdown.dart';
 import '../../widgets/events/event_info_card.dart';
+import '../../widgets/translate_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -32,6 +33,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final Map<String, TextEditingController> _formControllers = {};
   final Map<String, dynamic> _formValues = {};
 
+  // Speakers
+  List<Map<String, dynamic>> _speakers = [];
+
   // Proxy form controllers
   final _proxyNameController = TextEditingController();
   final _proxyEmailController = TextEditingController();
@@ -43,6 +47,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     _event = widget.event;
     _initFormControllers();
     _startCountdown();
+    _loadSpeakers();
   }
 
   void _initFormControllers() {
@@ -96,6 +101,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         _formValues.values.any((v) => v is String && v.isNotEmpty);
   }
 
+  Future<void> _loadSpeakers() async {
+    try {
+      final speakers = await ApiService().getEventSpeakers(eventId: _event.id);
+      if (mounted) {
+        setState(() {
+          _speakers = speakers;
+        });
+      }
+    } catch (_) {
+      // Speakers are optional, silently ignore errors
+    }
+  }
+
   void _startCountdown() {
     _updateTimeLeft();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -141,6 +159,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             expandedHeight: 300,
             pinned: true,
             backgroundColor: AppColors.burundiGreen,
+            actions: const [TranslateButton()],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
@@ -224,6 +243,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     isDark: isDark,
                   ),
                   const SizedBox(height: 20),
+
+                  // Speakers section
+                  if (_speakers.isNotEmpty)
+                    _buildSpeakersSection(isDark),
 
                   // Registration section
                   _buildRegistrationSection(context, langCode, isDark),
@@ -619,6 +642,90 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
 
+
+  // ── Speakers Section ─────────────────────────────────────
+
+  Widget _buildSpeakersSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Speakers',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : AppColors.lightText,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 160,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _speakers.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final speaker = _speakers[index];
+              final photoUrl = speaker['photo'] as String?;
+              return SizedBox(
+                width: 120,
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 36,
+                      backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
+                      backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(Environment.fixMediaUrl(photoUrl))
+                          : null,
+                      child: photoUrl == null || photoUrl.isEmpty
+                          ? Icon(Icons.person, size: 32, color: AppColors.burundiGreen)
+                          : null,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      speaker['name'] ?? '',
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : AppColors.lightText,
+                      ),
+                    ),
+                    if (speaker['title'] != null && (speaker['title'] as String).isNotEmpty)
+                      Text(
+                        speaker['title'],
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        ),
+                      ),
+                    if (speaker['organization'] != null && (speaker['organization'] as String).isNotEmpty)
+                      Text(
+                        speaker['organization'],
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.burundiGreen,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
 
   // ── Registration Section ──────────────────────────────────
 

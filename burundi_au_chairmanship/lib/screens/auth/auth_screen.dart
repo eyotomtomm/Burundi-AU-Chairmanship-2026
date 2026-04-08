@@ -5,6 +5,7 @@ import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/password_strength_meter.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -29,6 +30,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   bool _obscureSignInPassword = true;
   bool _obscureSignUpPassword = true;
   bool _obscureConfirmPassword = true;
+  String _signUpPassword = '';
 
   @override
   void initState() {
@@ -504,6 +506,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             icon: Icons.lock_outlined,
             obscureText: _obscureSignUpPassword,
             isDark: isDark,
+            onChanged: (value) => setState(() => _signUpPassword = value),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscureSignUpPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -520,6 +523,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               return null;
             },
           ),
+          PasswordStrengthMeter(password: _signUpPassword),
           const SizedBox(height: 14),
 
           // Confirm Password
@@ -657,12 +661,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     bool obscureText = false,
     Widget? suffixIcon,
     String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
       validator: validator,
+      onChanged: onChanged,
       style: TextStyle(fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,

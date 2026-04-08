@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/translate_button.dart';
 import 'video_detail_screen.dart';
 
 class VideosScreen extends StatefulWidget {
@@ -100,6 +101,7 @@ class _VideosScreenState extends State<VideosScreen> {
                     expandedHeight: 120,
                     pinned: true,
                     backgroundColor: AppColors.burundiRed,
+                    actions: const [TranslateButton()],
                     flexibleSpace: FlexibleSpaceBar(
                       title: const Text(
                         'Videos',

@@ -726,12 +726,6 @@ class ApiService {
     return await _post('polls/$pollId/vote/', {'option_id': optionId}, auth: true);
   }
 
-  // ── Contact Directory ─────────────────────────────────────
-  Future<List<Map<String, dynamic>>> getContactDirectory() async {
-    final data = await _get('contact-directory/');
-    return _extractResults(data).cast<Map<String, dynamic>>();
-  }
-
   // ── Announcement Banners ──────────────────────────────────
   Future<List<Map<String, dynamic>>> getAnnouncementBanners() async {
     final data = await _get('announcement-banners/');

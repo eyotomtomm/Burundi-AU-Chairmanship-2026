@@ -8,40 +8,92 @@
     <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Data Intelligence</span>
     <h1 class="text-3xl font-extrabold text-on-surface font-headline">Analytics &amp; Reports</h1>
   </div>
-  <!-- PDF Export Dropdown -->
-  <div class="relative" id="exportDropdown">
-    <button onclick="document.getElementById('exportMenu').classList.toggle('hidden')" class="flex items-center gap-2 bg-primary-container text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
-      <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-      Export PDF
-      <span class="material-symbols-outlined text-[16px]">expand_more</span>
-    </button>
-    <div id="exportMenu" class="hidden absolute right-0 mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 z-50 py-2">
-      <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=marketing" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
-        <span class="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
-        <div>
-          <p class="text-sm font-medium">Marketing Report</p>
-          <p class="text-xs text-on-surface-variant">Engagement &amp; growth</p>
-        </div>
-      </a>
-      <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=technical" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
-        <span class="material-symbols-outlined text-primary-container text-[18px]">devices</span>
-        <div>
-          <p class="text-sm font-medium">Technical Report</p>
-          <p class="text-xs text-on-surface-variant">Devices &amp; sessions</p>
-        </div>
-      </a>
-      <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=diplomacy" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
-        <span class="material-symbols-outlined text-amber-600 text-[18px]">public</span>
-        <div>
-          <p class="text-sm font-medium">Diplomacy Report</p>
-          <p class="text-xs text-on-surface-variant">Countries &amp; geography</p>
-        </div>
-      </a>
+  <!-- Export Buttons -->
+  <div class="flex items-center gap-3">
+    <!-- CSV Export -->
+    <a href="{% url 'custom_admin:export_analytics_csv' %}" class="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors">
+      <span class="material-symbols-outlined text-[18px]">table_chart</span>
+      Export CSV
+    </a>
+    <!-- PDF Export Dropdown -->
+    <div class="relative" id="exportDropdown">
+      <button onclick="document.getElementById('exportMenu').classList.toggle('hidden')" class="flex items-center gap-2 bg-primary-container text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+        <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+        Export PDF
+        <span class="material-symbols-outlined text-[16px]">expand_more</span>
+      </button>
+      <div id="exportMenu" class="hidden absolute right-0 mt-2 w-56 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/20 z-50 py-2">
+        <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=marketing" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
+          <span class="material-symbols-outlined text-secondary text-[18px]">trending_up</span>
+          <div>
+            <p class="text-sm font-medium">Marketing Report</p>
+            <p class="text-xs text-on-surface-variant">Engagement &amp; growth</p>
+          </div>
+        </a>
+        <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=technical" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
+          <span class="material-symbols-outlined text-primary-container text-[18px]">devices</span>
+          <div>
+            <p class="text-sm font-medium">Technical Report</p>
+            <p class="text-xs text-on-surface-variant">Devices &amp; sessions</p>
+          </div>
+        </a>
+        <a href="{% url 'custom_admin:analytics_export_pdf' %}?report_type=diplomacy" class="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors">
+          <span class="material-symbols-outlined text-amber-600 text-[18px]">public</span>
+          <div>
+            <p class="text-sm font-medium">Diplomacy Report</p>
+            <p class="text-xs text-on-surface-variant">Countries &amp; geography</p>
+          </div>
+        </a>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Summary Cards -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  138. ADMIN KPI DASHBOARD                                     -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-secondary">speed</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-secondary">Key Performance Indicators</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-blue-100 p-2 rounded-lg"><span class="material-symbols-outlined text-blue-600">today</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">DAU</span>
+      </div>
+      <h3 class="text-3xl font-extrabold">{{ dau }}</h3>
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Daily Active Users</p>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-indigo-500">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-indigo-100 p-2 rounded-lg"><span class="material-symbols-outlined text-indigo-600">date_range</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">MAU</span>
+      </div>
+      <h3 class="text-3xl font-extrabold">{{ mau }}</h3>
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Monthly Active Users</p>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-emerald-500">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-emerald-100 p-2 rounded-lg"><span class="material-symbols-outlined text-emerald-600">edit_note</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Content (30d)</span>
+      </div>
+      <h3 class="text-3xl font-extrabold">{{ content_published_30d }}</h3>
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Articles published</p>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-amber-500">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-amber-100 p-2 rounded-lg"><span class="material-symbols-outlined text-amber-600">support_agent</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Tickets (30d)</span>
+      </div>
+      <h3 class="text-3xl font-extrabold">{{ tickets_resolved_30d }}</h3>
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Resolved &middot; {{ open_tickets }} open</p>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Cards (original) -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
   <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
     <div class="flex items-center gap-3 mb-3">
@@ -77,6 +129,57 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  132. FUNNEL ANALYSIS                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-secondary">filter_alt</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-secondary">Funnel Analysis</h2>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <p class="text-sm text-on-surface-variant mb-6">User conversion through key stages: Registration &rarr; Verification &rarr; Event Registration</p>
+    <div class="space-y-4 max-w-2xl mx-auto">
+      <!-- Stage 1: Registration (always 100%) -->
+      <div class="flex items-center gap-4">
+        <div class="w-40 text-right">
+          <p class="text-sm font-bold">Registered</p>
+          <p class="text-xs text-on-surface-variant">{{ total_registered }} users</p>
+        </div>
+        <div class="flex-1">
+          <div class="bg-blue-500 rounded-lg h-10 flex items-center justify-end pr-3 transition-all" style="width: 100%;">
+            <span class="text-white text-xs font-bold">100%</span>
+          </div>
+        </div>
+      </div>
+      <!-- Stage 2: Verified -->
+      <div class="flex items-center gap-4">
+        <div class="w-40 text-right">
+          <p class="text-sm font-bold">Verified</p>
+          <p class="text-xs text-on-surface-variant">{{ verified_users }} users</p>
+        </div>
+        <div class="flex-1">
+          <div class="bg-indigo-500 rounded-lg h-10 flex items-center pr-3 transition-all {% if funnel_verify_pct > 0 %}justify-end{% else %}justify-center{% endif %}" style="width: {{ funnel_verify_pct }}%; min-width: 60px;">
+            <span class="text-white text-xs font-bold">{{ funnel_verify_pct }}%</span>
+          </div>
+        </div>
+      </div>
+      <!-- Stage 3: Event Registered -->
+      <div class="flex items-center gap-4">
+        <div class="w-40 text-right">
+          <p class="text-sm font-bold">Event Signup</p>
+          <p class="text-xs text-on-surface-variant">{{ event_registered_users }} users</p>
+        </div>
+        <div class="flex-1">
+          <div class="bg-emerald-500 rounded-lg h-10 flex items-center pr-3 transition-all {% if funnel_event_pct > 0 %}justify-end{% else %}justify-center{% endif %}" style="width: {{ funnel_event_pct }}%; min-width: 60px;">
+            <span class="text-white text-xs font-bold">{{ funnel_event_pct }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- User Growth Chart -->
 <div class="grid grid-cols-12 gap-8 mb-10">
   <div class="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
@@ -89,7 +192,13 @@
 <!-- Country Analytics -->
 <div class="grid grid-cols-12 gap-8 mb-10">
   <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
-    <h4 class="text-lg font-bold mb-2">Users by Nationality</h4>
+    <div class="flex items-center justify-between mb-2">
+      <h4 class="text-lg font-bold">Users by Nationality</h4>
+      <a href="{% url 'custom_admin:nationality_map' %}" class="inline-flex items-center gap-1 text-xs font-bold text-secondary hover:text-primary-container transition-colors">
+        View All
+        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+      </a>
+    </div>
     <p class="text-sm text-on-surface-variant mb-6">Top 20 countries from user profiles</p>
     <canvas id="nationalityChart" height="200"></canvas>
   </div>
@@ -217,20 +326,239 @@
   </div>
 </div>
 
-<!-- Device OS Pie Chart -->
+<!-- Device OS & Device Type Charts -->
 <div class="grid grid-cols-12 gap-8 mb-10">
   <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
     <h4 class="text-lg font-bold mb-6">Device OS Distribution</h4>
     <canvas id="osChart" height="200"></canvas>
   </div>
-  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm flex items-center justify-center">
-    <div class="text-center">
-      <span class="material-symbols-outlined text-6xl text-secondary/30">analytics</span>
-      <h4 class="text-lg font-bold mt-4 text-on-surface-variant">Session Tracking Active</h4>
-      <p class="text-sm text-on-surface-variant mt-2 max-w-xs">Geographic and device data is being collected from API sessions. Data appears here as users interact with the app.</p>
+  <!-- 135. Device Type Chart -->
+  <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Device Type Distribution</h4>
+    <canvas id="deviceTypeChart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  133. COHORT ANALYSIS                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-secondary">groups</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-secondary">Cohort Retention Analysis</h2>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <p class="text-sm text-on-surface-variant mb-6">Users grouped by signup month &mdash; showing how many logged in within the last 30 days (retained)</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-outline-variant/30">
+            <th class="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Cohort</th>
+            <th class="text-right py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Users</th>
+            <th class="text-right py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Retained (30d)</th>
+            <th class="text-right py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Retention Rate</th>
+            <th class="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider" style="min-width: 180px;">Visual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cohort in cohort_data %}
+          <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-4 font-medium">{{ cohort.cohort_label }}</td>
+            <td class="py-3 px-4 text-right">{{ cohort.total }}</td>
+            <td class="py-3 px-4 text-right">{{ cohort.retained }}</td>
+            <td class="py-3 px-4 text-right font-bold {% if cohort.retention_pct >= 50 %}text-emerald-600{% elif cohort.retention_pct >= 25 %}text-amber-600{% else %}text-red-500{% endif %}">{{ cohort.retention_pct }}%</td>
+            <td class="py-3 px-4">
+              <div class="w-full bg-slate-100 rounded-full h-2.5">
+                <div class="h-2.5 rounded-full {% if cohort.retention_pct >= 50 %}bg-emerald-500{% elif cohort.retention_pct >= 25 %}bg-amber-500{% else %}bg-red-400{% endif %}" style="width: {{ cohort.retention_pct }}%; min-width: 4px;"></div>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="py-6 text-center text-on-surface-variant">No cohort data available yet. Data will appear once users have been registered for at least one month.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  137. EVENT ATTENDANCE REPORT                                  -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-secondary">event_available</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-secondary">Event Attendance</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-blue-100 p-2 rounded-lg"><span class="material-symbols-outlined text-blue-600">how_to_reg</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Total Submissions</span>
+      </div>
+      <h3 class="text-3xl font-extrabold">{{ total_event_submissions }}</h3>
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Across all events</p>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-emerald-100 p-2 rounded-lg"><span class="material-symbols-outlined text-emerald-600">qr_code_scanner</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Check-Ins</span>
+      </div>
+      <h3 class="text-3xl font-extrabold">{{ total_checkins }}</h3>
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Confirmed attendees</p>
+    </div>
+    <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="bg-amber-100 p-2 rounded-lg"><span class="material-symbols-outlined text-amber-600">percent</span></div>
+        <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Attendance Rate</span>
+      </div>
+      {% with rate=total_checkins|divisibleby:1 %}
+      <h3 class="text-3xl font-extrabold">
+        {% if total_event_submissions > 0 %}
+          {% widthratio total_checkins total_event_submissions 100 %}%
+        {% else %}
+          --
+        {% endif %}
+      </h3>
+      {% endwith %}
+      <p class="text-xs text-on-surface-variant font-medium mt-1">Check-ins / Submissions</p>
+    </div>
+  </div>
+
+  <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <h4 class="text-lg font-bold mb-6">Recent Events with Registrations</h4>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-outline-variant/30">
+            <th class="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Event</th>
+            <th class="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Type</th>
+            <th class="text-right py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Submissions</th>
+            <th class="text-left py-3 px-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in event_attendance %}
+          <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-4 font-medium">{{ ev.event_title|truncatechars:50 }}</td>
+            <td class="py-3 px-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                {% if ev.card_type == 'event' %}bg-blue-100 text-blue-700
+                {% elif ev.card_type == 'survey' %}bg-purple-100 text-purple-700
+                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                {{ ev.get_card_type_display }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-right font-bold">{{ ev.sub_count }}</td>
+            <td class="py-3 px-4 text-on-surface-variant">{{ ev.created_at|date:"M d, Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="py-6 text-center text-on-surface-variant">No event registrations with submissions yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!--  139. AUTOMATED WEEKLY REPORT CONFIGURATION                    -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="mb-10">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-secondary">schedule_send</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-secondary">Automated Weekly Report</h2>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+    <div class="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+      <div class="flex-1">
+        <h4 class="text-lg font-bold mb-2">Weekly Metrics Digest</h4>
+        <p class="text-sm text-on-surface-variant mb-3">
+          Automated email with key metrics (new users, content published, tickets, engagement) sent to all staff members every Monday at 8:00 AM.
+        </p>
+        <p class="text-sm text-on-surface-variant mb-1">
+          <span class="font-medium text-on-surface">Current recipients:</span>
+        </p>
+        <div class="flex flex-wrap gap-2 mt-2">
+          {% for email in staff_emails %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+            <span class="material-symbols-outlined text-[14px]">mail</span>
+            {{ email }}
+          </span>
+          {% empty %}
+          <span class="text-xs text-on-surface-variant">No staff email addresses configured.</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="flex flex-col gap-2">
+        <button onclick="document.getElementById('weeklyReportModal').classList.remove('hidden')" class="flex items-center gap-2 bg-secondary text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+          <span class="material-symbols-outlined text-[18px]">settings</span>
+          Configure Report
+        </button>
+        <p class="text-xs text-on-surface-variant text-center">
+          Run manually:<br>
+          <code class="bg-surface-container-low px-2 py-0.5 rounded text-[11px]">python manage.py send_weekly_report</code>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Weekly Report Configuration Modal -->
+<div id="weeklyReportModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('weeklyReportModal').classList.add('hidden')"></div>
+  <div class="relative bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-8">
+    <button onclick="document.getElementById('weeklyReportModal').classList.add('hidden')" class="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface transition-colors">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    <h3 class="text-xl font-extrabold mb-2">Weekly Report Configuration</h3>
+    <p class="text-sm text-on-surface-variant mb-6">The weekly report is sent to all staff and superuser accounts with email addresses. To add or remove recipients, manage staff status in the Users section.</p>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm font-bold text-on-surface block mb-2">Schedule</label>
+        <p class="text-sm text-on-surface-variant">Every Monday at 8:00 AM (server time)</p>
+        <p class="text-xs text-on-surface-variant mt-1">Add to crontab: <code class="bg-surface-container-low px-1.5 py-0.5 rounded text-[11px]">0 8 * * 1 cd /path/to/backend && python manage.py send_weekly_report</code></p>
+      </div>
+      <div>
+        <label class="text-sm font-bold text-on-surface block mb-2">Report Contents</label>
+        <ul class="text-sm text-on-surface-variant space-y-1.5">
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-[16px]">check_circle</span> New user registrations (week-over-week)</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-[16px]">check_circle</span> Active users (DAU/MAU)</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-[16px]">check_circle</span> Content published (articles, magazines)</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-[16px]">check_circle</span> Event registrations and attendance</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-[16px]">check_circle</span> Support ticket summary</li>
+          <li class="flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-[16px]">check_circle</span> Top-performing content</li>
+        </ul>
+      </div>
+      <div>
+        <label class="text-sm font-bold text-on-surface block mb-2">Current Recipients ({{ staff_emails|length }})</label>
+        <div class="max-h-32 overflow-y-auto bg-surface-container-low rounded-lg p-3">
+          {% for email in staff_emails %}
+          <p class="text-sm py-0.5">{{ email }}</p>
+          {% empty %}
+          <p class="text-sm text-on-surface-variant">No staff emails found. Add email addresses to staff user accounts.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-8">
+      <button onclick="document.getElementById('weeklyReportModal').classList.add('hidden')" class="px-4 py-2 rounded-lg text-sm font-bold text-on-surface-variant hover:bg-surface-container-low transition-colors">
+        Close
+      </button>
+      <a href="{% url 'custom_admin:users_list' %}" class="flex items-center gap-2 bg-primary-container text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+        <span class="material-symbols-outlined text-[18px]">manage_accounts</span>
+        Manage Staff Users
+      </a>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -338,7 +666,7 @@ if (ipLabels.length > 0) {
 const osLabels = {{ os_labels_json|safe }};
 const osCounts = {{ os_counts_json|safe }};
 
-const osColors = ['#000000', '#745B17', '#1EB53A', '#e5c374', '#c5c6cd', '#64748b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
+const chartColors = ['#000000', '#745B17', '#1EB53A', '#e5c374', '#c5c6cd', '#64748b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 if (osLabels.length > 0) {
   new Chart(document.getElementById('osChart'), {
@@ -347,7 +675,7 @@ if (osLabels.length > 0) {
       labels: osLabels,
       datasets: [{
         data: osCounts,
-        backgroundColor: osColors.slice(0, osLabels.length),
+        backgroundColor: chartColors.slice(0, osLabels.length),
       }]
     },
     options: {
@@ -363,6 +691,37 @@ if (osLabels.length > 0) {
   });
 } else {
   document.getElementById('osChart').parentElement.innerHTML += '<p class="text-sm text-center text-on-surface-variant mt-4">No device data yet</p>';
+}
+
+// 135. Device Type Doughnut Chart
+const deviceTypeLabels = {{ device_type_labels_json|safe }};
+const deviceTypeCounts = {{ device_type_counts_json|safe }};
+
+const deviceTypeColors = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#6366f1'];
+
+if (deviceTypeLabels.length > 0) {
+  new Chart(document.getElementById('deviceTypeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: deviceTypeLabels,
+      datasets: [{
+        data: deviceTypeCounts,
+        backgroundColor: deviceTypeColors.slice(0, deviceTypeLabels.length),
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 12 }
+        }
+      },
+      cutout: '65%'
+    }
+  });
+} else {
+  document.getElementById('deviceTypeChart').parentElement.innerHTML += '<p class="text-sm text-center text-on-surface-variant mt-4">No device type data yet. Data appears as users interact with the app.</p>';
 }
 </script>
 {% endblock %}

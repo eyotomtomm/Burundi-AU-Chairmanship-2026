@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/location_model.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/translate_button.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -136,6 +137,7 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.translate('calendar')),
+        actions: const [TranslateButton()],
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(

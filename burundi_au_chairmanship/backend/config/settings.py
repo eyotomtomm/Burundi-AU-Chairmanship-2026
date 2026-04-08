@@ -53,19 +53,23 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third party
+    'drf_spectacular',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # For token revocation
     'corsheaders',
     'storages',
+    'graphene_django',
+    'channels',
     # Local
-    'core',
+    'core.apps.CoreConfig',
     'custom_admin',
 ]
 
 MIDDLEWARE = [
     'core.middleware.cloudflare.CloudflareProxyMiddleware',  # Must be first — sets real client IP
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.gzip.GZipMiddleware',  # Compress API responses (gzip)
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -76,6 +80,7 @@ MIDDLEWARE = [
     'core.middleware.session_tracking.SessionTrackingMiddleware',  # Analytics session tracking
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.rate_limit_logger.RateLimitLoggingMiddleware',  # Log 429 throttled requests
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -112,6 +117,49 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+# ─── Caching (Redis in production, LocMem for dev) ───────────
+REDIS_URL = os.environ.get('REDIS_URL', '')
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                'RETRY_ON_TIMEOUT': True,
+                'MAX_CONNECTIONS': 50,
+                'CONNECTION_POOL_KWARGS': {'max_connections': 50},
+            },
+            'KEY_PREFIX': 'burundi_au',
+            'TIMEOUT': 300,  # 5 minutes default
+        }
+    }
+    # Use Redis for session storage (stateless app servers)
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'default'
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'burundi-au-cache',
+            'TIMEOUT': 300,
+        }
+    }
+
+# Cache timeouts for specific data types
+CACHE_TTL_SHORT = 60       # 1 min  — rapidly changing (notifications, live feeds)
+CACHE_TTL_MEDIUM = 300     # 5 min  — articles list, settings, weather
+CACHE_TTL_LONG = 3600      # 1 hour — categories, priority agendas, social media
+CACHE_TTL_STATIC = 86400   # 24 hrs — onboarding steps, app config
+
+# ─── Database Read Replica ────────────────────────────────────
+READ_REPLICA_URL = os.environ.get('READ_REPLICA_URL', '')
+if READ_REPLICA_URL:
+    DATABASES['replica'] = dj_database_url.parse(READ_REPLICA_URL, conn_max_age=600)
+    DATABASE_ROUTERS = ['config.db_router.ReadReplicaRouter']
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -152,6 +200,11 @@ if not DEBUG:
     AWS_LOCATION = 'media'
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
+    # CDN: Rewrite media URLs through Cloudflare CDN if configured
+    CDN_DOMAIN = os.environ.get('CDN_DOMAIN', '')  # e.g. cdn.burundi4africa.com
+    if CDN_DOMAIN:
+        AWS_S3_CUSTOM_DOMAIN = CDN_DOMAIN
+        MEDIA_URL = f'https://{CDN_DOMAIN}/media/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -240,6 +293,18 @@ REST_FRAMEWORK = {
     },
     # Use real client IP behind Cloudflare / reverse proxies
     'NUM_PROXIES': 1,
+    # OpenAPI schema generation
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# ─── drf-spectacular (OpenAPI / Swagger) ──────────────────────
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Burundi AU Chairmanship API',
+    'DESCRIPTION': 'REST API for the Burundi AU Chairmanship 2026 mobile application',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
 }
 
 # ─── JWT settings with auto-logout ────────────────────────────
@@ -337,6 +402,50 @@ if SENTRY_DSN:
         environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
         release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
     )
+
+# ─── Celery Task Queue ───────────────────────────────────────
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', REDIS_URL or 'redis://localhost:6379/1')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', REDIS_URL or 'redis://localhost:6379/2')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 300  # 5 minutes max per task
+CELERY_TASK_SOFT_TIME_LIMIT = 240  # Soft limit at 4 minutes
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-expired-otps': {
+        'task': 'core.tasks.cleanup_expired_otps',
+        'schedule': 3600,  # Every hour
+    },
+    'cleanup-deactivated-accounts': {
+        'task': 'core.tasks.cleanup_deactivated_accounts',
+        'schedule': 86400,  # Every 24 hours
+    },
+    'generate-weekly-report': {
+        'task': 'core.tasks.generate_weekly_report',
+        'schedule': 604800,  # Every 7 days
+    },
+}
+
+# ─── GraphQL (graphene-django) ────────────────────────────────
+GRAPHENE = {
+    'SCHEMA': 'core.schema.schema',
+}
+
+# ─── ASGI / Django Channels (WebSocket support) ──────────────
+ASGI_APPLICATION = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.environ.get('REDIS_URL', 'redis://localhost:6379/3')],
+        },
+    } if REDIS_URL else {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
+}
 
 # ─── GeoIP2 Configuration ────────────────────────────────────
 # Download GeoLite2-City.mmdb from MaxMind and place in backend/geoip/

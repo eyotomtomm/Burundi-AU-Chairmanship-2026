@@ -6,6 +6,8 @@ import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../widgets/african_pattern.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
+import '../maintenance/maintenance_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -69,6 +71,23 @@ class _SplashScreenState extends State<SplashScreen>
     // CRITICAL: Wait for auth provider to fully initialize
     // Give it enough time to read from secure storage and SharedPreferences
     await Future.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
+
+    // Check maintenance mode before proceeding
+    try {
+      final maintenanceStatus = await ApiService().getMaintenanceStatus();
+      if (!mounted) return;
+      if (maintenanceStatus['in_maintenance'] == true) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => MaintenanceScreen(maintenanceData: maintenanceStatus),
+          ),
+        );
+        return;
+      }
+    } catch (_) {
+      // If maintenance check fails, proceed normally
+    }
     if (!mounted) return;
 
     final authProvider = context.read<AuthProvider>();

@@ -5,6 +5,7 @@ import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../widgets/african_pattern.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/translate_button.dart';
 
 class ResourcesScreen extends StatefulWidget {
   const ResourcesScreen({super.key});
@@ -59,6 +60,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.resources),
+        actions: const [TranslateButton()],
       ),
       body: _isLoading
           ? const ShimmerListItemSkeleton()

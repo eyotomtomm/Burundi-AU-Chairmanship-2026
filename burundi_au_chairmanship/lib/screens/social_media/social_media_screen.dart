@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../widgets/translate_button.dart';
 
 class SocialMediaScreen extends StatefulWidget {
   const SocialMediaScreen({super.key});
@@ -141,6 +142,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                     expandedHeight: 140,
                     pinned: true,
                     backgroundColor: AppColors.burundiGreen,
+                    actions: const [TranslateButton()],
                     flexibleSpace: FlexibleSpaceBar(
                       title: const Text(
                         'Social Media',

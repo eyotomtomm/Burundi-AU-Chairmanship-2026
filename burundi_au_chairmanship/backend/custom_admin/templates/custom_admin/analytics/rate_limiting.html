@@ -1,0 +1,344 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Rate Limiting Dashboard - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-center justify-between">
+  <div>
+    <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Security</span>
+    <h1 class="text-3xl font-extrabold text-on-surface font-headline">Rate Limiting Dashboard</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Monitor throttled requests and blocked IPs &middot; {{ period_label }}</p>
+  </div>
+  <!-- Period Filter -->
+  <div class="flex items-center gap-2">
+    <a href="?period=1h" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '1h' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">1h</a>
+    <a href="?period=24h" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '24h' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">24h</a>
+    <a href="?period=7d" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '7d' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">7d</a>
+    <a href="?period=30d" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '30d' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">30d</a>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-red-500">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-red-100 p-2 rounded-lg"><span class="material-symbols-outlined text-red-600">block</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Blocked</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ total_blocked }}</h3>
+    <p class="text-xs text-on-surface-variant font-medium mt-1">Total throttled requests</p>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-amber-500">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-amber-100 p-2 rounded-lg"><span class="material-symbols-outlined text-amber-600">dns</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Unique IPs</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ unique_ips }}</h3>
+    <p class="text-xs text-on-surface-variant font-medium mt-1">Distinct blocked IP addresses</p>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-blue-100 p-2 rounded-lg"><span class="material-symbols-outlined text-blue-600">api</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Endpoints</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ unique_endpoints }}</h3>
+    <p class="text-xs text-on-surface-variant font-medium mt-1">Distinct throttled endpoints</p>
+  </div>
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
+    <div class="flex items-center gap-3 mb-3">
+      <div class="bg-purple-100 p-2 rounded-lg"><span class="material-symbols-outlined text-purple-600">person_off</span></div>
+      <span class="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Users</span>
+    </div>
+    <h3 class="text-3xl font-extrabold">{{ unique_users }}</h3>
+    <p class="text-xs text-on-surface-variant font-medium mt-1">Authenticated users throttled</p>
+  </div>
+</div>
+
+<!-- Timeline Chart -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm mb-10">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-secondary">timeline</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-secondary">Throttled Requests Over Time</h2>
+  </div>
+  <canvas id="timelineChart" height="80"></canvas>
+</div>
+
+<!-- Two-column: Top IPs + Top Endpoints -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+
+  <!-- Top Offending IPs -->
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-red-500">gpp_bad</span>
+      <h2 class="text-lg font-extrabold uppercase tracking-wider text-red-600">Top Offending IPs</h2>
+    </div>
+    {% if top_ips %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-outline-variant/20">
+            <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">IP Address</th>
+            <th class="text-right py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Blocks</th>
+            <th class="text-right py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Last Seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ip in top_ips %}
+          <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-2">
+              <code class="bg-red-50 text-red-700 px-2 py-1 rounded text-xs font-mono">{{ ip.ip_address }}</code>
+            </td>
+            <td class="py-3 px-2 text-right">
+              <span class="inline-flex items-center justify-center bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-bold">{{ ip.block_count }}</span>
+            </td>
+            <td class="py-3 px-2 text-right text-xs text-on-surface-variant">{{ ip.last_seen|timesince }} ago</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+      <span class="material-symbols-outlined text-4xl text-emerald-400 mb-2">verified_user</span>
+      <p class="text-sm text-on-surface-variant">No blocked IPs in this period</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Top Throttled Endpoints -->
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-blue-500">api</span>
+      <h2 class="text-lg font-extrabold uppercase tracking-wider text-blue-600">Top Throttled Endpoints</h2>
+    </div>
+    {% if top_endpoints %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-outline-variant/20">
+            <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Endpoint</th>
+            <th class="text-right py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Blocks</th>
+            <th class="text-right py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">IPs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ep in top_endpoints %}
+          <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+            <td class="py-3 px-2">
+              <code class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono truncate block max-w-xs" title="{{ ep.endpoint }}">{{ ep.endpoint }}</code>
+            </td>
+            <td class="py-3 px-2 text-right">
+              <span class="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold">{{ ep.block_count }}</span>
+            </td>
+            <td class="py-3 px-2 text-right text-xs text-on-surface-variant">{{ ep.unique_ips }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+      <span class="material-symbols-outlined text-4xl text-emerald-400 mb-2">check_circle</span>
+      <p class="text-sm text-on-surface-variant">No throttled endpoints in this period</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Two-column: Throttle Classes + HTTP Methods -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+
+  <!-- Throttle Classes -->
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-amber-500">speed</span>
+      <h2 class="text-lg font-extrabold uppercase tracking-wider text-amber-600">Throttle Classes</h2>
+    </div>
+    {% if top_throttle_classes %}
+    <div class="space-y-3">
+      {% for tc in top_throttle_classes %}
+      <div class="flex items-center justify-between">
+        <code class="text-xs font-mono text-on-surface bg-surface-container-low px-2 py-1 rounded">{{ tc.throttle_class }}</code>
+        <span class="inline-flex items-center justify-center bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-bold">{{ tc.block_count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-on-surface-variant text-center py-8">No throttle class data recorded</p>
+    {% endif %}
+  </div>
+
+  <!-- HTTP Method Breakdown -->
+  <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+    <div class="flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-indigo-500">http</span>
+      <h2 class="text-lg font-extrabold uppercase tracking-wider text-indigo-600">HTTP Methods</h2>
+    </div>
+    {% if method_breakdown %}
+    <div class="space-y-3">
+      {% for mb in method_breakdown %}
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center justify-center w-16 text-center text-xs font-bold uppercase rounded py-1 {% if mb.request_method == 'GET' %}bg-emerald-100 text-emerald-700{% elif mb.request_method == 'POST' %}bg-blue-100 text-blue-700{% elif mb.request_method == 'PUT' or mb.request_method == 'PATCH' %}bg-amber-100 text-amber-700{% elif mb.request_method == 'DELETE' %}bg-red-100 text-red-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ mb.request_method }}</span>
+        <div class="flex-1 bg-surface-container-low rounded-full h-3 overflow-hidden">
+          {% widthratio mb.count total_blocked 100 as pct %}
+          <div class="h-full rounded-full {% if mb.request_method == 'GET' %}bg-emerald-400{% elif mb.request_method == 'POST' %}bg-blue-400{% elif mb.request_method == 'PUT' or mb.request_method == 'PATCH' %}bg-amber-400{% elif mb.request_method == 'DELETE' %}bg-red-400{% else %}bg-slate-400{% endif %}" style="width: {% widthratio mb.count total_blocked 100 %}%"></div>
+        </div>
+        <span class="text-sm font-bold text-on-surface w-12 text-right">{{ mb.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-on-surface-variant text-center py-8">No data</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Recent Blocked Requests Table -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="material-symbols-outlined text-red-500">history</span>
+    <h2 class="text-lg font-extrabold uppercase tracking-wider text-red-600">Recent Blocked Requests</h2>
+    <span class="ml-auto text-xs text-on-surface-variant">Page {{ recent_logs.number }} of {{ recent_logs.paginator.num_pages }}</span>
+  </div>
+
+  {% if recent_logs %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-outline-variant/20">
+          <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Time</th>
+          <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Method</th>
+          <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Endpoint</th>
+          <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">IP Address</th>
+          <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">User</th>
+          <th class="text-left py-3 px-2 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Throttle Class</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in recent_logs %}
+        <tr class="border-b border-outline-variant/10 hover:bg-surface-container-low transition-colors">
+          <td class="py-3 px-2 text-xs text-on-surface-variant whitespace-nowrap" title="{{ log.timestamp|date:'Y-m-d H:i:s' }}">{{ log.timestamp|timesince }} ago</td>
+          <td class="py-3 px-2">
+            <span class="inline-flex items-center justify-center text-[10px] font-bold uppercase rounded py-0.5 px-2 {% if log.request_method == 'GET' %}bg-emerald-100 text-emerald-700{% elif log.request_method == 'POST' %}bg-blue-100 text-blue-700{% elif log.request_method == 'PUT' or log.request_method == 'PATCH' %}bg-amber-100 text-amber-700{% elif log.request_method == 'DELETE' %}bg-red-100 text-red-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ log.request_method }}</span>
+          </td>
+          <td class="py-3 px-2">
+            <code class="text-xs font-mono text-on-surface truncate block max-w-xs" title="{{ log.endpoint }}">{{ log.endpoint }}</code>
+          </td>
+          <td class="py-3 px-2">
+            <code class="bg-red-50 text-red-700 px-2 py-0.5 rounded text-xs font-mono">{{ log.ip_address }}</code>
+          </td>
+          <td class="py-3 px-2 text-xs text-on-surface-variant">
+            {% if log.user %}
+              <span class="text-on-surface font-medium">{{ log.user.username }}</span>
+            {% else %}
+              <span class="text-on-surface-variant italic">anonymous</span>
+            {% endif %}
+          </td>
+          <td class="py-3 px-2 text-xs text-on-surface-variant">
+            {% if log.throttle_class %}
+              <code class="text-xs font-mono">{{ log.throttle_class }}</code>
+            {% else %}
+              <span class="italic">--</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if recent_logs.has_other_pages %}
+  <div class="flex items-center justify-center gap-2 mt-6">
+    {% if recent_logs.has_previous %}
+    <a href="?period={{ period }}&page={{ recent_logs.previous_page_number }}" class="px-3 py-1.5 rounded-lg text-sm bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors">
+      <span class="material-symbols-outlined text-[16px] align-middle">chevron_left</span> Previous
+    </a>
+    {% endif %}
+
+    {% for num in recent_logs.paginator.page_range %}
+      {% if recent_logs.number == num %}
+        <span class="px-3 py-1.5 rounded-lg text-sm bg-primary-container text-white font-bold">{{ num }}</span>
+      {% elif num > recent_logs.number|add:'-3' and num < recent_logs.number|add:'3' %}
+        <a href="?period={{ period }}&page={{ num }}" class="px-3 py-1.5 rounded-lg text-sm bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if recent_logs.has_next %}
+    <a href="?period={{ period }}&page={{ recent_logs.next_page_number }}" class="px-3 py-1.5 rounded-lg text-sm bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors">
+      Next <span class="material-symbols-outlined text-[16px] align-middle">chevron_right</span>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-center py-16">
+    <div class="w-20 h-20 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+      <span class="material-symbols-outlined text-4xl text-emerald-500">verified_user</span>
+    </div>
+    <h3 class="text-lg font-bold text-on-surface mb-2">All Clear</h3>
+    <p class="text-sm text-on-surface-variant">No throttled requests recorded in {{ period_label|lower }}.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  const labels = {{ timeline_labels_json|safe }};
+  const data = {{ timeline_data_json|safe }};
+
+  if (labels.length === 0) return;
+
+  const ctx = document.getElementById('timelineChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Blocked Requests',
+        data: data,
+        backgroundColor: 'rgba(239, 68, 68, 0.3)',
+        borderColor: 'rgba(239, 68, 68, 0.8)',
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: 0.7,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          titleFont: { family: 'Inter', size: 12 },
+          bodyFont: { family: 'Inter', size: 11 },
+          cornerRadius: 8,
+          padding: 10,
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Inter', size: 10 }, color: '#94a3b8' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            font: { family: 'Inter', size: 10 },
+            color: '#94a3b8',
+            stepSize: 1,
+            callback: function(val) { return Number.isInteger(val) ? val : ''; }
+          },
+          grid: { color: 'rgba(148,163,184,0.1)' }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

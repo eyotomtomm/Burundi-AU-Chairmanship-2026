@@ -11,6 +11,7 @@ import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/translate_button.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -196,6 +197,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           SliverAppBar(
             expandedHeight: 260,
             pinned: true,
+            actions: const [TranslateButton()],
             leading: IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(6),

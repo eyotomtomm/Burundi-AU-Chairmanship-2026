@@ -144,6 +144,8 @@ urlpatterns = [
     # Analytics
     path('analytics/', views.analytics_dashboard, name='analytics'),
     path('analytics/export-pdf/', views.analytics_export_pdf, name='analytics_export_pdf'),
+    path('analytics/nationality/', views.nationality_map, name='nationality_map'),
+    path('analytics/rate-limiting/', views.rate_limiting_dashboard, name='rate_limiting'),
 
     # Polls
     path('polls/', views.polls_list, name='polls_list'),

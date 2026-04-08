@@ -216,6 +216,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Analytics</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'rate_limiting' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:rate_limiting' %}">
+      <span class="material-symbols-outlined">shield</span>
+      <span class="text-sm tracking-wide font-headline">Rate Limiting</span>
+    </a>
+
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'audit_log' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:audit_log' %}">
       <span class="material-symbols-outlined">history</span>
       <span class="text-sm tracking-wide font-headline">Audit Log</span>
@@ -377,6 +382,33 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 <script>
 // Dark mode persistence
 if(localStorage.getItem('darkMode')==='true'){document.documentElement.classList.add('dark')}
+
+// Sidebar scroll position persistence
+(function() {
+  const sidebar = document.querySelector('.sidebar-scroll');
+  if (!sidebar) return;
+  const STORAGE_KEY = 'sidebarScrollPos';
+
+  // Restore scroll position on page load
+  const saved = sessionStorage.getItem(STORAGE_KEY);
+  if (saved !== null) {
+    sidebar.scrollTop = parseInt(saved, 10);
+  }
+
+  // Save scroll position before navigating away
+  window.addEventListener('beforeunload', function() {
+    sessionStorage.setItem(STORAGE_KEY, sidebar.scrollTop);
+  });
+
+  // Also save on scroll (debounced)
+  let scrollTimer;
+  sidebar.addEventListener('scroll', function() {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function() {
+      sessionStorage.setItem(STORAGE_KEY, sidebar.scrollTop);
+    }, 100);
+  }, { passive: true });
+})();
 </script>
 
 {% if user.is_authenticated %}

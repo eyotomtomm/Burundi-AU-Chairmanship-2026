@@ -150,6 +150,21 @@ class HeroSlide(models.Model):
     def __str__(self):
         return self.label
 
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'medium')
+
+    @property
+    def large_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'large')
+
 
 class MagazineEdition(models.Model):
     title = models.CharField(max_length=200)
@@ -169,6 +184,10 @@ class MagazineEdition(models.Model):
 
     class Meta:
         ordering = ['-publish_date']
+        indexes = [
+            models.Index(fields=['-publish_date']),
+            models.Index(fields=['is_featured', '-publish_date']),
+        ]
 
     def __str__(self):
         return self.title
@@ -282,9 +301,28 @@ class Article(models.Model):
 
     class Meta:
         ordering = ['-publish_date']
+        indexes = [
+            models.Index(fields=['-publish_date']),
+            models.Index(fields=['is_featured', '-publish_date']),
+        ]
 
     def __str__(self):
         return self.title
+
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'medium')
+
+    @property
+    def large_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'large')
 
 
 class ArticleComment(models.Model):
@@ -381,6 +419,9 @@ class Event(models.Model):
 
     class Meta:
         ordering = ['event_date']
+        indexes = [
+            models.Index(fields=['is_active', 'event_date']),
+        ]
 
     def __str__(self):
         return self.name
@@ -422,6 +463,9 @@ class LiveFeed(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+        ]
 
     def __str__(self):
         return f"[{self.get_status_display()}] {self.title}"
@@ -693,6 +737,9 @@ class EventRegistration(models.Model):
         ordering = ['order', '-created_at']
         verbose_name = 'Event Registration'
         verbose_name_plural = 'Event Registrations'
+        indexes = [
+            models.Index(fields=['is_active', 'order', '-created_at']),
+        ]
 
 
 class RegistrationFormField(models.Model):
@@ -778,6 +825,10 @@ class EventSubmission(models.Model):
         ordering = ['-submitted_at']
         verbose_name = 'Event Submission'
         verbose_name_plural = 'Event Submissions'
+        indexes = [
+            models.Index(fields=['status', '-submitted_at']),
+            models.Index(fields=['is_proxy', '-submitted_at']),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.event_registration.event_title}"
@@ -889,6 +940,9 @@ class Notification(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Notification'
         verbose_name_plural = 'Notifications'
+        indexes = [
+            models.Index(fields=['is_active', 'is_global', '-created_at']),
+        ]
 
     def __str__(self):
         return f'{self.title} ({self.notification_type})'
@@ -927,6 +981,9 @@ class SupportTicket(models.Model):
         ordering = ['-updated_at']
         verbose_name = 'Support Ticket'
         verbose_name_plural = 'Support Tickets'
+        indexes = [
+            models.Index(fields=['status', '-updated_at']),
+        ]
 
     def __str__(self):
         return f"#{self.pk} {self.subject} ({self.status})"
@@ -946,6 +1003,9 @@ class TicketMessage(models.Model):
         ordering = ['created_at']
         verbose_name = 'Ticket Message'
         verbose_name_plural = 'Ticket Messages'
+        indexes = [
+            models.Index(fields=['is_admin_reply', 'is_read']),
+        ]
 
     def __str__(self):
         return f"Message on #{self.ticket_id} by {self.sender.username}"
@@ -1055,6 +1115,9 @@ class GalleryAlbum(models.Model):
         ordering = ['-is_featured', 'display_order', '-created_at']
         verbose_name = 'Gallery Album'
         verbose_name_plural = 'Gallery Albums'
+        indexes = [
+            models.Index(fields=['-is_featured', 'display_order', '-created_at']),
+        ]
 
     def __str__(self):
         return self.title
@@ -1101,6 +1164,21 @@ class GalleryPhoto(models.Model):
             return ContentFile(buffer.read(), name=name)
         except Exception:
             return image_field
+
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'medium')
+
+    @property
+    def large_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'large')
 
 
 def _update_album_photo_count(instance, **kwargs):
@@ -1163,6 +1241,10 @@ class Video(models.Model):
         ordering = ['-is_featured', '-publish_date']
         verbose_name = 'Video'
         verbose_name_plural = 'Videos'
+        indexes = [
+            models.Index(fields=['-is_featured', '-publish_date']),
+            models.Index(fields=['category', '-publish_date']),
+        ]
 
     def __str__(self):
         return self.title
@@ -1388,6 +1470,9 @@ class VerificationRequest(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Verification Request'
         verbose_name_plural = 'Verification Requests'
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.full_name} ({self.status}) - {self.badge_type or 'No badge'}"
@@ -1651,6 +1736,9 @@ class Popup(models.Model):
         ordering = ['-priority', '-created_at']
         verbose_name = 'Popup/Announcement'
         verbose_name_plural = 'Popups/Announcements'
+        indexes = [
+            models.Index(fields=['is_active', '-priority', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.get_popup_type_display()})"
@@ -2039,6 +2127,9 @@ class EventReminder(models.Model):
         ordering = ['reminder_time']
         verbose_name = 'Event Reminder'
         verbose_name_plural = 'Event Reminders'
+        indexes = [
+            models.Index(fields=['sent', 'reminder_time']),
+        ]
 
     def __str__(self):
         event_name = self.event.name if self.event else self.event_registration.event_title if self.event_registration else 'Unknown'
@@ -2166,6 +2257,9 @@ class Conversation(models.Model):
         ordering = ['-last_message_at']
         verbose_name = 'Conversation'
         verbose_name_plural = 'Conversations'
+        indexes = [
+            models.Index(fields=['-last_message_at']),
+        ]
 
     def __str__(self):
         usernames = ', '.join(u.username for u in self.participants.all()[:3])
@@ -2186,6 +2280,9 @@ class DirectMessage(models.Model):
         ordering = ['created_at']
         verbose_name = 'Direct Message'
         verbose_name_plural = 'Direct Messages'
+        indexes = [
+            models.Index(fields=['is_read', '-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.sender.username}: {self.content[:50]}"
@@ -2217,6 +2314,10 @@ class Discussion(models.Model):
         ordering = ['-is_pinned', '-last_reply_at', '-created_at']
         verbose_name = 'Discussion'
         verbose_name_plural = 'Discussions'
+        indexes = [
+            models.Index(fields=['category', '-is_pinned', '-last_reply_at']),
+            models.Index(fields=['-is_pinned', '-last_reply_at', '-created_at']),
+        ]
 
     def __str__(self):
         return self.title
@@ -2353,6 +2454,9 @@ class AnnouncementBanner(models.Model):
         ordering = ['-priority', '-created_at']
         verbose_name = 'Announcement Banner'
         verbose_name_plural = 'Announcement Banners'
+        indexes = [
+            models.Index(fields=['is_active', '-priority', '-created_at']),
+        ]
 
     def __str__(self):
         return f"[{self.banner_type}] {self.message[:50]}"
@@ -2577,6 +2681,9 @@ class ScheduledMaintenance(models.Model):
         ordering = ['-starts_at']
         verbose_name = 'Scheduled Maintenance'
         verbose_name_plural = 'Scheduled Maintenance'
+        indexes = [
+            models.Index(fields=['is_active', 'starts_at', 'ends_at']),
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.starts_at} - {self.ends_at})"
@@ -2785,6 +2892,30 @@ class AppRelease(models.Model):
 
     def __str__(self):
         return f"v{self.version} - {self.title}"
+
+
+class RateLimitLog(models.Model):
+    """Logs throttled (429) requests for the rate limiting dashboard."""
+    ip_address = models.GenericIPAddressField(db_index=True)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='rate_limit_logs')
+    endpoint = models.CharField(max_length=255, db_index=True)
+    throttle_class = models.CharField(max_length=100, blank=True, help_text='DRF throttle class that triggered the block')
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    request_method = models.CharField(max_length=10)
+    was_blocked = models.BooleanField(default=True, help_text='True if request was rejected (429)')
+    user_agent = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp', 'ip_address']),
+            models.Index(fields=['-timestamp', 'endpoint']),
+        ]
+        verbose_name = 'Rate Limit Log'
+        verbose_name_plural = 'Rate Limit Logs'
+
+    def __str__(self):
+        return f"[{self.request_method}] {self.endpoint} from {self.ip_address} at {self.timestamp}"
 
 
 # ── Auto-optimize images on upload ────────────────────────────

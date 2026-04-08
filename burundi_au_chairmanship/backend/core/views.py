@@ -1,4 +1,7 @@
 import logging
+import threading
+import urllib.request
+import json as json_module
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from datetime import timedelta
@@ -81,6 +84,38 @@ def _split_display_name(display_name):
     return (first_name, last_name)
 
 
+def get_client_ip(request):
+    """Extract real client IP from request headers."""
+    # Cloudflare
+    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
+    if cf_ip:
+        return cf_ip
+    # Standard proxy header
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '')
+
+
+def lookup_ip_geolocation(login_history_id):
+    """Look up IP geolocation in background thread."""
+    try:
+        from core.models import LoginHistory as LH
+        entry = LH.objects.get(id=login_history_id)
+        if not entry.ip_address or entry.ip_address in ('127.0.0.1', '::1', ''):
+            return
+        url = f'http://ip-api.com/json/{entry.ip_address}?fields=status,country,city'
+        req = urllib.request.Request(url, headers={'User-Agent': 'BurundiAU/1.0'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json_module.loads(resp.read().decode())
+        if data.get('status') == 'success':
+            entry.country = data.get('country', '')
+            entry.city = data.get('city', '')
+            entry.save(update_fields=['country', 'city'])
+    except Exception:
+        pass  # Non-critical, don't break login flow
+
+
 # ── Auth Views ────────────────────────────────────────────
 
 @api_view(['POST'])
@@ -108,16 +143,40 @@ def register(request):
 def login(request):
     email = request.data.get('email', '')
     password = request.data.get('password', '')
+    ip = get_client_ip(request)
+    ua = request.META.get('HTTP_USER_AGENT', '')
 
     try:
         user = User.objects.get(email=email)
     except User.DoesNotExist:
+        # Record failed login - user not found
+        lh = LoginHistory.objects.create(
+            user=None,
+            email=email,
+            method='email',
+            ip_address=ip,
+            user_agent=ua,
+            success=False,
+            failure_reason='User not found',
+        )
+        threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
         return Response(
             {'detail': 'Invalid email or password.'},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
     if not user.check_password(password):
+        # Record failed login - wrong password
+        lh = LoginHistory.objects.create(
+            user=user,
+            email=email,
+            method='email',
+            ip_address=ip,
+            user_agent=ua,
+            success=False,
+            failure_reason='Invalid password',
+        )
+        threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
         return Response(
             {'detail': 'Invalid email or password.'},
             status=status.HTTP_401_UNAUTHORIZED,
@@ -152,6 +211,17 @@ def login(request):
         if was_scheduled:
             message = 'Welcome back! Your account deletion has been cancelled and your account is fully restored.'
 
+        # Record successful login (reactivation)
+        lh = LoginHistory.objects.create(
+            user=user,
+            email=email,
+            method='email',
+            ip_address=ip,
+            user_agent=ua,
+            success=True,
+        )
+        threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
+
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
             'access': str(refresh.access_token),
@@ -163,6 +233,18 @@ def login(request):
 
     refresh = RefreshToken.for_user(user)
     profile = user.profile
+
+    # Record successful login
+    lh = LoginHistory.objects.create(
+        user=user,
+        email=email,
+        method='email',
+        ip_address=ip,
+        user_agent=ua,
+        success=True,
+    )
+    threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
+
     return Response({
         'user': UserSerializer(user, context={'request': request}).data,
         'access': str(refresh.access_token),
@@ -635,7 +717,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MagazineEditionSerializer
 
     def get_queryset(self):
-        qs = MagazineEdition.objects.all()
+        qs = MagazineEdition.objects.prefetch_related('images').all()
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -805,7 +887,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view active events"""
     permission_classes = [AllowAny]
-    queryset = Event.objects.filter(is_active=True)
+    queryset = Event.objects.filter(is_active=True).prefetch_related('speakers')
     serializer_class = EventSerializer
 
 
@@ -961,7 +1043,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             from django.db.models import Q
             qs = qs.filter(
                 Q(is_global=True) | Q(target_users=self.request.user)
-            ).distinct()
+            ).distinct().prefetch_related('read_by')
         else:
             # Show only global notifications for anonymous users
             qs = qs.filter(is_global=True)
@@ -1026,24 +1108,88 @@ def app_settings(request):
 @permission_classes([AllowAny])
 def health_check(request):
     """
-    Health check endpoint for load balancers and monitoring.
+    Enhanced health check endpoint for load balancers and monitoring.
 
-    Returns 200 OK if the service is healthy.
+    Returns 200 OK with detailed component statuses including database,
+    cache, storage, and optional memory information.
     """
+    import time
+    import os
     from django.db import connection
+    from django.core.cache import cache
 
-    # Check database connection
+    checks = {}
+    overall_healthy = True
+
+    # ── Database check ────────────────────────────────────────
     try:
-        connection.ensure_connection()
-        db_status = 'healthy'
-    except Exception:
-        db_status = 'unhealthy'
+        start = time.monotonic()
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+        latency = round((time.monotonic() - start) * 1000, 1)
+        checks['database'] = {'status': 'up', 'latency_ms': latency}
+    except Exception as e:
+        checks['database'] = {'status': 'down', 'error': str(e)}
+        overall_healthy = False
+
+    # ── Cache check ───────────────────────────────────────────
+    try:
+        start = time.monotonic()
+        cache.set('_health_check', 'ok', timeout=10)
+        value = cache.get('_health_check')
+        latency = round((time.monotonic() - start) * 1000, 1)
+        if value == 'ok':
+            checks['cache'] = {'status': 'up', 'latency_ms': latency}
+        else:
+            checks['cache'] = {'status': 'degraded', 'latency_ms': latency, 'error': 'value mismatch'}
+            overall_healthy = False
+    except Exception as e:
+        checks['cache'] = {'status': 'down', 'error': str(e)}
+        overall_healthy = False
+
+    # ── Storage / disk space check ────────────────────────────
+    try:
+        stat = os.statvfs('/')
+        free_bytes = stat.f_bavail * stat.f_frsize
+        total_bytes = stat.f_blocks * stat.f_frsize
+        free_gb = round(free_bytes / (1024 ** 3), 2)
+        total_gb = round(total_bytes / (1024 ** 3), 2)
+        checks['storage'] = {
+            'status': 'up',
+            'free_gb': free_gb,
+            'total_gb': total_gb,
+        }
+        # Warn if less than 1 GB free
+        if free_gb < 1.0:
+            checks['storage']['status'] = 'warning'
+    except Exception as e:
+        checks['storage'] = {'status': 'unknown', 'error': str(e)}
+
+    # ── Memory check (optional, requires psutil) ──────────────
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        checks['memory'] = {
+            'status': 'up',
+            'used_percent': mem.percent,
+            'available_mb': round(mem.available / (1024 ** 2), 1),
+        }
+        if mem.percent > 90:
+            checks['memory']['status'] = 'warning'
+    except ImportError:
+        pass  # psutil not installed — skip memory check
+    except Exception as e:
+        checks['memory'] = {'status': 'unknown', 'error': str(e)}
+
+    response_status = status.HTTP_200_OK if overall_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
 
     return Response({
-        'status': 'healthy' if db_status == 'healthy' else 'degraded',
-        'database': db_status,
+        'status': 'healthy' if overall_healthy else 'degraded',
+        'version': '1.0.0',
         'timestamp': timezone.now().isoformat(),
-    }, status=status.HTTP_200_OK)
+        'checks': checks,
+    }, status=response_status)
 
 
 @api_view(['GET'])
@@ -1077,14 +1223,14 @@ def home_feed(request):
     # Get events with registration
     event_registrations = EventRegistration.objects.filter(
         is_active=True
-    ).prefetch_related('form_fields')
+    ).prefetch_related('form_fields', 'submissions')
 
     # Get regular informational events (upcoming only)
     now = timezone.now()
     informational_events = Event.objects.filter(
         is_active=True,
         event_date__gte=now  # Only future events
-    )
+    ).prefetch_related('speakers')
 
     # Serialize both types
     event_reg_data = EventRegistrationSerializer(event_registrations, many=True, context={'request': request}).data
@@ -1396,7 +1542,7 @@ class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         return EventRegistration.objects.filter(
             is_active=True
-        ).prefetch_related('form_fields')
+        ).prefetch_related('form_fields', 'submissions')
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -1412,7 +1558,9 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
     def get_queryset(self):
         # Users can only see their own submissions
-        return EventSubmission.objects.filter(user=self.request.user)
+        return EventSubmission.objects.filter(
+            user=self.request.user
+        ).select_related('event_registration', 'user')
 
     def perform_create(self, serializer):
         event_reg = serializer.validated_data['event_registration']
@@ -1696,7 +1844,9 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return SupportTicket.objects.filter(
             user=self.request.user
-        ).prefetch_related('messages')
+        ).select_related('user', 'assigned_to').prefetch_related(
+            'messages', 'messages__sender'
+        )
 
     def create(self, request, *args, **kwargs):
         """Create a new ticket with the first message."""
@@ -1922,7 +2072,7 @@ class BookmarkViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'delete']
 
     def get_queryset(self):
-        qs = Bookmark.objects.filter(user=self.request.user)
+        qs = Bookmark.objects.filter(user=self.request.user).select_related('user')
         content_type = self.request.query_params.get('content_type')
         if content_type:
             qs = qs.filter(content_type=content_type)
@@ -2065,7 +2215,9 @@ class EventReminderViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'delete']
 
     def get_queryset(self):
-        return EventReminder.objects.filter(user=self.request.user)
+        return EventReminder.objects.filter(
+            user=self.request.user
+        ).select_related('event', 'event_registration')
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -2151,7 +2303,9 @@ class EventPhotoViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post']
 
     def get_queryset(self):
-        qs = EventPhoto.objects.filter(is_approved=True)
+        qs = EventPhoto.objects.filter(is_approved=True).select_related(
+            'user', 'event', 'event_registration'
+        )
         event_id = self.request.query_params.get('event')
         event_reg_id = self.request.query_params.get('event_registration')
         if event_id:
@@ -2175,7 +2329,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post']
 
     def get_queryset(self):
-        return Conversation.objects.filter(participants=self.request.user)
+        return Conversation.objects.filter(
+            participants=self.request.user
+        ).prefetch_related('participants', 'messages', 'messages__sender')
 
     def create(self, request, *args, **kwargs):
         """Start a new conversation with another user."""
@@ -2231,7 +2387,7 @@ class DiscussionViewSet(viewsets.ModelViewSet):
     filterset_fields = ['category']
 
     def get_queryset(self):
-        return Discussion.objects.all()
+        return Discussion.objects.select_related('author', 'author__profile').all()
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -2284,7 +2440,9 @@ class PollViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PollSerializer
 
     def get_queryset(self):
-        return Poll.objects.filter(is_active=True).prefetch_related('options')
+        return Poll.objects.filter(is_active=True).prefetch_related(
+            'options', 'votes'
+        )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def vote(self, request, pk=None):
@@ -2361,7 +2519,7 @@ class ContactDirectoryViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['category', 'country']
 
     def get_queryset(self):
-        return ContactDirectory.objects.filter(is_active=True)
+        return ContactDirectory.objects.filter(is_active=True).order_by('order', 'name')
 
 
 class LiveQAViewSet(viewsets.ReadOnlyModelViewSet):
@@ -2370,14 +2528,16 @@ class LiveQAViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LiveQASessionSerializer
 
     def get_queryset(self):
-        return LiveQASession.objects.filter(is_active=True)
+        return LiveQASession.objects.filter(is_active=True).select_related(
+            'event', 'event_registration', 'moderator'
+        ).prefetch_related('questions')
 
     @action(detail=True, methods=['get', 'post'])
     def questions(self, request, pk=None):
         """Get approved questions or submit a new question."""
         session = self.get_object()
         if request.method == 'GET':
-            questions = session.questions.filter(is_approved=True)
+            questions = session.questions.filter(is_approved=True).select_related('user')
             return Response(LiveQAQuestionSerializer(questions, many=True, context={'request': request}).data)
 
         if not request.user.is_authenticated:
@@ -2623,7 +2783,9 @@ def request_account_merge(request):
 def article_drafts(request):
     """List or create article drafts."""
     if request.method == 'GET':
-        drafts = ArticleDraft.objects.filter(author=request.user).order_by('-updated_at')
+        drafts = ArticleDraft.objects.filter(
+            author=request.user
+        ).select_related('category', 'created_by', 'last_edited_by').order_by('-updated_at')
         serializer = ArticleDraftSerializer(drafts, many=True)
         return Response(serializer.data)
     serializer = ArticleDraftSerializer(data=request.data)
@@ -2664,7 +2826,7 @@ def content_versions(request):
         return Response({'error': 'content_type and content_id required'}, status=400)
     versions = ContentVersion.objects.filter(
         content_type=content_type, content_id=content_id
-    ).order_by('-version_number')
+    ).select_related('changed_by').order_by('-version_number')
     serializer = ContentVersionSerializer(versions, many=True)
     return Response(serializer.data)
 

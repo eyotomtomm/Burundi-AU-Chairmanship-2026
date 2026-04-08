@@ -149,9 +149,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class HeroSlideSerializer(serializers.ModelSerializer):
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
+
     class Meta:
         model = HeroSlide
-        fields = ['id', 'image', 'label', 'label_fr', 'order']
+        fields = ['id', 'image', 'thumbnail_url', 'medium_url', 'label', 'label_fr', 'order']
 
 
 class MagazineImageSerializer(serializers.ModelSerializer):
@@ -220,11 +223,14 @@ class ArticleSerializer(serializers.ModelSerializer):
     comment_count = serializers.IntegerField(read_only=True, default=0)
     like_count = serializers.IntegerField(read_only=True, default=0)
     is_liked = serializers.BooleanField(read_only=True, default=False)
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
 
     class Meta:
         model = Article
         fields = ['id', 'title', 'title_fr', 'content', 'content_fr',
-                  'image', 'author', 'category', 'publish_date', 'is_featured',
+                  'image', 'thumbnail_url', 'medium_url',
+                  'author', 'category', 'publish_date', 'is_featured',
                   'view_count', 'comment_count', 'like_count', 'is_liked', 'media']
 
 
@@ -384,10 +390,13 @@ class PriorityAgendaSerializer(serializers.ModelSerializer):
 
 
 class GalleryPhotoSerializer(serializers.ModelSerializer):
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
+
     class Meta:
         model = GalleryPhoto
-        fields = ['id', 'image', 'caption', 'caption_fr', 'photographer',
-                  'taken_date', 'display_order']
+        fields = ['id', 'image', 'thumbnail_url', 'medium_url', 'caption', 'caption_fr',
+                  'photographer', 'taken_date', 'display_order']
 
 
 class GalleryAlbumSerializer(serializers.ModelSerializer):

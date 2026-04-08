@@ -7,8 +7,8 @@ import '../config/app_constants.dart';
 import '../config/environment.dart';
 import '../models/api_models.dart';
 import '../models/magazine_model.dart';
-import '../models/location_model.dart';
 import '../models/event_registration_model.dart';
+import '../models/location_model.dart';
 import 'pinned_http_client.dart';
 
 class ApiService {
@@ -354,14 +354,6 @@ class ApiService {
 
   Future<Map<String, dynamic>> toggleMagazineLike(String magazineId) async {
     return await _post('magazines/$magazineId/toggle-like/', {}, auth: true);
-  }
-
-  // ── Embassies ────────────────────────────────────────────
-  Future<List<EmbassyLocation>> getEmbassies() async {
-    final data = await _get('embassies/');
-    return _extractResults(data)
-        .map((j) => EmbassyLocation.fromJson(j))
-        .toList();
   }
 
   // ── Events ───────────────────────────────────────────────

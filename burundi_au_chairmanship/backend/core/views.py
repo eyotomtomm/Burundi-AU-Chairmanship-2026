@@ -794,14 +794,6 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
-class EmbassyLocationViewSet(viewsets.ReadOnlyModelViewSet):
-    """Public endpoint: Anyone can view embassy locations"""
-    permission_classes = [AllowAny]
-    queryset = EmbassyLocation.objects.exclude(type__in=['embassy', 'consulate'])
-    serializer_class = EmbassyLocationSerializer
-    filterset_fields = ['type', 'country']
-
-
 class EventViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view active events"""
     permission_classes = [AllowAny]

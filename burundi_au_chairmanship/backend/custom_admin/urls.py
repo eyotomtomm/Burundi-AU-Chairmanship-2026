@@ -114,12 +114,6 @@ urlpatterns = [
     path('live-feeds/<int:pk>/edit/', views.live_feed_edit, name='live_feed_edit'),
     path('live-feeds/<int:pk>/delete/', views.live_feed_delete, name='live_feed_delete'),
 
-    # Embassies
-    path('embassies/', views.embassies_list, name='embassies_list'),
-    path('embassies/create/', views.embassy_create, name='embassy_create'),
-    path('embassies/<int:pk>/edit/', views.embassy_edit, name='embassy_edit'),
-    path('embassies/<int:pk>/delete/', views.embassy_delete, name='embassy_delete'),
-
     # Resources
     path('resources/', views.resources_list, name='resources_list'),
     path('resources/create/', views.resource_create, name='resource_create'),

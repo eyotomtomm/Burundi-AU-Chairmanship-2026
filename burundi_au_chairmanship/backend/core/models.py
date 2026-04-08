@@ -1682,3 +1682,35 @@ class UserSession(models.Model):
     def __str__(self):
         user_str = self.user.username if self.user else 'anonymous'
         return f"{user_str} from {self.country_name or self.ip_address} at {self.created_at}"
+
+
+# ── Auto-optimize images on upload ────────────────────────────
+def _auto_optimize_image(sender, instance, **kwargs):
+    """Convert uploaded images to WebP on save for all core models."""
+    from .image_utils import optimize_image
+    for field in sender._meta.get_fields():
+        if not isinstance(field, models.ImageField):
+            continue
+        image = getattr(instance, field.name, None)
+        if not image or not image.name:
+            continue
+        if image.name.endswith('.webp'):
+            continue
+        # Only optimize new uploads (file has been changed)
+        if not hasattr(image, 'file'):
+            continue
+        try:
+            optimize_image(image, max_width=1200)
+        except Exception:
+            pass
+
+
+# Connect to all core models with image fields
+from django.db.models.signals import pre_save  # noqa: E402
+for _model in [
+    HeroSlide, MagazineEdition, MagazineImage, Article, ArticleMedia,
+    EmbassyLocation, Event, LiveFeed, FeatureCard, FeatureCardMedia,
+    Notification, PriorityAgenda, GalleryAlbum, GalleryPhoto, Video,
+    VerificationRequest, WeatherCity, Popup, UserProfile,
+]:
+    pre_save.connect(_auto_optimize_image, sender=_model)

@@ -5489,14 +5489,14 @@ def widget_data(request):
         recent = list(
             VerificationRequest.objects.filter(status='pending')
             .select_related('user')
-            .order_by('-submitted_at')[:5]
+            .order_by('-created_at')[:5]
         )
         items = []
         for vr in recent:
             items.append({
-                'username': vr.user.username if vr.user else 'Unknown',
+                'username': vr.user.get_full_name() or vr.user.username if vr.user else 'Unknown',
                 'email': vr.user.email if vr.user else '',
-                'submitted_at': vr.submitted_at.strftime('%b %d, %Y') if vr.submitted_at else '',
+                'submitted_at': vr.created_at.strftime('%b %d, %Y') if vr.created_at else '',
                 'badge_type': vr.badge_type or 'N/A',
             })
         return JsonResponse({

@@ -293,4 +293,7 @@ urlpatterns = [
     # Error Tracking (Sentry)
     path('error-tracking/', views.error_tracking_dashboard, name='error_tracking'),
     path('error-tracking/api/', views.error_tracking_api, name='error_tracking_api'),
+
+    # Auto-translate (EN <-> FR)
+    path('translate/', views.auto_translate, name='auto_translate'),
 ]

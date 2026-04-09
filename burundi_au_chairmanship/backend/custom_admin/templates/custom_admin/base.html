@@ -1710,8 +1710,8 @@ function toggleDarkMode() {
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'bilingual-copy-btn ml-2 px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50';
-    btn.textContent = sourceIsEn ? '\u2192 Copy to FR' : '\u2192 Copy to EN';
-    btn.title = sourceIsEn ? 'Copy English text to French field as a starting point' : 'Copy French text to English field as a starting point';
+    btn.textContent = sourceIsEn ? '\u2192 Translate to FR' : '\u2192 Translate to EN';
+    btn.title = sourceIsEn ? 'Auto-translate English to French' : 'Auto-translate French to English';
     btn.addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
@@ -1720,11 +1720,45 @@ function toggleDarkMode() {
         setTimeout(function() { sourceField.style.backgroundColor = ''; }, 800);
         return;
       }
-      targetField.value = sourceField.value;
-      targetField.focus();
-      // Flash effect on target
-      targetField.style.backgroundColor = '#fef3c7';
-      setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+      // Show translating state
+      var origText = btn.textContent;
+      btn.textContent = 'Translating...';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+
+      var formData = new FormData();
+      formData.append('text', sourceField.value);
+      formData.append('source', sourceIsEn ? 'en' : 'fr');
+      formData.append('target', sourceIsEn ? 'fr' : 'en');
+
+      fetch('{% url "custom_admin:auto_translate" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+        body: formData
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.translated) {
+          targetField.value = data.translated;
+          targetField.focus();
+          targetField.style.backgroundColor = '#d1fae5';
+          setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
+        } else {
+          targetField.value = sourceField.value;
+          targetField.style.backgroundColor = '#fef3c7';
+          setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+        }
+      })
+      .catch(function() {
+        targetField.value = sourceField.value;
+        targetField.style.backgroundColor = '#fef3c7';
+        setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+      })
+      .finally(function() {
+        btn.textContent = origText;
+        btn.disabled = false;
+        btn.style.opacity = '';
+      });
     });
 
     label.style.display = 'flex';
@@ -1756,8 +1790,8 @@ function toggleDarkMode() {
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'bilingual-copy-btn ml-2 px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50';
-    btn.textContent = sourceIsEn ? '\u2192 Copy to FR' : '\u2192 Copy to EN';
-    btn.title = sourceIsEn ? 'Copy English text to French field as a starting point' : 'Copy French text to English field as a starting point';
+    btn.textContent = sourceIsEn ? '\u2192 Translate to FR' : '\u2192 Translate to EN';
+    btn.title = sourceIsEn ? 'Auto-translate English to French' : 'Auto-translate French to English';
     btn.addEventListener('click', function(e) {
       e.preventDefault();
       e.stopPropagation();
@@ -1779,14 +1813,54 @@ function toggleDarkMode() {
         return;
       }
 
-      // Set content in TinyMCE editor if active, otherwise set value directly
-      if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
-        tinymce.get(targetId).setContent(sourceContent);
-        tinymce.get(targetId).save();
-      } else {
-        targetField.value = sourceContent;
-      }
-      targetField.focus();
+      // Show translating state
+      var origText = btn.textContent;
+      btn.textContent = 'Translating...';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+
+      var formData = new FormData();
+      formData.append('text', sourceContent);
+      formData.append('source', sourceIsEn ? 'en' : 'fr');
+      formData.append('target', sourceIsEn ? 'fr' : 'en');
+
+      fetch('{% url "custom_admin:auto_translate" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+        body: formData
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var translated = data.translated || sourceContent;
+        if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
+          tinymce.get(targetId).setContent(translated);
+          tinymce.get(targetId).save();
+        } else {
+          targetField.value = translated;
+        }
+        targetField.focus();
+        if (data.translated) {
+          targetField.style.backgroundColor = '#d1fae5';
+        } else {
+          targetField.style.backgroundColor = '#fef3c7';
+        }
+        setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
+      })
+      .catch(function() {
+        if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
+          tinymce.get(targetId).setContent(sourceContent);
+          tinymce.get(targetId).save();
+        } else {
+          targetField.value = sourceContent;
+        }
+        targetField.style.backgroundColor = '#fef3c7';
+        setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+      })
+      .finally(function() {
+        btn.textContent = origText;
+        btn.disabled = false;
+        btn.style.opacity = '';
+      });
     });
 
     label.style.display = 'flex';

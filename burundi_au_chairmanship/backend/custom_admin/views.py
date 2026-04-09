@@ -6769,3 +6769,53 @@ def error_tracking_api(request):
         return JsonResponse({'error': f'Sentry API error ({e.code}): {error_body}'}, status=e.code)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required(login_url='/admin/')
+@user_passes_test(lambda u: u.is_staff)
+def auto_translate(request):
+    """Auto-translate text between EN and FR using Google Translate API."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    import urllib.request
+    import urllib.parse
+    import json
+
+    text = request.POST.get('text', '').strip()
+    source_lang = request.POST.get('source', 'en')
+    target_lang = request.POST.get('target', 'fr')
+
+    if not text:
+        return JsonResponse({'error': 'No text provided'}, status=400)
+
+    # Validate languages
+    if source_lang not in ('en', 'fr') or target_lang not in ('en', 'fr'):
+        return JsonResponse({'error': 'Only EN and FR are supported'}, status=400)
+
+    try:
+        # Use Google Translate free API
+        encoded_text = urllib.parse.quote(text)
+        url = f'https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={encoded_text}'
+
+        req = urllib.request.Request(url)
+        req.add_header('User-Agent', 'Mozilla/5.0')
+
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+
+        # Google returns nested arrays: [[["translated text","original text",...],...],...]
+        translated = ''
+        if data and data[0]:
+            for segment in data[0]:
+                if segment and segment[0]:
+                    translated += segment[0]
+
+        if not translated:
+            return JsonResponse({'error': 'Translation returned empty result'}, status=500)
+
+        return JsonResponse({'translated': translated})
+    except urllib.error.HTTPError as e:
+        return JsonResponse({'error': f'Translation service error ({e.code})'}, status=502)
+    except Exception as e:
+        return JsonResponse({'error': f'Translation failed: {str(e)}'}, status=500)

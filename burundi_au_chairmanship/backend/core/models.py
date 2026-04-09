@@ -3009,6 +3009,7 @@ class ScheduledMaintenance(models.Model):
     severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='minor')
     affected_services = models.CharField(max_length=200, blank=True, default='all', help_text='Comma-separated list of affected services')
     auto_activate = models.BooleanField(default=False, help_text='Automatically enable maintenance at start time')
+    image = models.ImageField(upload_to='maintenance/', blank=True, null=True, help_text='Full-screen image shown in the app during maintenance')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

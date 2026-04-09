@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -12,7 +13,9 @@ import '../../widgets/offline_banner.dart';
 import '../../widgets/confetti_overlay.dart';
 import '../../services/popup_service.dart';
 import '../../services/haptic_service.dart';
+import '../../services/api_service.dart';
 import '../../config/app_constants.dart';
+import '../maintenance/maintenance_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/magazine_tab.dart';
 import 'tabs/agenda_tab.dart';
@@ -25,12 +28,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  Timer? _maintenanceTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Check verification status and show popups after screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkVerificationStatus();
@@ -38,6 +43,33 @@ class _HomeScreenState extends State<HomeScreen> {
       _checkForAppUpdate();
       _showWhatsNew();
     });
+    // Check maintenance every 60 seconds
+    _maintenanceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _checkMaintenance();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Check maintenance when app comes back to foreground
+    if (state == AppLifecycleState.resumed) {
+      _checkMaintenance();
+    }
+  }
+
+  Future<void> _checkMaintenance() async {
+    try {
+      final status = await ApiService().getMaintenanceStatus();
+      if (!mounted) return;
+      if (status['in_maintenance'] == true) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => MaintenanceScreen(maintenanceData: status),
+          ),
+          (route) => false,
+        );
+      }
+    } catch (_) {}
   }
 
   /// Check verification status and show popup if needed
@@ -178,6 +210,13 @@ class _HomeScreenState extends State<HomeScreen> {
       currentVersion: AppConstants.appVersion,
       langCode: langCode,
     );
+  }
+
+  @override
+  void dispose() {
+    _maintenanceTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

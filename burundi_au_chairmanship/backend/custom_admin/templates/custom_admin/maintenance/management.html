@@ -178,11 +178,25 @@
       {% endif %}
     </div>
 
-    <form method="post" action="{% url 'custom_admin:maintenance_schedule' %}" class="p-6 space-y-6">
+    <form method="post" action="{% url 'custom_admin:maintenance_schedule' %}" enctype="multipart/form-data" class="p-6 space-y-6">
       {% csrf_token %}
       {% if editing_window %}
       <input type="hidden" name="pk" value="{{ editing_window.pk }}">
       {% endif %}
+
+      <!-- Maintenance Image -->
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Maintenance Image</label>
+        <p class="text-xs text-slate-400 mb-3">This image will be shown full-screen in the app during maintenance. Use a branded announcement image.</p>
+        {% if editing_window and editing_window.image %}
+        <div class="mb-3">
+          <img src="{{ editing_window.image.url }}" alt="Current maintenance image" class="max-w-xs rounded-lg shadow border border-slate-200">
+          <p class="text-xs text-slate-500 mt-2">Current image (upload a new file to replace)</p>
+        </div>
+        {% endif %}
+        <input type="file" name="image" accept="image/*"
+          class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+      </div>
 
       <!-- Titles -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

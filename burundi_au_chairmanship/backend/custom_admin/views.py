@@ -6262,6 +6262,9 @@ def maintenance_schedule(request):
         messages.error(request, 'Title, start date, and end date are required.')
         return redirect('custom_admin:maintenance_management')
 
+    # Handle image upload
+    image_file = request.FILES.get('image')
+
     # Check if editing existing window
     pk = request.POST.get('pk')
     if pk:
@@ -6279,12 +6282,14 @@ def maintenance_schedule(request):
             window.show_banner = show_banner
             window.auto_activate = auto_activate
             window.affected_services = affected_services
+            if image_file:
+                window.image = image_file
             window.save()
             messages.success(request, f'Maintenance window "{title}" updated successfully.')
         except ScheduledMaintenance.DoesNotExist:
             messages.error(request, 'Maintenance window not found.')
     else:
-        ScheduledMaintenance.objects.create(
+        window = ScheduledMaintenance.objects.create(
             title=title,
             title_fr=title_fr,
             description=description,
@@ -6298,6 +6303,9 @@ def maintenance_schedule(request):
             auto_activate=auto_activate,
             affected_services=affected_services,
         )
+        if image_file:
+            window.image = image_file
+            window.save()
         messages.success(request, f'Maintenance window "{title}" scheduled successfully.')
 
     return redirect('custom_admin:maintenance_management')

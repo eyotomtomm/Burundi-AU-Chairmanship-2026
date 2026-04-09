@@ -1224,11 +1224,21 @@ class EmailTemplateSerializer(serializers.ModelSerializer):
 
 
 class ScheduledMaintenanceSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = ScheduledMaintenance
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'starts_at', 'ends_at', 'is_active', 'show_banner',
-                  'contact_email', 'severity', 'affected_services']
+                  'contact_email', 'severity', 'affected_services', 'image_url']
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class AppReleaseSerializer(serializers.ModelSerializer):

@@ -3274,10 +3274,11 @@ def maintenance_status(request):
     upcoming = ScheduledMaintenance.objects.filter(
         is_active=True, show_banner=True, starts_at__gt=now
     ).order_by('starts_at').first()
+    ctx = {'request': request}
     return Response({
         'in_maintenance': active is not None,
-        'active': ScheduledMaintenanceSerializer(active).data if active else None,
-        'upcoming': ScheduledMaintenanceSerializer(upcoming).data if upcoming else None,
+        'active': ScheduledMaintenanceSerializer(active, context=ctx).data if active else None,
+        'upcoming': ScheduledMaintenanceSerializer(upcoming, context=ctx).data if upcoming else None,
     })
 
 

@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
@@ -18,11 +20,13 @@ class MaintenanceScreen extends StatefulWidget {
 
 class _MaintenanceScreenState extends State<MaintenanceScreen>
     with TickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late AnimationController _patternController;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _pulseController;
   bool _isRetrying = false;
+  Timer? _countdownTimer;
+  Timer? _autoRetryTimer;
+  Duration _remaining = Duration.zero;
 
   @override
   void initState() {
@@ -33,81 +37,93 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       statusBarIconBrightness: Brightness.light,
     ));
 
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    _fadeController.forward();
+
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
 
-    _patternController = AnimationController(
-      duration: const Duration(seconds: 20),
-      vsync: this,
-    )..repeat();
+    _startCountdown();
 
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
+    // Auto-retry every 30 seconds
+    _autoRetryTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _silentRetry();
+    });
+  }
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
+  void _startCountdown() {
+    _updateRemaining();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateRemaining();
+    });
+  }
 
-    _fadeController.forward();
+  void _updateRemaining() {
+    final data = widget.maintenanceData?['active'];
+    if (data != null && data['ends_at'] != null) {
+      try {
+        final endsAt = DateTime.parse(data['ends_at']).toLocal();
+        final now = DateTime.now();
+        final diff = endsAt.difference(now);
+        if (mounted) {
+          setState(() {
+            _remaining = diff.isNegative ? Duration.zero : diff;
+          });
+        }
+        // If countdown reached zero, auto-retry
+        if (diff.isNegative) {
+          _silentRetry();
+        }
+      } catch (_) {}
+    }
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _patternController.dispose();
     _fadeController.dispose();
+    _pulseController.dispose();
+    _countdownTimer?.cancel();
+    _autoRetryTimer?.cancel();
     super.dispose();
   }
 
+  Map<String, dynamic>? get _activeData => widget.maintenanceData?['active'];
+
+  String? get _imageUrl => _activeData?['image_url'] as String?;
+
   String _getTitle(bool isFrench) {
-    final data = widget.maintenanceData?['active'];
+    final data = _activeData;
     if (data != null) {
       final title = isFrench
           ? (data['title_fr'] ?? data['title'] ?? '')
           : (data['title'] ?? '');
-      if (title.isNotEmpty) return title;
+      if ((title as String).isNotEmpty) return title;
     }
     return isFrench ? 'Maintenance en cours' : 'Under Maintenance';
   }
 
   String _getDescription(bool isFrench) {
-    final data = widget.maintenanceData?['active'];
+    final data = _activeData;
     if (data != null) {
       final desc = isFrench
           ? (data['description_fr'] ?? data['description'] ?? '')
           : (data['description'] ?? '');
-      if (desc.isNotEmpty) return desc;
+      if ((desc as String).isNotEmpty) return desc;
     }
     return isFrench
         ? 'Nous effectuons une maintenance planifiée. Veuillez réessayer bientôt.'
         : 'We are performing scheduled maintenance. Please try again shortly.';
   }
 
-  String? _getEstimatedEnd() {
-    final data = widget.maintenanceData?['active'];
-    if (data != null && data['ends_at'] != null) {
-      try {
-        final endsAt = DateTime.parse(data['ends_at']);
-        final now = DateTime.now();
-        final diff = endsAt.difference(now);
-        if (diff.isNegative) return null;
-        if (diff.inHours > 0) {
-          return '~${diff.inHours}h ${diff.inMinutes % 60}m';
-        }
-        return '~${diff.inMinutes}m';
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  String? _getContactEmail() {
-    final data = widget.maintenanceData?['active'];
-    return data?['contact_email'] as String?;
-  }
+  String? _getContactEmail() => _activeData?['contact_email'] as String?;
 
   Future<void> _launchEmail(String email) async {
     final uri = Uri(
@@ -115,12 +131,23 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       path: email,
       queryParameters: {
         'subject': 'Support Request - Maintenance',
-        'body': 'Hello,\n\nI need assistance while the app is under maintenance.\n\n',
+        'body':
+            'Hello,\n\nI need assistance while the app is under maintenance.\n\n',
       },
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
+  }
+
+  Future<void> _silentRetry() async {
+    try {
+      final status = await ApiService().getMaintenanceStatus();
+      if (!mounted) return;
+      if (status['in_maintenance'] != true) {
+        Navigator.of(context).pushReplacementNamed('/auth');
+      }
+    } catch (_) {}
   }
 
   Future<void> _retry() async {
@@ -133,7 +160,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Still under maintenance. Please try again later.'),
+            content:
+                const Text('Still under maintenance. Please try again later.'),
             backgroundColor: AppColors.burundiRed,
             behavior: SnackBarBehavior.floating,
           ),
@@ -148,333 +176,286 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
     }
   }
 
+  String _formatCountdown(Duration d) {
+    if (d.inDays > 0) {
+      return '${d.inDays}d ${d.inHours % 24}h ${d.inMinutes % 60}m';
+    }
+    final h = d.inHours.toString().padLeft(2, '0');
+    final m = (d.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isFrench = context.watch<LanguageProvider>().isFrench;
-    final estimatedEnd = _getEstimatedEnd();
     final contactEmail = _getContactEmail();
     final screenSize = MediaQuery.of(context).size;
+    final hasImage = _imageUrl != null && _imageUrl!.isNotEmpty;
 
     return Scaffold(
-      body: Container(
-        width: screenSize.width,
-        height: screenSize.height,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1EB53A),
-              Color(0xFF0D8C2D),
-              Color(0xFF065A1A),
-            ],
-            stops: [0.0, 0.5, 1.0],
-          ),
-        ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            // Animated geometric pattern background (same as splash)
-            AnimatedBuilder(
-              animation: _patternController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: 0.08,
-                  child: CustomPaint(
-                    size: screenSize,
-                    painter: _MaintenancePatternPainter(
-                      progress: _patternController.value,
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            // Main content with fade-in
-            SafeArea(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 40),
-
-                        // App branding at top
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: AppColors.auGold.withValues(alpha: 0.4),
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'BURUNDI AU CHAIRMANSHIP',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.burundiWhite.withValues(alpha: 0.8),
-                              letterSpacing: 3,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        // Frosted glass card with maintenance info
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(32),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 30,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  // Animated maintenance icon
-                                  AnimatedBuilder(
-                                    animation: _pulseController,
-                                    builder: (context, child) {
-                                      final scale =
-                                          1.0 + (_pulseController.value * 0.08);
-                                      final glow =
-                                          _pulseController.value * 0.3;
-                                      return Transform.scale(
-                                        scale: scale,
-                                        child: Container(
-                                          width: 100,
-                                          height: 100,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white
-                                                .withValues(alpha: 0.15),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: AppColors.auGold
-                                                    .withValues(alpha: glow),
-                                                blurRadius: 30,
-                                                spreadRadius: 5,
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            Icons.build_circle_outlined,
-                                            size: 50,
-                                            color: AppColors.auGold,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-
-                                  const SizedBox(height: 28),
-
-                                  // Title
-                                  Text(
-                                    _getTitle(isFrench),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // Decorative gold line
-                                  Container(
-                                    width: 60,
-                                    height: 3,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.auGold,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // Description
-                                  Text(
-                                    _getDescription(isFrench),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      height: 1.6,
-                                      color: Colors.white
-                                          .withValues(alpha: 0.85),
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 24),
-
-                                  // Estimated time remaining
-                                  if (estimatedEnd != null)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 20,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.auGold
-                                            .withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: AppColors.auGold
-                                              .withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.timer_outlined,
-                                            size: 20,
-                                            color: AppColors.auGold,
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Text(
-                                            isFrench
-                                                ? 'Temps estimé: $estimatedEnd'
-                                                : 'Estimated time: $estimatedEnd',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        // Retry button (glossy style)
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: BackdropFilter(
-                              filter:
-                                  ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                              child: ElevatedButton.icon(
-                                onPressed: _isRetrying ? null : _retry,
-                                icon: _isRetrying
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Icon(Icons.refresh_rounded),
-                                label: Text(
-                                  _isRetrying
-                                      ? (isFrench
-                                          ? 'Vérification...'
-                                          : 'Checking...')
-                                      : (isFrench ? 'Réessayer' : 'Retry'),
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      Colors.white.withValues(alpha: 0.2),
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    side: BorderSide(
-                                      color: Colors.white
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  elevation: 0,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Email support button
-                        if (contactEmail != null && contactEmail.isNotEmpty)
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _launchEmail(contactEmail),
-                              icon: const Icon(Icons.email_outlined),
-                              label: Text(
-                                isFrench
-                                    ? 'Contacter le support'
-                                    : 'Email Support',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.auGold,
-                                side: BorderSide(
-                                  color: AppColors.auGold
-                                      .withValues(alpha: 0.5),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        const SizedBox(height: 48),
-
-                        // Footer
-                        Text(
-                          'Burundi AU Chairmanship 2026',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.4),
-                            letterSpacing: 2,
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-                      ],
+            // Background: Image or gradient
+            if (hasImage)
+              CachedNetworkImage(
+                imageUrl: _imageUrl!,
+                fit: BoxFit.cover,
+                width: screenSize.width,
+                height: screenSize.height,
+                placeholder: (context, url) => Container(
+                  color: const Color(0xFF101c2e),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.auGold,
                     ),
                   ),
                 ),
+                errorWidget: (context, url, error) =>
+                    _buildGradientBackground(),
+              )
+            else
+              _buildGradientBackground(),
+
+            // Dark overlay for readability
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: hasImage ? 0.3 : 0.0),
+                    Colors.black.withValues(alpha: hasImage ? 0.7 : 0.0),
+                  ],
+                ),
+              ),
+            ),
+
+            // Content overlay at bottom
+            SafeArea(
+              child: Column(
+                children: [
+                  const Spacer(),
+
+                  // Bottom card with info
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Pulsing icon
+                              AnimatedBuilder(
+                                animation: _pulseController,
+                                builder: (context, child) {
+                                  return Opacity(
+                                    opacity:
+                                        0.6 + (_pulseController.value * 0.4),
+                                    child: Icon(
+                                      Icons.build_circle_outlined,
+                                      size: 40,
+                                      color: AppColors.auGold,
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Title
+                              Text(
+                                _getTitle(isFrench),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // Gold divider
+                              Container(
+                                width: 50,
+                                height: 2.5,
+                                decoration: BoxDecoration(
+                                  color: AppColors.auGold,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Description
+                              Text(
+                                _getDescription(isFrench),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
+                                  color:
+                                      Colors.white.withValues(alpha: 0.85),
+                                ),
+                              ),
+
+                              // Countdown timer
+                              if (_remaining.inSeconds > 0) ...[
+                                const SizedBox(height: 20),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.auGold
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: AppColors.auGold
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.timer_outlined,
+                                        size: 20,
+                                        color: AppColors.auGold,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        _formatCountdown(_remaining),
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                          fontFeatures: [
+                                            FontFeature.tabularFigures()
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 20),
+
+                              // Buttons row
+                              Row(
+                                children: [
+                                  // Retry button
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 48,
+                                      child: ElevatedButton.icon(
+                                        onPressed:
+                                            _isRetrying ? null : _retry,
+                                        icon: _isRetrying
+                                            ? const SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.refresh_rounded,
+                                                size: 20),
+                                        label: Text(
+                                          _isRetrying
+                                              ? (isFrench
+                                                  ? 'Vérif...'
+                                                  : 'Checking...')
+                                              : (isFrench
+                                                  ? 'Réessayer'
+                                                  : 'Retry'),
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white
+                                              .withValues(alpha: 0.2),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            side: BorderSide(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.25),
+                                            ),
+                                          ),
+                                          elevation: 0,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Email button
+                                  if (contactEmail != null &&
+                                      contactEmail.isNotEmpty) ...[
+                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      height: 48,
+                                      child: OutlinedButton.icon(
+                                        onPressed: () =>
+                                            _launchEmail(contactEmail),
+                                        icon: const Icon(
+                                            Icons.email_outlined,
+                                            size: 18),
+                                        label: Text(
+                                          isFrench ? 'Contact' : 'Email',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.auGold,
+                                          side: BorderSide(
+                                            color: AppColors.auGold
+                                                .withValues(alpha: 0.5),
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -482,56 +463,50 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       ),
     );
   }
+
+  Widget _buildGradientBackground() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF101c2e),
+            Color(0xFF1a2d47),
+            Color(0xFF0f1923),
+          ],
+        ),
+      ),
+      child: CustomPaint(
+        size: MediaQuery.of(context).size,
+        painter: _MaintenancePatternPainter(),
+      ),
+    );
+  }
 }
 
-/// Geometric pattern painter matching the splash screen style
 class _MaintenancePatternPainter extends CustomPainter {
-  final double progress;
-
-  _MaintenancePatternPainter({required this.progress});
-
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.auGold
+      ..color = AppColors.auGold.withValues(alpha: 0.06)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1.5;
 
-    final spacing = 100.0;
-
-    // Diamond grid
+    const spacing = 100.0;
     for (double x = -spacing; x < size.width + spacing; x += spacing) {
       for (double y = -spacing; y < size.height + spacing; y += spacing) {
-        final offset = Offset(x, y);
-        _drawDiamond(canvas, paint, offset, 30);
+        final path = Path();
+        path.moveTo(x, y - 25);
+        path.lineTo(x + 25, y);
+        path.lineTo(x, y + 25);
+        path.lineTo(x - 25, y);
+        path.close();
+        canvas.drawPath(path, paint);
       }
     }
-
-    // Zigzag lines
-    paint.strokeWidth = 1.5;
-    for (double y = 0; y < size.height; y += spacing * 1.5) {
-      final path = Path();
-      path.moveTo(0, y);
-      for (double x = 0; x < size.width; x += 40) {
-        final peakY = y + ((x ~/ 40) % 2 == 0 ? -20 : 20);
-        path.lineTo(x + 20, peakY);
-        path.lineTo(x + 40, y);
-      }
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  void _drawDiamond(Canvas canvas, Paint paint, Offset center, double s) {
-    final path = Path();
-    path.moveTo(center.dx, center.dy - s);
-    path.lineTo(center.dx + s, center.dy);
-    path.lineTo(center.dx, center.dy + s);
-    path.lineTo(center.dx - s, center.dy);
-    path.close();
-    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant _MaintenancePatternPainter oldDelegate) =>
-      progress != oldDelegate.progress;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

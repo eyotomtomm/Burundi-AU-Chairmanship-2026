@@ -352,7 +352,10 @@ def article_create(request):
         else:
             messages.success(request, 'Article created successfully!')
         return redirect('custom_admin:articles_list')
-    return render(request, 'custom_admin/articles/form.html', {'categories': categories, 'action': 'Create'})
+    return render(request, 'custom_admin/articles/form.html', {
+        'categories': categories, 'action': 'Create',
+        'prefill_date': request.GET.get('date', ''),
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -542,6 +545,7 @@ def event_create(request):
     return render(request, 'custom_admin/events/form.html', {
         'action': 'Create',
         'recurrence_choices': Event.RECURRENCE_CHOICES,
+        'prefill_date': request.GET.get('date', ''),
     })
 
 
@@ -715,6 +719,7 @@ def notification_create(request):
     return render(request, 'custom_admin/notifications/form.html', {
         'action': 'Create',
         'nationality_choices': NATIONALITY_CHOICES,
+        'prefill_date': request.GET.get('date', ''),
     })
 
 
@@ -1271,7 +1276,7 @@ def magazine_create(request):
         log_admin_action(request, 'create', 'MagazineEdition', object_repr=request.POST.get('title', ''))
         messages.success(request, f'Magazine created as {content_status}!')
         return redirect('custom_admin:magazines_list')
-    return render(request, 'custom_admin/magazines/form.html', {'action': 'Create'})
+    return render(request, 'custom_admin/magazines/form.html', {'action': 'Create', 'prefill_date': request.GET.get('date', '')})
 
 
 @login_required(login_url='custom_admin:login')
@@ -2074,7 +2079,7 @@ def video_create(request):
         messages.success(request, f'Video created as {content_status}!')
         return redirect('custom_admin:videos_list')
     category_choices = Video.CATEGORY_CHOICES
-    return render(request, 'custom_admin/videos/form.html', {'action': 'Create', 'category_choices': category_choices})
+    return render(request, 'custom_admin/videos/form.html', {'action': 'Create', 'category_choices': category_choices, 'prefill_date': request.GET.get('date', '')})
 
 
 @login_required(login_url='custom_admin:login')
@@ -2148,7 +2153,7 @@ def live_feed_create(request):
         )
         messages.success(request, f'Live feed created as {content_status}!')
         return redirect('custom_admin:live_feeds_list')
-    return render(request, 'custom_admin/live_feeds/form.html', {'action': 'Create'})
+    return render(request, 'custom_admin/live_feeds/form.html', {'action': 'Create', 'prefill_date': request.GET.get('date', '')})
 
 
 @login_required(login_url='custom_admin:login')

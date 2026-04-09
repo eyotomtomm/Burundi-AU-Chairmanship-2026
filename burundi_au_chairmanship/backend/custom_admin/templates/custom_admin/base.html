@@ -1904,6 +1904,27 @@ function toggleDarkMode() {
     observer.observe(document.body, { childList: true, subtree: true });
   }
 })();
+
+// Auto-fill date fields from calendar prefill_date
+(function() {
+  var prefillDate = '{{ prefill_date|default:"" }}';
+  if (!prefillDate) return;
+  document.addEventListener('DOMContentLoaded', function() {
+    // Common date field names across create forms
+    var dateFields = ['publish_date', 'event_date', 'scheduled_publish_date', 'start_time', 'scheduled_at'];
+    dateFields.forEach(function(name) {
+      var field = document.querySelector('input[name="' + name + '"]');
+      if (field && !field.value) {
+        // datetime-local needs "YYYY-MM-DDThh:mm", date needs "YYYY-MM-DD"
+        if (field.type === 'datetime-local') {
+          field.value = prefillDate + 'T09:00';
+        } else {
+          field.value = prefillDate;
+        }
+      }
+    });
+  });
+})();
 </script>
 
 {% block extra_js %}{% endblock %}

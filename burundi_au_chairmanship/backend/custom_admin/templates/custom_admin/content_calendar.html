@@ -402,7 +402,7 @@
     body.innerHTML = '';
 
     if (dayItems.length === 0) {
-      body.innerHTML = '<p class="text-sm text-slate-400 text-center py-8">No content scheduled for this day.</p>';
+      body.innerHTML = '<p class="text-sm text-slate-400 text-center py-6">No content scheduled for this day.</p>';
     } else {
       dayItems.forEach(function(item) {
         const link = document.createElement('a');
@@ -418,6 +418,21 @@
         body.appendChild(link);
       });
     }
+
+    // Add "Create New" section
+    var createSection = document.createElement('div');
+    createSection.className = 'border-t border-slate-100 mt-3 pt-3';
+    createSection.innerHTML =
+      '<p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">Create New</p>' +
+      '<div class="grid grid-cols-2 gap-2">' +
+        createBtn('article', 'Article', 'article', '#3b82f6', dateStr) +
+        createBtn('event', 'Event', 'event', '#22c55e', dateStr) +
+        createBtn('magazine', 'Magazine', 'menu_book', '#8b5cf6', dateStr) +
+        createBtn('livefeed', 'Live Feed', 'live_tv', '#ef4444', dateStr) +
+        createBtn('video', 'Video', 'videocam', '#f59e0b', dateStr) +
+        createBtn('notification', 'Notification', 'notifications', '#6366f1', dateStr) +
+      '</div>';
+    body.appendChild(createSection);
 
     overlay.classList.add('open');
   };
@@ -438,6 +453,24 @@
   window.navigateMonth = function(val) {
     window.location.href = '?month=' + val;
   };
+
+  const CREATE_URLS = {
+    article:      adminBase + 'articles/create/',
+    event:        adminBase + 'events/create/',
+    magazine:     adminBase + 'magazines/create/',
+    livefeed:     adminBase + 'live-feeds/create/',
+    video:        adminBase + 'videos/create/',
+    notification: adminBase + 'notifications/create/',
+  };
+
+  function createBtn(type, label, icon, color, dateStr) {
+    var url = CREATE_URLS[type] || '#';
+    // Pass date as query param so the create form can pre-fill it
+    url += '?date=' + dateStr;
+    return '<a href="' + url + '" class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all text-sm text-slate-700 font-medium">' +
+      '<span class="material-symbols-outlined text-base" style="color:' + color + '">' + icon + '</span>' +
+      label + '</a>';
+  }
 
   function escapeHtml(str) {
     var div = document.createElement('div');

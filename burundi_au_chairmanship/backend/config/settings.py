@@ -389,6 +389,12 @@ except ImportError:
 
 # ─── Sentry Error Tracking ───────────────────────────────────
 SENTRY_DSN = os.environ.get('SENTRY_DSN', '')
+SENTRY_AUTH_TOKEN = os.environ.get('SENTRY_AUTH_TOKEN', '')
+SENTRY_ORG = os.environ.get('SENTRY_ORG', '')
+SENTRY_PROJECT = os.environ.get('SENTRY_PROJECT', '')
+# Sentry API base URL (EU region uses de.sentry.io)
+SENTRY_API_BASE = os.environ.get('SENTRY_API_BASE', 'https://de.sentry.io/api/0')
+
 if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -438,6 +444,10 @@ if SENTRY_DSN:
         before_send=_sentry_before_send,
         # Attach server name for multi-server debugging
         server_name=os.environ.get('SENTRY_SERVER_NAME', ''),
+        # Enable metrics (requires sentry-sdk >= 2.44.0)
+        _experiments={
+            'continuous_profiling_auto_start': True,
+        },
     )
 
 # ─── Celery Task Queue ───────────────────────────────────────

@@ -71,6 +71,13 @@ services:
       - key: SENTRY_DSN
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
+      - key: SENTRY_AUTH_TOKEN
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: SENTRY_ORG
+        value: "burundi-embassy-pu"
+      - key: SENTRY_PROJECT
+        value: "b4africa-backend"
       - key: FIREBASE_CREDENTIALS_JSON
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"

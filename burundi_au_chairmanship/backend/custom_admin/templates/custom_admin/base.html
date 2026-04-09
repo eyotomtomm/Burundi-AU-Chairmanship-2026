@@ -726,6 +726,11 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Database</span>
     </a>
 
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'error_tracking' in url_name %}bg-red-500/10 text-red-500 border-r-4 border-red-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:error_tracking' %}">
+      <span class="material-symbols-outlined">bug_report</span>
+      <span class="text-sm tracking-wide font-headline">Error Tracking</span>
+    </a>
+
     <!-- More (collapsed) -->
     <div class="pt-6 pb-2 px-4">
       <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">More</p>

@@ -289,4 +289,8 @@ urlpatterns = [
     path('comments/', views.comments_list, name='comments_list'),
     path('comments/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
     path('comments/bulk-delete/', views.comment_bulk_delete, name='comment_bulk_delete'),
+
+    # Error Tracking (Sentry)
+    path('error-tracking/', views.error_tracking_dashboard, name='error_tracking'),
+    path('error-tracking/api/', views.error_tracking_api, name='error_tracking_api'),
 ]

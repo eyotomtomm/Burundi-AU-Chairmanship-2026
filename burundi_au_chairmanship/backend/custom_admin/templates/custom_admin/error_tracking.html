@@ -1,0 +1,714 @@
+{% extends "custom_admin/base.html" %}
+{% block title %}Error Tracking - Sentry | Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center">
+      <span class="material-symbols-outlined text-2xl text-red-600">bug_report</span>
+    </div>
+    <div>
+      <h1 class="text-2xl font-black text-slate-900 font-headline">Error Tracking</h1>
+      <p class="text-sm text-slate-500 mt-1">Monitor and resolve application errors</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="lastUpdated" class="text-xs text-slate-400"></span>
+    <span id="autoRefreshDot" class="hidden inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Auto-refreshing every 60s"></span>
+  </div>
+</div>
+
+{% if not sentry_configured %}
+<!-- Sentry Not Configured -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 mb-8">
+  <div class="flex items-start gap-4">
+    <div class="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+      <span class="material-symbols-outlined text-2xl text-amber-600">settings</span>
+    </div>
+    <div class="flex-1">
+      <h2 class="text-lg font-bold text-slate-800 font-headline mb-2">Sentry Integration Setup Required</h2>
+      <p class="text-sm text-slate-500 mb-4">
+        To enable error tracking, you need to configure the following environment variables on your server:
+      </p>
+      <div class="space-y-3 mb-6">
+        <div class="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+          <span class="material-symbols-outlined text-lg text-red-500">close</span>
+          <div>
+            <p class="text-sm font-semibold text-slate-800 font-mono">SENTRY_AUTH_TOKEN</p>
+            <p class="text-xs text-slate-400">API authentication token from your Sentry account settings</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+          <span class="material-symbols-outlined text-lg text-red-500">close</span>
+          <div>
+            <p class="text-sm font-semibold text-slate-800 font-mono">SENTRY_ORG</p>
+            <p class="text-xs text-slate-400">Your Sentry organization slug</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+          <span class="material-symbols-outlined text-lg text-red-500">close</span>
+          <div>
+            <p class="text-sm font-semibold text-slate-800 font-mono">SENTRY_PROJECT</p>
+            <p class="text-xs text-slate-400">Your Sentry project slug</p>
+          </div>
+        </div>
+      </div>
+
+      {% if not sentry_dsn_set %}
+      <div class="flex items-center gap-3 p-4 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 mb-6">
+        <span class="material-symbols-outlined text-sm">warning</span>
+        <span class="text-sm font-medium">
+          <strong>SENTRY_DSN</strong> is also not set. Without it, your application will not send error reports to Sentry.
+          Set the <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono">SENTRY_DSN</code> environment variable to start capturing errors.
+        </span>
+      </div>
+      {% endif %}
+
+      <div class="bg-slate-50 rounded-xl p-4 border border-slate-200/60">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Example Configuration</p>
+        <pre class="text-sm text-slate-700 font-mono whitespace-pre-wrap">SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+SENTRY_AUTH_TOKEN=sntrys_eyJ...
+SENTRY_ORG=your-organization
+SENTRY_PROJECT=your-project</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- Sentry Configured - Show Dashboard -->
+
+{% if not sentry_dsn_set %}
+<div class="flex items-center gap-3 p-4 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 mb-6">
+  <span class="material-symbols-outlined text-sm">warning</span>
+  <span class="text-sm font-medium">
+    <strong>SENTRY_DSN</strong> is not set. The API integration is configured, but your application may not be sending error reports to Sentry.
+    Set the <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono">SENTRY_DSN</code> environment variable.
+  </span>
+</div>
+{% endif %}
+
+<!-- Stats Bar -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 text-center">
+    <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center mx-auto mb-3">
+      <span class="material-symbols-outlined text-xl text-red-600">error</span>
+    </div>
+    <p id="statUnresolved" class="text-3xl font-black text-slate-900 font-headline">--</p>
+    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Unresolved</p>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 text-center">
+    <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+      <span class="material-symbols-outlined text-xl text-emerald-600">check_circle</span>
+    </div>
+    <p id="statResolved" class="text-3xl font-black text-emerald-600 font-headline">--</p>
+    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Resolved (24h)</p>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 text-center">
+    <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mx-auto mb-3">
+      <span class="material-symbols-outlined text-xl text-amber-600">visibility_off</span>
+    </div>
+    <p id="statIgnored" class="text-3xl font-black text-amber-600 font-headline">--</p>
+    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ignored</p>
+  </div>
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 text-center">
+    <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mx-auto mb-3">
+      <span class="material-symbols-outlined text-xl text-blue-600">analytics</span>
+    </div>
+    <p id="statEvents" class="text-3xl font-black text-slate-900 font-headline">--</p>
+    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total Events</p>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 mb-6">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-2">
+      <button id="filterUnresolved" onclick="setFilter('is:unresolved')" class="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 bg-red-100 text-red-700 border border-red-200">
+        <span class="material-symbols-outlined text-sm align-middle mr-1">error</span>Unresolved
+      </button>
+      <button id="filterResolved" onclick="setFilter('is:resolved')" class="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 bg-slate-100 text-slate-600 border border-slate-200 hover:bg-emerald-100 hover:text-emerald-700 hover:border-emerald-200">
+        <span class="material-symbols-outlined text-sm align-middle mr-1">check_circle</span>Resolved
+      </button>
+      <button id="filterIgnored" onclick="setFilter('is:ignored')" class="px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 bg-slate-100 text-slate-600 border border-slate-200 hover:bg-amber-100 hover:text-amber-700 hover:border-amber-200">
+        <span class="material-symbols-outlined text-sm align-middle mr-1">visibility_off</span>Ignored
+      </button>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-slate-400 font-medium">Sort by:</span>
+      <select id="sortSelect" onchange="changeSort(this.value)" class="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-red-200 focus:border-red-400">
+        <option value="date" selected>Date</option>
+        <option value="priority">Priority</option>
+        <option value="freq">Events</option>
+        <option value="users">Users</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Issues Table -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden mb-6">
+  <!-- Loading Overlay -->
+  <div id="issuesLoading" class="flex items-center justify-center py-16">
+    <div class="flex flex-col items-center gap-3">
+      <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      <span class="text-sm text-slate-400">Loading issues from Sentry...</span>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div id="issuesEmpty" class="hidden flex flex-col items-center justify-center py-16">
+    <span class="material-symbols-outlined text-5xl text-slate-300 mb-3">celebration</span>
+    <p class="text-lg font-bold text-slate-600 font-headline">No issues found</p>
+    <p class="text-sm text-slate-400 mt-1">Everything is looking good!</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="issuesError" class="hidden flex flex-col items-center justify-center py-16">
+    <span class="material-symbols-outlined text-5xl text-red-300 mb-3">cloud_off</span>
+    <p class="text-lg font-bold text-slate-600 font-headline">Failed to load issues</p>
+    <p id="issuesErrorMsg" class="text-sm text-slate-400 mt-1">Could not connect to Sentry API.</p>
+    <button onclick="fetchIssues()" class="mt-4 px-4 py-2 text-sm font-semibold rounded-xl bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 transition-colors">
+      <span class="material-symbols-outlined text-sm align-middle mr-1">refresh</span>Retry
+    </button>
+  </div>
+
+  <!-- Issues Table Body -->
+  <div id="issuesTableWrapper" class="hidden">
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-slate-200/60">
+          <th class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest px-6 py-3">Issue</th>
+          <th class="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 py-3 hidden sm:table-cell">Events</th>
+          <th class="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 py-3 hidden sm:table-cell">Users</th>
+          <th class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 py-3 hidden lg:table-cell">First Seen</th>
+          <th class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 py-3 hidden lg:table-cell">Last Seen</th>
+          <th class="text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest px-6 py-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="issuesTableBody" class="divide-y divide-slate-100">
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+<div id="paginationBar" class="hidden flex items-center justify-between mb-8">
+  <button id="prevBtn" onclick="goPage('prev')" disabled class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+    <span class="material-symbols-outlined text-sm">chevron_left</span>Previous
+  </button>
+  <span id="pageInfo" class="text-xs text-slate-400"></span>
+  <button id="nextBtn" onclick="goPage('next')" disabled class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+    Next<span class="material-symbols-outlined text-sm">chevron_right</span>
+  </button>
+</div>
+
+<!-- Issue Detail Modal -->
+<div id="issueModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.5);">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+    <!-- Modal Header -->
+    <div class="flex items-center justify-between p-6 border-b border-slate-200/60">
+      <div class="flex items-center gap-3 min-w-0">
+        <span id="modalLevelIcon" class="material-symbols-outlined text-xl text-red-500">error</span>
+        <h3 id="modalTitle" class="text-lg font-bold text-slate-800 font-headline truncate">Issue Title</h3>
+      </div>
+      <button onclick="closeModal()" class="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 transition-colors">
+        <span class="material-symbols-outlined text-xl text-slate-400">close</span>
+      </button>
+    </div>
+    <!-- Modal Body -->
+    <div class="flex-1 overflow-y-auto p-6">
+      <div class="space-y-4">
+        <!-- Culprit -->
+        <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Culprit</p>
+          <p id="modalCulprit" class="text-sm font-mono text-slate-700 break-all">--</p>
+        </div>
+        <!-- Metadata -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">First Seen</p>
+            <p id="modalFirstSeen" class="text-sm font-semibold text-slate-800">--</p>
+          </div>
+          <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Last Seen</p>
+            <p id="modalLastSeen" class="text-sm font-semibold text-slate-800">--</p>
+          </div>
+          <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Events</p>
+            <p id="modalEvents" class="text-sm font-semibold text-slate-800">--</p>
+          </div>
+          <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Users Affected</p>
+            <p id="modalUsers" class="text-sm font-semibold text-slate-800">--</p>
+          </div>
+        </div>
+        <!-- Sentry Link -->
+        <div>
+          <a id="modalPermalink" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-200 transition-colors">
+            <span class="material-symbols-outlined text-sm">open_in_new</span>View in Sentry
+          </a>
+        </div>
+        <!-- Recent Events -->
+        <div>
+          <h4 class="text-sm font-bold text-slate-700 font-headline mb-3">Recent Events</h4>
+          <div id="modalEventsLoading" class="flex items-center justify-center py-8">
+            <svg class="animate-spin h-6 w-6 text-red-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+          </div>
+          <div id="modalEventsList" class="hidden space-y-2"></div>
+          <div id="modalEventsEmpty" class="hidden text-center py-6">
+            <p class="text-sm text-slate-400">No recent events found.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Footer -->
+    <div class="flex items-center justify-end gap-3 p-6 border-t border-slate-200/60">
+      <button id="modalResolveBtn" onclick="modalAction('resolve')" class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 transition-colors">
+        <span class="material-symbols-outlined text-sm">check_circle</span>Resolve
+      </button>
+      <button id="modalIgnoreBtn" onclick="modalAction('ignore')" class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 transition-colors">
+        <span class="material-symbols-outlined text-sm">visibility_off</span>Ignore
+      </button>
+      <button onclick="closeModal()" class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-colors">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if sentry_configured %}
+<script>
+(function() {
+  var API_URL = "{% url 'custom_admin:error_tracking_api' %}";
+  var currentQuery = 'is:unresolved';
+  var currentSort = 'date';
+  var currentCursor = '';
+  var prevCursors = [];
+  var nextCursor = '';
+  var currentModalIssueId = null;
+  var refreshTimer = null;
+
+  // ---- CSRF ----
+  function getCsrfToken() {
+    var cookie = document.cookie.split(';').find(function(c) { return c.trim().startsWith('csrftoken='); });
+    return cookie ? cookie.split('=')[1] : '';
+  }
+
+  // ---- Time Ago ----
+  function timeAgo(dateStr) {
+    if (!dateStr) return '--';
+    var now = new Date();
+    var then = new Date(dateStr);
+    var diffMs = now - then;
+    var diffSec = Math.floor(diffMs / 1000);
+    var diffMin = Math.floor(diffSec / 60);
+    var diffHour = Math.floor(diffMin / 60);
+    var diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) return 'just now';
+    if (diffMin < 60) return diffMin + 'm ago';
+    if (diffHour < 24) return diffHour + 'h ago';
+    if (diffDay < 30) return diffDay + 'd ago';
+    if (diffDay < 365) return Math.floor(diffDay / 30) + 'mo ago';
+    return Math.floor(diffDay / 365) + 'y ago';
+  }
+
+  // ---- Format Number ----
+  function formatNumber(n) {
+    if (n === undefined || n === null) return '--';
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return n.toLocaleString();
+  }
+
+  // ---- Level Helpers ----
+  function getLevelIcon(level) {
+    switch (level) {
+      case 'error':
+      case 'fatal':
+        return { icon: 'error', color: 'text-red-500', bg: 'bg-red-100' };
+      case 'warning':
+        return { icon: 'warning', color: 'text-amber-500', bg: 'bg-amber-100' };
+      case 'info':
+        return { icon: 'info', color: 'text-blue-500', bg: 'bg-blue-100' };
+      default:
+        return { icon: 'help', color: 'text-slate-400', bg: 'bg-slate-100' };
+    }
+  }
+
+  // ---- Fetch Stats ----
+  function fetchStats() {
+    // Unresolved count
+    fetch(API_URL + '?endpoint=issues&query=is:unresolved&per_page=1')
+      .then(function(r) {
+        var total = r.headers.get('X-Total-Count');
+        document.getElementById('statUnresolved').textContent = total ? formatNumber(parseInt(total)) : '--';
+        return r.json();
+      })
+      .catch(function() {
+        document.getElementById('statUnresolved').textContent = '--';
+      });
+
+    // Resolved (24h)
+    fetch(API_URL + '?endpoint=issues&query=is:resolved&sort=date&per_page=1')
+      .then(function(r) {
+        var total = r.headers.get('X-Total-Count');
+        document.getElementById('statResolved').textContent = total ? formatNumber(parseInt(total)) : '--';
+        return r.json();
+      })
+      .catch(function() {
+        document.getElementById('statResolved').textContent = '--';
+      });
+
+    // Ignored
+    fetch(API_URL + '?endpoint=issues&query=is:ignored&per_page=1')
+      .then(function(r) {
+        var total = r.headers.get('X-Total-Count');
+        document.getElementById('statIgnored').textContent = total ? formatNumber(parseInt(total)) : '--';
+        return r.json();
+      })
+      .catch(function() {
+        document.getElementById('statIgnored').textContent = '--';
+      });
+
+    // Total events
+    fetch(API_URL + '?endpoint=issues&query=&per_page=1')
+      .then(function(r) {
+        var total = r.headers.get('X-Total-Count');
+        document.getElementById('statEvents').textContent = total ? formatNumber(parseInt(total)) : '--';
+        return r.json();
+      })
+      .catch(function() {
+        document.getElementById('statEvents').textContent = '--';
+      });
+  }
+
+  // ---- Fetch Issues ----
+  function fetchIssues(query, sort, cursor) {
+    if (query !== undefined) currentQuery = query;
+    if (sort !== undefined) currentSort = sort;
+    if (cursor !== undefined) currentCursor = cursor;
+
+    // Show loading, hide others
+    document.getElementById('issuesLoading').classList.remove('hidden');
+    document.getElementById('issuesEmpty').classList.add('hidden');
+    document.getElementById('issuesError').classList.add('hidden');
+    document.getElementById('issuesTableWrapper').classList.add('hidden');
+    document.getElementById('paginationBar').classList.add('hidden');
+
+    var url = API_URL + '?endpoint=issues&query=' + encodeURIComponent(currentQuery) +
+              '&sort=' + encodeURIComponent(currentSort) +
+              '&per_page=25';
+    if (currentCursor) {
+      url += '&cursor=' + encodeURIComponent(currentCursor);
+    }
+
+    fetch(url)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        // Parse Sentry link cursor from response headers
+        nextCursor = '';
+        var linkHeader = r.headers.get('X-Sentry-Next-Cursor');
+        if (linkHeader) nextCursor = linkHeader;
+        return r.json();
+      })
+      .then(function(issues) {
+        document.getElementById('issuesLoading').classList.add('hidden');
+
+        if (!issues || issues.length === 0) {
+          document.getElementById('issuesEmpty').classList.remove('hidden');
+          return;
+        }
+
+        renderIssues(issues);
+        document.getElementById('issuesTableWrapper').classList.remove('hidden');
+
+        // Pagination
+        document.getElementById('paginationBar').classList.remove('hidden');
+        document.getElementById('prevBtn').disabled = prevCursors.length === 0;
+        document.getElementById('nextBtn').disabled = !nextCursor;
+
+        // Update timestamp
+        document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+        document.getElementById('autoRefreshDot').classList.remove('hidden');
+      })
+      .catch(function(err) {
+        document.getElementById('issuesLoading').classList.add('hidden');
+        document.getElementById('issuesError').classList.remove('hidden');
+        document.getElementById('issuesErrorMsg').textContent = err.message || 'Could not connect to Sentry API.';
+      });
+  }
+
+  // ---- Render Issues ----
+  function renderIssues(issues) {
+    var tbody = document.getElementById('issuesTableBody');
+    tbody.innerHTML = '';
+
+    issues.forEach(function(issue) {
+      var level = getLevelIcon(issue.level);
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition-colors cursor-pointer';
+      tr.onclick = function(e) {
+        // Don't open modal if clicking an action button
+        if (e.target.closest('.action-btn')) return;
+        openModal(issue);
+      };
+
+      tr.innerHTML =
+        '<td class="px-6 py-4">' +
+          '<div class="flex items-start gap-3">' +
+            '<div class="w-8 h-8 rounded-lg ' + level.bg + ' flex items-center justify-center flex-shrink-0 mt-0.5">' +
+              '<span class="material-symbols-outlined text-base ' + level.color + '">' + level.icon + '</span>' +
+            '</div>' +
+            '<div class="min-w-0">' +
+              '<p class="text-sm font-semibold text-slate-800 truncate max-w-md">' + escapeHtml(issue.shortTitle || issue.title) + '</p>' +
+              '<p class="text-xs text-slate-400 truncate max-w-md mt-0.5 font-mono">' + escapeHtml(issue.culprit || '') + '</p>' +
+            '</div>' +
+          '</div>' +
+        '</td>' +
+        '<td class="px-4 py-4 text-center hidden sm:table-cell">' +
+          '<span class="text-sm font-bold text-slate-700">' + formatNumber(parseInt(issue.count) || 0) + '</span>' +
+        '</td>' +
+        '<td class="px-4 py-4 text-center hidden sm:table-cell">' +
+          '<span class="text-sm font-bold text-slate-700">' + formatNumber(parseInt(issue.userCount) || 0) + '</span>' +
+        '</td>' +
+        '<td class="px-4 py-4 hidden lg:table-cell">' +
+          '<span class="text-xs text-slate-400" title="' + escapeHtml(issue.firstSeen || '') + '">' + timeAgo(issue.firstSeen) + '</span>' +
+        '</td>' +
+        '<td class="px-4 py-4 hidden lg:table-cell">' +
+          '<span class="text-xs text-slate-400" title="' + escapeHtml(issue.lastSeen || '') + '">' + timeAgo(issue.lastSeen) + '</span>' +
+        '</td>' +
+        '<td class="px-6 py-4 text-right">' +
+          '<div class="flex items-center justify-end gap-1">' +
+            '<button class="action-btn w-8 h-8 rounded-lg hover:bg-emerald-100 flex items-center justify-center transition-colors" onclick="performAction(\'' + issue.id + '\', \'resolve\')" title="Resolve">' +
+              '<span class="material-symbols-outlined text-base text-emerald-500">check_circle</span>' +
+            '</button>' +
+            '<button class="action-btn w-8 h-8 rounded-lg hover:bg-amber-100 flex items-center justify-center transition-colors" onclick="performAction(\'' + issue.id + '\', \'ignore\')" title="Ignore">' +
+              '<span class="material-symbols-outlined text-base text-amber-500">visibility_off</span>' +
+            '</button>' +
+          '</div>' +
+        '</td>';
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ---- Perform Action (Resolve / Ignore) ----
+  window.performAction = function(issueId, action) {
+    var statusMap = { resolve: 'resolved', ignore: 'ignored' };
+    var newStatus = statusMap[action];
+    if (!newStatus) return;
+
+    fetch(API_URL, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken(),
+      },
+      body: JSON.stringify({ action: action, issue_id: issueId }),
+    })
+    .then(function(r) {
+      if (!r.ok) throw new Error('Action failed');
+      return r.json();
+    })
+    .then(function() {
+      // Refresh the issues list and stats
+      fetchIssues();
+      fetchStats();
+    })
+    .catch(function(err) {
+      alert('Failed to ' + action + ' issue: ' + err.message);
+    });
+  };
+
+  // ---- Modal ----
+  function openModal(issue) {
+    currentModalIssueId = issue.id;
+    var level = getLevelIcon(issue.level);
+
+    document.getElementById('modalLevelIcon').className = 'material-symbols-outlined text-xl ' + level.color;
+    document.getElementById('modalLevelIcon').textContent = level.icon;
+    document.getElementById('modalTitle').textContent = issue.title || issue.shortTitle || '--';
+    document.getElementById('modalCulprit').textContent = issue.culprit || '--';
+    document.getElementById('modalFirstSeen').textContent = issue.firstSeen ? timeAgo(issue.firstSeen) + ' (' + new Date(issue.firstSeen).toLocaleString() + ')' : '--';
+    document.getElementById('modalLastSeen').textContent = issue.lastSeen ? timeAgo(issue.lastSeen) + ' (' + new Date(issue.lastSeen).toLocaleString() + ')' : '--';
+    document.getElementById('modalEvents').textContent = formatNumber(parseInt(issue.count) || 0);
+    document.getElementById('modalUsers').textContent = formatNumber(parseInt(issue.userCount) || 0);
+    document.getElementById('modalPermalink').href = issue.permalink || '#';
+
+    // Show/hide action buttons based on status
+    var resolveBtn = document.getElementById('modalResolveBtn');
+    var ignoreBtn = document.getElementById('modalIgnoreBtn');
+    if (issue.status === 'resolved') {
+      resolveBtn.classList.add('hidden');
+      ignoreBtn.classList.remove('hidden');
+    } else if (issue.status === 'ignored') {
+      resolveBtn.classList.remove('hidden');
+      ignoreBtn.classList.add('hidden');
+    } else {
+      resolveBtn.classList.remove('hidden');
+      ignoreBtn.classList.remove('hidden');
+    }
+
+    document.getElementById('issueModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    // Fetch recent events for this issue
+    fetchIssueEvents(issue.id);
+  }
+
+  window.closeModal = function() {
+    document.getElementById('issueModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    currentModalIssueId = null;
+  };
+
+  window.modalAction = function(action) {
+    if (!currentModalIssueId) return;
+    performAction(currentModalIssueId, action);
+    closeModal();
+  };
+
+  // Close modal on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // Close modal on backdrop click
+  document.getElementById('issueModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ---- Fetch Issue Events ----
+  function fetchIssueEvents(issueId) {
+    document.getElementById('modalEventsLoading').classList.remove('hidden');
+    document.getElementById('modalEventsList').classList.add('hidden');
+    document.getElementById('modalEventsEmpty').classList.add('hidden');
+
+    fetch(API_URL + '?endpoint=events&issue_id=' + encodeURIComponent(issueId))
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(events) {
+        document.getElementById('modalEventsLoading').classList.add('hidden');
+
+        if (!events || events.length === 0) {
+          document.getElementById('modalEventsEmpty').classList.remove('hidden');
+          return;
+        }
+
+        var listEl = document.getElementById('modalEventsList');
+        listEl.innerHTML = '';
+
+        events.slice(0, 10).forEach(function(event) {
+          var div = document.createElement('div');
+          div.className = 'bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60';
+          div.innerHTML =
+            '<div class="flex items-center justify-between">' +
+              '<div class="min-w-0 flex-1">' +
+                '<p class="text-sm font-medium text-slate-700 truncate">' + escapeHtml(event.title || event.eventID || '--') + '</p>' +
+                '<p class="text-xs text-slate-400 mt-0.5">' + timeAgo(event.dateCreated) + ' &middot; ' + escapeHtml(event.eventID || '').substring(0, 12) + '</p>' +
+              '</div>' +
+              (event.context && event.context.browser ? '<span class="text-xs text-slate-400 ml-2">' + escapeHtml(event.context.browser) + '</span>' : '') +
+            '</div>';
+          listEl.appendChild(div);
+        });
+
+        listEl.classList.remove('hidden');
+      })
+      .catch(function() {
+        document.getElementById('modalEventsLoading').classList.add('hidden');
+        document.getElementById('modalEventsEmpty').classList.remove('hidden');
+      });
+  }
+
+  // ---- Filter / Sort ----
+  window.setFilter = function(query) {
+    currentQuery = query;
+    currentCursor = '';
+    prevCursors = [];
+
+    // Update button styles
+    var filters = {
+      'is:unresolved': 'filterUnresolved',
+      'is:resolved': 'filterResolved',
+      'is:ignored': 'filterIgnored'
+    };
+    var activeStyles = {
+      'is:unresolved': 'bg-red-100 text-red-700 border-red-200',
+      'is:resolved': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      'is:ignored': 'bg-amber-100 text-amber-700 border-amber-200'
+    };
+    var inactiveStyle = 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
+
+    Object.keys(filters).forEach(function(key) {
+      var btn = document.getElementById(filters[key]);
+      if (!btn) return;
+      var baseClasses = 'px-4 py-2 text-sm font-semibold rounded-xl transition-all duration-200 border ';
+      if (key === query) {
+        btn.className = baseClasses + activeStyles[key];
+      } else {
+        btn.className = baseClasses + inactiveStyle;
+      }
+    });
+
+    fetchIssues();
+  };
+
+  window.changeSort = function(sort) {
+    currentSort = sort;
+    currentCursor = '';
+    prevCursors = [];
+    fetchIssues();
+  };
+
+  // ---- Pagination ----
+  window.goPage = function(direction) {
+    if (direction === 'next' && nextCursor) {
+      prevCursors.push(currentCursor);
+      currentCursor = nextCursor;
+      fetchIssues();
+    } else if (direction === 'prev' && prevCursors.length > 0) {
+      currentCursor = prevCursors.pop();
+      fetchIssues();
+    }
+  };
+
+  // ---- Escape HTML ----
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ---- Auto Refresh ----
+  function startAutoRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(function() {
+      fetchIssues();
+      fetchStats();
+    }, 60000);
+  }
+
+  // ---- Initialize ----
+  fetchStats();
+  fetchIssues();
+  startAutoRefresh();
+})();
+</script>
+{% endif %}
+{% endblock %}

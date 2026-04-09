@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import urllib.parse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
@@ -6655,3 +6656,116 @@ def comment_bulk_delete(request):
     else:
         messages.warning(request, 'No comments were selected for deletion.')
     return redirect('custom_admin:comments_list')
+
+
+@login_required(login_url='/admin/')
+@user_passes_test(lambda u: u.is_staff)
+def error_tracking_dashboard(request):
+    """Sentry error tracking dashboard - shows issues from Sentry API."""
+    from django.conf import settings as django_settings
+
+    sentry_configured = bool(
+        getattr(django_settings, 'SENTRY_AUTH_TOKEN', '') and
+        getattr(django_settings, 'SENTRY_ORG', '') and
+        getattr(django_settings, 'SENTRY_PROJECT', '')
+    )
+
+    return render(request, 'custom_admin/error_tracking.html', {
+        'sentry_configured': sentry_configured,
+        'sentry_dsn_set': bool(getattr(django_settings, 'SENTRY_DSN', '')),
+    })
+
+
+@login_required(login_url='/admin/')
+@user_passes_test(lambda u: u.is_staff)
+def error_tracking_api(request):
+    """Proxy Sentry API calls to avoid exposing auth token to frontend."""
+    import urllib.request
+    import urllib.error
+    import json
+    from django.conf import settings as django_settings
+
+    auth_token = getattr(django_settings, 'SENTRY_AUTH_TOKEN', '')
+    org = getattr(django_settings, 'SENTRY_ORG', '')
+    project = getattr(django_settings, 'SENTRY_PROJECT', '')
+    api_base = getattr(django_settings, 'SENTRY_API_BASE', 'https://de.sentry.io/api/0')
+
+    if not all([auth_token, org, project]):
+        return JsonResponse({'error': 'Sentry API not configured. Set SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT environment variables.'}, status=400)
+
+    # Which endpoint to proxy
+    endpoint = request.GET.get('endpoint', 'issues')
+    query = request.GET.get('query', 'is:unresolved')
+    cursor = request.GET.get('cursor', '')
+    sort = request.GET.get('sort', 'date')
+
+    # Handle different actions (resolve, ignore)
+    if request.method == 'POST':
+        action = request.POST.get('action', '')
+        issue_id = request.POST.get('issue_id', '')
+        if action and issue_id:
+            try:
+                url = f'{api_base}/issues/{issue_id}/'
+                if action == 'resolve':
+                    data = json.dumps({'status': 'resolved'}).encode()
+                elif action == 'ignore':
+                    data = json.dumps({'status': 'ignored'}).encode()
+                elif action == 'unresolve':
+                    data = json.dumps({'status': 'unresolved'}).encode()
+                else:
+                    return JsonResponse({'error': 'Invalid action'}, status=400)
+
+                req = urllib.request.Request(url, data=data, method='PUT')
+                req.add_header('Authorization', f'Bearer {auth_token}')
+                req.add_header('Content-Type', 'application/json')
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    result = json.loads(resp.read())
+                log_admin_action(request, 'sentry_action', 'ErrorTracking',
+                    object_repr=f'Issue {issue_id}: {action}')
+                return JsonResponse({'success': True, 'status': result.get('status', '')})
+            except Exception as e:
+                return JsonResponse({'error': str(e)}, status=500)
+
+    # Build Sentry API URL
+    if endpoint == 'issues':
+        url = f'{api_base}/projects/{org}/{project}/issues/?query={urllib.parse.quote(query)}&sort={sort}'
+        if cursor:
+            url += f'&cursor={cursor}'
+    elif endpoint == 'stats':
+        stat_type = request.GET.get('stat', 'received')
+        url = f'{api_base}/projects/{org}/{project}/stats/?stat={stat_type}&resolution=1d'
+    elif endpoint == 'issue_events':
+        issue_id = request.GET.get('issue_id', '')
+        url = f'{api_base}/issues/{issue_id}/events/'
+    else:
+        return JsonResponse({'error': 'Invalid endpoint'}, status=400)
+
+    try:
+        req = urllib.request.Request(url)
+        req.add_header('Authorization', f'Bearer {auth_token}')
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+            # Parse Link header for pagination
+            link_header = resp.getheader('Link', '')
+            pagination = {}
+            if link_header:
+                for part in link_header.split(','):
+                    part = part.strip()
+                    if 'rel="next"' in part and 'results="true"' in part:
+                        # Extract cursor from URL
+                        import re
+                        cursor_match = re.search(r'cursor=([^&>]+)', part)
+                        if cursor_match:
+                            pagination['next_cursor'] = cursor_match.group(1)
+                    elif 'rel="previous"' in part and 'results="true"' in part:
+                        import re
+                        cursor_match = re.search(r'cursor=([^&>]+)', part)
+                        if cursor_match:
+                            pagination['prev_cursor'] = cursor_match.group(1)
+
+            return JsonResponse({'data': data, 'pagination': pagination})
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else str(e)
+        return JsonResponse({'error': f'Sentry API error ({e.code}): {error_body}'}, status=e.code)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

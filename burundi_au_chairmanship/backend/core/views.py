@@ -2127,6 +2127,92 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 defaults={'position': position},
             )
 
+        # Send confirmation email
+        if event_reg.send_confirmation_email and user.email:
+            try:
+                from django.core.mail import send_mail
+                from django.conf import settings as django_settings
+
+                subject = f'Registration Confirmation: {event_reg.event_title}'
+
+                # Build HTML email
+                html_message = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">African Union Chairmanship 2026-2027</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
+        Dear <strong>{user.get_full_name() or user.username}</strong>,
+      </p>
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        Thank you for registering for <strong>{event_reg.event_title}</strong>. Your registration has been received and is being processed.
+      </p>
+      <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
+        <h3 style="color:#2d3748;font-size:14px;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px;">Event Details</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Event</td><td style="padding:6px 0;color:#2d3748;font-size:14px;font-weight:600;">{event_reg.event_title}</td></tr>'''
+
+                if event_reg.event_date:
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Date</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{event_reg.event_date.strftime("%B %d, %Y at %H:%M")}</td></tr>'''
+                if event_reg.venue:
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Venue</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{event_reg.venue}</td></tr>'''
+                if is_waitlisted:
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Status</td><td style="padding:6px 0;color:#e53e3e;font-size:14px;font-weight:600;">Waitlisted</td></tr>'''
+                else:
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Status</td><td style="padding:6px 0;color:#38a169;font-size:14px;font-weight:600;">Registered</td></tr>'''
+
+                html_message += '''
+        </table>
+      </div>'''
+
+                if event_reg.confirmation_message:
+                    html_message += f'''
+      <div style="background:#fffff0;border-left:4px solid #ecc94b;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+        <p style="color:#744210;font-size:14px;line-height:1.6;margin:0;">{event_reg.confirmation_message}</p>
+      </div>'''
+
+                html_message += f'''
+      <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+      </p>
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; African Union Chairmanship 2026-2027</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>'''
+
+                plain_message = f"Dear {user.get_full_name() or user.username},\n\nThank you for registering for {event_reg.event_title}.\n\n"
+                if event_reg.confirmation_message:
+                    plain_message += f"{event_reg.confirmation_message}\n\n"
+                plain_message += "Best regards,\nBurundi AU Chairmanship Team"
+
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=django_settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    html_message=html_message,
+                    fail_silently=True,
+                )
+            except Exception:
+                pass  # Don't fail registration if email fails
+
     @action(detail=True, methods=['get'], url_path='qr-ticket')
     def qr_ticket(self, request, pk=None):
         """Generate QR ticket data for a submission."""

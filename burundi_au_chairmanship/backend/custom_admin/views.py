@@ -1763,6 +1763,91 @@ def event_submission_review(request, pk):
             submission.reviewed_at = timezone.now()
             submission.save()
             messages.success(request, f'Submission from {submission.user.username} approved.')
+
+            # Send approval confirmation email
+            if submission.user.email:
+                try:
+                    from django.core.mail import send_mail
+                    event_reg = submission.event_registration
+                    user = submission.user
+
+                    subject = f'Registration Approved: {event_reg.event_title}'
+                    html_message = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#1a4731 0%,#276749 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#276749;">&#10003;</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Approved</h1>
+      <p style="color:#9ae6b4;font-size:14px;margin:0;">African Union Chairmanship 2026-2027</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
+        Dear <strong>{user.get_full_name() or user.username}</strong>,
+      </p>
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        Great news! Your registration for <strong>{event_reg.event_title}</strong> has been approved.
+      </p>
+      <div style="background:#f0fff4;border-radius:12px;padding:20px;margin:0 0 24px;">
+        <h3 style="color:#276749;font-size:14px;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px;">Event Details</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Event</td><td style="padding:6px 0;color:#2d3748;font-size:14px;font-weight:600;">{event_reg.event_title}</td></tr>'''
+
+                    if event_reg.event_date:
+                        html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Date</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{event_reg.event_date.strftime("%B %d, %Y at %H:%M")}</td></tr>'''
+                    if event_reg.venue:
+                        html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Venue</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{event_reg.venue}</td></tr>'''
+
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Status</td><td style="padding:6px 0;color:#38a169;font-size:14px;font-weight:600;">Approved</td></tr>
+        </table>
+      </div>'''
+
+                    if submission.admin_notes:
+                        html_message += f'''
+      <div style="background:#fffff0;border-left:4px solid #ecc94b;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+        <p style="color:#744210;font-size:13px;margin:0 0 4px;font-weight:600;">Note from organizer:</p>
+        <p style="color:#744210;font-size:14px;line-height:1.6;margin:0;">{submission.admin_notes}</p>
+      </div>'''
+
+                    html_message += f'''
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        You can view your ticket and event details in the Burundi AU Chairmanship app.
+      </p>
+      <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+      </p>
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; African Union Chairmanship 2026-2027</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>'''
+
+                    plain_message = f"Dear {user.get_full_name() or user.username},\n\nYour registration for {event_reg.event_title} has been approved.\n\n"
+                    if submission.admin_notes:
+                        plain_message += f"Note from organizer: {submission.admin_notes}\n\n"
+                    plain_message += "You can view your ticket and event details in the Burundi AU Chairmanship app.\n\nBest regards,\nBurundi AU Chairmanship Team"
+
+                    send_mail(
+                        subject=subject,
+                        message=plain_message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        html_message=html_message,
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass  # Don't fail the review if email fails
+
         elif action == 'reject':
             submission.status = 'rejected'
             submission.admin_notes = request.POST.get('admin_notes', '')
@@ -1770,6 +1855,75 @@ def event_submission_review(request, pk):
             submission.reviewed_at = timezone.now()
             submission.save()
             messages.success(request, f'Submission from {submission.user.username} rejected.')
+
+            # Send rejection notification email
+            if submission.user.email:
+                try:
+                    from django.core.mail import send_mail
+                    event_reg = submission.event_registration
+                    user = submission.user
+
+                    subject = f'Registration Update: {event_reg.event_title}'
+                    html_message = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#742a2a 0%,#9b2c2c 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#9b2c2c;">!</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Not Approved</h1>
+      <p style="color:#feb2b2;font-size:14px;margin:0;">African Union Chairmanship 2026-2027</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
+        Dear <strong>{user.get_full_name() or user.username}</strong>,
+      </p>
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        We regret to inform you that your registration for <strong>{event_reg.event_title}</strong> could not be approved at this time.
+      </p>'''
+
+                    if submission.admin_notes:
+                        html_message += f'''
+      <div style="background:#fff5f5;border-left:4px solid #fc8181;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+        <p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p>
+        <p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{submission.admin_notes}</p>
+      </div>'''
+
+                    html_message += f'''
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        If you believe this was made in error or have any questions, please don't hesitate to reach out.
+      </p>
+      <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+        Contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+      </p>
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; African Union Chairmanship 2026-2027</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>'''
+
+                    plain_message = f"Dear {user.get_full_name() or user.username},\n\nWe regret to inform you that your registration for {event_reg.event_title} could not be approved at this time.\n\n"
+                    if submission.admin_notes:
+                        plain_message += f"Reason: {submission.admin_notes}\n\n"
+                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundi4africa.com'}.\n\nBest regards,\nBurundi AU Chairmanship Team"
+
+                    send_mail(
+                        subject=subject,
+                        message=plain_message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        html_message=html_message,
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass  # Don't fail the review if email fails
+
         return redirect('custom_admin:event_registration_submissions', pk=submission.event_registration.pk)
 
     # Map field_name → field_label for friendly display

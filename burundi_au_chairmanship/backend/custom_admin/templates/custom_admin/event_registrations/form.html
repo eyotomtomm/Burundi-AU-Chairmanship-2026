@@ -11,13 +11,13 @@
                 <span class="material-symbols-outlined text-3xl text-white">{% if reg %}edit_calendar{% else %}add_circle{% endif %}</span>
             </div>
             <div>
-                <h1 class="text-3xl font-bold text-slate-900 font-headline">
+                <h1 class="text-3xl font-bold text-slate-900 dark:text-white font-headline">
                     {% if reg %}Edit Event Registration{% else %}Create Event Registration{% endif %}
                 </h1>
-                <p class="text-sm text-slate-500 mt-1">Configure event details and registration form fields</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure event details and registration form fields</p>
             </div>
         </div>
-        <a href="{% url 'custom_admin:event_registrations_list' %}" class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
+        <a href="{% url 'custom_admin:event_registrations_list' %}" class="inline-flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm">
             <span class="material-symbols-outlined text-sm">arrow_back</span>
             Back to List
         </a>
@@ -26,150 +26,186 @@
     <form method="post" enctype="multipart/form-data" class="space-y-6">
         {% csrf_token %}
 
-        <!-- Event Details Card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
-            <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+        <!-- ============================================================ -->
+        <!-- EVENT DETAILS CARD                                           -->
+        <!-- ============================================================ -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-8">
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                 <span class="material-symbols-outlined text-blue-600">event</span>
                 Event Details
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Row 1: Card Type + Event Title (EN) -->
                 <div>
-                    <label for="card_type" class="block text-sm font-semibold text-slate-700 mb-2">Card Type</label>
-                    <select id="card_type" name="card_type" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800" required>
+                    <label for="card_type" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Card Type</label>
+                    <select id="card_type" name="card_type" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required>
                         <option value="event" {% if reg and reg.card_type == 'event' %}selected{% endif %}>Event</option>
                         <option value="holiday" {% if reg and reg.card_type == 'holiday' %}selected{% endif %}>Holiday</option>
                     </select>
                 </div>
 
                 <div>
-                    <label for="order" class="block text-sm font-semibold text-slate-700 mb-2">Display Order</label>
-                    <input type="number" id="order" name="order" value="{{ reg.order|default:0 }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
+                    <label for="event_title" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Title (EN) <span class="text-red-500">*</span></label>
+                    <input type="text" id="event_title" name="event_title" value="{{ reg.event_title|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required>
+                </div>
+
+                <!-- Row 2: Event Start Date + Event End Date -->
+                <div>
+                    <label for="event_date" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Start Date <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" id="event_date" name="event_date" value="{% if reg.event_date %}{{ reg.event_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required>
                 </div>
 
                 <div>
-                    <label for="event_title" class="block text-sm font-semibold text-slate-700 mb-2">Event Title (EN) <span class="text-red-500">*</span></label>
-                    <input type="text" id="event_title" name="event_title" value="{{ reg.event_title|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800" required>
+                    <label for="event_end_date" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event End Date</label>
+                    <input type="datetime-local" id="event_end_date" name="event_end_date" value="{% if reg.event_end_date %}{{ reg.event_end_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                </div>
+
+                <!-- Row 3: Venue (EN) + Contact Email -->
+                <div>
+                    <label for="venue" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Venue (EN)</label>
+                    <input type="text" id="venue" name="venue" value="{{ reg.venue|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
                 </div>
 
                 <div>
-                    <label for="event_title_fr" class="block text-sm font-semibold text-slate-700 mb-2">Event Title (FR)</label>
-                    <input type="text" id="event_title_fr" name="event_title_fr" value="{{ reg.event_title_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
+                    <label for="contact_email" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Contact Email</label>
+                    <input type="email" id="contact_email" name="contact_email" value="{{ reg.contact_email|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
                 </div>
 
+                <!-- Row 4: Event Poster (full width) -->
                 <div class="md:col-span-2">
-                    <label for="event_description" class="block text-sm font-semibold text-slate-700 mb-2">Event Description (EN)</label>
-                    <textarea id="event_description" name="event_description" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">{{ reg.event_description|default:'' }}</textarea>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="event_description_fr" class="block text-sm font-semibold text-slate-700 mb-2">Event Description (FR)</label>
-                    <textarea id="event_description_fr" name="event_description_fr" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">{{ reg.event_description_fr|default:'' }}</textarea>
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="event_poster" class="block text-sm font-semibold text-slate-700 mb-2">Event Poster</label>
+                    <label for="event_poster" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Poster</label>
                     {% if reg and reg.event_poster %}
                     <div class="mb-3">
                         <img src="{{ reg.event_poster.url }}" alt="Current poster" class="max-w-xs rounded-lg shadow">
-                        <p class="text-xs text-slate-500 mt-2">Current poster (upload a new file to replace)</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Current poster (upload a new file to replace)</p>
                     </div>
                     {% endif %}
-                    <input type="file" id="event_poster" name="event_poster" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    <p class="text-xs text-slate-500 mt-2">Recommended: 800x1200px (portrait). JPG, PNG, or WebP. Max: 10 MB</p>
+                    <input type="file" id="event_poster" name="event_poster" accept="image/*" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Recommended: 800x1200px (portrait). JPG, PNG, or WebP. Max: 10 MB</p>
                 </div>
 
-                <div>
-                    <label for="event_date" class="block text-sm font-semibold text-slate-700 mb-2">Event Start Date <span class="text-red-500">*</span></label>
-                    <input type="datetime-local" id="event_date" name="event_date" value="{% if reg.event_date %}{{ reg.event_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800" required>
-                </div>
-
-                <div>
-                    <label for="event_end_date" class="block text-sm font-semibold text-slate-700 mb-2">Event End Date</label>
-                    <input type="datetime-local" id="event_end_date" name="event_end_date" value="{% if reg.event_end_date %}{{ reg.event_end_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
-
-                <div>
-                    <label for="venue" class="block text-sm font-semibold text-slate-700 mb-2">Venue (EN)</label>
-                    <input type="text" id="venue" name="venue" value="{{ reg.venue|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
-
-                <div>
-                    <label for="venue_fr" class="block text-sm font-semibold text-slate-700 mb-2">Venue (FR)</label>
-                    <input type="text" id="venue_fr" name="venue_fr" value="{{ reg.venue_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
-
+                <!-- Row 5: Event Description (EN) (full width) -->
                 <div class="md:col-span-2">
-                    <label for="venue_address" class="block text-sm font-semibold text-slate-700 mb-2">Venue Address</label>
-                    <input type="text" id="venue_address" name="venue_address" value="{{ reg.venue_address|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
+                    <label for="event_description" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Description (EN)</label>
+                    <textarea id="event_description" name="event_description" rows="4" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">{{ reg.event_description|default:'' }}</textarea>
                 </div>
+            </div>
 
-                <div>
-                    <label for="contact_email" class="block text-sm font-semibold text-slate-700 mb-2">Contact Email</label>
-                    <input type="email" id="contact_email" name="contact_email" value="{{ reg.contact_email|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+            <!-- Collapsible: More Options -->
+            <div class="mt-6 border-t border-slate-200 dark:border-slate-600 pt-4">
+                <button type="button" onclick="toggleCollapsible('eventMoreOptions', this)" class="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors group">
+                    <span class="material-symbols-outlined text-base transition-transform duration-200 collapsible-arrow">chevron_right</span>
+                    More Options
+                    <span class="text-xs font-normal text-slate-400 dark:text-slate-500">(Display Order, French translations, Address, Phone)</span>
+                </button>
+                <div id="eventMoreOptions" class="hidden mt-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                        <div>
+                            <label for="order" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Display Order</label>
+                            <input type="number" id="order" name="order" value="{{ reg.order|default:0 }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
 
-                <div>
-                    <label for="contact_phone" class="block text-sm font-semibold text-slate-700 mb-2">Contact Phone</label>
-                    <input type="tel" id="contact_phone" name="contact_phone" value="{{ reg.contact_phone|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
+                        <div>
+                            <label for="event_title_fr" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Title (FR)</label>
+                            <input type="text" id="event_title_fr" name="event_title_fr" value="{{ reg.event_title_fr|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="event_description_fr" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Description (FR)</label>
+                            <textarea id="event_description_fr" name="event_description_fr" rows="4" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">{{ reg.event_description_fr|default:'' }}</textarea>
+                        </div>
+
+                        <div>
+                            <label for="venue_fr" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Venue (FR)</label>
+                            <input type="text" id="venue_fr" name="venue_fr" value="{{ reg.venue_fr|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
+
+                        <div>
+                            <label for="venue_address" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Venue Address</label>
+                            <input type="text" id="venue_address" name="venue_address" value="{{ reg.venue_address|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
+
+                        <div>
+                            <label for="contact_phone" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Contact Phone</label>
+                            <input type="tel" id="contact_phone" name="contact_phone" value="{{ reg.contact_phone|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Registration Settings Card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
-            <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+        <!-- ============================================================ -->
+        <!-- REGISTRATION SETTINGS CARD                                    -->
+        <!-- ============================================================ -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-8">
+            <h2 class="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                 <span class="material-symbols-outlined text-blue-600">settings</span>
                 Registration Settings
             </h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <label for="is_registration_enabled" class="font-medium text-slate-700">Enable Registration</label>
+                <!-- Primary settings -->
+                <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <label for="is_registration_enabled" class="font-medium text-slate-700 dark:text-slate-300">Enable Registration</label>
                     <input type="checkbox" id="is_registration_enabled" name="is_registration_enabled" {% if reg.is_registration_enabled %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
                 </div>
 
-                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <label for="is_active" class="font-medium text-slate-700">Active</label>
-                    <input type="checkbox" id="is_active" name="is_active" {% if reg.is_active or not reg %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                <div>
+                    <label for="max_registrations" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Max Registrations</label>
+                    <input type="number" id="max_registrations" name="max_registrations" value="{{ reg.max_registrations|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" placeholder="Leave blank for unlimited">
                 </div>
 
                 <div>
-                    <label for="registration_deadline" class="block text-sm font-semibold text-slate-700 mb-2">Registration Deadline</label>
-                    <input type="datetime-local" id="registration_deadline" name="registration_deadline" value="{% if reg.registration_deadline %}{{ reg.registration_deadline|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
+                    <label for="registration_deadline" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Registration Deadline</label>
+                    <input type="datetime-local" id="registration_deadline" name="registration_deadline" value="{% if reg.registration_deadline %}{{ reg.registration_deadline|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
                 </div>
 
-                <div>
-                    <label for="max_registrations" class="block text-sm font-semibold text-slate-700 mb-2">Max Registrations</label>
-                    <input type="number" id="max_registrations" name="max_registrations" value="{{ reg.max_registrations|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
-
-                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <label for="allow_proxy_registration" class="font-medium text-slate-700">Allow Proxy Registration</label>
-                    <input type="checkbox" id="allow_proxy_registration" name="allow_proxy_registration" {% if reg.allow_proxy_registration %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
-                </div>
-
-                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                    <label for="send_confirmation_email" class="font-medium text-slate-700">Send Confirmation Email</label>
+                <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <label for="send_confirmation_email" class="font-medium text-slate-700 dark:text-slate-300">Send Confirmation Email</label>
                     <input type="checkbox" id="send_confirmation_email" name="send_confirmation_email" {% if reg.send_confirmation_email %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
                 </div>
+            </div>
 
-                <div class="md:col-span-2">
-                    <label for="confirmation_message" class="block text-sm font-semibold text-slate-700 mb-2">Confirmation Message (EN)</label>
-                    <textarea id="confirmation_message" name="confirmation_message" rows="3" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">{{ reg.confirmation_message|default:'' }}</textarea>
-                </div>
+            <!-- Collapsible: Advanced Settings -->
+            <div class="mt-6 border-t border-slate-200 dark:border-slate-600 pt-4">
+                <button type="button" onclick="toggleCollapsible('regAdvancedSettings', this)" class="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors group">
+                    <span class="material-symbols-outlined text-base transition-transform duration-200 collapsible-arrow">chevron_right</span>
+                    Advanced Settings
+                    <span class="text-xs font-normal text-slate-400 dark:text-slate-500">(Proxy registration, Confirmation messages, Active toggle)</span>
+                </button>
+                <div id="regAdvancedSettings" class="hidden mt-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                        <div class="flex items-center justify-between p-4 bg-white dark:bg-slate-700 rounded-lg">
+                            <label for="allow_proxy_registration" class="font-medium text-slate-700 dark:text-slate-300">Allow Proxy Registration</label>
+                            <input type="checkbox" id="allow_proxy_registration" name="allow_proxy_registration" {% if reg.allow_proxy_registration %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                        </div>
 
-                <div class="md:col-span-2">
-                    <label for="confirmation_message_fr" class="block text-sm font-semibold text-slate-700 mb-2">Confirmation Message (FR)</label>
-                    <textarea id="confirmation_message_fr" name="confirmation_message_fr" rows="3" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">{{ reg.confirmation_message_fr|default:'' }}</textarea>
+                        <div class="flex items-center justify-between p-4 bg-white dark:bg-slate-700 rounded-lg">
+                            <label for="is_active" class="font-medium text-slate-700 dark:text-slate-300">Active</label>
+                            <input type="checkbox" id="is_active" name="is_active" {% if reg.is_active or not reg %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="confirmation_message" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Confirmation Message (EN)</label>
+                            <textarea id="confirmation_message" name="confirmation_message" rows="3" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">{{ reg.confirmation_message|default:'' }}</textarea>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label for="confirmation_message_fr" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Confirmation Message (FR)</label>
+                            <textarea id="confirmation_message_fr" name="confirmation_message_fr" rows="3" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">{{ reg.confirmation_message_fr|default:'' }}</textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Dynamic Form Builder Card -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <!-- ============================================================ -->
+        <!-- DYNAMIC FORM BUILDER CARD                                     -->
+        <!-- ============================================================ -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <span class="material-symbols-outlined text-blue-600">dynamic_form</span>
                     Registration Form Fields
                 </h2>
@@ -179,14 +215,37 @@
                 </button>
             </div>
 
-            <div id="formFieldsContainer" class="space-y-4">
+            <!-- Quick Templates -->
+            <div class="mb-6 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
+                <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Quick Templates</p>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="applyTemplate('diplomatic')" class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-700 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-full py-1.5 px-4 text-xs font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-sm">assured_workload</span>
+                        Diplomatic Event
+                    </button>
+                    <button type="button" onclick="applyTemplate('general')" class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-700 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-full py-1.5 px-4 text-xs font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:border-emerald-300 transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-sm">group</span>
+                        General Event
+                    </button>
+                    <button type="button" onclick="applyTemplate('survey')" class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-700 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 rounded-full py-1.5 px-4 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:border-amber-300 transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-sm">rate_review</span>
+                        Survey / Feedback
+                    </button>
+                    <button type="button" onclick="applyTemplate('conference')" class="inline-flex items-center gap-1.5 bg-white dark:bg-slate-700 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-full py-1.5 px-4 text-xs font-semibold hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:border-purple-300 transition-all shadow-sm">
+                        <span class="material-symbols-outlined text-sm">podium</span>
+                        Conference
+                    </button>
+                </div>
+            </div>
+
+            <div id="formFieldsContainer" class="space-y-3">
                 <!-- Dynamic fields will be added here -->
             </div>
         </div>
 
         <!-- Form Actions -->
         <div class="flex items-center justify-end gap-3">
-            <a href="{% url 'custom_admin:event_registrations_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-8 text-sm hover:bg-slate-50 transition-all">
+            <a href="{% url 'custom_admin:event_registrations_list' %}" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-lg py-3 px-8 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
                 Cancel
             </a>
             <button type="submit" class="bg-blue-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-blue-700 transition-all shadow-sm inline-flex items-center gap-2">
@@ -199,89 +258,228 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    .collapsible-arrow.expanded {
+        transform: rotate(90deg);
+    }
+    .field-row {
+        transition: all 0.15s ease;
+    }
+    .field-row:hover {
+        border-color: #93c5fd;
+    }
+    .field-advanced {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.25s ease-out, padding 0.25s ease-out, opacity 0.2s ease;
+        opacity: 0;
+    }
+    .field-advanced.expanded {
+        max-height: 600px;
+        opacity: 1;
+        transition: max-height 0.35s ease-in, padding 0.25s ease-in, opacity 0.2s ease;
+    }
+</style>
 <script>
 let fieldCounter = 0;
 const existingFieldsJson = {{ existing_fields_json|safe|default:"[]" }};
 const fieldTypeChoices = {{ field_type_choices|safe }};
 
+/* ---------------------------------------------------------- */
+/*  Collapsible sections                                       */
+/* ---------------------------------------------------------- */
+function toggleCollapsible(id, btn) {
+    const el = document.getElementById(id);
+    const arrow = btn.querySelector('.collapsible-arrow');
+    el.classList.toggle('hidden');
+    arrow.classList.toggle('expanded');
+}
+
+/* ---------------------------------------------------------- */
+/*  Slugify helper: "Full Name" -> "full_name"                 */
+/* ---------------------------------------------------------- */
+function slugify(text) {
+    return text.toLowerCase().trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+/* ---------------------------------------------------------- */
+/*  Quick Templates                                            */
+/* ---------------------------------------------------------- */
+const TEMPLATES = {
+    diplomatic: [
+        { field_type: 'text',        field_label: 'Full Name',        is_required: true },
+        { field_type: 'email',       field_label: 'Email',            is_required: true },
+        { field_type: 'nationality', field_label: 'Nationality',      is_required: true },
+        { field_type: 'text',        field_label: 'Organization',     is_required: true },
+        { field_type: 'text',        field_label: 'Title / Position', is_required: false },
+        { field_type: 'passport',    field_label: 'Passport Number',  is_required: true },
+    ],
+    general: [
+        { field_type: 'text',  field_label: 'Full Name',    is_required: true },
+        { field_type: 'email', field_label: 'Email',        is_required: true },
+        { field_type: 'phone', field_label: 'Phone Number', is_required: false },
+    ],
+    survey: [
+        { field_type: 'text',     field_label: 'Full Name', is_required: true },
+        { field_type: 'email',    field_label: 'Email',     is_required: true },
+        { field_type: 'textarea', field_label: 'Comments',  is_required: false },
+    ],
+    conference: [
+        { field_type: 'text',     field_label: 'Full Name',            is_required: true },
+        { field_type: 'email',    field_label: 'Email',                is_required: true },
+        { field_type: 'text',     field_label: 'Organization',         is_required: true },
+        { field_type: 'text',     field_label: 'Title / Position',     is_required: false },
+        { field_type: 'select',   field_label: 'Dietary Requirements', is_required: false, options: ['None', 'Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-free', 'Other'] },
+        { field_type: 'checkbox', field_label: 'Accommodation Needed', is_required: false },
+    ],
+};
+
+function applyTemplate(templateKey) {
+    const tpl = TEMPLATES[templateKey];
+    if (!tpl) return;
+
+    // Confirm if fields already exist
+    const container = document.getElementById('formFieldsContainer');
+    if (container.children.length > 0) {
+        if (!confirm('This will replace existing form fields. Continue?')) return;
+        container.innerHTML = '';
+        fieldCounter = 0;
+    }
+
+    tpl.forEach(fieldDef => {
+        addFormField({
+            field_type:   fieldDef.field_type,
+            field_label:  fieldDef.field_label,
+            field_name:   slugify(fieldDef.field_label),
+            is_required:  fieldDef.is_required,
+            is_active:    true,
+            options:      fieldDef.options || [],
+        });
+    });
+}
+
+/* ---------------------------------------------------------- */
+/*  Toggle per-field Advanced section                          */
+/* ---------------------------------------------------------- */
+function toggleFieldAdvanced(index) {
+    const adv = document.getElementById('fieldAdvanced_' + index);
+    const arrow = document.getElementById('fieldAdvArrow_' + index);
+    if (adv) {
+        adv.classList.toggle('expanded');
+        if (arrow) arrow.classList.toggle('expanded');
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Add Form Field                                             */
+/* ---------------------------------------------------------- */
 function addFormField(existingData = null) {
     const index = fieldCounter++;
     const fieldData = existingData || {};
 
+    const optionsValue = Array.isArray(fieldData.options)
+        ? fieldData.options.join(', ')
+        : (fieldData.options || '');
+
+    const showOptions = ['select', 'radio', 'multi_checkbox'].includes(fieldData.field_type);
+
     const fieldHtml = `
-        <div class="bg-slate-50 rounded-xl p-6 border border-slate-200" data-field-index="${index}">
+        <div class="field-row bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600" data-field-index="${index}">
             <input type="hidden" name="field_${index}_id" value="${fieldData.id || ''}">
 
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold text-slate-700">Field #${index + 1}</h3>
-                <button type="button" onclick="removeFormField(this)" class="text-red-500 hover:text-red-700 transition-colors p-1 rounded-lg hover:bg-red-50">
-                    <span class="material-symbols-outlined text-sm">delete</span>
-                </button>
-            </div>
+            <!-- Compact single-row: Type | Label | Required | Delete -->
+            <div class="flex items-center gap-3 p-3">
+                <!-- Drag handle visual (decorative) -->
+                <span class="material-symbols-outlined text-slate-300 dark:text-slate-500 text-base cursor-default select-none">drag_indicator</span>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Field Type</label>
-                    <select name="field_${index}_type" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800" required onchange="toggleOptionsField(this)">
+                <!-- Field Type -->
+                <div class="w-44 shrink-0">
+                    <select name="field_${index}_type" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required onchange="toggleOptionsField(this)">
                         ${fieldTypeChoices.map(choice => `<option value="${choice[0]}" ${fieldData.field_type === choice[0] ? 'selected' : ''}>${choice[1]}</option>`).join('')}
                     </select>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Field Name</label>
-                    <input type="text" name="field_${index}_name" value="${fieldData.field_name || ''}" placeholder="field_identifier" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800" required>
+                <!-- Label EN -->
+                <div class="flex-1 min-w-0">
+                    <input type="text" name="field_${index}_label" value="${escapeAttr(fieldData.field_label || '')}" placeholder="Field Label (EN)" class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required
+                        oninput="autoSlugify(this, ${index})">
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Label (EN)</label>
-                    <input type="text" name="field_${index}_label" value="${fieldData.field_label || ''}" placeholder="Field Label" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800" required>
+                <!-- Required checkbox -->
+                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 select-none">
+                    <input type="checkbox" name="field_${index}_required" ${fieldData.is_required ? 'checked' : ''} class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                    <span class="text-xs text-slate-600 dark:text-slate-400 font-medium">Required</span>
+                </label>
+
+                <!-- Advanced toggle -->
+                <button type="button" onclick="toggleFieldAdvanced(${index})" class="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 shrink-0" title="Advanced options">
+                    <span id="fieldAdvArrow_${index}" class="material-symbols-outlined text-base transition-transform duration-200 collapsible-arrow">tune</span>
+                </button>
+
+                <!-- Delete -->
+                <button type="button" onclick="removeFormField(this)" class="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0" title="Remove field">
+                    <span class="material-symbols-outlined text-base">close</span>
+                </button>
+            </div>
+
+            <!-- Options row (only for select/radio/multi_checkbox) -->
+            <div class="options-field px-3 pb-3 ${showOptions ? '' : 'hidden'}">
+                <div class="flex items-center gap-2 ml-8">
+                    <span class="material-symbols-outlined text-slate-400 text-sm">list</span>
+                    <input type="text" name="field_${index}_options" value="${escapeAttr(optionsValue)}" placeholder="Option 1, Option 2, Option 3" class="flex-1 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
                 </div>
+            </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Label (FR)</label>
-                    <input type="text" name="field_${index}_label_fr" value="${fieldData.field_label_fr || ''}" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+            <!-- Per-field Advanced (collapsed by default) -->
+            <div id="fieldAdvanced_${index}" class="field-advanced">
+                <div class="mx-3 mb-3 p-4 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+                    <p class="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Advanced Field Settings</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Label (FR)</label>
+                            <input type="text" name="field_${index}_label_fr" value="${escapeAttr(fieldData.field_label_fr || '')}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Placeholder (EN)</label>
-                    <input type="text" name="field_${index}_placeholder" value="${fieldData.placeholder || ''}" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Field Name</label>
+                            <input type="text" name="field_${index}_name" id="fieldName_${index}" value="${escapeAttr(fieldData.field_name || '')}" placeholder="auto_generated" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white font-mono" required>
+                        </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Placeholder (FR)</label>
-                    <input type="text" name="field_${index}_placeholder_fr" value="${fieldData.placeholder_fr || ''}" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Validation Regex</label>
+                            <input type="text" name="field_${index}_validation_regex" value="${escapeAttr(fieldData.validation_regex || '')}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white font-mono">
+                        </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Help Text (EN)</label>
-                    <input type="text" name="field_${index}_help_text" value="${fieldData.help_text || ''}" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Placeholder (EN)</label>
+                            <input type="text" name="field_${index}_placeholder" value="${escapeAttr(fieldData.placeholder || '')}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Help Text (FR)</label>
-                    <input type="text" name="field_${index}_help_text_fr" value="${fieldData.help_text_fr || ''}" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Placeholder (FR)</label>
+                            <input type="text" name="field_${index}_placeholder_fr" value="${escapeAttr(fieldData.placeholder_fr || '')}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Validation Regex</label>
-                    <input type="text" name="field_${index}_validation_regex" value="${fieldData.validation_regex || ''}" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Help Text (EN)</label>
+                            <input type="text" name="field_${index}_help_text" value="${escapeAttr(fieldData.help_text || '')}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
 
-                <div class="md:col-span-3 options-field" style="display: ${['select', 'radio', 'multi_checkbox'].includes(fieldData.field_type) ? 'block' : 'none'}">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Options (comma-separated)</label>
-                    <input type="text" name="field_${index}_options" value="${Array.isArray(fieldData.options) ? fieldData.options.join(', ') : (fieldData.options || '')}" placeholder="Option 1, Option 2, Option 3" class="w-full border border-slate-200 bg-white rounded-lg py-2.5 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800">
-                </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Help Text (FR)</label>
+                            <input type="text" name="field_${index}_help_text_fr" value="${escapeAttr(fieldData.help_text_fr || '')}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-600 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        </div>
 
-                <div class="flex items-center gap-6 md:col-span-3">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="field_${index}_required" ${fieldData.is_required ? 'checked' : ''} class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
-                        <span class="text-sm text-slate-700 font-medium">Required</span>
-                    </label>
-
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="field_${index}_active" ${fieldData.is_active !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
-                        <span class="text-sm text-slate-700 font-medium">Active</span>
-                    </label>
+                        <div class="flex items-end pb-1">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="field_${index}_active" ${fieldData.is_active !== false ? 'checked' : ''} class="w-4 h-4 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                                <span class="text-sm text-slate-700 dark:text-slate-300 font-medium">Active</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -290,6 +488,41 @@ function addFormField(existingData = null) {
     document.getElementById('formFieldsContainer').insertAdjacentHTML('beforeend', fieldHtml);
 }
 
+/* ---------------------------------------------------------- */
+/*  Escape helper for attribute values in template literals    */
+/* ---------------------------------------------------------- */
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/* ---------------------------------------------------------- */
+/*  Auto-slugify Label -> Field Name                           */
+/* ---------------------------------------------------------- */
+function autoSlugify(labelInput, index) {
+    const nameInput = document.getElementById('fieldName_' + index);
+    if (nameInput && (!nameInput.dataset.userEdited || nameInput.dataset.userEdited === 'false')) {
+        nameInput.value = slugify(labelInput.value);
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Mark field_name as user-edited (stop auto-slugify)         */
+/* ---------------------------------------------------------- */
+document.addEventListener('input', function(e) {
+    if (e.target.id && e.target.id.startsWith('fieldName_')) {
+        e.target.dataset.userEdited = 'true';
+    }
+});
+
+/* ---------------------------------------------------------- */
+/*  Remove Form Field                                          */
+/* ---------------------------------------------------------- */
 function removeFormField(button) {
     const fieldContainer = button.closest('[data-field-index]');
     if (fieldContainer) {
@@ -297,22 +530,32 @@ function removeFormField(button) {
     }
 }
 
+/* ---------------------------------------------------------- */
+/*  Toggle Options Field (select/radio/multi_checkbox)         */
+/* ---------------------------------------------------------- */
 function toggleOptionsField(selectElement) {
     const fieldContainer = selectElement.closest('[data-field-index]');
     const optionsField = fieldContainer.querySelector('.options-field');
     const selectedType = selectElement.value;
 
     if (['select', 'radio', 'multi_checkbox'].includes(selectedType)) {
-        optionsField.style.display = 'block';
+        optionsField.classList.remove('hidden');
     } else {
-        optionsField.style.display = 'none';
+        optionsField.classList.add('hidden');
     }
 }
 
+/* ---------------------------------------------------------- */
+/*  Initialize on DOM ready                                    */
+/* ---------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', function() {
     if (existingFieldsJson && existingFieldsJson.length > 0) {
         existingFieldsJson.forEach(field => {
             addFormField(field);
+        });
+        // Mark all existing field_name inputs as user-edited so auto-slugify doesn't overwrite
+        document.querySelectorAll('[id^="fieldName_"]').forEach(el => {
+            el.dataset.userEdited = 'true';
         });
     } else {
         addFormField();

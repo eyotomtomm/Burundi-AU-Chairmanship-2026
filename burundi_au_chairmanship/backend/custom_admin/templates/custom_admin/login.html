@@ -88,19 +88,19 @@ tailwind.config = {
       </div>
       {% endif %}
 
-      <form method="post" class="space-y-8">
+      <form method="post" id="loginForm" class="space-y-8" autocomplete="on">
         {% csrf_token %}
         <div class="space-y-2">
           <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant" for="username">Username</label>
           <div class="relative group">
-            <input class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-4 px-0 focus:ring-0 focus:border-secondary transition-colors font-body text-on-surface placeholder:text-outline/50" id="username" name="username" placeholder="admin" type="text" required autofocus />
+            <input class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-4 px-0 focus:ring-0 focus:border-secondary transition-colors font-body text-on-surface placeholder:text-outline/50" id="username" name="username" placeholder="admin" type="text" autocomplete="username" required autofocus />
           </div>
         </div>
 
         <div class="space-y-2">
           <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant" for="password">Password</label>
           <div class="relative group">
-            <input class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-4 px-0 focus:ring-0 focus:border-secondary transition-colors font-body text-on-surface placeholder:text-outline/50" id="password" name="password" placeholder="••••••••••" type="password" required />
+            <input class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-4 px-0 focus:ring-0 focus:border-secondary transition-colors font-body text-on-surface placeholder:text-outline/50" id="password" name="password" placeholder="••••••••••" type="password" autocomplete="current-password" required />
             <button class="absolute right-0 top-1/2 -translate-y-1/2 text-outline hover:text-secondary transition-colors" type="button" onclick="let p=document.getElementById('password');p.type=p.type==='password'?'text':'password'">
               <span class="material-symbols-outlined">visibility</span>
             </button>
@@ -117,6 +117,31 @@ tailwind.config = {
           <span class="material-symbols-outlined text-secondary">arrow_forward</span>
         </button>
       </form>
+
+      <script>
+      (function() {
+        var saved = localStorage.getItem('admin_remember_user');
+        if (saved) {
+          try {
+            var data = JSON.parse(saved);
+            document.getElementById('username').value = data.username || '';
+            document.getElementById('remember_me').checked = true;
+            // Focus password field since username is pre-filled
+            document.getElementById('password').focus();
+          } catch(e) {}
+        }
+        document.getElementById('loginForm').addEventListener('submit', function() {
+          var cb = document.getElementById('remember_me');
+          if (cb.checked) {
+            localStorage.setItem('admin_remember_user', JSON.stringify({
+              username: document.getElementById('username').value
+            }));
+          } else {
+            localStorage.removeItem('admin_remember_user');
+          }
+        });
+      })();
+      </script>
 
       <footer class="mt-12 pt-8 border-t border-surface-container flex justify-between items-center gap-4 text-xs text-outline font-medium">
         <div class="flex items-center gap-2">

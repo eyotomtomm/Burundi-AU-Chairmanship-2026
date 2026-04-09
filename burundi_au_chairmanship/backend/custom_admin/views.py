@@ -6784,7 +6784,9 @@ def error_tracking_api(request):
 @login_required(login_url='/admin/')
 @user_passes_test(lambda u: u.is_staff)
 def auto_translate(request):
-    """Auto-translate text between EN and FR using Google Translate API."""
+    """Auto-translate text between EN and FR using free translation APIs.
+    Uses MyMemory API (free, no key) with LibreTranslate fallback.
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -6799,33 +6801,84 @@ def auto_translate(request):
     if not text:
         return JsonResponse({'error': 'No text provided'}, status=400)
 
-    # Validate languages
     if source_lang not in ('en', 'fr') or target_lang not in ('en', 'fr'):
         return JsonResponse({'error': 'Only EN and FR are supported'}, status=400)
 
+    # For long texts, split into chunks (MyMemory limit: 500 chars per request)
+    def _translate_chunk(chunk, sl, tl):
+        """Try multiple free translation APIs in order."""
+        errors = []
+
+        # 1) MyMemory API — free, no API key, 5000 chars/day
+        try:
+            encoded = urllib.parse.quote(chunk)
+            url = f'https://api.mymemory.translated.net/get?q={encoded}&langpair={sl}|{tl}'
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'BurundiAU/1.0')
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+            if data.get('responseStatus') == 200:
+                result = data.get('responseData', {}).get('translatedText', '')
+                if result and result.upper() != chunk.upper():
+                    return result
+        except Exception as e:
+            errors.append(f'MyMemory: {e}')
+
+        # 2) LibreTranslate public instances
+        libre_hosts = [
+            'https://libretranslate.de',
+            'https://translate.argosopentech.com',
+        ]
+        for host in libre_hosts:
+            try:
+                url = f'{host}/translate'
+                payload = json.dumps({
+                    'q': chunk, 'source': sl, 'target': tl, 'format': 'text',
+                }).encode()
+                req = urllib.request.Request(url, data=payload, method='POST')
+                req.add_header('Content-Type', 'application/json')
+                req.add_header('User-Agent', 'BurundiAU/1.0')
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                result = data.get('translatedText', '')
+                if result:
+                    return result
+            except Exception as e:
+                errors.append(f'LibreTranslate ({host}): {e}')
+
+        return None
+
     try:
-        # Use Google Translate free API
-        encoded_text = urllib.parse.quote(text)
-        url = f'https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={encoded_text}'
+        # Split long texts into ~450 char chunks at sentence boundaries
+        if len(text) <= 450:
+            chunks = [text]
+        else:
+            chunks = []
+            remaining = text
+            while remaining:
+                if len(remaining) <= 450:
+                    chunks.append(remaining)
+                    break
+                # Find last sentence break before 450 chars
+                cut = 450
+                for sep in ['. ', '.\n', '! ', '? ', '\n']:
+                    pos = remaining[:cut].rfind(sep)
+                    if pos > 100:
+                        cut = pos + len(sep)
+                        break
+                chunks.append(remaining[:cut])
+                remaining = remaining[cut:]
 
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0')
+        translated_parts = []
+        for chunk in chunks:
+            result = _translate_chunk(chunk, source_lang, target_lang)
+            if result:
+                translated_parts.append(result)
+            else:
+                return JsonResponse({'error': 'Translation service unavailable. Please try again later.'}, status=502)
 
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-
-        # Google returns nested arrays: [[["translated text","original text",...],...],...]
-        translated = ''
-        if data and data[0]:
-            for segment in data[0]:
-                if segment and segment[0]:
-                    translated += segment[0]
-
-        if not translated:
-            return JsonResponse({'error': 'Translation returned empty result'}, status=500)
-
+        translated = ''.join(translated_parts)
         return JsonResponse({'translated': translated})
-    except urllib.error.HTTPError as e:
-        return JsonResponse({'error': f'Translation service error ({e.code})'}, status=502)
+
     except Exception as e:
         return JsonResponse({'error': f'Translation failed: {str(e)}'}, status=500)

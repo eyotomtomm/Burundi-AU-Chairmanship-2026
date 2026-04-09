@@ -186,39 +186,7 @@
                     </div>
                 </div>
 
-                <!-- Phone Verification Channels -->
-                <div class="pt-6 border-t border-outline-variant mt-6">
-                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Phone Verification (Twilio)</h3>
-                    <p class="text-sm text-on-surface-variant mb-4">Toggle which OTP channels are available to users during sign-up. Both off = phone step is skipped.</p>
 
-                    <div class="flex flex-wrap gap-6">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                name="sms_verification_enabled"
-                                {% if settings.sms_verification_enabled %}checked{% endif %}
-                                class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"
-                            />
-                            <span class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-lg text-primary">sms</span>
-                                <span class="font-body text-on-surface font-medium">SMS Verification</span>
-                            </span>
-                        </label>
-
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                name="whatsapp_verification_enabled"
-                                {% if settings.whatsapp_verification_enabled %}checked{% endif %}
-                                class="w-5 h-5 rounded border-outline-variant text-emerald-600 focus:ring-emerald-600"
-                            />
-                            <span class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-lg text-emerald-600">chat</span>
-                                <span class="font-body text-on-surface font-medium">WhatsApp Verification</span>
-                            </span>
-                        </label>
-                    </div>
-                </div>
 
                 <!-- Live Agent Support -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
@@ -242,6 +210,86 @@
                             {% endif %}
                         </span>
                     </label>
+                </div>
+
+                <!-- Feature Toggles -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Feature Toggles</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">Control which features are visible in the mobile app. Turning a feature OFF hides it from all users instantly.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <input
+                                type="checkbox"
+                                name="bookmarks_enabled"
+                                {% if settings.bookmarks_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-orange-500 focus:ring-orange-500"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-orange-500">bookmark</span>
+                                <span class="font-body text-on-surface font-medium">Bookmarks</span>
+                            </span>
+                            {% if settings.bookmarks_enabled %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                            {% else %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                            {% endif %}
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <input
+                                type="checkbox"
+                                name="discussions_enabled"
+                                {% if settings.discussions_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-purple-600 focus:ring-purple-600"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-purple-600">forum</span>
+                                <span class="font-body text-on-surface font-medium">Discussions</span>
+                            </span>
+                            {% if settings.discussions_enabled %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                            {% else %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                            {% endif %}
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <input
+                                type="checkbox"
+                                name="polls_enabled"
+                                {% if settings.polls_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-indigo-600 focus:ring-indigo-600"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-indigo-600">ballot</span>
+                                <span class="font-body text-on-surface font-medium">Polls</span>
+                            </span>
+                            {% if settings.polls_enabled %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                            {% else %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                            {% endif %}
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <input
+                                type="checkbox"
+                                name="newsletter_enabled"
+                                {% if settings.newsletter_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-teal-600 focus:ring-teal-600"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-teal-600">newspaper</span>
+                                <span class="font-body text-on-surface font-medium">Weekly Newsletter</span>
+                            </span>
+                            {% if settings.newsletter_enabled %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                            {% else %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                            {% endif %}
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Submit Button -->
@@ -293,7 +341,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap font-body text-sm text-on-surface">
                                 {% if log.user %}
-                                    {{ log.user.username }}
+                                    {{ log.user.get_full_name|default:log.user.username }}
                                 {% else %}
                                     <span class="text-on-surface-variant italic">System</span>
                                 {% endif %}

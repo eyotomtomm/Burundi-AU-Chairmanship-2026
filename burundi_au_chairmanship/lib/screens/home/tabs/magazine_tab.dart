@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,6 +27,10 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   List<Article>? _articles;
   bool _isLoading = true;
 
+  // Page flip controller for magazines
+  late PageController _magazinePageController;
+  int _currentMagazinePage = 0;
+
   // Search & filters
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -40,6 +45,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) setState(() {});
     });
+    _magazinePageController = PageController(viewportFraction: 0.85);
     _loadData();
   }
 
@@ -47,6 +53,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _magazinePageController.dispose();
     super.dispose();
   }
 
@@ -454,26 +461,341 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
         ),
       );
     }
-    return RefreshIndicator(
-      onRefresh: () async {
-        HapticFeedback.mediumImpact();
-        setState(() => _isLoading = true);
-        await _loadData();
-      },
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.62,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+    return Column(
+      children: [
+        Expanded(
+          child: AnimatedBuilder(
+            animation: _magazinePageController,
+            builder: (context, child) {
+              return PageView.builder(
+                controller: _magazinePageController,
+                onPageChanged: (index) {
+                  setState(() => _currentMagazinePage = index);
+                },
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  double value = 0.0;
+                  if (_magazinePageController.position.haveDimensions) {
+                    value = ((_magazinePageController.page ?? 0) - index);
+                    value = (value * 0.8).clamp(-1.0, 1.0);
+                  }
+
+                  final angle = value * math.pi / 2;
+                  final mag = filtered[index];
+
+                  // Hide pages that have fully rotated away
+                  if (angle.abs() >= math.pi / 2) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Center(
+                    child: Transform(
+                      alignment: value >= 0
+                          ? Alignment.centerLeft
+                          : Alignment.centerRight,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.001)
+                        ..rotateY(angle),
+                      child: _buildMagazineFlipCard(context, mag, langCode, isDark),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
-        itemCount: filtered.length,
-        itemBuilder: (context, index) {
-          final mag = filtered[index];
-          return _buildMagCard(context, mag, langCode, isDark);
-        },
+        // Page indicator dots
+        if (filtered.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(filtered.length, (index) {
+                final isActive = index == _currentMagazinePage;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: isActive ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? AppColors.burundiGreen
+                        : AppColors.burundiGreen.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMagazineFlipCard(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
+    return GestureDetector(
+      onTap: () => _openPdf(context, magazine),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Full cover image
+              CachedNetworkImage(
+                imageUrl: magazine.coverImageUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.burundiGreen,
+                        AppColors.burundiGreen.withValues(alpha: 0.7),
+                      ],
+                    ),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                errorWidget: (_, _, _) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.burundiGreen,
+                        AppColors.burundiGreen.withValues(alpha: 0.7),
+                      ],
+                    ),
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.auto_stories, size: 56, color: Colors.white54),
+                      SizedBox(height: 8),
+                      Text('Magazine', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Dark gradient overlay at bottom for text readability
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 180,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.4),
+                        Colors.black.withValues(alpha: 0.85),
+                      ],
+                      stops: const [0.0, 0.4, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Featured badge
+              if (magazine.isFeatured)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.auGold,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'FEATURED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Info button (top-right)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: GestureDetector(
+                  onTap: () => _showMagInfo(context, magazine, langCode),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.info_outline, size: 18, color: AppColors.burundiGreen),
+                  ),
+                ),
+              ),
+
+              // PDF badge
+              if (magazine.hasPdf)
+                Positioned(
+                  top: 16,
+                  left: magazine.isFeatured ? 110 : 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.burundiRed,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.picture_as_pdf, size: 13, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text('PDF', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Bottom content overlay
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        magazine.getTitle(langCode),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'HeatherGreen',
+                          height: 1.2,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black45,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      // Issue date
+                      Text(
+                        DateFormat('MMMM yyyy').format(magazine.publishDate),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Stats row
+                      Row(
+                        children: [
+                          _flipCardStat(Icons.visibility, '${magazine.viewCount}'),
+                          const SizedBox(width: 14),
+                          GestureDetector(
+                            onTap: () => _toggleLike(magazine),
+                            child: _flipCardStat(
+                              magazine.isLiked ? Icons.favorite : Icons.favorite_border,
+                              '${magazine.likeCount}',
+                              iconColor: magazine.isLiked ? Colors.red : null,
+                            ),
+                          ),
+                          if (magazine.pageCount > 0) ...[
+                            const SizedBox(width: 14),
+                            _flipCardStat(Icons.description, '${magazine.pageCount} pages'),
+                          ],
+                          const Spacer(),
+                          // Read button
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: AppColors.burundiGreen,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.menu_book, size: 14, color: Colors.white),
+                                const SizedBox(width: 6),
+                                Text(
+                                  langCode == 'fr' ? 'Lire' : 'Read',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _flipCardStat(IconData icon, String value, {Color? iconColor}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: iconColor ?? Colors.white70),
+        const SizedBox(width: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 
@@ -641,168 +963,6 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
       ],
-    );
-  }
-
-  Widget _buildMagCard(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 3,
-      shadowColor: Colors.black.withValues(alpha: 0.12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: InkWell(
-        onTap: () => _openPdf(context, magazine),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cover image
-            Expanded(
-              flex: 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: magazine.coverImageUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) => Container(
-                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    ),
-                    errorWidget: (_, _, _) => Container(
-                      color: AppColors.burundiGreen.withValues(alpha: 0.08),
-                      child: const Icon(Icons.auto_stories_rounded, size: 36, color: AppColors.burundiGreen),
-                    ),
-                  ),
-                  // Info button (top-right)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: GestureDetector(
-                      onTap: () => _showMagInfo(context, magazine, langCode),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.info_outline, size: 15, color: AppColors.burundiGreen),
-                      ),
-                    ),
-                  ),
-                  // PDF badge
-                  if (magazine.hasPdf)
-                    Positioned(
-                      bottom: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.burundiRed,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.picture_as_pdf, size: 11, color: Colors.white),
-                            SizedBox(width: 3),
-                            Text('PDF', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  if (magazine.isFeatured)
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.auGold,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'FEATURED',
-                          style: TextStyle(fontSize: 8, fontWeight: FontWeight.w700, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // Info section
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-              child: Text(
-                magazine.getTitle(langCode),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'HeatherGreen',
-                  color: isDark ? AppColors.darkText : AppColors.lightText,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                DateFormat('MMM yyyy').format(magazine.publishDate),
-                style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Stat pills
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: Row(
-                children: [
-                  _miniPill(Icons.visibility, '${magazine.viewCount}', isDark),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => _toggleLike(magazine),
-                    child: _miniPill(
-                      magazine.isLiked ? Icons.favorite : Icons.favorite_border,
-                      '${magazine.likeCount}',
-                      isDark,
-                      iconColor: magazine.isLiked ? Colors.red : Colors.red[400],
-                    ),
-                  ),
-                  if (magazine.pageCount > 0) ...[
-                    const Spacer(),
-                    _miniPill(Icons.description, '${magazine.pageCount}p', isDark),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _miniPill(IconData icon, String value, bool isDark, {Color? iconColor}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: iconColor ?? (isDark ? Colors.grey[400] : Colors.grey[500])),
-          const SizedBox(width: 3),
-          Text(value, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.grey[300] : Colors.grey[700])),
-        ],
-      ),
     );
   }
 

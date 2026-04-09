@@ -356,22 +356,19 @@ if not DEBUG:
         'https://www.burundi4africa.com',
         'https://burundi-au-api-mgo34.ondigitalocean.app',
     ]
-# ─── Twilio SMS Configuration ─────────────────────────────────
-# For OTP verification via SMS
-# SECURITY: All Twilio credentials MUST be set via environment variables
-TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
-TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
-TWILIO_VERIFY_SERVICE_SID = os.environ.get('TWILIO_VERIFY_SERVICE_SID', '')
-TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
-TWILIO_SENDER_ID = os.environ.get('TWILIO_SENDER_ID', 'TWverify')
-
 # ─── Email Configuration ──────────────────────────────────────
 # For email OTP verification
 # Uses SMTP in production (Google Workspace), console backend for local dev
-EMAIL_BACKEND = os.environ.get(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend'  # Fallback for local dev
-)
+if DEBUG:
+    EMAIL_BACKEND = os.environ.get(
+        'EMAIL_BACKEND',
+        'django.core.mail.backends.console.EmailBackend'
+    )
+else:
+    EMAIL_BACKEND = os.environ.get(
+        'EMAIL_BACKEND',
+        'django.core.mail.backends.smtp.EmailBackend'
+    )
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')

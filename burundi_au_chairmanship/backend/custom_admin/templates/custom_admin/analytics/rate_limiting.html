@@ -229,7 +229,7 @@
           </td>
           <td class="py-3 px-2 text-xs text-on-surface-variant">
             {% if log.user %}
-              <span class="text-on-surface font-medium">{{ log.user.username }}</span>
+              <span class="text-on-surface font-medium">{{ log.user.get_full_name|default:log.user.username }}</span>
             {% else %}
               <span class="text-on-surface-variant italic">anonymous</span>
             {% endif %}

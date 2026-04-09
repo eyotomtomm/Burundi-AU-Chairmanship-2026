@@ -1,4 +1,4 @@
-"""OTP utility functions for email and SMS verification"""
+"""OTP utility functions for email verification"""
 import logging
 import secrets
 import string
@@ -21,7 +21,7 @@ def generate_otp(length=6):
 
 def send_email_otp(user, email):
     """
-    Send OTP to email address
+    Send OTP to email address.
     Returns (success, message, otp_id)
     """
     try:
@@ -42,33 +42,58 @@ def send_email_otp(user, email):
             expires_at=timezone.now() + timedelta(minutes=10)
         )
 
-        # Send email
+        # Build email content
         subject = 'Burundi AU Chairmanship - Email Verification OTP'
-        message = f'''
-Hello {user.username},
+        message = (
+            f'Hello {user.username},\n\n'
+            f'Your email verification OTP code is: {otp_code}\n\n'
+            f'This code will expire in 10 minutes.\n\n'
+            f'If you did not request this code, please ignore this email.\n\n'
+            f'Best regards,\n'
+            f'Burundi AU Chairmanship Team'
+        )
 
-Your email verification OTP code is: {otp_code}
+        # Verify email configuration before sending
+        backend = getattr(settings, 'EMAIL_BACKEND', '')
+        if 'console' in backend.lower():
+            logger.warning(
+                'EMAIL_BACKEND is set to console - OTP emails will only appear '
+                'in the server log. Set EMAIL_BACKEND to '
+                'django.core.mail.backends.smtp.EmailBackend for production.'
+            )
 
-This code will expire in 10 minutes.
-
-If you did not request this code, please ignore this email.
-
-Best regards,
-Burundi AU Chairmanship Team
-        '''
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+        if not from_email:
+            logger.error('DEFAULT_FROM_EMAIL is not configured')
+            return False, 'Email sending is not configured. Please contact support.', None
 
         send_mail(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL,
+            from_email,
             [email],
             fail_silently=False,
         )
 
+        logger.info(f'OTP email sent to {email} for user {user.pk}')
         return True, 'OTP sent successfully', otp.id
 
+    except ConnectionRefusedError:
+        logger.error(
+            'SMTP connection refused. Check EMAIL_HOST (%s) and EMAIL_PORT (%s).',
+            getattr(settings, 'EMAIL_HOST', '(not set)'),
+            getattr(settings, 'EMAIL_PORT', '(not set)'),
+        )
+        return False, 'Email server is unreachable. Please try again later or contact support.', None
     except Exception as e:
-        logger.exception('Failed to send email OTP')
+        logger.exception('Failed to send email OTP: %s', e)
+        error_detail = str(e)
+        if 'authentication' in error_detail.lower():
+            return False, 'Email authentication failed. Please contact support.', None
+        elif 'timed out' in error_detail.lower() or 'timeout' in error_detail.lower():
+            return False, 'Email server timed out. Please try again later.', None
+        elif 'ssl' in error_detail.lower() or 'certificate' in error_detail.lower():
+            return False, 'Email SSL/TLS error. Please contact support.', None
         return False, 'Failed to send verification code. Please try again.', None
 
 
@@ -78,7 +103,6 @@ def verify_email_otp(user, email, otp_code):
     Returns (success, message)
     """
     try:
-        # Get the most recent unverified OTP for this email
         otp = OTPVerification.objects.filter(
             user=user,
             type='email',
@@ -89,10 +113,9 @@ def verify_email_otp(user, email, otp_code):
         if not otp:
             return False, 'No pending verification found. Please request a new code.'
 
-        # Check brute-force attempts
         attempts = getattr(otp, 'attempts', 0)
         if attempts >= MAX_OTP_ATTEMPTS:
-            otp.is_verified = True  # Invalidate it
+            otp.is_verified = True
             otp.save()
             return False, 'Too many failed attempts. Please request a new code.'
 
@@ -100,17 +123,14 @@ def verify_email_otp(user, email, otp_code):
             return False, 'OTP has expired. Please request a new one.'
 
         if otp.otp_code != otp_code:
-            # Increment attempt counter
             OTPVerification.objects.filter(pk=otp.pk).update(
                 attempts=models_F('attempts') + 1
             )
             return False, 'Invalid OTP code'
 
-        # Mark as verified
         otp.is_verified = True
         otp.save()
 
-        # Update user profile
         profile = user.profile
         profile.is_email_verified = True
         profile.email_verified_at = timezone.now()
@@ -121,204 +141,3 @@ def verify_email_otp(user, email, otp_code):
     except Exception as e:
         logger.exception('Failed to verify email OTP')
         return False, 'Verification failed. Please try again.'
-
-
-def send_phone_otp_twilio(user, country_code, phone_number, channel='sms'):
-    """
-    Send OTP via Twilio Verify Service (or fallback to SMS).
-    channel: 'sms' or 'whatsapp'
-    Returns (success, message, otp_id)
-    """
-    full_phone = f"{country_code}{phone_number}"
-    otp = None
-    twilio_sent = False
-
-    try:
-        # Invalidate all previous unverified OTPs for this user+phone
-        OTPVerification.objects.filter(
-            user=user, type='phone', contact=full_phone, is_verified=False
-        ).update(is_verified=True)
-
-        # Check if Twilio is configured
-        if not hasattr(settings, 'TWILIO_ACCOUNT_SID') or not settings.TWILIO_ACCOUNT_SID:
-            return False, 'SMS verification is not configured. Please contact administrator.', None
-
-        # Import Twilio (optional dependency)
-        try:
-            from twilio.rest import Client
-        except ImportError:
-            return False, 'Twilio library not installed. Please contact administrator.', None
-
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-
-        # Validate channel
-        if channel not in ('sms', 'whatsapp'):
-            channel = 'sms'
-
-        # Use Twilio Verify if Service SID is configured (recommended)
-        # Twilio Verify supports both 'sms' and 'whatsapp' channels
-        if hasattr(settings, 'TWILIO_VERIFY_SERVICE_SID') and settings.TWILIO_VERIFY_SERVICE_SID:
-            # Send via Twilio first
-            verification = client.verify.v2.services(
-                settings.TWILIO_VERIFY_SERVICE_SID
-            ).verifications.create(
-                to=full_phone,
-                channel=channel  # 'sms' or 'whatsapp'
-            )
-            twilio_sent = True
-
-            # Try to create OTP record for tracking
-            try:
-                otp = OTPVerification.objects.create(
-                    user=user,
-                    type='phone',
-                    contact=full_phone,
-                    otp_code='TWILIO_VERIFY',
-                    expires_at=timezone.now() + timedelta(minutes=10)
-                )
-            except Exception as db_error:
-                logger.warning(f'OTP sent via Twilio but failed to save record: {db_error}')
-                # OTP was sent, so still return success even if DB save failed
-                pass
-
-            channel_label = 'WhatsApp' if channel == 'whatsapp' else 'SMS'
-            return True, f'OTP sent via {channel_label}', otp.id if otp else None
-
-        # Fallback: Manual SMS only when Twilio Verify Service is NOT configured
-        otp_code = generate_otp()
-
-        # Create OTP record first
-        otp = OTPVerification.objects.create(
-            user=user,
-            type='phone',
-            contact=full_phone,
-            otp_code=otp_code,
-            expires_at=timezone.now() + timedelta(minutes=10)
-        )
-
-        # Determine sender (Alphanumeric Sender ID or Phone Number)
-        sender = None
-        if hasattr(settings, 'TWILIO_SENDER_ID') and settings.TWILIO_SENDER_ID:
-            sender = settings.TWILIO_SENDER_ID
-        elif hasattr(settings, 'TWILIO_PHONE_NUMBER') and settings.TWILIO_PHONE_NUMBER:
-            sender = settings.TWILIO_PHONE_NUMBER
-        else:
-            return False, 'No sender configured. Please set TWILIO_SENDER_ID or TWILIO_PHONE_NUMBER in settings.', None
-
-        # Send SMS
-        client.messages.create(
-            body=f'Your Burundi AU Chairmanship verification code is: {otp_code}. Valid for 10 minutes.',
-            from_=sender,
-            to=full_phone
-        )
-        twilio_sent = True
-
-        return True, 'OTP sent via SMS', otp.id
-
-    except Exception as e:
-        logger.exception('Failed to send phone OTP')
-        # If Twilio succeeded but something else failed, still return success
-        if twilio_sent:
-            logger.warning('OTP was sent via Twilio but error occurred after')
-            return True, 'OTP sent successfully', otp.id if otp else None
-        return False, 'Failed to send verification code. Please try again.', None
-
-
-def verify_phone_otp(user, country_code, phone_number, otp_code):
-    """
-    Verify phone OTP code with brute-force protection.
-    On success, marks user profile phone_verified=True.
-    Returns (success, message)
-    """
-    try:
-        from django.conf import settings
-        full_phone = f"{country_code}{phone_number}"
-
-        # Get the most recent OTP for this phone
-        otp = OTPVerification.objects.filter(
-            user=user,
-            type='phone',
-            contact=full_phone,
-            is_verified=False
-        ).order_by('-created_at').first()
-
-        if not otp:
-            return False, 'No pending verification found. Please request a new code.'
-
-        # Check brute-force attempts
-        attempts = getattr(otp, 'attempts', 0)
-        if attempts >= MAX_OTP_ATTEMPTS:
-            otp.is_verified = True
-            otp.save()
-            return False, 'Too many failed attempts. Please request a new code.'
-
-        # If using Twilio Verify Service
-        if otp.otp_code == 'TWILIO_VERIFY':
-            try:
-                from twilio.rest import Client
-                client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-
-                verification_check = client.verify.v2.services(
-                    settings.TWILIO_VERIFY_SERVICE_SID
-                ).verification_checks.create(
-                    to=full_phone,
-                    code=otp_code
-                )
-
-                if verification_check.status == 'approved':
-                    otp.is_verified = True
-                    otp.save()
-                    _mark_phone_verified(user, country_code, phone_number)
-                    return True, 'Phone number verified successfully'
-                elif verification_check.status == 'pending':
-                    OTPVerification.objects.filter(pk=otp.pk).update(
-                        attempts=models_F('attempts') + 1
-                    )
-                    return False, 'Invalid OTP code. Please check the code and try again.'
-                else:
-                    OTPVerification.objects.filter(pk=otp.pk).update(
-                        attempts=models_F('attempts') + 1
-                    )
-                    return False, f'Verification failed: {verification_check.status}. Please request a new code.'
-
-            except Exception as e:
-                logger.exception(f'Twilio verification failed: {str(e)}')
-                error_msg = str(e)
-                if 'expired' in error_msg.lower():
-                    return False, 'OTP code has expired. Please request a new one.'
-                elif 'max check attempts reached' in error_msg.lower():
-                    return False, 'Too many attempts. Please request a new code.'
-                return False, 'Verification failed. Please request a new code and try again.'
-
-        # Manual verification
-        if otp.is_expired():
-            return False, 'OTP has expired. Please request a new one.'
-
-        if otp.otp_code != otp_code:
-            OTPVerification.objects.filter(pk=otp.pk).update(
-                attempts=models_F('attempts') + 1
-            )
-            return False, 'Invalid OTP code'
-
-        # Mark as verified
-        otp.is_verified = True
-        otp.save()
-
-        _mark_phone_verified(user, country_code, phone_number)
-        return True, 'Phone number verified successfully'
-
-    except Exception as e:
-        logger.exception('Failed to verify phone OTP')
-        return False, 'Verification failed. Please try again.'
-
-
-def _mark_phone_verified(user, country_code, phone_number):
-    """Update user profile with verified phone number."""
-    try:
-        profile = user.profile
-        profile.phone_verified = True
-        profile.country_code = country_code
-        profile.phone_number = phone_number
-        profile.save(update_fields=['phone_verified', 'country_code', 'phone_number'])
-    except Exception:
-        logger.exception('Failed to update phone_verified on profile')

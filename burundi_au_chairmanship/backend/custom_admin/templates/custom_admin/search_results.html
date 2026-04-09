@@ -78,9 +78,9 @@
           <tr class="hover:bg-surface-container-low transition-colors">
             <td class="py-3 px-6">
               <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">{{ user.username|first|upper }}</div>
+                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">{% if user.first_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</div>
                 <div>
-                  <p class="text-sm font-medium text-on-surface">{{ user.username }}</p>
+                  <p class="text-sm font-medium text-on-surface">{{ user.get_full_name|default:user.username }}</p>
                   <p class="text-xs text-slate-400">{{ user.first_name }} {{ user.last_name }}</p>
                 </div>
               </div>
@@ -254,7 +254,7 @@
           {% for ticket in results.tickets %}
           <tr class="hover:bg-surface-container-low transition-colors">
             <td class="py-3 px-6 text-sm font-medium text-on-surface">{{ ticket.subject }}</td>
-            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ ticket.user.username }}</td>
+            <td class="py-3 px-6 text-sm text-on-surface-variant">{{ ticket.user.get_full_name|default:ticket.user.username }}</td>
             <td class="py-3 px-6">
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold
                 {% if ticket.status == 'open' %}bg-blue-50 text-blue-600

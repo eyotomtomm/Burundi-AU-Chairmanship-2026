@@ -60,6 +60,7 @@ urlpatterns = [
     path('auth/firebase-register/', views.firebase_register, name='firebase-register'),
     path('auth/firebase-login/', views.firebase_login, name='firebase-login'),
     path('auth/update-fcm-token/', views.update_fcm_token, name='update-fcm-token'),
+    path('register-fcm-token/', views.register_fcm_token, name='register-fcm-token'),
     path('auth/deactivate-fcm-token/', views.deactivate_fcm_token, name='deactivate-fcm-token'),
     path('auth/update-device-info/', views.update_device_info, name='update-device-info'),
     path('auth/update-language/', views.update_language_preference, name='update-language'),
@@ -85,8 +86,6 @@ urlpatterns = [
     # OTP Verification (for badge verification flow)
     path('otp/send-email/', views.send_email_otp, name='otp-send-email'),
     path('otp/verify-email/', views.verify_email_otp, name='otp-verify-email'),
-    path('otp/send-phone/', views.send_phone_otp, name='otp-send-phone'),
-    path('otp/verify-phone/', views.verify_phone_otp, name='otp-verify-phone'),
 
     # Event registrations
     path('my-registrations/', views.my_event_registrations, name='my-registrations'),

@@ -48,6 +48,7 @@ urlpatterns = [
     path('notifications/<int:pk>/edit/', views.notification_edit, name='notification_edit'),
     path('notifications/<int:pk>/delete/', views.notification_delete, name='notification_delete'),
     path('notifications/<int:pk>/send/', views.notification_send_push, name='notification_send_push'),
+    path('notifications/estimate-audience/', views.notification_estimate_audience, name='notification_estimate_audience'),
 
     # Users
     path('users/', views.users_list, name='users_list'),

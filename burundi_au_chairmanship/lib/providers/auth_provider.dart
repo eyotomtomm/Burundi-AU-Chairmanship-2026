@@ -796,6 +796,14 @@ class AuthProvider extends ChangeNotifier {
     _verificationName = verificationName;
     _receivesNewsletter = receivesNewsletter;
     await prefs.setBool('user_receives_newsletter', receivesNewsletter);
+
+    // Link the FCM token to the authenticated user
+    try {
+      final messaging = FirebaseMessagingService();
+      await messaging.linkTokenToUser();
+    } catch (e) {
+      if (kDebugMode) print('Failed to link FCM token to user: $e');
+    }
   }
 
   /// Toggle newsletter subscription

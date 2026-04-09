@@ -17,6 +17,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../widgets/verified_badge.dart';
 import '../../../models/api_models.dart';
 import '../../../models/magazine_model.dart';
+import '../../magazine/pdf_viewer_screen.dart';
 import '../../../models/event_registration_model.dart';
 import '../../../services/api_service.dart';
 import '../../../services/firebase_messaging_service.dart';
@@ -60,6 +61,7 @@ class _HomeTabState extends State<HomeTab> {
   List<Map<String, dynamic>>? _apiFeatureCards;
   List<Map<String, dynamic>>? _apiPriorityAgendas;
   List<EventRegistrationModel>? _apiEventCards;
+  List<MagazineEdition>? _apiMagazines;
   Map<String, String>? _heroTextContent;
   List<Map<String, dynamic>>? _quickAccessItems;
   int _unreadBadgeCount = 0;
@@ -177,6 +179,18 @@ class _HomeTabState extends State<HomeTab> {
     } catch (_) {
       // Silently fail - trending is non-critical
     }
+  }
+
+  /// Cache feature toggle flags from API settings into SharedPreferences.
+  /// These flags control visibility of Bookmarks, Discussions, Polls, and Newsletter in the app.
+  Future<void> _cacheFeatureFlags(Map<String, dynamic> settings) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('feature_bookmarks_enabled', settings['bookmarks_enabled'] ?? true);
+      await prefs.setBool('feature_discussions_enabled', settings['discussions_enabled'] ?? true);
+      await prefs.setBool('feature_polls_enabled', settings['polls_enabled'] ?? true);
+      await prefs.setBool('feature_newsletter_enabled', settings['newsletter_enabled'] ?? true);
+    } catch (_) {}
   }
 
   /// Cache the home feed response for offline/fallback use
@@ -325,12 +339,23 @@ class _HomeTabState extends State<HomeTab> {
         .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>))
         .toList();
 
+    // Parse magazines
+    final rawMagazines = homeFeed['magazines'] as List<dynamic>? ?? [];
+    final magazines = rawMagazines
+        .map((j) => MagazineEdition.fromJson(j as Map<String, dynamic>))
+        .toList();
+
+    // Cache feature toggle flags from settings for use by other tabs (e.g. MoreTab)
+    final settingsData = homeFeed['settings'] as Map<String, dynamic>? ?? {};
+    _cacheFeatureFlags(settingsData);
+
     setState(() {
       _apiHeroSlides = heroSlides;
       _apiArticles = articles;
       _apiFeatureCards = featureCards;
       _apiPriorityAgendas = priorityAgendas;
       _apiEventCards = eventCards;
+      _apiMagazines = magazines;
       _heroTextContent = heroTextMap;
       _quickAccessItems = quickAccessMenu;
       _isLoading = false;
@@ -512,7 +537,12 @@ class _HomeTabState extends State<HomeTab> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-              child: _buildSectionTitle(context, langCode == 'fr' ? 'Prochains Événements' : 'Upcoming Events'),
+              child: _buildSectionTitle(
+                context,
+                langCode == 'fr' ? 'Prochains Événements' : 'Upcoming Events',
+                showSeeAll: true,
+                onSeeAll: () => widget.onSwitchTab?.call(2),
+              ),
             ),
           ),
           SliverToBoxAdapter(
@@ -536,6 +566,30 @@ class _HomeTabState extends State<HomeTab> {
                       );
                     },
                   );
+                },
+              ),
+            ),
+          ),
+        ],
+
+        // Latest Magazines Section
+        if (_apiMagazines != null && _apiMagazines!.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+              child: _buildMagazineSectionTitle(context, langCode),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 220,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _apiMagazines!.length,
+                itemBuilder: (context, index) {
+                  final magazine = _apiMagazines![index];
+                  return _buildMagazineCard(context, magazine, langCode);
                 },
               ),
             ),
@@ -1283,33 +1337,106 @@ class _HomeTabState extends State<HomeTab> {
       }));
     }
 
-    // Append hardcoded Gallery, Videos, and Follow Us items
-    items.addAll([
-      <String, dynamic>{
-        'title': langCode == 'fr' ? 'Galerie' : 'Gallery',
-        'icon': Icons.photo_library_rounded,
-        'hasLiveDot': false,
-        'badgeText': '',
-        'badgeColor': '',
-        'onTap': () => Navigator.pushNamed(context, '/gallery'),
-      },
-      <String, dynamic>{
-        'title': langCode == 'fr' ? 'Vid\u00e9os' : 'Videos',
-        'icon': Icons.play_circle_rounded,
-        'hasLiveDot': false,
-        'badgeText': '',
-        'badgeColor': '',
-        'onTap': () => Navigator.pushNamed(context, '/videos'),
-      },
-      <String, dynamic>{
-        'title': langCode == 'fr' ? 'Suivez-nous' : 'Follow Us',
-        'icon': Icons.people_rounded,
-        'hasLiveDot': false,
-        'badgeText': '',
-        'badgeColor': '',
-        'onTap': () => Navigator.pushNamed(context, '/social-media'),
-      },
-    ]);
+    // Build a set of action values already provided by the API to avoid duplicates
+    final existingActionValues = <String>{};
+    final existingTitles = <String>{};
+    if (_quickAccessItems != null) {
+      for (final item in _quickAccessItems!) {
+        final av = item['action_value'] as String? ?? '';
+        if (av.isNotEmpty) existingActionValues.add(av);
+        final t = (item['title_en'] as String? ?? '').toLowerCase();
+        final tFr = (item['title_fr'] as String? ?? '').toLowerCase();
+        if (t.isNotEmpty) existingTitles.add(t);
+        if (tFr.isNotEmpty) existingTitles.add(tFr);
+      }
+    }
+
+    // Helper to check if a hardcoded item already exists in the API response
+    bool isDuplicate(String actionValue, String titleEn, String titleFr) {
+      if (existingActionValues.contains(actionValue)) return true;
+      if (existingTitles.contains(titleEn.toLowerCase())) return true;
+      if (existingTitles.contains(titleFr.toLowerCase())) return true;
+      return false;
+    }
+
+    // Append hardcoded quick access items (only if not already in the API response)
+    final hardcodedItems = <Map<String, dynamic>>[
+      // --- New items ---
+      if (!isDuplicate('tab:1', 'Magazines', 'Magazines'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Magazines' : 'Magazines',
+          'icon': Icons.menu_book_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => widget.onSwitchTab?.call(1),
+        },
+      if (!isDuplicate('/live-feeds', 'Live Feeds', 'En direct'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'En direct' : 'Live Feeds',
+          'icon': Icons.live_tv_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/live-feeds'),
+        },
+      if (!isDuplicate('tab:2', 'Events', '\u00c9v\u00e9nements'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? '\u00c9v\u00e9nements' : 'Events',
+          'icon': Icons.event_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => widget.onSwitchTab?.call(2),
+        },
+      if (!isDuplicate('/resources', 'Resources', 'Ressources'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Ressources' : 'Resources',
+          'icon': Icons.folder_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/resources'),
+        },
+      if (!isDuplicate('/support', 'Support', 'Assistance'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Assistance' : 'Support',
+          'icon': Icons.support_agent_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/support'),
+        },
+      // --- Existing items ---
+      if (!isDuplicate('/gallery', 'Gallery', 'Galerie'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Galerie' : 'Gallery',
+          'icon': Icons.photo_library_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/gallery'),
+        },
+      if (!isDuplicate('/videos', 'Videos', 'Vid\u00e9os'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Vid\u00e9os' : 'Videos',
+          'icon': Icons.play_circle_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/videos'),
+        },
+      if (!isDuplicate('/social-media', 'Follow Us', 'Suivez-nous'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Suivez-nous' : 'Follow Us',
+          'icon': Icons.share_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/social-media'),
+        },
+    ];
+    items.addAll(hardcodedItems);
 
     return QuickAccessGrid(items: items);
   }
@@ -1721,7 +1848,133 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title, {bool showSeeAll = false}) {
+  Widget _buildMagazineSectionTitle(BuildContext context, String langCode) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 20,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.burundiGreen, AppColors.auGold],
+                ),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              langCode == 'fr' ? 'Derniers Magazines' : 'Latest Magazines',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        TextButton(
+          onPressed: () {
+            // Switch to the Magazines tab (index 1)
+            widget.onSwitchTab?.call(1);
+          },
+          child: Row(
+            children: [
+              Text(
+                langCode == 'fr' ? 'Voir tout' : 'See All',
+                style: const TextStyle(color: AppColors.burundiGreen),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.burundiGreen, size: 18),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMagazineCard(BuildContext context, MagazineEdition magazine, String langCode) {
+    final title = magazine.getTitle(langCode);
+    return GestureDetector(
+      onTap: () {
+        final url = magazine.openablePdfUrl;
+        if (url.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(langCode == 'fr'
+                  ? 'PDF pas encore disponible.'
+                  : 'PDF not available yet.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (_) => PdfViewerScreen(
+              pdfUrl: url,
+              title: title,
+              magazineId: magazine.id,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cover image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: magazine.coverImageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: magazine.coverImageUrl,
+                      width: 140,
+                      height: 170,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: 140,
+                        height: 170,
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: CupertinoActivityIndicator(),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        width: 140,
+                        height: 170,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.menu_book, size: 40, color: Colors.grey),
+                      ),
+                    )
+                  : Container(
+                      width: 140,
+                      height: 170,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.menu_book, size: 40, color: Colors.grey),
+                    ),
+            ),
+            const SizedBox(height: 6),
+            // Title
+            Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(BuildContext context, String title, {bool showSeeAll = false, VoidCallback? onSeeAll}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1750,7 +2003,7 @@ class _HomeTabState extends State<HomeTab> {
         ),
         if (showSeeAll)
           TextButton(
-            onPressed: () => Navigator.pushNamed(context, '/news'),
+            onPressed: onSeeAll ?? () => Navigator.pushNamed(context, '/news'),
             child: const Row(
               children: [
                 Text(

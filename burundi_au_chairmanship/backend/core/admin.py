@@ -37,13 +37,14 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = 'User Profile Information'
     fields = [
+        'firebase_uid',
         ('phone_number', 'gender'),
         ('nationality', 'date_of_birth'),
         'profile_picture',
         ('is_deactivated', 'deactivated_at'),
         ('is_scheduled_for_deletion', 'deletion_requested_at', 'deletion_scheduled_for'),
     ]
-    readonly_fields = ['deactivated_at', 'deletion_requested_at', 'deletion_scheduled_for']
+    readonly_fields = ['firebase_uid', 'deactivated_at', 'deletion_requested_at', 'deletion_scheduled_for']
 
 
 class CustomUserAdmin(BaseUserAdmin):
@@ -52,7 +53,7 @@ class CustomUserAdmin(BaseUserAdmin):
                     'is_staff', 'account_status', 'assigned_roles', 'date_joined']
     list_filter = ['is_active', 'is_staff', 'is_superuser', 'date_joined',
                    'profile__is_deactivated', 'profile__is_scheduled_for_deletion']
-    search_fields = ['username', 'email', 'first_name', 'last_name']
+    search_fields = ['username', 'email', 'first_name', 'last_name', 'profile__firebase_uid']
     ordering = ['-date_joined']
     actions = ['make_staff', 'remove_staff', 'reactivate_accounts', 'terminate_all_sessions']
 

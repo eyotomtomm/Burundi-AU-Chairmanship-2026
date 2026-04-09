@@ -812,9 +812,9 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
   <!-- User menu at bottom -->
   <div class="mt-auto pt-6 px-4 border-t border-white/10">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold">{{ user.username.0|upper }}</div>
+      <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold">{% if user.first_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</div>
       <div class="flex-1">
-        <p class="text-sm font-bold text-white">{{ user.username }}</p>
+        <p class="text-sm font-bold text-white">{{ user.get_full_name|default:user.username }}</p>
         <p class="text-[10px] text-slate-500 uppercase tracking-wider">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
       </div>
       <a href="{% url 'custom_admin:logout' %}" class="text-slate-400 hover:text-red-400 transition-colors" title="Logout">
@@ -1618,6 +1618,214 @@ function toggleDarkMode() {
 })();
 </script>
 {% endif %}
+
+<!-- Bilingual Auto-fill Helper -->
+<script>
+(function() {
+  'use strict';
+
+  function initBilingualAutofill() {
+    var allFields = document.querySelectorAll('input[name], textarea[name]');
+    var processed = {};
+
+    allFields.forEach(function(field) {
+      var name = field.getAttribute('name');
+      if (!name || processed[name]) return;
+
+      var pairField = null;
+      var isEnField = false;
+
+      // Handle array-style names like kp_text[] / kp_text_fr[]
+      if (name.endsWith('_fr[]')) {
+        var enName = name.replace(/_fr\[\]$/, '[]');
+        // For array fields, find the matching pair in the same row/container
+        var container = field.closest('.dynamic-row') || field.closest('.grid') || field.closest('div');
+        if (container) {
+          pairField = container.querySelector('[name="' + enName + '"]');
+        }
+        if (!pairField) pairField = document.querySelector('[name="' + enName + '"]');
+        isEnField = false;
+      } else if (name.endsWith('[]')) {
+        var frName = name.replace(/\[\]$/, '_fr[]');
+        var container = field.closest('.dynamic-row') || field.closest('.grid') || field.closest('div');
+        if (container) {
+          pairField = container.querySelector('[name="' + frName + '"]');
+        }
+        if (!pairField) pairField = document.querySelector('[name="' + frName + '"]');
+        isEnField = true;
+      } else if (name.endsWith('_fr')) {
+        var enName = name.replace(/_fr$/, '');
+        pairField = document.querySelector('[name="' + enName + '"]');
+        isEnField = false;
+      } else {
+        pairField = document.querySelector('[name="' + name + '_fr"]');
+        isEnField = true;
+      }
+
+      if (pairField && pairField !== field) {
+        // For array fields, don't mark as processed (multiple rows have same name)
+        if (!name.endsWith('[]') && !name.endsWith('_fr[]')) {
+          processed[name] = true;
+          processed[pairField.getAttribute('name')] = true;
+        }
+
+        // Skip file inputs, selects, checkboxes, etc.
+        var fieldType = field.getAttribute('type');
+        var pairType = pairField.getAttribute('type');
+        if (fieldType === 'file' || fieldType === 'checkbox' || fieldType === 'radio' ||
+            fieldType === 'color' || fieldType === 'hidden' ||
+            pairType === 'file' || pairType === 'checkbox' || pairType === 'radio' ||
+            pairType === 'color' || pairType === 'hidden') {
+          return;
+        }
+
+        // Skip TinyMCE editors (handled separately below)
+        if (field.classList.contains('tinymce-editor') || pairField.classList.contains('tinymce-editor')) {
+          addTinyMCECopyButton(field, pairField, isEnField);
+          return;
+        }
+
+        addCopyButton(field, pairField, isEnField);
+        addCopyButton(pairField, field, !isEnField);
+      }
+    });
+  }
+
+  function addCopyButton(sourceField, targetField, sourceIsEn) {
+    var label = null;
+    var wrapper = sourceField.closest('div');
+    if (wrapper) {
+      label = wrapper.querySelector('label');
+    }
+    if (!label) return;
+
+    // Don't add duplicate buttons
+    if (label.querySelector('.bilingual-copy-btn')) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bilingual-copy-btn ml-2 px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50';
+    btn.textContent = sourceIsEn ? '\u2192 Copy to FR' : '\u2192 Copy to EN';
+    btn.title = sourceIsEn ? 'Copy English text to French field as a starting point' : 'Copy French text to English field as a starting point';
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!sourceField.value.trim()) {
+        sourceField.style.backgroundColor = '#fee2e2';
+        setTimeout(function() { sourceField.style.backgroundColor = ''; }, 800);
+        return;
+      }
+      targetField.value = sourceField.value;
+      targetField.focus();
+      // Flash effect on target
+      targetField.style.backgroundColor = '#fef3c7';
+      setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+    });
+
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.flexWrap = 'wrap';
+    label.appendChild(btn);
+  }
+
+  function addTinyMCECopyButton(field, pairField, isEnField) {
+    // For TinyMCE fields, add buttons to both labels
+    // But the copy must read/write via tinymce API
+    var enField = isEnField ? field : pairField;
+    var frField = isEnField ? pairField : field;
+
+    addTinyMCECopyButtonForDirection(enField, frField, true);
+    addTinyMCECopyButtonForDirection(frField, enField, false);
+  }
+
+  function addTinyMCECopyButtonForDirection(sourceField, targetField, sourceIsEn) {
+    var label = null;
+    var wrapper = sourceField.closest('div');
+    if (wrapper) {
+      label = wrapper.querySelector('label');
+    }
+    if (!label) return;
+
+    if (label.querySelector('.bilingual-copy-btn')) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bilingual-copy-btn ml-2 px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50';
+    btn.textContent = sourceIsEn ? '\u2192 Copy to FR' : '\u2192 Copy to EN';
+    btn.title = sourceIsEn ? 'Copy English text to French field as a starting point' : 'Copy French text to English field as a starting point';
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      var sourceContent = '';
+      var sourceId = sourceField.getAttribute('id');
+      var targetId = targetField.getAttribute('id');
+
+      // Try to get content from TinyMCE editor if active
+      if (typeof tinymce !== 'undefined' && sourceId && tinymce.get(sourceId)) {
+        sourceContent = tinymce.get(sourceId).getContent();
+      } else {
+        sourceContent = sourceField.value;
+      }
+
+      if (!sourceContent.trim()) {
+        sourceField.style.backgroundColor = '#fee2e2';
+        setTimeout(function() { sourceField.style.backgroundColor = ''; }, 800);
+        return;
+      }
+
+      // Set content in TinyMCE editor if active, otherwise set value directly
+      if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
+        tinymce.get(targetId).setContent(sourceContent);
+        tinymce.get(targetId).save();
+      } else {
+        targetField.value = sourceContent;
+      }
+      targetField.focus();
+    });
+
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.flexWrap = 'wrap';
+    label.appendChild(btn);
+  }
+
+  // Initialize on DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      // Delay slightly to allow TinyMCE and other scripts to initialize
+      setTimeout(initBilingualAutofill, 500);
+    });
+  } else {
+    setTimeout(initBilingualAutofill, 500);
+  }
+
+  // Also re-initialize when dynamic rows are added (MutationObserver)
+  var observer = new MutationObserver(function(mutations) {
+    var shouldReinit = false;
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node.nodeType === 1 && (node.classList.contains('dynamic-row') || node.querySelector && node.querySelector('.dynamic-row'))) {
+            shouldReinit = true;
+          }
+        });
+      }
+    });
+    if (shouldReinit) {
+      setTimeout(initBilingualAutofill, 100);
+    }
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+  } else {
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+})();
+</script>
 
 {% block extra_js %}{% endblock %}
 </body>

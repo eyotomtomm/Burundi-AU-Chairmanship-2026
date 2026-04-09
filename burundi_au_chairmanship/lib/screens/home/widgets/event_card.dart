@@ -293,6 +293,42 @@ class EventCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                )
+              else if (event.isRegistrationEnabled && event.isRegistrationOpen && !isPast)
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFCE1126), Color(0xFFE8334A)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFCE1126).withValues(alpha: 0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.app_registration, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'Register',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
               // Bottom content
@@ -351,6 +387,27 @@ class EventCard extends StatelessWidget {
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.85),
                                 fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (event.isRegistrationEnabled && event.isRegistrationOpen && !isPast && event.registrationDeadline != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.timer_outlined, color: const Color(0xFFF0D060).withValues(alpha: 0.9), size: 13),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                '${langCode == 'fr' ? 'Inscription avant' : 'Register by'} ${_formatDate(event.registrationDeadline!)}',
+                                style: TextStyle(
+                                  color: const Color(0xFFF0D060).withValues(alpha: 0.9),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],

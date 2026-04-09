@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../../config/app_colors.dart';
 import '../../../config/app_constants.dart';
@@ -34,6 +35,32 @@ class MoreTab extends StatefulWidget {
 
 class _MoreTabState extends State<MoreTab> {
   final GlobalKey _shareMenuKey = GlobalKey();
+
+  // Feature toggles (loaded from SharedPreferences, set by admin via API)
+  bool _bookmarksEnabled = true;
+  bool _discussionsEnabled = true;
+  bool _pollsEnabled = true;
+  bool _newsletterEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeatureFlags();
+  }
+
+  Future<void> _loadFeatureFlags() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _bookmarksEnabled = prefs.getBool('feature_bookmarks_enabled') ?? true;
+          _discussionsEnabled = prefs.getBool('feature_discussions_enabled') ?? true;
+          _pollsEnabled = prefs.getBool('feature_polls_enabled') ?? true;
+          _newsletterEnabled = prefs.getBool('feature_newsletter_enabled') ?? true;
+        });
+      }
+    } catch (_) {}
+  }
 
   /// Build display name: "Title FirstName" for verified users, plain name otherwise.
   /// Uses the real name from verification instead of the signup name (which may
@@ -64,6 +91,7 @@ class _MoreTabState extends State<MoreTab> {
         child: RefreshIndicator(
           onRefresh: () async {
             HapticFeedback.mediumImpact();
+            await _loadFeatureFlags();
             if (mounted) setState(() {});
           },
           color: AppColors.burundiGreen,
@@ -415,36 +443,39 @@ class _MoreTabState extends State<MoreTab> {
 
                     return Column(
                       children: [
-                        // Engagement features (for logged in users)
+                        // Engagement features (for logged in users, respects admin feature toggles)
                         if (isLoggedIn) ...[
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.bookmark_rounded,
-                            iconBgColor: const Color(0xFFFF7043),
-                            title: l10n.translate('bookmarks'),
-                            subtitle: l10n.translate('saved_content'),
-                            isDark: isDark,
-                            isFirst: true,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const BookmarksScreen())),
-                          ),
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.forum_rounded,
-                            iconBgColor: const Color(0xFF7E57C2),
-                            title: l10n.translate('discussions'),
-                            subtitle: l10n.translate('community_forums'),
-                            isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const DiscussionsScreen())),
-                          ),
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.ballot_rounded,
-                            iconBgColor: const Color(0xFF5C6BC0),
-                            title: l10n.translate('polls'),
-                            subtitle: l10n.translate('vote_share_opinion'),
-                            isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const PollsScreen())),
-                          ),
+                          if (_bookmarksEnabled)
+                            _buildMenuItem(
+                              context: context,
+                              icon: Icons.bookmark_rounded,
+                              iconBgColor: const Color(0xFFFF7043),
+                              title: l10n.translate('bookmarks'),
+                              subtitle: l10n.translate('saved_content'),
+                              isDark: isDark,
+                              isFirst: true,
+                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const BookmarksScreen())),
+                            ),
+                          if (_discussionsEnabled)
+                            _buildMenuItem(
+                              context: context,
+                              icon: Icons.forum_rounded,
+                              iconBgColor: const Color(0xFF7E57C2),
+                              title: l10n.translate('discussions'),
+                              subtitle: l10n.translate('community_forums'),
+                              isDark: isDark,
+                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const DiscussionsScreen())),
+                            ),
+                          if (_pollsEnabled)
+                            _buildMenuItem(
+                              context: context,
+                              icon: Icons.ballot_rounded,
+                              iconBgColor: const Color(0xFF5C6BC0),
+                              title: l10n.translate('polls'),
+                              subtitle: l10n.translate('vote_share_opinion'),
+                              isDark: isDark,
+                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const PollsScreen())),
+                            ),
                         ],
                         // Security section (for logged in users)
                         if (isLoggedIn) ...[
@@ -456,11 +487,12 @@ class _MoreTabState extends State<MoreTab> {
                             isDark: isDark,
                             onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const NotificationPreferencesScreen())),
                           ),
-                          _buildNewsletterToggle(
-                            context: context,
-                            isDark: isDark,
-                            authProvider: authProvider,
-                          ),
+                          if (_newsletterEnabled)
+                            _buildNewsletterToggle(
+                              context: context,
+                              isDark: isDark,
+                              authProvider: authProvider,
+                            ),
                           // Only show Change Password for email/password users (not Google/Apple SSO)
                           if (authProvider.hasPasswordProvider)
                             _buildMenuItem(

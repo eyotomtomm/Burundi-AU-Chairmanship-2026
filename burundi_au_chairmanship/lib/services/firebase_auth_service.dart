@@ -14,8 +14,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 /// - Token management
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
-  static bool _googleInitialized = false;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
 
   /// Get the currently authenticated Firebase user
   User? get currentUser => _auth.currentUser;
@@ -63,24 +62,24 @@ class FirebaseAuthService {
   /// Throws FirebaseAuthException if signin fails
   Future<UserCredential> signInWithGoogle() async {
     try {
-      // Initialize Google Sign-In (once)
-      if (!_googleInitialized) {
-        await _googleSignIn.initialize();
-        _googleInitialized = true;
+      // 1. Trigger Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        throw FirebaseAuthException(
+          code: 'ERROR_ABORTED_BY_USER',
+          message: 'Google Sign-In cancelled by user',
+        );
       }
 
-      // 1. Trigger Google Sign-In flow
-      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-
-      // 2. Obtain Google auth details and authorize scopes
-      final idToken = googleUser.authentication.idToken;
-      final clientAuth = await googleUser.authorizationClient
-          .authorizeScopes(['email', 'profile']);
+      // 2. Obtain Google auth details
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // 3. Create Firebase credential
       final credential = GoogleAuthProvider.credential(
-        accessToken: clientAuth.accessToken,
-        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
 
       // 4. Sign in to Firebase
@@ -193,7 +192,7 @@ class FirebaseAuthService {
   Future<void> signOut() async {
     await Future.wait([
       _auth.signOut(),
-      _googleSignIn.disconnect(),
+      _googleSignIn.signOut(),
     ]);
   }
 

@@ -91,6 +91,38 @@ def _split_display_name(display_name):
     return (first_name, last_name)
 
 
+def _generate_unique_username(email, firebase_uid, display_name=None):
+    """Generate a readable username from display name or email, falling back to Firebase UID.
+    Prefers name-based usernames (e.g. 'john.doe') over email-prefix usernames.
+    Username is capped at 150 chars (Django limit).
+    """
+    import re as _re
+    base = None
+    # Prefer display name (e.g. "John Doe" → "john.doe")
+    if display_name and display_name.strip():
+        base = display_name.strip().lower().replace(' ', '.')
+        base = _re.sub(r'[^\w.\-]', '', base)[:140]
+    # Fallback to email prefix
+    if not base and email:
+        base = email.split('@')[0]
+        base = _re.sub(r'[^\w.\-]', '', base)[:140]
+    if not base:
+        base = firebase_uid[:150]
+
+    # Check if base username is available
+    if not User.objects.filter(username=base).exists():
+        return base
+
+    # Append numeric suffix until unique
+    for i in range(1, 1000):
+        candidate = f'{base}{i}'[:150]
+        if not User.objects.filter(username=candidate).exists():
+            return candidate
+
+    # Ultimate fallback
+    return firebase_uid[:150]
+
+
 def get_client_ip(request):
     """Extract real client IP from request headers."""
     # Cloudflare
@@ -527,16 +559,37 @@ def firebase_register(request):
         firebase_uid = decoded_token['uid']
         email = decoded_token.get('email', '')
 
-        # Check if user already exists — return success (idempotent)
+        # Check if user already exists by Firebase UID or email
+        existing_user = None
         try:
-            existing_user = User.objects.get(username=firebase_uid)
+            profile = UserProfile.objects.select_related('user').get(firebase_uid=firebase_uid)
+            existing_user = profile.user
+        except UserProfile.DoesNotExist:
+            # Also check by email — link existing email accounts to Firebase
+            if email:
+                try:
+                    existing_user = User.objects.get(email=email)
+                except User.DoesNotExist:
+                    pass
+
+        if existing_user:
             # Update name if provided (split into first/last for long social names)
             if name and not existing_user.first_name:
                 first_name, last_name = _split_display_name(name)
                 existing_user.first_name = first_name
                 existing_user.last_name = last_name
-                existing_user.save()
+            # Fix username if it's still a Firebase UID (random string)
+            if existing_user.username == firebase_uid or (
+                    len(existing_user.username) > 20 and not existing_user.email):
+                if email or name:
+                    new_username = _generate_unique_username(email, firebase_uid, display_name=name)
+                    existing_user.username = new_username
+            # Update email if missing
+            if email and not existing_user.email:
+                existing_user.email = email
+            existing_user.save()
             profile = existing_user.profile
+            profile.firebase_uid = firebase_uid
             profile.is_email_verified = decoded_token.get('email_verified', False)
             if phone_number and not profile.phone_number:
                 profile.phone_number = phone_number
@@ -549,15 +602,14 @@ def firebase_register(request):
                 'email_verified': profile.is_email_verified,
                 'requires_email_verification': not profile.is_email_verified,
             }, status=status.HTTP_200_OK)
-        except User.DoesNotExist:
-            pass
 
         # Split display name into first/last (handles long Google/Apple names)
         first_name, last_name = _split_display_name(name)
 
-        # Create Django user with Firebase UID as username
+        # Create Django user with readable username derived from name or email
+        username = _generate_unique_username(email, firebase_uid, display_name=name)
         user = User.objects.create(
-            username=firebase_uid,
+            username=username,
             email=email,
             first_name=first_name,
             last_name=last_name,
@@ -614,23 +666,58 @@ def firebase_login(request):
         email = decoded_token.get('email', '')
         name = decoded_token.get('name', email.split('@')[0] if email else 'User')
 
-        # Find or create user by Firebase UID
+        # Find or create user by Firebase UID, then by email
+        is_new_user = False
         try:
             profile = UserProfile.objects.select_related('user').get(firebase_uid=firebase_uid)
             user = profile.user
-            is_new_user = False
         except UserProfile.DoesNotExist:
-            # Auto-create user if they don't exist (standard for social logins)
-            first_name, last_name = _split_display_name(name)
-            user = User.objects.create(
-                username=firebase_uid,
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-            )
-            profile = user.profile
-            profile.firebase_uid = firebase_uid
-            is_new_user = True
+            # Try to find existing user by email before creating a new one
+            user = None
+            if email:
+                try:
+                    user = User.objects.get(email=email)
+                    profile = user.profile
+                    profile.firebase_uid = firebase_uid
+                except User.DoesNotExist:
+                    pass
+
+            if user is None:
+                # Auto-create user if they don't exist (standard for social logins)
+                first_name, last_name = _split_display_name(name)
+                username = _generate_unique_username(email, firebase_uid, display_name=name)
+                user = User.objects.create(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                )
+                profile = user.profile
+                profile.firebase_uid = firebase_uid
+                is_new_user = True
+
+        # Update email and username for existing users if needed
+        if not is_new_user:
+            user_changed = False
+            # Update email if the user doesn't have one yet
+            if email and not user.email:
+                user.email = email
+                user_changed = True
+            # Fix username if it's still a Firebase UID (random string)
+            if user.username == firebase_uid:
+                if email or name:
+                    new_username = _generate_unique_username(email, firebase_uid, display_name=name)
+                    if new_username != firebase_uid:
+                        user.username = new_username
+                        user_changed = True
+            # Update name if missing
+            if name and not user.first_name:
+                first_name, last_name = _split_display_name(name)
+                user.first_name = first_name
+                user.last_name = last_name
+                user_changed = True
+            if user_changed:
+                user.save()
 
         # Handle deactivated / deletion-scheduled accounts
         if not is_new_user and not user.is_active and (profile.is_deactivated or profile.is_scheduled_for_deletion):
@@ -677,12 +764,59 @@ def firebase_login(request):
 
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
+def register_fcm_token(request):
+    """
+    Register an FCM token for push notifications (no auth required).
+    If user is authenticated, links the token to the user.
+    If user is not authenticated, stores the token with user=None (anonymous).
+    This ensures anonymous users can still receive global push notifications.
+    """
+    fcm_token = request.data.get('fcm_token')
+
+    if not fcm_token:
+        return Response(
+            {'detail': 'FCM token is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        user = request.user if request.user.is_authenticated else None
+
+        defaults = {
+            'is_active': True,
+            'device_type': request.data.get('device_type', ''),
+            'device_os': request.data.get('device_os', ''),
+        }
+
+        if user:
+            defaults['user'] = user
+
+        DeviceToken.objects.update_or_create(
+            token=fcm_token,
+            defaults=defaults,
+        )
+
+        return Response({
+            'message': 'FCM token registered successfully'
+        })
+
+    except Exception as e:
+        logger.exception('Failed to register FCM token')
+        return Response(
+            {'detail': 'Failed to register notification token. Please try again.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_fcm_token(request):
     """
     Update user's FCM token for push notifications.
     Creates/reactivates a DeviceToken entry and also updates the legacy
     UserProfile.fcm_token for backward compatibility.
+    Also links any existing anonymous token to the authenticated user.
     """
     fcm_token = request.data.get('fcm_token')
 
@@ -698,16 +832,13 @@ def update_fcm_token(request):
         profile.fcm_token = fcm_token
         profile.save(update_fields=['fcm_token'])
 
-        # Deactivate this token for any other users (device ownership transfer)
-        DeviceToken.objects.filter(token=fcm_token).exclude(
-            user=request.user
-        ).update(is_active=False)
-
-        # Create or reactivate for the current user
+        # Link existing token (possibly anonymous) to the current user,
+        # or create a new one. Since token is unique, use update_or_create
+        # with token as the lookup field.
         DeviceToken.objects.update_or_create(
-            user=request.user,
             token=fcm_token,
             defaults={
+                'user': request.user,
                 'is_active': True,
                 'device_type': profile.device_type,
                 'device_os': profile.device_os,
@@ -1624,12 +1755,22 @@ def home_feed(request):
     all_event_cards = list(event_reg_data) + list(info_event_data)
     all_event_cards.sort(key=lambda x: x.get('event_date', ''))
 
+    # Latest magazines (published only, newest first)
+    magazines = MagazineEdition.objects.prefetch_related('images').filter(
+        status='published',
+    ).order_by('-publish_date')[:5]
+    if request.user.is_authenticated:
+        magazines = magazines.annotate(
+            is_liked=Exists(MagazineLike.objects.filter(user=request.user, edition=OuterRef('pk')))
+        )
+
     data = {
         'hero_slides': HeroSlideSerializer(hero_slides, many=True, context={'request': request}).data,
         'featured_articles': ArticleSerializer(featured_articles, many=True, context={'request': request}).data,
         'articles': ArticleSerializer(articles, many=True, context={'request': request}).data,
         'feature_cards': FeatureCardSerializer(feature_cards, many=True, context={'request': request}).data,
         'event_cards': all_event_cards,
+        'magazines': MagazineEditionSerializer(magazines, many=True, context={'request': request}).data,
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
     }
@@ -2251,73 +2392,7 @@ def verify_email_otp(request):
         )
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@throttle_classes([OTPRateThrottle])
-def send_phone_otp(request):
-    """Send OTP to user's phone via Twilio SMS or WhatsApp"""
-    from .otp_utils import send_phone_otp_twilio
 
-    country_code = request.data.get('country_code')
-    phone_number = request.data.get('phone_number')
-    channel = request.data.get('channel', 'sms')  # 'sms' or 'whatsapp'
-
-    if not country_code or not phone_number:
-        return Response(
-            {'detail': 'Country code and phone number are required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    success, message, otp_id = send_phone_otp_twilio(
-        request.user,
-        country_code,
-        phone_number,
-        channel=channel
-    )
-
-    if success:
-        return Response({
-            'message': message,
-            'otp_id': otp_id
-        })
-    else:
-        return Response(
-            {'detail': message},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@throttle_classes([OTPRateThrottle])
-def verify_phone_otp(request):
-    """Verify phone OTP code"""
-    from .otp_utils import verify_phone_otp
-
-    country_code = request.data.get('country_code')
-    phone_number = request.data.get('phone_number')
-    otp_code = request.data.get('otp_code')
-
-    if not country_code or not phone_number or not otp_code:
-        return Response(
-            {'detail': 'Country code, phone number, and OTP code are required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    success, message = verify_phone_otp(
-        request.user,
-        country_code,
-        phone_number,
-        otp_code
-    )
-
-    if success:
-        return Response({'message': message})
-    else:
-        return Response(
-            {'detail': message},
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
 
 # ── Support Ticket System ────────────────────────────────────────────

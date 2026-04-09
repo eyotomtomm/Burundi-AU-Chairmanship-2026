@@ -21,157 +21,29 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
   final _emailOtpController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _phoneOtpController = TextEditingController();
   final _reasoningController = TextEditingController();
 
   // Social media entries (list of maps with platform and username/URL controllers)
   final List<Map<String, dynamic>> _socialMediaEntries = [];
 
   // State
-  String _selectedCountryCode = '+257'; // Burundi default
   bool _emailVerified = false;
-  bool _phoneVerified = false;
   Timer? _emailTimer;
-  Timer? _phoneTimer;
   int _emailCountdown = 0;
-  int _phoneCountdown = 0;
 
   // Country codes with flags
-  final List<Map<String, String>> _countryCodes = [
-    // Burundi first (host country)
-    {'name': 'Burundi', 'code': '+257', 'flag': '🇧🇮'},
-    // African Union member states
-    {'name': 'Algeria', 'code': '+213', 'flag': '🇩🇿'},
-    {'name': 'Angola', 'code': '+244', 'flag': '🇦🇴'},
-    {'name': 'Benin', 'code': '+229', 'flag': '🇧🇯'},
-    {'name': 'Botswana', 'code': '+267', 'flag': '🇧🇼'},
-    {'name': 'Burkina Faso', 'code': '+226', 'flag': '🇧🇫'},
-    {'name': 'Cabo Verde', 'code': '+238', 'flag': '🇨🇻'},
-    {'name': 'Cameroon', 'code': '+237', 'flag': '🇨🇲'},
-    {'name': 'Central African Republic', 'code': '+236', 'flag': '🇨🇫'},
-    {'name': 'Chad', 'code': '+235', 'flag': '🇹🇩'},
-    {'name': 'Comoros', 'code': '+269', 'flag': '🇰🇲'},
-    {'name': 'Congo (Brazzaville)', 'code': '+242', 'flag': '🇨🇬'},
-    {'name': 'Congo (DRC)', 'code': '+243', 'flag': '🇨🇩'},
-    {'name': "Côte d'Ivoire", 'code': '+225', 'flag': '🇨🇮'},
-    {'name': 'Djibouti', 'code': '+253', 'flag': '🇩🇯'},
-    {'name': 'Egypt', 'code': '+20', 'flag': '🇪🇬'},
-    {'name': 'Equatorial Guinea', 'code': '+240', 'flag': '🇬🇶'},
-    {'name': 'Eritrea', 'code': '+291', 'flag': '🇪🇷'},
-    {'name': 'Eswatini', 'code': '+268', 'flag': '🇸🇿'},
-    {'name': 'Ethiopia', 'code': '+251', 'flag': '🇪🇹'},
-    {'name': 'Gabon', 'code': '+241', 'flag': '🇬🇦'},
-    {'name': 'Gambia', 'code': '+220', 'flag': '🇬🇲'},
-    {'name': 'Ghana', 'code': '+233', 'flag': '🇬🇭'},
-    {'name': 'Guinea', 'code': '+224', 'flag': '🇬🇳'},
-    {'name': 'Guinea-Bissau', 'code': '+245', 'flag': '🇬🇼'},
-    {'name': 'Kenya', 'code': '+254', 'flag': '🇰🇪'},
-    {'name': 'Lesotho', 'code': '+266', 'flag': '🇱🇸'},
-    {'name': 'Liberia', 'code': '+231', 'flag': '🇱🇷'},
-    {'name': 'Libya', 'code': '+218', 'flag': '🇱🇾'},
-    {'name': 'Madagascar', 'code': '+261', 'flag': '🇲🇬'},
-    {'name': 'Malawi', 'code': '+265', 'flag': '🇲🇼'},
-    {'name': 'Mali', 'code': '+223', 'flag': '🇲🇱'},
-    {'name': 'Mauritania', 'code': '+222', 'flag': '🇲🇷'},
-    {'name': 'Mauritius', 'code': '+230', 'flag': '🇲🇺'},
-    {'name': 'Morocco', 'code': '+212', 'flag': '🇲🇦'},
-    {'name': 'Mozambique', 'code': '+258', 'flag': '🇲🇿'},
-    {'name': 'Namibia', 'code': '+264', 'flag': '🇳🇦'},
-    {'name': 'Niger', 'code': '+227', 'flag': '🇳🇪'},
-    {'name': 'Nigeria', 'code': '+234', 'flag': '🇳🇬'},
-    {'name': 'Rwanda', 'code': '+250', 'flag': '🇷🇼'},
-    {'name': 'São Tomé and Príncipe', 'code': '+239', 'flag': '🇸🇹'},
-    {'name': 'Senegal', 'code': '+221', 'flag': '🇸🇳'},
-    {'name': 'Seychelles', 'code': '+248', 'flag': '🇸🇨'},
-    {'name': 'Sierra Leone', 'code': '+232', 'flag': '🇸🇱'},
-    {'name': 'Somalia', 'code': '+252', 'flag': '🇸🇴'},
-    {'name': 'South Africa', 'code': '+27', 'flag': '🇿🇦'},
-    {'name': 'South Sudan', 'code': '+211', 'flag': '🇸🇸'},
-    {'name': 'Sudan', 'code': '+249', 'flag': '🇸🇩'},
-    {'name': 'Tanzania', 'code': '+255', 'flag': '🇹🇿'},
-    {'name': 'Togo', 'code': '+228', 'flag': '🇹🇬'},
-    {'name': 'Tunisia', 'code': '+216', 'flag': '🇹🇳'},
-    {'name': 'Uganda', 'code': '+256', 'flag': '🇺🇬'},
-    {'name': 'Zambia', 'code': '+260', 'flag': '🇿🇲'},
-    {'name': 'Zimbabwe', 'code': '+263', 'flag': '🇿🇼'},
-    // Major international countries
-    {'name': 'Afghanistan', 'code': '+93', 'flag': '🇦🇫'},
-    {'name': 'Argentina', 'code': '+54', 'flag': '🇦🇷'},
-    {'name': 'Australia', 'code': '+61', 'flag': '🇦🇺'},
-    {'name': 'Austria', 'code': '+43', 'flag': '🇦🇹'},
-    {'name': 'Bangladesh', 'code': '+880', 'flag': '🇧🇩'},
-    {'name': 'Belgium', 'code': '+32', 'flag': '🇧🇪'},
-    {'name': 'Brazil', 'code': '+55', 'flag': '🇧🇷'},
-    {'name': 'Canada', 'code': '+1', 'flag': '🇨🇦'},
-    {'name': 'China', 'code': '+86', 'flag': '🇨🇳'},
-    {'name': 'Colombia', 'code': '+57', 'flag': '🇨🇴'},
-    {'name': 'Cuba', 'code': '+53', 'flag': '🇨🇺'},
-    {'name': 'Denmark', 'code': '+45', 'flag': '🇩🇰'},
-    {'name': 'Finland', 'code': '+358', 'flag': '🇫🇮'},
-    {'name': 'France', 'code': '+33', 'flag': '🇫🇷'},
-    {'name': 'Germany', 'code': '+49', 'flag': '🇩🇪'},
-    {'name': 'Greece', 'code': '+30', 'flag': '🇬🇷'},
-    {'name': 'India', 'code': '+91', 'flag': '🇮🇳'},
-    {'name': 'Indonesia', 'code': '+62', 'flag': '🇮🇩'},
-    {'name': 'Iran', 'code': '+98', 'flag': '🇮🇷'},
-    {'name': 'Iraq', 'code': '+964', 'flag': '🇮🇶'},
-    {'name': 'Ireland', 'code': '+353', 'flag': '🇮🇪'},
-    {'name': 'Israel', 'code': '+972', 'flag': '🇮🇱'},
-    {'name': 'Italy', 'code': '+39', 'flag': '🇮🇹'},
-    {'name': 'Jamaica', 'code': '+1876', 'flag': '🇯🇲'},
-    {'name': 'Japan', 'code': '+81', 'flag': '🇯🇵'},
-    {'name': 'Jordan', 'code': '+962', 'flag': '🇯🇴'},
-    {'name': 'Kuwait', 'code': '+965', 'flag': '🇰🇼'},
-    {'name': 'Lebanon', 'code': '+961', 'flag': '🇱🇧'},
-    {'name': 'Malaysia', 'code': '+60', 'flag': '🇲🇾'},
-    {'name': 'Mexico', 'code': '+52', 'flag': '🇲🇽'},
-    {'name': 'Netherlands', 'code': '+31', 'flag': '🇳🇱'},
-    {'name': 'New Zealand', 'code': '+64', 'flag': '🇳🇿'},
-    {'name': 'Norway', 'code': '+47', 'flag': '🇳🇴'},
-    {'name': 'Oman', 'code': '+968', 'flag': '🇴🇲'},
-    {'name': 'Pakistan', 'code': '+92', 'flag': '🇵🇰'},
-    {'name': 'Palestine', 'code': '+970', 'flag': '🇵🇸'},
-    {'name': 'Peru', 'code': '+51', 'flag': '🇵🇪'},
-    {'name': 'Philippines', 'code': '+63', 'flag': '🇵🇭'},
-    {'name': 'Poland', 'code': '+48', 'flag': '🇵🇱'},
-    {'name': 'Portugal', 'code': '+351', 'flag': '🇵🇹'},
-    {'name': 'Qatar', 'code': '+974', 'flag': '🇶🇦'},
-    {'name': 'Romania', 'code': '+40', 'flag': '🇷🇴'},
-    {'name': 'Russia', 'code': '+7', 'flag': '🇷🇺'},
-    {'name': 'Saudi Arabia', 'code': '+966', 'flag': '🇸🇦'},
-    {'name': 'Singapore', 'code': '+65', 'flag': '🇸🇬'},
-    {'name': 'South Korea', 'code': '+82', 'flag': '🇰🇷'},
-    {'name': 'Spain', 'code': '+34', 'flag': '🇪🇸'},
-    {'name': 'Sri Lanka', 'code': '+94', 'flag': '🇱🇰'},
-    {'name': 'Sweden', 'code': '+46', 'flag': '🇸🇪'},
-    {'name': 'Switzerland', 'code': '+41', 'flag': '🇨🇭'},
-    {'name': 'Thailand', 'code': '+66', 'flag': '🇹🇭'},
-    {'name': 'Turkey', 'code': '+90', 'flag': '🇹🇷'},
-    {'name': 'UAE', 'code': '+971', 'flag': '🇦🇪'},
-    {'name': 'UK', 'code': '+44', 'flag': '🇬🇧'},
-    {'name': 'Ukraine', 'code': '+380', 'flag': '🇺🇦'},
-    {'name': 'USA', 'code': '+1', 'flag': '🇺🇸'},
-    {'name': 'Venezuela', 'code': '+58', 'flag': '🇻🇪'},
-    {'name': 'Vietnam', 'code': '+84', 'flag': '🇻🇳'},
-    {'name': 'Yemen', 'code': '+967', 'flag': '🇾🇪'},
-  ];
-
   @override
   void dispose() {
     _emailController.dispose();
     _emailOtpController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _phoneController.dispose();
-    _phoneOtpController.dispose();
     _reasoningController.dispose();
     // Dispose social media controllers
     for (var entry in _socialMediaEntries) {
       (entry['controller'] as TextEditingController).dispose();
     }
     _emailTimer?.cancel();
-    _phoneTimer?.cancel();
     super.dispose();
   }
 
@@ -181,18 +53,6 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_emailCountdown > 0) {
         setState(() => _emailCountdown--);
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  void _startPhoneCountdown() {
-    _phoneCountdown = 60;
-    _phoneTimer?.cancel();
-    _phoneTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_phoneCountdown > 0) {
-        setState(() => _phoneCountdown--);
       } else {
         timer.cancel();
       }
@@ -291,71 +151,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     }
   }
 
-  Future<void> _sendPhoneOtp() async {
-    if (_phoneController.text.isEmpty) {
-      _showError('Please enter your phone number');
-      return;
-    }
 
-    setState(() => _isLoading = true);
 
-    try {
-      await ApiService().post('otp/send-phone/', {
-        'country_code': _selectedCountryCode,
-        'phone_number': _phoneController.text,
-      }, auth: true);
-
-      if (mounted) {
-        _showSuccess('OTP sent to your phone!');
-        _startPhoneCountdown();
-      }
-    } catch (e) {
-      if (mounted) {
-        _showError('Failed to send OTP: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _verifyPhoneOtp() async {
-    if (_phoneOtpController.text.isEmpty) {
-      _showError('Please enter the OTP code');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      await ApiService().post('otp/verify-phone/', {
-        'country_code': _selectedCountryCode,
-        'phone_number': _phoneController.text,
-        'otp_code': _phoneOtpController.text,
-      }, auth: true);
-
-      if (mounted) {
-        setState(() => _phoneVerified = true);
-        _showSuccess('Phone verified successfully!');
-
-        // Move to next step
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            setState(() => _currentStep++);
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _showError('Invalid OTP code');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
 
   Future<void> _submitVerificationRequest() async {
     // Validate all fields
@@ -377,8 +174,6 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
         'last_name': _lastNameController.text,
         'full_name': '${_firstNameController.text} ${_lastNameController.text}'.trim(),
         'email': _emailController.text,
-        'country_code': _selectedCountryCode,
-        'phone_number': _phoneController.text,
         'position_role': 'User',
         'reasoning_message': _reasoningController.text,
       };
@@ -536,7 +331,7 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       child: Row(
-        children: List.generate(5, (index) {
+        children: List.generate(4, (index) {
           final isActive = index == _currentStep;
           final isCompleted = index < _currentStep;
 
@@ -554,7 +349,7 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                     ),
                   ),
                 ),
-                if (index < 4) const SizedBox(width: 8),
+                if (index < 3) const SizedBox(width: 8),
               ],
             ),
           );
@@ -570,10 +365,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
       case 1:
         return _buildPersonalInfoStep();
       case 2:
-        return _buildPhoneVerificationStep();
-      case 3:
         return _buildSocialMediaStep();
-      case 4:
+      case 3:
         return _buildReasoningStep();
       default:
         return const SizedBox();
@@ -723,156 +516,6 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
                 : Colors.grey[100],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildPhoneVerificationStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildStepHeader(
-          icon: Icons.phone_android,
-          title: 'Verify Your Phone',
-          subtitle: 'We\'ll send an SMS code to your phone number',
-        ),
-        const SizedBox(height: 32),
-
-        // Country Code + Phone Number Row
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Country Code Selector
-            InkWell(
-              onTap: _phoneVerified ? null : _showCountryCodePicker,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white24
-                        : Colors.grey[300]!,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _countryCodes.firstWhere(
-                        (c) => c['code'] == _selectedCountryCode,
-                        orElse: () => _countryCodes[0],
-                      )['flag']!,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _selectedCountryCode,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white54
-                          : Colors.grey[600]),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Phone Number
-            Expanded(
-              child: TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: '123456789',
-                  prefixIcon: const Icon(Icons.phone),
-                  suffixIcon: _phoneVerified
-                      ? const Icon(Icons.check_circle, color: AppColors.success)
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.grey[100],
-                ),
-                enabled: !_phoneVerified,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Send OTP Button
-        if (!_phoneVerified)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _phoneCountdown > 0 ? null : _sendPhoneOtp,
-              icon: const Icon(Icons.sms),
-              label: Text(
-                _phoneCountdown > 0
-                    ? 'Resend in $_phoneCountdown seconds'
-                    : 'Send SMS Code',
-              ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: AppColors.burundiGreen,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-
-        if (_phoneCountdown > 0) ...[
-          const SizedBox(height: 24),
-          AutofillGroup(
-            child: TextField(
-              controller: _phoneOtpController,
-              keyboardType: TextInputType.number,
-              autofillHints: const [AutofillHints.oneTimeCode],
-              maxLength: 6,
-              decoration: InputDecoration(
-                labelText: 'Enter 6-Digit Code',
-                hintText: '123456',
-                prefixIcon: const Icon(Icons.pin),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.grey[100],
-                counterText: '',
-              ),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _verifyPhoneOtp,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: AppColors.success,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Verify Code'),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -1154,77 +797,6 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
     );
   }
 
-  void _showCountryCodePicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    const Text(
-                      'Select Country',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _countryCodes.length,
-                  itemBuilder: (context, index) {
-                    final country = _countryCodes[index];
-                    final isSelected = country['code'] == _selectedCountryCode;
-
-                    return ListTile(
-                      leading: Text(
-                        country['flag']!,
-                        style: const TextStyle(fontSize: 32),
-                      ),
-                      title: Text(country['name']!),
-                      trailing: Text(
-                        country['code']!,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppColors.burundiGreen : null,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedTileColor: AppColors.burundiGreen.withValues(alpha: 0.1),
-                      onTap: () {
-                        setState(() {
-                          _selectedCountryCode = country['code']!;
-                        });
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
   String _getNextButtonText() {
     switch (_currentStep) {
@@ -1233,10 +805,8 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
       case 1:
         return 'Continue';
       case 2:
-        return _phoneVerified ? 'Continue' : 'Verify Phone First';
-      case 3:
         return 'Continue';
-      case 4:
+      case 3:
         return 'Submit Request';
       default:
         return 'Next';
@@ -1260,17 +830,10 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
         setState(() => _currentStep++);
         break;
       case 2:
-        if (!_phoneVerified) {
-          _showError('Please verify your phone number first');
-          return;
-        }
-        setState(() => _currentStep++);
-        break;
-      case 3:
         // Social media step - optional, always allow continue
         setState(() => _currentStep++);
         break;
-      case 4:
+      case 3:
         _submitVerificationRequest();
         break;
     }

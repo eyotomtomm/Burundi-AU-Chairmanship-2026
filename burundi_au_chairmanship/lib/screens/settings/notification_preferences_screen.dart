@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
@@ -15,10 +16,27 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
   Map<String, dynamic> _prefs = {};
   bool _loading = true;
 
+  // Feature toggles from admin
+  bool _discussionsFeatureEnabled = true;
+  bool _pollsFeatureEnabled = true;
+
   @override
   void initState() {
     super.initState();
+    _loadFeatureFlags();
     _load();
+  }
+
+  Future<void> _loadFeatureFlags() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _discussionsFeatureEnabled = prefs.getBool('feature_discussions_enabled') ?? true;
+          _pollsFeatureEnabled = prefs.getBool('feature_polls_enabled') ?? true;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -67,8 +85,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                 ], isDark),
                 const SizedBox(height: 16),
                 _buildSection('Engagement', [
-                  _buildToggle('discussions_enabled', 'Discussions', 'Forum replies and mentions', Icons.forum),
-                  _buildToggle('polls_enabled', 'Polls', 'New polls available', Icons.ballot),
+                  if (_discussionsFeatureEnabled)
+                    _buildToggle('discussions_enabled', 'Discussions', 'Forum replies and mentions', Icons.forum),
+                  if (_pollsFeatureEnabled)
+                    _buildToggle('polls_enabled', 'Polls', 'New polls available', Icons.ballot),
                   _buildToggle('messages_enabled', 'Messages', 'Direct messages', Icons.chat),
                 ], isDark),
                 const SizedBox(height: 16),

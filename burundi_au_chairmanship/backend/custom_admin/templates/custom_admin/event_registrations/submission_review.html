@@ -33,10 +33,10 @@
                 <p class="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1.5">Submitted By</p>
                 <div class="flex items-center gap-3">
                     <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                        {{ submission.user.username|first|upper }}
+                        {% if submission.user.first_name %}{{ submission.user.first_name|first|upper }}{% else %}{{ submission.user.username|first|upper }}{% endif %}
                     </div>
                     <div>
-                        <p class="font-semibold text-slate-900 text-sm">{{ submission.user.username }}</p>
+                        <p class="font-semibold text-slate-900 text-sm">{{ submission.user.get_full_name|default:submission.user.username }}</p>
                         <p class="text-xs text-slate-500">{{ submission.user.email }}</p>
                     </div>
                 </div>

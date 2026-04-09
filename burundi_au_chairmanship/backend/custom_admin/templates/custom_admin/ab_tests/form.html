@@ -74,10 +74,10 @@
         <div class="flex-1 p-4 rounded-lg border-2 border-blue-200 bg-blue-50/50">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-bold text-blue-700">Variant A (Control)</span>
-            <span id="splitA" class="text-lg font-bold text-blue-700">{% widthratio test.traffic_split|default:50 1 1 as split_b %}{{ 100|add:"-"|add:test.traffic_split|default:"50" }}%</span>
+            <span id="splitA" class="text-lg font-bold text-blue-700">--</span>
           </div>
           <div class="h-2 bg-blue-200 rounded-full overflow-hidden">
-            <div id="barA" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: {% widthratio 100 1 1 %}%"></div>
+            <div id="barA" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width: 50%"></div>
           </div>
         </div>
         <div class="flex-1 p-4 rounded-lg border-2 border-violet-200 bg-violet-50/50">

@@ -50,19 +50,18 @@ post_install do |installer|
       config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
     end
 
-    # Disable module verification for pods that fail with Xcode 26
+    # Disable strict module verification for Xcode 26 compatibility
     if target.respond_to?(:product_type) && target.product_type == "com.apple.product-type.framework"
       target.build_configurations.each do |config|
-        config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'NO'
         config.build_settings['CLANG_VERIFY_MODULES'] = 'NO'
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
     end
 
-    # Fix GoogleSignIn/GTMAppAuth Swift module import issues with Xcode 26
+    # Fix GoogleSignIn/GTMAppAuth Swift-ObjC interop for Xcode 26
     if ['GoogleSignIn', 'GTMAppAuth', 'GTMSessionFetcher', 'AppAuth'].include?(target.name)
       target.build_configurations.each do |config|
         config.build_settings['SWIFT_VERSION'] = '5.0'
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
         config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
         config.build_settings['OTHER_CFLAGS'] << '-Wno-error=non-modular-include-in-framework-module'

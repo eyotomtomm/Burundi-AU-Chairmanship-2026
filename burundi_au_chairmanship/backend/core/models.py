@@ -1134,10 +1134,10 @@ class DeviceToken(models.Model):
     Tokens are deactivated (not deleted) on logout and reactivated on login.
     Ensures no duplicate sends to the same physical device.
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_tokens')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='device_tokens')
     token = models.CharField(
         max_length=255,
-        db_index=True,
+        unique=True,
         validators=[validate_fcm_token],
         help_text='FCM registration token'
     )
@@ -1159,7 +1159,7 @@ class DeviceToken(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('user', 'token')
+        # unique_together removed: anonymous tokens (user=None) are allowed
         verbose_name = 'Device Token'
         verbose_name_plural = 'Device Tokens'
         indexes = [
@@ -1168,7 +1168,8 @@ class DeviceToken(models.Model):
 
     def __str__(self):
         status = 'active' if self.is_active else 'inactive'
-        return f"{self.user.username} - {self.token[:20]}... ({status})"
+        username = self.user.username if self.user else 'anonymous'
+        return f"{username} - {self.token[:20]}... ({status})"
 
 
 class SupportTicket(models.Model):
@@ -1249,12 +1250,15 @@ class AppSettings(models.Model):
     developer_name = models.CharField(max_length=100, blank=True, default='Eyosias Tamene', help_text='Developer/company name shown in About dialog')
     developer_url = models.URLField(blank=True, default='https://eyosias.dev', help_text='Developer website URL')
 
-    # Phone verification toggles (controlled from admin)
-    sms_verification_enabled = models.BooleanField(default=False, help_text='Enable SMS OTP verification via Twilio')
-    whatsapp_verification_enabled = models.BooleanField(default=False, help_text='Enable WhatsApp OTP verification via Twilio')
 
     # Live agent support toggle
     live_agent_online = models.BooleanField(default=False, help_text='When ON, users see Live Agent chat option in support')
+
+    # Feature toggles (controlled from admin portal)
+    bookmarks_enabled = models.BooleanField(default=True, help_text='Show Bookmarks feature in the app')
+    discussions_enabled = models.BooleanField(default=True, help_text='Show Discussions feature in the app')
+    polls_enabled = models.BooleanField(default=True, help_text='Show Polls feature in the app')
+    newsletter_enabled = models.BooleanField(default=True, help_text='Show Weekly Newsletter toggle in the app')
 
     class Meta:
         verbose_name = 'App Settings'
@@ -1707,7 +1711,7 @@ class VerificationRequest(models.Model):
     # Phone verification
     country_code = models.CharField(max_length=10, default='+1', help_text='Country calling code (e.g. +1, +257)')
     phone_number = models.CharField(max_length=20, help_text='Phone number for SMS verification')
-    phone_verified = models.BooleanField(default=False, help_text='Phone number verified via Twilio SMS')
+    phone_verified = models.BooleanField(default=False, help_text='Phone number verified')
 
     # Additional info
     position_role = models.CharField(max_length=200, help_text='Current position/role')
@@ -2444,17 +2448,21 @@ class EventWaitlist(models.Model):
 
 class EventSpeaker(models.Model):
     """Speaker profiles for events."""
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='event_speakers', null=True, blank=True)
     name = models.CharField(max_length=200)
     title = models.CharField(max_length=200, blank=True, help_text='e.g. Minister of Foreign Affairs')
     bio = models.TextField(blank=True)
     bio_fr = models.TextField(blank=True)
     photo = models.ImageField(upload_to='event_speakers/', blank=True, validators=[validate_image_file])
     organization = models.CharField(max_length=200, blank=True)
+    topic = models.CharField(max_length=300, blank=True)
+    topic_fr = models.CharField(max_length=300, blank=True)
     linkedin_url = models.URLField(blank=True)
     twitter_handle = models.CharField(max_length=100, blank=True)
     events = models.ManyToManyField(Event, blank=True, related_name='speakers')
     event_registrations = models.ManyToManyField(EventRegistration, blank=True, related_name='speakers')
     is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
     order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -2658,6 +2666,7 @@ class PollOption(models.Model):
     text = models.CharField(max_length=200)
     text_fr = models.CharField(max_length=200, blank=True)
     vote_count = models.PositiveIntegerField(default=0)
+    display_order = models.IntegerField(default=0)
     order = models.IntegerField(default=0)
 
     class Meta:
@@ -2722,17 +2731,22 @@ class AnnouncementBanner(models.Model):
         ('info', 'Information'),
         ('warning', 'Warning'),
         ('success', 'Success'),
+        ('error', 'Error'),
         ('urgent', 'Urgent'),
     ]
+    title = models.CharField(max_length=300, blank=True)
+    title_fr = models.CharField(max_length=300, blank=True)
     message = models.CharField(max_length=500)
     message_fr = models.CharField(max_length=500, blank=True)
     banner_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default='info')
+    link_url = models.CharField(max_length=500, blank=True)
     action_url = models.CharField(max_length=500, blank=True)
     action_text = models.CharField(max_length=100, blank=True)
     action_text_fr = models.CharField(max_length=100, blank=True)
     is_dismissible = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     priority = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -2759,7 +2773,11 @@ class ContactDirectory(models.Model):
         ('other', 'Other'),
     ]
     name = models.CharField(max_length=200)
+    name_fr = models.CharField(max_length=200, blank=True)
     title = models.CharField(max_length=200, blank=True)
+    title_fr = models.CharField(max_length=200, blank=True)
+    department = models.CharField(max_length=200, blank=True)
+    department_fr = models.CharField(max_length=200, blank=True)
     organization = models.CharField(max_length=200, blank=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
     email = models.EmailField(blank=True)
@@ -2767,6 +2785,7 @@ class ContactDirectory(models.Model):
     photo = models.ImageField(upload_to='contacts/', blank=True, validators=[validate_image_file])
     country = models.CharField(max_length=5, choices=NATIONALITY_CHOICES, blank=True)
     is_active = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
     order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

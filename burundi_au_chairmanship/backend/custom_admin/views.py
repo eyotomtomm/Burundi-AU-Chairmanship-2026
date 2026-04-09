@@ -40,6 +40,7 @@ from core.models import (
     ABTest, ABTestParticipant,
     TranslationRequest, VideoChapter,
     ArticleComment, EventComment,
+    DeviceToken,
 )
 
 
@@ -831,6 +832,49 @@ def notification_send_push(request, pk):
     return redirect('custom_admin:notifications_list')
 
 
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def notification_estimate_audience(request):
+    """Return estimated audience count based on targeting filters.
+    Includes anonymous device tokens for global notifications."""
+    from core.models import UserProfile
+
+    profiles = UserProfile.objects.exclude(fcm_token='').exclude(fcm_token__isnull=True)
+
+    is_global = request.GET.get('is_global') == 'true'
+    if not is_global:
+        gender = request.GET.get('target_gender', '')
+        if gender:
+            profiles = profiles.filter(gender=gender)
+
+        language = request.GET.get('target_language', '')
+        if language:
+            profiles = profiles.filter(preferred_language=language)
+
+        verified_only = request.GET.get('target_verified_only') == 'true'
+        if verified_only:
+            profiles = profiles.filter(is_verified=True)
+            badge_type = request.GET.get('target_badge_type', '')
+            if badge_type:
+                profiles = profiles.filter(badge_type=badge_type)
+
+    count = profiles.count()
+
+    # Include anonymous device tokens for global notifications
+    if is_global:
+        anonymous_count = DeviceToken.objects.filter(
+            user__isnull=True,
+            is_active=True,
+        ).count()
+        count += anonymous_count
+
+    total = UserProfile.objects.exclude(fcm_token='').exclude(fcm_token__isnull=True).count()
+    # Add anonymous device count to total as well
+    total += DeviceToken.objects.filter(user__isnull=True, is_active=True).count()
+
+    return JsonResponse({'count': count, 'total': total})
+
+
 # ═══════════════════════════════════════════════════════════════
 #  USERS
 # ═══════════════════════════════════════════════════════════════
@@ -1154,6 +1198,19 @@ def verification_request_review(request, pk):
                 object_repr=ver_request.full_name,
                 changes={'status': {'old': 'pending', 'new': 'approved'}, 'badge_type': {'old': '', 'new': badge_type}}
             )
+            # Send verification approval email
+            try:
+                from django.core.mail import send_mail
+                user = ver_request.user
+                send_mail(
+                    subject='Congratulations! Your Account is Verified',
+                    message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Burundi AU Chairmanship community.\n\nBest regards,\nB4Africa Team',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
             messages.success(request, f'Approved {ver_request.full_name} with {badge_type} badge.')
         elif action == 'reject':
             ver_request.status = 'rejected'
@@ -2321,9 +2378,11 @@ def app_settings(request):
         settings.app_description_fr = request.POST.get('app_description_fr', '')
         settings.developer_name = request.POST.get('developer_name', '')
         settings.developer_url = request.POST.get('developer_url', '')
-        settings.sms_verification_enabled = request.POST.get('sms_verification_enabled') == 'on'
-        settings.whatsapp_verification_enabled = request.POST.get('whatsapp_verification_enabled') == 'on'
         settings.live_agent_online = request.POST.get('live_agent_online') == 'on'
+        settings.bookmarks_enabled = request.POST.get('bookmarks_enabled') == 'on'
+        settings.discussions_enabled = request.POST.get('discussions_enabled') == 'on'
+        settings.polls_enabled = request.POST.get('polls_enabled') == 'on'
+        settings.newsletter_enabled = request.POST.get('newsletter_enabled') == 'on'
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')
@@ -4814,10 +4873,27 @@ def system_health_dashboard(request):
 def system_health_api(request):
     """Return system health data as JSON for AJAX refresh."""
     import time
+    import platform
+    import socket
+    import re
+    import django
+    from datetime import timedelta
     from django.db import connection
     from django.conf import settings
 
     data = {}
+
+    # ── Server Info ──
+    data['server_info'] = {
+        'django_version': django.get_version(),
+        'python_version': platform.python_version(),
+        'hostname': socket.gethostname(),
+        'os': f"{platform.system()} {platform.release()}",
+        'environment': os.environ.get(
+            'SENTRY_ENVIRONMENT',
+            'development' if settings.DEBUG else 'production'
+        ),
+    }
 
     # ── CPU / Memory / Disk (psutil) ──
     try:
@@ -4890,7 +4966,6 @@ def system_health_api(request):
         data['db_name'] = db_name.split('/')[-1] if '/' in str(db_name) else str(db_name)
 
         with connection.cursor() as cursor:
-            # Table count
             if 'postgresql' in db_engine or 'postgis' in db_engine:
                 cursor.execute(
                     "SELECT count(*) FROM information_schema.tables "
@@ -4906,13 +4981,15 @@ def system_health_api(request):
                     "SELECT pg_size_pretty(pg_database_size(current_database()))"
                 )
                 data['db_size'] = cursor.fetchone()[0]
+                # PostgreSQL version
+                cursor.execute("SELECT version()")
+                data['db_version'] = cursor.fetchone()[0]
             elif 'sqlite' in db_engine:
                 cursor.execute(
                     "SELECT count(*) FROM sqlite_master WHERE type='table'"
                 )
                 data['table_count'] = cursor.fetchone()[0]
                 data['row_count'] = 0
-                import os
                 if os.path.exists(str(db_name)):
                     size_bytes = os.path.getsize(str(db_name))
                     if size_bytes < 1024 * 1024:
@@ -4921,16 +4998,105 @@ def system_health_api(request):
                         data['db_size'] = f"{round(size_bytes / (1024 * 1024), 2)} MB"
                 else:
                     data['db_size'] = 'N/A'
+                cursor.execute("SELECT sqlite_version()")
+                data['db_version'] = f"SQLite {cursor.fetchone()[0]}"
             else:
                 data['table_count'] = 0
                 data['row_count'] = 0
                 data['db_size'] = 'N/A'
+                data['db_version'] = 'N/A'
     except Exception:
         data['db_engine'] = 'Unknown'
         data['db_name'] = 'Unknown'
         data['table_count'] = 0
         data['row_count'] = 0
         data['db_size'] = 'N/A'
+        data['db_version'] = 'N/A'
+
+    # ── Application Stats (real counts from database) ──
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    try:
+        data['app_stats'] = {
+            'total_users': User.objects.count(),
+            'active_users_30d': UserProfile.objects.filter(
+                user__last_login__gte=thirty_days_ago
+            ).count(),
+            'total_articles': Article.objects.count(),
+            'total_events': Event.objects.count(),
+            'total_magazines': MagazineEdition.objects.count(),
+            'total_videos': Video.objects.count(),
+            'total_gallery_albums': GalleryAlbum.objects.count(),
+            'total_gallery_photos': GalleryPhoto.objects.count(),
+            'total_live_feeds': LiveFeed.objects.count(),
+            'notifications_sent': Notification.objects.filter(
+                push_sent=True
+            ).count(),
+            'pending_tickets': SupportTicket.objects.filter(
+                status='open'
+            ).count(),
+            'pending_verifications': VerificationRequest.objects.filter(
+                status='pending'
+            ).count(),
+        }
+    except Exception:
+        data['app_stats'] = {}
+
+    # ── Media / Storage Info ──
+    try:
+        media_root = getattr(settings, 'MEDIA_ROOT', '')
+        if media_root and os.path.isdir(media_root):
+            total_size = 0
+            for dirpath, dirnames, filenames in os.walk(media_root):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if os.path.isfile(fp):
+                        total_size += os.path.getsize(fp)
+            if total_size < 1024 * 1024:
+                data['media_size'] = f"{round(total_size / 1024, 1)} KB"
+            elif total_size < 1024 * 1024 * 1024:
+                data['media_size'] = f"{round(total_size / (1024 * 1024), 1)} MB"
+            else:
+                data['media_size'] = f"{round(total_size / (1024 * 1024 * 1024), 2)} GB"
+        else:
+            data['media_size'] = 'N/A'
+    except Exception:
+        data['media_size'] = 'N/A'
+
+    # ── Deployment / Environment Info ──
+    try:
+        deploy_info = {}
+        # Database URL (masked)
+        db_url = os.environ.get('DATABASE_URL', '')
+        if db_url:
+            masked = re.sub(r'://([^:]+):([^@]+)@', r'://\1:****@', db_url)
+            deploy_info['database_url'] = masked
+        else:
+            deploy_info['database_url'] = 'Not set (using SQLite)'
+
+        deploy_info['django_env'] = os.environ.get(
+            'SENTRY_ENVIRONMENT',
+            'development' if settings.DEBUG else 'production'
+        )
+        deploy_info['debug_mode'] = settings.DEBUG
+        deploy_info['allowed_hosts'] = (
+            ', '.join(settings.ALLOWED_HOSTS)
+            if settings.ALLOWED_HOSTS else '*'
+        )
+        deploy_info['static_url'] = getattr(settings, 'STATIC_URL', '/static/')
+        deploy_info['media_url'] = getattr(settings, 'MEDIA_URL', '/media/')
+
+        # Storage backend
+        default_file_storage = getattr(
+            settings, 'DEFAULT_FILE_STORAGE', ''
+        )
+        if 's3' in default_file_storage.lower() or 'boto' in default_file_storage.lower():
+            deploy_info['storage_backend'] = 'S3 / DigitalOcean Spaces'
+        else:
+            deploy_info['storage_backend'] = 'Local filesystem'
+
+        data['deploy_info'] = deploy_info
+    except Exception:
+        data['deploy_info'] = {}
 
     # ── Recent admin logins ──
     try:
@@ -5042,13 +5208,12 @@ def create_backup(request):
                 **cmd_kwargs,
             )
         else:
-            # Full backup
+            # Full backup — include all models
             call_command(
                 'dumpdata',
+                '--all',
                 '--natural-foreign',
                 '--natural-primary',
-                '--exclude=contenttypes',
-                '--exclude=auth.permission',
                 **cmd_kwargs,
             )
 
@@ -5097,12 +5262,12 @@ def download_backup(request, pk):
         messages.error(request, 'Backup file not found on disk.')
         return redirect('custom_admin:database_backup')
 
-    response = FileResponse(
+    return FileResponse(
         open(backup.file_path, 'rb'),
+        as_attachment=True,
+        filename=backup.filename,
         content_type='application/json',
     )
-    response['Content-Disposition'] = f'attachment; filename="{backup.filename}"'
-    return response
 
 
 @login_required(login_url='custom_admin:login')
@@ -5977,8 +6142,8 @@ def maintenance_schedule(request):
 # A/B TESTING MANAGEMENT
 # ══════════════════════════════════════════════════════════════
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def ab_test_list(request):
     """List all A/B tests."""
     tests_qs = ABTest.objects.annotate(participant_count=Count('participants'))
@@ -5996,8 +6161,8 @@ def ab_test_list(request):
     return render(request, 'custom_admin/ab_tests/list.html', context)
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def ab_test_create(request):
     """Create a new A/B test."""
     if request.method == 'POST':
@@ -6041,8 +6206,8 @@ def ab_test_create(request):
     })
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def ab_test_edit(request, pk):
     """Edit an existing A/B test."""
     test = get_object_or_404(ABTest, pk=pk)
@@ -6090,8 +6255,8 @@ def ab_test_edit(request, pk):
     })
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def ab_test_detail(request, pk):
     """View A/B test details and results."""
     test = get_object_or_404(ABTest, pk=pk)
@@ -6125,8 +6290,8 @@ def ab_test_detail(request, pk):
     return render(request, 'custom_admin/ab_tests/detail.html', context)
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def ab_test_delete(request, pk):
     """Delete an A/B test."""
@@ -6141,8 +6306,8 @@ def ab_test_delete(request, pk):
 # WEBHOOK INTEGRATIONS MANAGEMENT
 # ══════════════════════════════════════════════════════════════
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def webhook_list(request):
     """List all webhooks."""
     webhooks_qs = Webhook.objects.all()
@@ -6174,8 +6339,8 @@ def _mask_url(url):
     return url[:25] + '...' + url[-8:]
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def webhook_create(request):
     """Create a new webhook."""
     event_choices = Webhook.EVENT_CHOICES
@@ -6221,8 +6386,8 @@ def webhook_create(request):
     })
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def webhook_edit(request, pk):
     """Edit an existing webhook."""
     webhook = get_object_or_404(Webhook, pk=pk)
@@ -6257,8 +6422,8 @@ def webhook_edit(request, pk):
     })
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def webhook_delete(request, pk):
     """Delete a webhook."""
@@ -6269,8 +6434,8 @@ def webhook_delete(request, pk):
     return redirect('custom_admin:webhook_list')
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def webhook_toggle(request, pk):
     """Toggle a webhook active/inactive."""
@@ -6282,8 +6447,8 @@ def webhook_toggle(request, pk):
     return redirect('custom_admin:webhook_list')
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def webhook_logs(request, pk):
     """View delivery logs for a webhook."""
     webhook = get_object_or_404(Webhook, pk=pk)
@@ -6310,8 +6475,8 @@ def webhook_logs(request, pk):
     return render(request, 'custom_admin/webhooks/logs.html', context)
 
 
-@login_required(login_url='/portal/')
-@user_passes_test(is_staff, login_url='/portal/')
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def webhook_test(request, pk):
     """Send a test payload to a webhook."""

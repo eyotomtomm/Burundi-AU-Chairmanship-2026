@@ -122,10 +122,10 @@
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                  {{ sub.user.username|first|upper }}
+                  {% if sub.user.first_name %}{{ sub.user.first_name|first|upper }}{% else %}{{ sub.user.username|first|upper }}{% endif %}
                 </div>
                 <div>
-                  <p class="font-semibold text-slate-900 text-sm">{{ sub.user.username }}</p>
+                  <p class="font-semibold text-slate-900 text-sm">{{ sub.user.get_full_name|default:sub.user.username }}</p>
                   <p class="text-xs text-slate-500">{{ sub.user.email }}</p>
                 </div>
               </div>

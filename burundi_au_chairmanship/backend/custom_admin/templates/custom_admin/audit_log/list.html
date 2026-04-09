@@ -122,9 +122,9 @@
             <td class="py-4 px-6">
               {% if log.user %}
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-primary-container/30 flex items-center justify-center text-xs font-bold text-primary-container">{{ log.user.username|first|upper }}</div>
+                <div class="w-8 h-8 rounded-full bg-primary-container/30 flex items-center justify-center text-xs font-bold text-primary-container">{% if log.user.first_name %}{{ log.user.first_name|first|upper }}{% else %}{{ log.user.username|first|upper }}{% endif %}</div>
                 <div>
-                  <p class="text-sm font-medium text-on-surface">{{ log.user.username }}</p>
+                  <p class="text-sm font-medium text-on-surface">{{ log.user.get_full_name|default:log.user.username }}</p>
                   <p class="text-xs text-slate-400">{{ log.user.email }}</p>
                 </div>
               </div>

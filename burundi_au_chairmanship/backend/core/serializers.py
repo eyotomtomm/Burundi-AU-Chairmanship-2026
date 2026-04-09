@@ -380,8 +380,9 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'website_url', 'facebook_url', 'twitter_url', 'instagram_url',
                   'app_description', 'app_description_fr',
                   'developer_name', 'developer_url',
-                  'sms_verification_enabled', 'whatsapp_verification_enabled',
-                  'live_agent_online']
+                  'live_agent_online',
+                  'bookmarks_enabled', 'discussions_enabled',
+                  'polls_enabled', 'newsletter_enabled']
 
 
 class PriorityAgendaSerializer(serializers.ModelSerializer):
@@ -985,8 +986,9 @@ class EventWaitlistSerializer(serializers.ModelSerializer):
 class EventSpeakerSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventSpeaker
-        fields = ['id', 'name', 'title', 'bio', 'bio_fr', 'photo',
-                  'organization', 'linkedin_url', 'twitter_handle', 'order']
+        fields = ['id', 'event', 'name', 'title', 'bio', 'bio_fr', 'photo',
+                  'organization', 'topic', 'topic_fr', 'linkedin_url',
+                  'twitter_handle', 'display_order', 'order']
 
 
 class EventFeedbackSerializer(serializers.ModelSerializer):
@@ -1105,7 +1107,7 @@ class PollOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PollOption
-        fields = ['id', 'text', 'text_fr', 'vote_count', 'vote_percentage', 'order']
+        fields = ['id', 'text', 'text_fr', 'vote_count', 'vote_percentage', 'display_order', 'order']
 
     def get_vote_percentage(self, obj):
         if obj.poll.total_votes > 0:
@@ -1151,15 +1153,18 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
 class AnnouncementBannerSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnnouncementBanner
-        fields = ['id', 'message', 'message_fr', 'banner_type', 'action_url',
-                  'action_text', 'action_text_fr', 'is_dismissible', 'priority']
+        fields = ['id', 'title', 'title_fr', 'message', 'message_fr',
+                  'banner_type', 'link_url', 'action_url', 'action_text',
+                  'action_text_fr', 'is_dismissible', 'is_active', 'starts_at',
+                  'ends_at', 'priority']
 
 
 class ContactDirectorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactDirectory
-        fields = ['id', 'name', 'title', 'organization', 'category',
-                  'email', 'phone', 'photo', 'country', 'order']
+        fields = ['id', 'name', 'name_fr', 'title', 'title_fr', 'department',
+                  'department_fr', 'organization', 'category', 'email', 'phone',
+                  'photo', 'country', 'is_active', 'display_order', 'order']
 
 
 class LiveQASessionSerializer(serializers.ModelSerializer):

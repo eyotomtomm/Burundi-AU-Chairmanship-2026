@@ -189,9 +189,11 @@ class AppSettingsModel {
   final String appDescriptionFr;
   final String developerName;
   final String developerUrl;
-  final bool smsVerificationEnabled;
-  final bool whatsappVerificationEnabled;
   final bool liveAgentOnline;
+  final bool bookmarksEnabled;
+  final bool discussionsEnabled;
+  final bool pollsEnabled;
+  final bool newsletterEnabled;
 
   AppSettingsModel({
     required this.summitYear,
@@ -205,9 +207,11 @@ class AppSettingsModel {
     required this.appDescriptionFr,
     required this.developerName,
     required this.developerUrl,
-    required this.smsVerificationEnabled,
-    required this.whatsappVerificationEnabled,
     required this.liveAgentOnline,
+    this.bookmarksEnabled = true,
+    this.discussionsEnabled = true,
+    this.pollsEnabled = true,
+    this.newsletterEnabled = true,
   });
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -223,13 +227,14 @@ class AppSettingsModel {
       appDescriptionFr: json['app_description_fr'] ?? 'Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.',
       developerName: json['developer_name'] ?? 'Eyosias Tamene',
       developerUrl: json['developer_url'] ?? 'https://eyosias.dev',
-      smsVerificationEnabled: json['sms_verification_enabled'] ?? false,
-      whatsappVerificationEnabled: json['whatsapp_verification_enabled'] ?? false,
       liveAgentOnline: json['live_agent_online'] ?? false,
+      bookmarksEnabled: json['bookmarks_enabled'] ?? true,
+      discussionsEnabled: json['discussions_enabled'] ?? true,
+      pollsEnabled: json['polls_enabled'] ?? true,
+      newsletterEnabled: json['newsletter_enabled'] ?? true,
     );
   }
 
-  bool get phoneVerificationEnabled => smsVerificationEnabled || whatsappVerificationEnabled;
 
   String getTheme(String langCode) => langCode == 'fr' ? summitThemeFr : summitTheme;
   String getDescription(String langCode) => langCode == 'fr' ? appDescriptionFr : appDescription;

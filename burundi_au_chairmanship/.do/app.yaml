@@ -4,7 +4,7 @@
 #
 # Before deploying, set encrypted env vars in DO dashboard:
 #   DJANGO_SECRET_KEY, DATABASE_URL, EMAIL_HOST_PASSWORD,
-#   TWILIO_AUTH_TOKEN, TWILIO_ACCOUNT_SID, SENTRY_DSN, etc.
+#   SENTRY_DSN, etc.
 
 name: burundi-au-chairmanship
 
@@ -52,8 +52,6 @@ services:
         value: "noreply@burundi4africa.com"
       - key: DEFAULT_FROM_EMAIL
         value: "Burundi AU Chairmanship <noreply@burundi4africa.com>"
-      - key: TWILIO_SENDER_ID
-        value: "B4africa"
       - key: SENTRY_ENVIRONMENT
         value: "production"
       - key: SENTRY_RELEASE
@@ -68,15 +66,6 @@ services:
         type: SECRET
         value: "${db.DATABASE_URL}"
       - key: EMAIL_HOST_PASSWORD
-        type: SECRET
-        value: "REPLACE_IN_DASHBOARD"
-      - key: TWILIO_ACCOUNT_SID
-        type: SECRET
-        value: "REPLACE_IN_DASHBOARD"
-      - key: TWILIO_AUTH_TOKEN
-        type: SECRET
-        value: "REPLACE_IN_DASHBOARD"
-      - key: TWILIO_VERIFY_SERVICE_SID
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: SENTRY_DSN

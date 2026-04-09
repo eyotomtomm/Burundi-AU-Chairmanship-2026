@@ -664,42 +664,27 @@ function toggleScheduleDay() {
 }
 
 function previewAudienceCount() {
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     const isGlobal = document.getElementById('is_global').checked;
     const targetGender = document.getElementById('target_gender').value;
     const targetLanguage = document.getElementById('target_language').value;
-    const targetAgeMin = document.getElementById('target_age_min').value;
-    const targetAgeMax = document.getElementById('target_age_max').value;
     const targetVerifiedOnly = document.getElementById('target_verified_only').checked;
     const targetBadgeType = document.getElementById('target_badge_type').value;
-
-    // Get selected nationalities
-    const natSelect = document.getElementById('target_nationalities');
-    const targetNationalities = Array.from(natSelect.selectedOptions).map(o => o.value);
 
     const countEl = document.getElementById('audienceCount');
     countEl.textContent = '...';
 
-    fetch('/api/notifications/target-count/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken,
-        },
-        body: JSON.stringify({
-            is_global: isGlobal,
-            target_gender: targetGender,
-            target_language: targetLanguage,
-            target_nationalities: targetNationalities,
-            target_age_min: targetAgeMin ? parseInt(targetAgeMin) : null,
-            target_age_max: targetAgeMax ? parseInt(targetAgeMax) : null,
-            target_verified_only: targetVerifiedOnly,
-            target_badge_type: targetBadgeType,
-        }),
-    })
+    const params = new URLSearchParams({
+        is_global: isGlobal,
+        target_gender: targetGender,
+        target_language: targetLanguage,
+        target_verified_only: targetVerifiedOnly,
+        target_badge_type: targetBadgeType,
+    });
+
+    fetch('{% url "custom_admin:notification_estimate_audience" %}?' + params.toString())
     .then(r => r.json())
     .then(data => {
-        countEl.textContent = data.target_count ?? '--';
+        countEl.textContent = data.count + ' / ' + data.total + ' total';
     })
     .catch(() => {
         countEl.textContent = 'Error';

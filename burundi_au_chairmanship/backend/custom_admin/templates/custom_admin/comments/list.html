@@ -128,9 +128,9 @@
               <td class="px-6 py-4">
                 <div class="flex items-center gap-2">
                   <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center">
-                    <span class="text-xs font-bold text-slate-600">{{ c.user.username|first|upper }}</span>
+                    <span class="text-xs font-bold text-slate-600">{% if c.user.first_name %}{{ c.user.first_name|first|upper }}{% else %}{{ c.user.username|first|upper }}{% endif %}</span>
                   </div>
-                  <span class="text-sm text-slate-700 font-medium">{{ c.user.username }}</span>
+                  <span class="text-sm text-slate-700 font-medium">{{ c.user.get_full_name|default:c.user.username }}</span>
                 </div>
               </td>
               <td class="px-6 py-4">

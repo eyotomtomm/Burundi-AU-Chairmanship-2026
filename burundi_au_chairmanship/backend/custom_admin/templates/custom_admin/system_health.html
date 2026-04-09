@@ -19,6 +19,33 @@
   <span class="text-sm font-medium">psutil is not installed. CPU, memory, disk, and uptime data are unavailable. Install with: <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono">pip install psutil</code></span>
 </div>
 
+<!-- Server Info Banner -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-8">
+  <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Server Information</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Environment</p>
+      <p id="serverEnv" class="text-sm font-semibold text-slate-800">--</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Django</p>
+      <p id="serverDjango" class="text-sm font-semibold text-slate-800">--</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Python</p>
+      <p id="serverPython" class="text-sm font-semibold text-slate-800">--</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Hostname</p>
+      <p id="serverHostname" class="text-sm font-semibold text-slate-800 truncate">--</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-3 border border-slate-200/60">
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">OS</p>
+      <p id="serverOS" class="text-sm font-semibold text-slate-800 truncate">--</p>
+    </div>
+  </div>
+</div>
+
 <!-- Server Status Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 
@@ -131,8 +158,66 @@
   </div>
 </div>
 
-<!-- Database Stats + Recent Logins -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Application Stats -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6 mb-8">
+  <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Application Statistics</h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statTotalUsers" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Total Users</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statActiveUsers" class="text-2xl font-black text-emerald-600 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Active (30d)</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statArticles" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Articles</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statEvents" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Events</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statMagazines" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Magazines</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statVideos" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Videos</p>
+    </div>
+
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statGalleryAlbums" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Albums</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statGalleryPhotos" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Photos</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statLiveFeeds" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Live Feeds</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl px-4 py-4 border border-slate-200/60 text-center">
+      <p id="statNotifSent" class="text-2xl font-black text-slate-900 font-headline">--</p>
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Push Sent</p>
+    </div>
+    <div class="bg-amber-50 rounded-xl px-4 py-4 border border-amber-200/60 text-center">
+      <p id="statPendingTickets" class="text-2xl font-black text-amber-600 font-headline">--</p>
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">Open Tickets</p>
+    </div>
+    <div class="bg-amber-50 rounded-xl px-4 py-4 border border-amber-200/60 text-center">
+      <p id="statPendingVerify" class="text-2xl font-black text-amber-600 font-headline">--</p>
+      <p class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">Pending Verify</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- Database Stats + Deployment Info -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 
   <!-- Database Stats -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
@@ -141,6 +226,10 @@
       <div class="flex items-center justify-between py-3 border-b border-slate-100">
         <span class="text-sm text-slate-500">Engine</span>
         <span id="statEngine" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Version</span>
+        <span id="statDbVersion" class="text-sm font-semibold text-slate-800 max-w-xs truncate text-right">--</span>
       </div>
       <div class="flex items-center justify-between py-3 border-b border-slate-100">
         <span class="text-sm text-slate-500">Database Name</span>
@@ -161,26 +250,58 @@
     </div>
   </div>
 
-  <!-- Recent Admin Logins -->
+  <!-- Deployment Info -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
-    <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Recent Activity</h2>
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-            <th class="pb-3 pr-4">User</th>
-            <th class="pb-3 pr-4">IP Address</th>
-            <th class="pb-3">Login Time</th>
-          </tr>
-        </thead>
-        <tbody id="loginsTable">
-          <tr><td colspan="3" class="py-6 text-center text-slate-400">Loading...</td></tr>
-        </tbody>
-      </table>
+    <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Deployment &amp; Storage</h2>
+    <div class="space-y-4">
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Environment</span>
+        <span id="deployEnv" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Debug Mode</span>
+        <span id="deployDebug" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Allowed Hosts</span>
+        <span id="deployHosts" class="text-sm font-semibold text-slate-800 max-w-xs truncate text-right" title="">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Storage Backend</span>
+        <span id="deployStorage" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3 border-b border-slate-100">
+        <span class="text-sm text-slate-500">Media Size</span>
+        <span id="deployMediaSize" class="text-sm font-semibold text-slate-800">--</span>
+      </div>
+      <div class="flex items-center justify-between py-3">
+        <span class="text-sm text-slate-500">Database URL</span>
+        <span id="deployDbUrl" class="text-xs font-mono font-semibold text-slate-600 max-w-xs truncate text-right" title="">--</span>
+      </div>
     </div>
   </div>
 
 </div>
+
+<!-- Recent Admin Logins -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-6">
+  <h2 class="text-lg font-bold text-slate-800 font-headline mb-4">Recent Activity</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+          <th class="pb-3 pr-4">User</th>
+          <th class="pb-3 pr-4">IP Address</th>
+          <th class="pb-3">Login Time</th>
+        </tr>
+      </thead>
+      <tbody id="loginsTable">
+        <tr><td colspan="3" class="py-6 text-center text-slate-400">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -220,12 +341,38 @@
     return n.toLocaleString();
   }
 
+  function setTextById(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value !== undefined && value !== null ? value : '--';
+  }
+
   function updateDashboard(data) {
     // psutil warning
     if (!data.psutil_available) {
       document.getElementById('psutilWarning').classList.remove('hidden');
     } else {
       document.getElementById('psutilWarning').classList.add('hidden');
+    }
+
+    // Server Info
+    if (data.server_info) {
+      var si = data.server_info;
+      var envEl = document.getElementById('serverEnv');
+      if (envEl) {
+        envEl.textContent = si.environment || '--';
+        // Color-code environment badge
+        if (si.environment === 'production') {
+          envEl.className = 'text-sm font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full inline-block';
+        } else if (si.environment === 'staging') {
+          envEl.className = 'text-sm font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full inline-block';
+        } else {
+          envEl.className = 'text-sm font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full inline-block';
+        }
+      }
+      setTextById('serverDjango', si.django_version);
+      setTextById('serverPython', si.python_version);
+      setTextById('serverHostname', si.hostname);
+      setTextById('serverOS', si.os);
     }
 
     // CPU
@@ -284,12 +431,64 @@
       'Configured', 'Not configured'
     );
 
+    // Application Stats
+    if (data.app_stats) {
+      var as = data.app_stats;
+      setTextById('statTotalUsers', formatNumber(as.total_users));
+      setTextById('statActiveUsers', formatNumber(as.active_users_30d));
+      setTextById('statArticles', formatNumber(as.total_articles));
+      setTextById('statEvents', formatNumber(as.total_events));
+      setTextById('statMagazines', formatNumber(as.total_magazines));
+      setTextById('statVideos', formatNumber(as.total_videos));
+      setTextById('statGalleryAlbums', formatNumber(as.total_gallery_albums));
+      setTextById('statGalleryPhotos', formatNumber(as.total_gallery_photos));
+      setTextById('statLiveFeeds', formatNumber(as.total_live_feeds));
+      setTextById('statNotifSent', formatNumber(as.notifications_sent));
+      setTextById('statPendingTickets', formatNumber(as.pending_tickets));
+      setTextById('statPendingVerify', formatNumber(as.pending_verifications));
+    }
+
     // DB Stats
     document.getElementById('statEngine').textContent = data.db_engine || '--';
     document.getElementById('statDbName').textContent = data.db_name || '--';
     document.getElementById('statTables').textContent = formatNumber(data.table_count);
     document.getElementById('statRows').textContent = formatNumber(data.row_count);
     document.getElementById('statSize').textContent = data.db_size || '--';
+
+    // DB Version
+    var dbVersionEl = document.getElementById('statDbVersion');
+    if (dbVersionEl) {
+      var version = data.db_version || '--';
+      // Truncate long PostgreSQL version strings to just the version number
+      if (version.length > 60) {
+        var match = version.match(/PostgreSQL\s+[\d.]+/);
+        dbVersionEl.textContent = match ? match[0] : version.substring(0, 60) + '...';
+        dbVersionEl.title = version;
+      } else {
+        dbVersionEl.textContent = version;
+      }
+    }
+
+    // Deployment Info
+    if (data.deploy_info) {
+      var di = data.deploy_info;
+      setTextById('deployEnv', di.django_env);
+      setTextById('deployDebug', di.debug_mode ? 'ON (Development)' : 'OFF (Production)');
+      var hostsEl = document.getElementById('deployHosts');
+      if (hostsEl) {
+        hostsEl.textContent = di.allowed_hosts || '--';
+        hostsEl.title = di.allowed_hosts || '';
+      }
+      setTextById('deployStorage', di.storage_backend);
+      var dbUrlEl = document.getElementById('deployDbUrl');
+      if (dbUrlEl) {
+        dbUrlEl.textContent = di.database_url || '--';
+        dbUrlEl.title = di.database_url || '';
+      }
+    }
+
+    // Media Size
+    setTextById('deployMediaSize', data.media_size);
 
     // Recent logins
     var tbody = document.getElementById('loginsTable');

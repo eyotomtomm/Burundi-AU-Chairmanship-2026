@@ -80,6 +80,7 @@ def get_target_tokens(notification):
     """
     Collect FCM tokens based on notification targeting fields.
     Uses both DeviceToken model (preferred) and legacy UserProfile.fcm_token.
+    For global notifications, also includes anonymous device tokens (user=None).
 
     Returns a list of non-empty, deduplicated FCM token strings.
     """
@@ -93,6 +94,16 @@ def get_target_tokens(notification):
             is_active=True,
         ).values_list('token', flat=True).distinct()
     )
+
+    # Include anonymous device tokens for global notifications
+    if notification.is_global:
+        anonymous_tokens = list(
+            DeviceToken.objects.filter(
+                user__isnull=True,
+                is_active=True,
+            ).values_list('token', flat=True).distinct()
+        )
+        device_tokens = list(set(device_tokens + anonymous_tokens))
 
     # Also collect legacy tokens from UserProfile for backward compatibility
     legacy_tokens = list(profiles.values_list('fcm_token', flat=True))
@@ -108,6 +119,7 @@ def get_target_tokens_by_language(notification):
 
     Returns dict: {'en': [tokens...], 'fr': [tokens...]}
     This allows sending language-specific push notification content.
+    Anonymous device tokens (user=None) are included under 'en' for global notifications.
     """
     profiles = get_target_profiles(notification)
     user_ids_by_lang = {}
@@ -132,16 +144,41 @@ def get_target_tokens_by_language(notification):
             device_tokens + [t for t in legacy_tokens if t]
         ))
 
+    # Include anonymous device tokens for global notifications (default to 'en')
+    if notification.is_global:
+        anonymous_tokens = list(
+            DeviceToken.objects.filter(
+                user__isnull=True,
+                is_active=True,
+            ).values_list('token', flat=True).distinct()
+        )
+        if anonymous_tokens:
+            # Add anonymous tokens to 'en' bucket, excluding any already assigned
+            all_assigned = set(user_ids_by_lang.get('en', []) + user_ids_by_lang.get('fr', []))
+            new_anon = [t for t in anonymous_tokens if t not in all_assigned]
+            user_ids_by_lang['en'] = list(set(user_ids_by_lang.get('en', []) + new_anon))
+
     return user_ids_by_lang
 
 
 def get_target_audience_count(notification):
     """
-    Return the number of unique users who would receive this notification.
+    Return the number of unique devices that would receive this notification.
     Used for audience preview in admin before sending.
+    Includes anonymous device tokens for global notifications.
     """
     profiles = get_target_profiles(notification)
-    return profiles.count()
+    count = profiles.count()
+
+    # Add anonymous device tokens for global notifications
+    if notification.is_global:
+        anonymous_count = DeviceToken.objects.filter(
+            user__isnull=True,
+            is_active=True,
+        ).count()
+        count += anonymous_count
+
+    return count
 
 
 def send_push_notification(notification):

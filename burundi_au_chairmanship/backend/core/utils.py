@@ -108,9 +108,8 @@ def send_sms(phone_number, message):
     Stub SMS sending function.
 
     Logs the message instead of actually sending it.
-    To integrate with a real SMS provider (e.g., Twilio, Africa's Talking),
-    replace this stub with actual API calls and configure the provider's
-    API keys in settings.
+    To integrate with a real SMS provider, replace this stub with
+    actual API calls and configure the provider's credentials in settings.
 
     Args:
         phone_number (str): The recipient's phone number (e.g., '+25779000000')
@@ -136,14 +135,6 @@ def send_sms(phone_number, message):
     )
 
     # TODO: Replace with actual SMS provider integration
-    # Example with Twilio:
-    # from twilio.rest import Client
-    # client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-    # client.messages.create(
-    #     body=message,
-    #     from_=settings.TWILIO_PHONE_NUMBER,
-    #     to=phone_number,
-    # )
 
     return True
 

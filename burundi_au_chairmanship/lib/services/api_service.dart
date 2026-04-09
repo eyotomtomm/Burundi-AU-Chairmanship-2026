@@ -204,6 +204,16 @@ class ApiService {
     }, auth: true);
   }
 
+  /// Register FCM token without requiring authentication.
+  /// This allows anonymous users to receive global push notifications.
+  Future<void> registerFCMToken(String fcmToken, {String? deviceType, String? deviceOs}) async {
+    await _post('register-fcm-token/', {
+      'fcm_token': fcmToken,
+      if (deviceType != null) 'device_type': deviceType,
+      if (deviceOs != null) 'device_os': deviceOs,
+    }, auth: false);
+  }
+
   /// Deactivate FCM token on logout (don't delete, just mark inactive)
   Future<void> deactivateFCMToken(String fcmToken) async {
     await _post('auth/deactivate-fcm-token/', {
@@ -618,22 +628,7 @@ class ApiService {
     return await _post('auth/verify-signup-otp/', {'otp_code': otpCode}, auth: true);
   }
 
-  // ── Phone OTP Verification (Twilio) ──────────────────────
-  Future<Map<String, dynamic>> sendPhoneOtp(String countryCode, String phoneNumber, {String channel = 'sms'}) async {
-    return await _post('otp/send-phone/', {
-      'country_code': countryCode,
-      'phone_number': phoneNumber,
-      'channel': channel,
-    }, auth: true);
-  }
 
-  Future<Map<String, dynamic>> verifyPhoneOtp(String countryCode, String phoneNumber, String otpCode) async {
-    return await _post('otp/verify-phone/', {
-      'country_code': countryCode,
-      'phone_number': phoneNumber,
-      'otp_code': otpCode,
-    }, auth: true);
-  }
 
   // ── Support Tickets ──────────────────────────────────────
   Future<List<Map<String, dynamic>>> getTickets() async {

@@ -400,19 +400,38 @@ class FirebaseMessagingService {
     }
   }
 
-  /// Send FCM token to Django backend
+  /// Register FCM token with Django backend (no auth required).
+  /// This works for both authenticated and anonymous users,
+  /// ensuring all devices can receive global push notifications.
   Future<void> _sendTokenToBackend(String token) async {
     try {
-      await ApiService().updateFCMToken(token);
+      await ApiService().registerFCMToken(token);
       if (kDebugMode) {
-        print('FCM token sent to backend successfully');
+        print('FCM token registered with backend successfully');
       }
     } catch (e) {
       // Security: Only log detailed errors in debug mode
       if (kDebugMode) {
-        print('Failed to send FCM token to backend: $e');
+        print('Failed to register FCM token with backend: $e');
       }
       // Don't throw - this is not critical for app functionality
+    }
+  }
+
+  /// Link the current FCM token to an authenticated user.
+  /// Call this after login to associate the device token with the user account.
+  Future<void> linkTokenToUser() async {
+    try {
+      if (_currentToken != null) {
+        await ApiService().updateFCMToken(_currentToken!);
+        if (kDebugMode) {
+          print('FCM token linked to user successfully');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to link FCM token to user: $e');
+      }
     }
   }
 

@@ -6804,47 +6804,57 @@ def auto_translate(request):
     if source_lang not in ('en', 'fr') or target_lang not in ('en', 'fr'):
         return JsonResponse({'error': 'Only EN and FR are supported'}, status=400)
 
-    # For long texts, split into chunks (MyMemory limit: 500 chars per request)
     def _translate_chunk(chunk, sl, tl):
         """Try multiple free translation APIs in order."""
-        errors = []
 
-        # 1) MyMemory API — free, no API key, 5000 chars/day
+        # 1) Google Translate (gtx client — free, no key)
+        try:
+            encoded = urllib.parse.quote(chunk)
+            url = f'https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q={encoded}'
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read())
+            if data and data[0]:
+                result = ''.join(seg[0] for seg in data[0] if seg and seg[0])
+                if result and result.strip():
+                    return result
+        except Exception:
+            pass
+
+        # 2) Lingva Translate (Google Translate proxy)
+        try:
+            encoded = urllib.parse.quote(chunk)
+            url = f'https://lingva.ml/api/v1/{sl}/{tl}/{encoded}'
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read())
+            result = data.get('translation', '')
+            if result and result.strip():
+                return result
+        except Exception:
+            pass
+
+        # 3) MyMemory API — check both translatedText and matches
         try:
             encoded = urllib.parse.quote(chunk)
             url = f'https://api.mymemory.translated.net/get?q={encoded}&langpair={sl}|{tl}'
             req = urllib.request.Request(url)
-            req.add_header('User-Agent', 'BurundiAU/1.0')
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read())
-            if data.get('responseStatus') == 200:
-                result = data.get('responseData', {}).get('translatedText', '')
-                if result and result.upper() != chunk.upper():
-                    return result
-        except Exception as e:
-            errors.append(f'MyMemory: {e}')
-
-        # 2) LibreTranslate public instances
-        libre_hosts = [
-            'https://libretranslate.de',
-            'https://translate.argosopentech.com',
-        ]
-        for host in libre_hosts:
-            try:
-                url = f'{host}/translate'
-                payload = json.dumps({
-                    'q': chunk, 'source': sl, 'target': tl, 'format': 'text',
-                }).encode()
-                req = urllib.request.Request(url, data=payload, method='POST')
-                req.add_header('Content-Type', 'application/json')
-                req.add_header('User-Agent', 'BurundiAU/1.0')
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = json.loads(resp.read())
-                result = data.get('translatedText', '')
-                if result:
-                    return result
-            except Exception as e:
-                errors.append(f'LibreTranslate ({host}): {e}')
+            result = data.get('responseData', {}).get('translatedText', '')
+            if result and result.strip():
+                return result
+            # Fallback: use best match from matches array
+            matches = data.get('matches', [])
+            for m in matches:
+                t = m.get('translation', '')
+                if t and t.strip():
+                    return t
+        except Exception:
+            pass
 
         return None
 

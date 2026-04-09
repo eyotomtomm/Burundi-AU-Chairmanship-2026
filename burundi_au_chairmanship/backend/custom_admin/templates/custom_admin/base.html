@@ -1731,10 +1731,14 @@ function toggleDarkMode() {
       formData.append('source', sourceIsEn ? 'en' : 'fr');
       formData.append('target', sourceIsEn ? 'fr' : 'en');
 
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+
       fetch('{% url "custom_admin:auto_translate" %}', {
         method: 'POST',
         headers: { 'X-CSRFToken': getCsrfToken() },
-        body: formData
+        body: formData,
+        signal: controller.signal
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -1744,18 +1748,18 @@ function toggleDarkMode() {
           targetField.style.backgroundColor = '#d1fae5';
           setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
         } else {
-          targetField.value = sourceField.value;
-          targetField.style.backgroundColor = '#fef3c7';
-          setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+          btn.textContent = 'Failed!';
+          btn.style.color = '#dc2626';
+          setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
         }
       })
-      .catch(function() {
-        targetField.value = sourceField.value;
-        targetField.style.backgroundColor = '#fef3c7';
-        setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+      .catch(function(err) {
+        btn.textContent = err.name === 'AbortError' ? 'Timeout!' : 'Failed!';
+        btn.style.color = '#dc2626';
+        setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
       })
       .finally(function() {
-        btn.textContent = origText;
+        clearTimeout(timeoutId);
         btn.disabled = false;
         btn.style.opacity = '';
       });
@@ -1824,40 +1828,40 @@ function toggleDarkMode() {
       formData.append('source', sourceIsEn ? 'en' : 'fr');
       formData.append('target', sourceIsEn ? 'fr' : 'en');
 
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+
       fetch('{% url "custom_admin:auto_translate" %}', {
         method: 'POST',
         headers: { 'X-CSRFToken': getCsrfToken() },
-        body: formData
+        body: formData,
+        signal: controller.signal
       })
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        var translated = data.translated || sourceContent;
-        if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
-          tinymce.get(targetId).setContent(translated);
-          tinymce.get(targetId).save();
-        } else {
-          targetField.value = translated;
-        }
-        targetField.focus();
         if (data.translated) {
+          if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
+            tinymce.get(targetId).setContent(data.translated);
+            tinymce.get(targetId).save();
+          } else {
+            targetField.value = data.translated;
+          }
+          targetField.focus();
           targetField.style.backgroundColor = '#d1fae5';
+          setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
         } else {
-          targetField.style.backgroundColor = '#fef3c7';
+          btn.textContent = 'Failed!';
+          btn.style.color = '#dc2626';
+          setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
         }
-        setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
       })
-      .catch(function() {
-        if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
-          tinymce.get(targetId).setContent(sourceContent);
-          tinymce.get(targetId).save();
-        } else {
-          targetField.value = sourceContent;
-        }
-        targetField.style.backgroundColor = '#fef3c7';
-        setTimeout(function() { targetField.style.backgroundColor = ''; }, 1000);
+      .catch(function(err) {
+        btn.textContent = err.name === 'AbortError' ? 'Timeout!' : 'Failed!';
+        btn.style.color = '#dc2626';
+        setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
       })
       .finally(function() {
-        btn.textContent = origText;
+        clearTimeout(timeoutId);
         btn.disabled = false;
         btn.style.opacity = '';
       });

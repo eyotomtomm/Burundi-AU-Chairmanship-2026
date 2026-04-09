@@ -60,6 +60,11 @@ def admin_login(request):
 
         if user and is_staff(user):
             login(request, user)
+            # "Remember Me" — keep session for 30 days, otherwise expire on browser close
+            if request.POST.get('remember_me'):
+                request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+            else:
+                request.session.set_expiry(0)  # Browser close
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
             return redirect('custom_admin:dashboard')
         else:

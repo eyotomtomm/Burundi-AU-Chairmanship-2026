@@ -44,7 +44,7 @@ class LiveFeedType(DjangoObjectType):
         model = LiveFeed
         fields = (
             'id', 'title', 'title_fr', 'description', 'description_fr',
-            'stream_url', 'stream_type', 'meeting_id', 'passcode',
+            'stream_url', 'stream_type',
             'thumbnail', 'status', 'viewer_count', 'duration',
             'scheduled_time', 'created_at',
         )
@@ -146,7 +146,11 @@ class Query(graphene.ObjectType):
 
     def resolve_all_articles(self, info, category=None, author=None, search=None,
                              featured_only=None, limit=None):
-        qs = Article.objects.select_related('category').all()
+        qs = Article.objects.select_related('category').filter(
+            is_draft=False,
+        ).exclude(
+            expires_at__isnull=False, expires_at__lt=timezone.now()
+        )
 
         if category is not None:
             qs = qs.filter(category_id=category)

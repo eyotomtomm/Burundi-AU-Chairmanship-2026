@@ -143,7 +143,9 @@ class ApiService {
         return json.decode(response.body);
       }
       throw ApiException('HTTP ${response.statusCode}', response.statusCode);
-    } on http.ClientException {
+    } on ApiException {
+      rethrow;
+    } catch (e) {
       throw ApiException('Connection failed. Check your network.', 0);
     }
   }
@@ -204,9 +206,17 @@ class ApiService {
     return await _post('auth/firebase-register/', body);
   }
 
-  Future<Map<String, dynamic>> firebaseLogin({required String idToken}) async {
+  Future<Map<String, dynamic>> firebaseLogin({
+    required String idToken,
+    String? deviceName,
+    String? deviceType,
+    String? appVersion,
+  }) async {
     return await _post('auth/firebase-login/', {
       'firebase_token': idToken,
+      'device_name': ?deviceName,
+      'device_type': ?deviceType,
+      'app_version': ?appVersion,
     });
   }
 
@@ -293,7 +303,9 @@ class ApiService {
         message = body['detail'];
       }
       throw ApiException(message, response.statusCode);
-    } on http.ClientException {
+    } on ApiException {
+      rethrow;
+    } catch (e) {
       throw ApiException('Connection failed. Check your network.', 0);
     }
   }
@@ -313,7 +325,7 @@ class ApiService {
         await http.MultipartFile.fromPath('profile_picture', imageFile.path),
       );
 
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final streamedResponse = await _client.send(request).timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
@@ -339,7 +351,9 @@ class ApiService {
         return json.decode(response.body);
       }
       throw ApiException('Failed to deactivate account', response.statusCode);
-    } on http.ClientException {
+    } on ApiException {
+      rethrow;
+    } catch (e) {
       throw ApiException('Connection failed. Check your network.', 0);
     }
   }
@@ -356,7 +370,9 @@ class ApiService {
         return json.decode(response.body);
       }
       throw ApiException('Failed to delete account', response.statusCode);
-    } on http.ClientException {
+    } on ApiException {
+      rethrow;
+    } catch (e) {
       throw ApiException('Connection failed. Check your network.', 0);
     }
   }
@@ -1068,7 +1084,7 @@ class ApiService {
         await http.MultipartFile.fromPath('image', imageFile.path),
       );
 
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final streamedResponse = await _client.send(request).timeout(const Duration(seconds: 30));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {

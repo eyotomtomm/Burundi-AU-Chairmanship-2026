@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -62,7 +63,7 @@ class AuthProvider extends ChangeNotifier {
   String? get gender => _gender;
   String? get nationality => _nationality;
   String? get dateOfBirth => _dateOfBirth;
-  bool get isEmailVerified => _userEmail?.toLowerCase() == 'apple.review@burundi4africa.com' ? true : _isEmailVerified;
+  bool get isEmailVerified => _isEmailVerified;
   bool get isGovernmentOfficial => _isGovernmentOfficial;
   bool get isVerified => _isVerified;
   String? get badgeType => _badgeType;
@@ -72,7 +73,7 @@ class AuthProvider extends ChangeNotifier {
   String? get verificationName => _verificationName;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get requiresEmailVerification => _userEmail?.toLowerCase() == 'apple.review@burundi4africa.com' ? false : _requiresEmailVerification;
+  bool get requiresEmailVerification => _requiresEmailVerification;
   bool get receivesNewsletter => _receivesNewsletter;
 
   /// Whether the current user has an email/password credential (not SSO-only).
@@ -208,13 +209,34 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Get device name for session tracking
+  Future<String> _getDeviceName() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final info = await deviceInfo.androidInfo;
+        return '${info.brand} ${info.model}';
+      } else if (Platform.isIOS) {
+        final info = await deviceInfo.iosInfo;
+        return info.name;
+      }
+    } catch (_) {}
+    return Platform.operatingSystem;
+  }
+
   /// Sync Firebase user with Django backend
   Future<void> _syncWithBackend() async {
     try {
       final idToken = await _firebaseAuth.getIdToken();
       if (idToken == null) return;
 
-      final data = await _api.firebaseLogin(idToken: idToken);
+      final deviceName = await _getDeviceName();
+      final data = await _api.firebaseLogin(
+        idToken: idToken,
+        deviceName: deviceName,
+        deviceType: Platform.operatingSystem,
+        appVersion: AppConstants.appVersion,
+      );
       await _storeUserData(data['user']);
 
       // Capture email verification requirement
@@ -318,8 +340,14 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Failed to get Firebase ID token');
       }
 
-      // 3. Login with Django backend
-      final data = await _api.firebaseLogin(idToken: idToken);
+      // 3. Login with Django backend (include device info for session tracking)
+      final deviceName = await _getDeviceName();
+      final data = await _api.firebaseLogin(
+        idToken: idToken,
+        deviceName: deviceName,
+        deviceType: Platform.operatingSystem,
+        appVersion: AppConstants.appVersion,
+      );
 
       // 4. Store user data locally
       await _storeUserData(data['user']);
@@ -456,7 +484,13 @@ class AuthProvider extends ChangeNotifier {
     required String email,
   }) async {
     try {
-      return await _api.firebaseLogin(idToken: idToken);
+      final deviceName = await _getDeviceName();
+      return await _api.firebaseLogin(
+        idToken: idToken,
+        deviceName: deviceName,
+        deviceType: Platform.operatingSystem,
+        appVersion: AppConstants.appVersion,
+      );
     } on ApiException catch (e) {
       // If user not found on backend, auto-create their account
       if (e.statusCode == 404 || e.statusCode == 401) {
@@ -845,6 +879,12 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('user_verification_title');
     await prefs.remove('user_verification_role');
     await prefs.remove('user_verification_name');
+    await prefs.remove('user_receives_newsletter');
+    // Clear verification cache to prevent data leaking between accounts
+    await prefs.remove('cached_is_verified');
+    await prefs.remove('cached_verification_status');
+    await prefs.remove('cached_badge_type');
+    await prefs.remove('cached_verification_request_id');
 
     _userId = null;
     _userName = null;
@@ -861,6 +901,7 @@ class AuthProvider extends ChangeNotifier {
     _verificationTitle = null;
     _verificationRole = null;
     _verificationName = null;
+    _receivesNewsletter = false;
   }
 
   /// Clear error message

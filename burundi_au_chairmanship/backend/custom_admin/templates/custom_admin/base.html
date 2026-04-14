@@ -954,6 +954,13 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     </a>
     {% endif %}
 
+    {% if 'newsletter_editions_list' in allowed_sections %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'newsletter' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:newsletter_editions_list' %}">
+      <span class="material-symbols-outlined">newspaper</span>
+      <span class="text-sm tracking-wide font-headline">Newsletters</span>
+    </a>
+    {% endif %}
+
     {% if 'maintenance_list' in allowed_sections %}
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'maintenance' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:maintenance_list' %}">
       <span class="material-symbols-outlined">engineering</span>

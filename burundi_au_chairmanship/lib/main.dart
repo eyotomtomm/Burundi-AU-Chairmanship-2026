@@ -171,7 +171,7 @@ void main() async {
         options.release = 'burundi-au-app@1.0.0+1';
         options.tracesSampleRate = Environment.sentryTracesSampleRate;
         options.profilesSampleRate = Environment.sentryProfilesSampleRate;
-        options.sendDefaultPii = true;
+        options.sendDefaultPii = false;
         options.attachScreenshot = true;
         options.attachViewHierarchy = true;
         // In debug mode, log Sentry events for visibility

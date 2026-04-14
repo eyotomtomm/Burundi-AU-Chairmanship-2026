@@ -161,6 +161,7 @@ urlpatterns = [
 
     # Newsletter
     path('newsletter/toggle/', views.toggle_newsletter, name='toggle-newsletter'),
+    path('newsletter/unsubscribe/<str:token>/', views.newsletter_unsubscribe, name='newsletter-unsubscribe'),
 
     # Analytics API (admin only)
     path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),

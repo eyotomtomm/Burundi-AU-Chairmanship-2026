@@ -1,0 +1,119 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Segment: {{ segment.name }} - Burundi Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8">
+      <a href="{% url 'custom_admin:segment_list' %}" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 mb-4">
+        <span class="material-symbols-outlined text-sm">arrow_back</span> Back to Segments
+      </a>
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <span class="material-symbols-outlined text-4xl text-purple-600 dark:text-purple-400">group_work</span>
+            <h1 class="text-3xl font-bold text-slate-900 dark:text-white">{{ segment.name }}</h1>
+            {% if segment.is_dynamic %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">
+                <span class="material-symbols-outlined text-sm">auto_awesome</span> Dynamic
+              </span>
+            {% else %}
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-full">Static</span>
+            {% endif %}
+          </div>
+          {% if segment.description %}
+          <p class="text-slate-600 dark:text-slate-400">{{ segment.description }}</p>
+          {% endif %}
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ member_count }} member{{ member_count|pluralize }} &middot; Created {{ segment.created_at|date:"M d, Y" }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="{% url 'custom_admin:segment_edit' segment.pk %}"
+             class="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
+            <span class="material-symbols-outlined text-sm">edit</span> Edit
+          </a>
+          <a href="{% url 'custom_admin:segment_export' segment.pk %}"
+             class="inline-flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">
+            <span class="material-symbols-outlined text-sm">download</span> Export CSV
+          </a>
+          <form method="POST" action="{% url 'custom_admin:segment_notify' segment.pk %}" class="inline" onsubmit="return confirm('Send a notification to all {{ member_count }} member(s) of this segment?');">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex items-center gap-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg">
+              <span class="material-symbols-outlined text-sm">notifications</span> Notify
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Members table -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      {% if users %}
+        <table class="w-full">
+          <thead class="bg-slate-50 dark:bg-slate-750 border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">User</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Email</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Badge</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Joined</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            {% for user in users %}
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-700 dark:text-purple-300 text-sm font-semibold">
+                    {{ user.first_name|default:user.username|truncatechars:1 }}
+                  </div>
+                  <div>
+                    <div class="font-medium text-slate-900 dark:text-white">{{ user.get_full_name|default:user.username }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">@{{ user.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{{ user.email }}</td>
+              <td class="px-6 py-4">
+                {% if user.profile.badge_type == 'gold' %}
+                  <span class="inline-flex items-center px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-full">Gold</span>
+                {% elif user.profile.badge_type == 'blue' %}
+                  <span class="inline-flex items-center px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">Blue</span>
+                {% else %}
+                  <span class="text-xs text-slate-400">None</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{{ user.date_joined|date:"M d, Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        {% if users.has_other_pages %}
+        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-750 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <div class="text-sm text-slate-600 dark:text-slate-400">
+            Page {{ users.number }} of {{ users.paginator.num_pages }}
+          </div>
+          <div class="flex items-center gap-2">
+            {% if users.has_previous %}
+              <a href="?page={{ users.previous_page_number }}" class="px-3 py-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-600">&lsaquo;</a>
+            {% endif %}
+            <span class="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg">{{ users.number }}</span>
+            {% if users.has_next %}
+              <a href="?page={{ users.next_page_number }}" class="px-3 py-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-600">&rsaquo;</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="p-12 text-center">
+          <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-500 mb-4">group_off</span>
+          <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">No members</h3>
+          <p class="text-slate-600 dark:text-slate-400">This segment doesn't have any matching users yet.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

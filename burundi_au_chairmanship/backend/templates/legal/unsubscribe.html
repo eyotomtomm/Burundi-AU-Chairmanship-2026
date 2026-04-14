@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsubscribe - B4africa | Burundi Chairmanship 2026</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.7;
+            color: #333;
+            background: #f9f9f9;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 60px 24px;
+            text-align: center;
+        }
+        header {
+            background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+            color: white;
+            padding: 48px 24px;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+        p {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 8px;
+        }
+        .error-text {
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Burundi Chairmanship 2026</h1>
+    </header>
+    <div class="container">
+        {% if error %}
+            <div class="icon">&#9888;&#65039;</div>
+            <h2 class="error-text">Invalid or Expired Link</h2>
+            <p>This unsubscribe link is invalid or has expired.</p>
+            <p>If you still wish to unsubscribe, please log in to the app and update your newsletter preferences in your profile settings.</p>
+        {% else %}
+            <div class="icon">&#9989;</div>
+            <h2>You've Been Unsubscribed</h2>
+            <p>You will no longer receive the weekly newsletter from Burundi Chairmanship.</p>
+            <p>If this was a mistake, you can re-subscribe anytime from your profile settings in the app.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -3084,6 +3084,7 @@ class EmailCampaign(models.Model):
     """One-off marketing / broadcast email sent from the admin to a user audience."""
     AUDIENCE_CHOICES = [
         ('all', 'All active users'),
+        ('newsletter', 'Newsletter subscribers'),
         ('language', 'By preferred language'),
         ('nationality', 'By nationality'),
         ('verified', 'Verified users only'),

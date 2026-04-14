@@ -70,7 +70,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'core.middleware.cloudflare.CloudflareProxyMiddleware',  # Must be first — sets real client IP
     'django.middleware.security.SecurityMiddleware',
-    'django.middleware.gzip.GZipMiddleware',  # Compress API responses (gzip)
+    # GZipMiddleware removed — Cloudflare handles compression; avoids BREACH attack vector
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -458,7 +458,7 @@ if SENTRY_DSN:
         integrations=_sentry_integrations,
         traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.2')),
         profiles_sample_rate=float(os.environ.get('SENTRY_PROFILES_SAMPLE_RATE', '0.1')),
-        send_default_pii=True,
+        send_default_pii=False,
         environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
         release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
         before_send=_sentry_before_send,

@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../../services/haptic_service.dart';
 import '../../models/magazine_model.dart';
@@ -431,7 +432,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 ),
                 onPressed: () {
                   HapticService.light();
-                  final shareUrl = 'https://burundi4africa.com/articles/${_article.id}/share/';
+                  final shareUrl = '${Environment.siteBaseUrl}/articles/${_article.id}/share/';
                   Share.share(
                     '${_article.getTitle(Provider.of<LanguageProvider>(context, listen: false).languageCode)}\n\n$shareUrl',
                   );

@@ -1,0 +1,91 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}User Segments - Burundi Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8 flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="material-symbols-outlined text-4xl text-purple-600 dark:text-purple-400">group_work</span>
+          <h1 class="text-3xl font-bold text-slate-900 dark:text-white">User Segments</h1>
+        </div>
+        <p class="text-slate-600 dark:text-slate-400">Create and manage audience segments for targeted notifications and campaigns.</p>
+      </div>
+      <a href="{% url 'custom_admin:segment_create' %}"
+         class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+        <span class="material-symbols-outlined">add</span>
+        <span>New Segment</span>
+      </a>
+    </div>
+
+    <!-- Segments list -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      {% if segment_data %}
+        <div class="divide-y divide-slate-200 dark:divide-slate-700">
+          {% for item in segment_data %}
+          <div class="p-6 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-1">
+                  <h3 class="text-lg font-semibold text-slate-900 dark:text-white truncate">{{ item.segment.name }}</h3>
+                  {% if item.segment.is_dynamic %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">
+                      <span class="material-symbols-outlined text-sm">auto_awesome</span> Dynamic
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-full">Static</span>
+                  {% endif %}
+                </div>
+                {% if item.segment.description %}
+                <p class="text-sm text-slate-600 dark:text-slate-400 truncate">{{ item.segment.description }}</p>
+                {% endif %}
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-sm">group</span> {{ item.member_count }} member{{ item.member_count|pluralize }}</span>
+                  <span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-sm">person</span> By {{ item.segment.created_by.username }}</span>
+                  <span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-sm">schedule</span> {{ item.segment.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <a href="{% url 'custom_admin:segment_detail' item.segment.pk %}"
+                   class="inline-flex items-center gap-1 px-3 py-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium rounded-lg">
+                  <span class="material-symbols-outlined text-sm">visibility</span> View
+                </a>
+                <a href="{% url 'custom_admin:segment_edit' item.segment.pk %}"
+                   class="inline-flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
+                  <span class="material-symbols-outlined text-sm">edit</span> Edit
+                </a>
+                <a href="{% url 'custom_admin:segment_export' item.segment.pk %}"
+                   class="inline-flex items-center gap-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">
+                  <span class="material-symbols-outlined text-sm">download</span> CSV
+                </a>
+                <form method="POST" action="{% url 'custom_admin:segment_delete' item.segment.pk %}" class="inline" onsubmit="return confirm('Delete segment &quot;{{ item.segment.name|escapejs }}&quot;? This cannot be undone.');">
+                  {% csrf_token %}
+                  <button type="submit" class="inline-flex items-center gap-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg">
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="p-12 text-center">
+          <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
+            <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-500">group_work</span>
+          </div>
+          <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">No segments yet</h3>
+          <p class="text-slate-600 dark:text-slate-400 mb-6">Create your first user segment to target specific audiences.</p>
+          <a href="{% url 'custom_admin:segment_create' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg">
+            <span class="material-symbols-outlined">add</span> Create First Segment
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

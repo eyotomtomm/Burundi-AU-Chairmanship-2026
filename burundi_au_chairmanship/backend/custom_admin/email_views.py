@@ -192,6 +192,8 @@ def _campaign_audience_queryset(campaign):
         qs = qs.filter(profile__nationality=campaign.audience_nationality or '')
     elif campaign.audience_type == 'verified':
         qs = qs.filter(profile__is_verified=True)
+    elif campaign.audience_type == 'newsletter':
+        qs = qs.filter(profile__receives_newsletter=True)
     elif campaign.audience_type == 'staff':
         qs = qs.filter(is_staff=True)
     # 'all' → no further filter

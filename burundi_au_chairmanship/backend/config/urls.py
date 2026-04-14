@@ -12,11 +12,12 @@ from graphene_django.views import GraphQLView
 
 def handler500_view(request):
     """Show actual error details for staff users, generic message for others."""
+    from django.utils.html import escape as html_escape
     exc_type, exc_value, exc_tb = sys.exc_info()
     if request.user.is_authenticated and request.user.is_staff:
         tb = traceback.format_exception(exc_type, exc_value, exc_tb)
         return HttpResponse(
-            '<h1>Server Error (500)</h1><pre>' + ''.join(tb) + '</pre>',
+            '<h1>Server Error (500)</h1><pre>' + html_escape(''.join(tb)) + '</pre>',
             status=500,
             content_type='text/html',
         )
@@ -40,8 +41,8 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
-    # GraphQL API
-    path('api/graphql/', csrf_exempt(GraphQLView.as_view(graphiql=True)), name='graphql'),
+    # GraphQL API (graphiql only in DEBUG; auth required via DRF LoginRequiredMiddleware)
+    path('api/graphql/', csrf_exempt(GraphQLView.as_view(graphiql=settings.DEBUG)), name='graphql'),
 ]
 
 if settings.DEBUG:

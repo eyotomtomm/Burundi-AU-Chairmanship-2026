@@ -69,6 +69,7 @@
         <select name="audience_type" id="audience_type" onchange="toggleAudienceFields()"
                 class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white">
           <option value="all" {% if campaign.audience_type == 'all' %}selected{% endif %}>All active users</option>
+          <option value="newsletter" {% if campaign.audience_type == 'newsletter' %}selected{% endif %}>Newsletter subscribers</option>
           <option value="language" {% if campaign.audience_type == 'language' %}selected{% endif %}>By preferred language</option>
           <option value="nationality" {% if campaign.audience_type == 'nationality' %}selected{% endif %}>By nationality (ISO country code)</option>
           <option value="verified" {% if campaign.audience_type == 'verified' %}selected{% endif %}>Verified users only</option>

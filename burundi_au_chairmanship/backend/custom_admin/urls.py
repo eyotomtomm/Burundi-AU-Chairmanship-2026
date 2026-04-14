@@ -191,6 +191,11 @@ urlpatterns = [
     # Email Inbox (IMAP viewer)
     path('email-inbox/', views.email_inbox, name='email_inbox'),
 
+    # Newsletter Editions
+    path('newsletters/', views.newsletter_editions_list, name='newsletter_editions_list'),
+    path('newsletters/<int:pk>/preview/', views.newsletter_edition_preview, name='newsletter_edition_preview'),
+    path('newsletters/send-now/', views.newsletter_send_now, name='newsletter_send_now'),
+
     # Announcement Banners
     path('announcements/', views.announcements_list, name='announcements_list'),
     path('announcements/create/', views.announcement_create, name='announcement_create'),
@@ -280,8 +285,7 @@ urlpatterns = [
     path('reorder/save/', views.reorder_save, name='reorder_save'),
 
     # Scheduled Maintenance Management
-    path('maintenance/management/', views.maintenance_management, name='maintenance_management'),
-    path('maintenance/management/', views.maintenance_management, name='maintenance'),  # alias used by template
+    path('maintenance/management/', views.maintenance_management, name='maintenance'),
     path('maintenance/toggle/', views.maintenance_toggle, name='maintenance_toggle'),
     path('maintenance/schedule/', views.maintenance_schedule, name='maintenance_schedule'),
 

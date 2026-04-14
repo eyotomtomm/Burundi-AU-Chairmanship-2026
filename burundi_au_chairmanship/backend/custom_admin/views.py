@@ -44,6 +44,7 @@ from core.models import (
     DeviceToken,
     AppRelease, AppReleaseHighlight,
     ArticleLike,
+    NewsletterEdition,
 )
 
 # Email-related views live in custom_admin/email_views.py. Re-exported here so
@@ -7569,4 +7570,44 @@ def auto_translate(request):
     except Exception as e:
         return JsonResponse({'error': f'Translation failed: {str(e)}'}, status=500)
 
+
+# ═══════════════════════════════════════════════════════════════
+#  NEWSLETTER EDITIONS (browse past newsletters + manual send)
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def newsletter_editions_list(request):
+    editions = NewsletterEdition.objects.all().order_by('-created_at')
+    paginator = Paginator(editions, 20)
+    page = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'custom_admin/newsletters/list.html', {
+        'editions': page,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def newsletter_edition_preview(request, pk):
+    edition = get_object_or_404(NewsletterEdition, pk=pk)
+    return render(request, 'custom_admin/newsletters/preview.html', {
+        'edition': edition,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def newsletter_send_now(request):
+    """Manually trigger the weekly newsletter (synchronous)."""
+    from core.tasks import send_weekly_newsletter
+    try:
+        sent = send_weekly_newsletter()
+        if sent:
+            messages.success(request, f'Newsletter sent to {sent} subscriber(s).')
+        else:
+            messages.info(request, 'No newsletter sent — either no content this week or no subscribers.')
+    except Exception as e:
+        messages.error(request, f'Newsletter send failed: {e}')
+    return redirect('custom_admin:newsletter_editions_list')
 

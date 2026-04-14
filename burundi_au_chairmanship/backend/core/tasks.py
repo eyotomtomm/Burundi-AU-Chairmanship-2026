@@ -100,7 +100,7 @@ def generate_weekly_report():
     stats = {
         'new_users': User.objects.filter(date_joined__gte=week_ago).count(),
         'new_articles': Article.objects.filter(created_at__gte=week_ago).count(),
-        'upcoming_events': Event.objects.filter(start_date__gte=now).count(),
+        'upcoming_events': Event.objects.filter(event_date__gte=now).count(),
         'total_users': User.objects.filter(is_active=True).count(),
     }
     logger.info(f"Weekly report: {stats}")
@@ -283,19 +283,40 @@ def send_weekly_newsletter():
     except EmailTemplate.DoesNotExist:
         pass  # Use default body_html built above
 
-    # Send emails in batch
+    # Send emails in batch with per-user unsubscribe link
+    from django.core import signing
     from django.core.mail import EmailMessage
     from django.conf import settings as django_settings
 
+    site_url = getattr(django_settings, 'SITE_URL', 'https://api.burundi4africa.com').rstrip('/')
+
+    unsubscribe_footer = (
+        '<hr style="margin:32px 0 16px;border:none;border-top:1px solid #e0e0e0">'
+        '<p style="font-size:12px;color:#888;text-align:center">'
+        'You received this because you subscribed to the Burundi Chairmanship weekly newsletter. '
+        '<a href="{unsub_url}" style="color:#1976d2">Unsubscribe</a></p>'
+    )
+
     sent = 0
     batch_size = 50
+    # Build a subscriber lookup: email -> user.pk
+    subscriber_map = {p.user.email: p.user.pk for p in subscribers if p.user.email}
+
     for i in range(0, len(recipient_emails), batch_size):
         batch = recipient_emails[i:i + batch_size]
         for email_addr in batch:
             try:
+                user_pk = subscriber_map.get(email_addr)
+                if user_pk:
+                    token = signing.dumps(user_pk)
+                    unsub_url = f"{site_url}/api/newsletter/unsubscribe/{token}/"
+                    personalised_html = body_html + unsubscribe_footer.format(unsub_url=unsub_url)
+                else:
+                    personalised_html = body_html
+
                 msg = EmailMessage(
                     subject=subject,
-                    body=body_html,
+                    body=personalised_html,
                     from_email=django_settings.DEFAULT_FROM_EMAIL,
                     to=[email_addr],
                 )

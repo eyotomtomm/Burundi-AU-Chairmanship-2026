@@ -9,6 +9,7 @@ from django.conf import settings as django_settings
 from django.db import models
 from django.db.models import Count, Exists, OuterRef, F, Q
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
@@ -154,6 +155,82 @@ def lookup_ip_geolocation(login_history_id):
             entry.save(update_fields=['country', 'city'])
     except Exception:
         pass  # Non-critical, don't break login flow
+
+
+def _parse_device_from_ua(ua_string):
+    """Extract a human-readable device name from the User-Agent header."""
+    ua = ua_string or ''
+    if not ua:
+        return 'Unknown Device', 'unknown'
+
+    device_type = 'unknown'
+    device_name = 'Unknown Device'
+
+    ua_lower = ua.lower()
+    if 'iphone' in ua_lower:
+        device_type = 'ios'
+        device_name = 'iPhone'
+    elif 'ipad' in ua_lower:
+        device_type = 'ios'
+        device_name = 'iPad'
+    elif 'android' in ua_lower:
+        device_type = 'android'
+        device_name = 'Android Device'
+    elif 'macintosh' in ua_lower or 'mac os' in ua_lower:
+        device_type = 'web'
+        device_name = 'Mac'
+    elif 'windows' in ua_lower:
+        device_type = 'web'
+        device_name = 'Windows PC'
+    elif 'linux' in ua_lower:
+        device_type = 'web'
+        device_name = 'Linux'
+
+    return device_name, device_type
+
+
+def _create_active_session(user, request, session_key=None):
+    """Create or update an ActiveSession record for a successful login.
+
+    Args:
+        user: The authenticated Django user
+        request: The DRF request object (for IP, User-Agent, optional body fields)
+        session_key: Optional unique key (e.g. JWT jti). Falls back to uuid4.
+    """
+    import uuid
+
+    ip = get_client_ip(request)
+    ua = request.META.get('HTTP_USER_AGENT', '')
+
+    # Prefer explicit device info from request body, fall back to UA parsing
+    body_device_name = request.data.get('device_name', '').strip()[:200]
+    body_device_type = request.data.get('device_type', '').strip()[:50]
+    body_app_version = request.data.get('app_version', '').strip()[:20]
+
+    parsed_name, parsed_type = _parse_device_from_ua(ua)
+    device_name = body_device_name or parsed_name
+    device_type = body_device_type or parsed_type
+    app_version = body_app_version
+
+    if not session_key:
+        session_key = str(uuid.uuid4())
+
+    # Mark all existing sessions for this user as not current
+    ActiveSession.objects.filter(user=user, is_current=True).update(is_current=False)
+
+    # Create new session (or update if session_key already exists)
+    session, _ = ActiveSession.objects.update_or_create(
+        session_key=session_key,
+        defaults={
+            'user': user,
+            'device_name': device_name,
+            'device_type': device_type,
+            'ip_address': ip if ip else None,
+            'app_version': app_version,
+            'is_current': True,
+        },
+    )
+    return session
 
 
 # ── reCAPTCHA Verification ────────────────────────────────
@@ -319,6 +396,9 @@ def login(request):
         )
         threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
 
+        # Create active session
+        _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')))
+
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
             'access': str(refresh.access_token),
@@ -341,6 +421,9 @@ def login(request):
         success=True,
     )
     threading.Thread(target=lookup_ip_geolocation, args=(lh.id,), daemon=True).start()
+
+    # Create active session
+    _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')))
 
     return Response({
         'user': UserSerializer(user, context={'request': request}).data,
@@ -742,6 +825,29 @@ def firebase_login(request):
         # Update email verification status from Firebase
         profile.is_email_verified = decoded_token.get('email_verified', False)
         profile.save()
+
+        # Record login history
+        ip = get_client_ip(request)
+        ua = request.META.get('HTTP_USER_AGENT', '')
+        method = 'firebase'
+        sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
+        if 'google' in sign_in_provider:
+            method = 'google'
+        elif 'apple' in sign_in_provider:
+            method = 'apple'
+        elif 'password' in sign_in_provider:
+            method = 'email'
+        LoginHistory.objects.create(
+            user=user,
+            email=email,
+            method=method,
+            ip_address=ip,
+            user_agent=ua,
+            success=True,
+        )
+
+        # Create active session (use firebase_uid as session key for consistency)
+        _create_active_session(user, request, session_key=firebase_uid)
 
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
@@ -1403,6 +1509,12 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         uid = f"event-{event.id}@burundi4africa.com"
         dtstamp = timezone.now().strftime('%Y%m%dT%H%M%SZ')
 
+        def ics_escape(text):
+            """Escape text for ICS format — prevent injection of extra fields."""
+            if not text:
+                return ''
+            return text.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '').replace(';', '\\;').replace(',', '\\,')
+
         ics_content = (
             "BEGIN:VCALENDAR\r\n"
             "VERSION:2.0\r\n"
@@ -1414,9 +1526,9 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
             f"DTSTART:{dtstart}\r\n"
             f"DTEND:{dtend}\r\n"
             f"DTSTAMP:{dtstamp}\r\n"
-            f"SUMMARY:{event.name}\r\n"
-            f"DESCRIPTION:{event.description[:500]}\r\n"
-            f"LOCATION:{event.address}\r\n"
+            f"SUMMARY:{ics_escape(event.name)}\r\n"
+            f"DESCRIPTION:{ics_escape(event.description[:500])}\r\n"
+            f"LOCATION:{ics_escape(event.address)}\r\n"
             "STATUS:CONFIRMED\r\n"
             "END:VEVENT\r\n"
             "END:VCALENDAR\r\n"
@@ -1755,10 +1867,10 @@ def app_settings(request):
 @permission_classes([AllowAny])
 def health_check(request):
     """
-    Enhanced health check endpoint for load balancers and monitoring.
+    Health check endpoint for load balancers and monitoring.
 
-    Returns 200 OK with detailed component statuses including database,
-    cache, storage, and optional memory information.
+    Returns 200 OK with basic status for anonymous users.
+    Returns detailed component statuses (DB, cache, disk, memory) only for staff.
     """
     import time
     import os
@@ -1831,11 +1943,18 @@ def health_check(request):
 
     response_status = status.HTTP_200_OK if overall_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
 
+    # Only expose detailed checks to authenticated staff users
+    if request.user.is_authenticated and request.user.is_staff:
+        return Response({
+            'status': 'healthy' if overall_healthy else 'degraded',
+            'version': '1.0.0',
+            'timestamp': timezone.now().isoformat(),
+            'checks': checks,
+        }, status=response_status)
+
+    # Anonymous / non-staff get minimal response (for load balancers)
     return Response({
         'status': 'healthy' if overall_healthy else 'degraded',
-        'version': '1.0.0',
-        'timestamp': timezone.now().isoformat(),
-        'checks': checks,
     }, status=response_status)
 
 
@@ -3734,12 +3853,12 @@ def unlink_account(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def merge_accounts(request):
     """Merge another user's data into the current user's account.
 
-    Moves all linked accounts, bookmarks, reactions, comments, etc.
-    from the source account to the current user, then deactivates the source.
+    Admin-only: Moves all linked accounts, bookmarks, reactions, comments, etc.
+    from the source account to the target user, then deactivates the source.
 
     Expects: source_user_id (the account to absorb)
     """
@@ -3944,7 +4063,6 @@ def profile_completion(request):
         'nationality': bool(profile and profile.nationality),
         'gender': bool(profile and profile.gender),
         'date_of_birth': bool(profile and profile.date_of_birth),
-        'bio': bool(profile and hasattr(profile, 'bio') and profile.bio),
         'phone': bool(profile and profile.phone_number),
         'verified': bool(profile and profile.is_verified),
     }
@@ -3997,6 +4115,7 @@ def whats_new(request):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def event_comments(request, event_id):
     """Get or post comments on an event. Supports nested replies (1 level deep) and @mentions."""
     import re
@@ -4029,8 +4148,9 @@ def event_comments(request, event_id):
         if parent.parent is not None:
             parent = parent.parent
 
+    from django.utils.html import escape
     comment = EventComment.objects.create(
-        event=event, user=request.user, parent=parent, content=content,
+        event=event, user=request.user, parent=parent, content=escape(content),
     )
 
     # Parse @mentions (privacy-safe — username is stored as email in DB)
@@ -4066,11 +4186,13 @@ def event_comment_delete(request, event_id, comment_id):
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def event_attendees(request, event_id):
     """List attendees for event networking (name, badge, nationality only - no email/phone)."""
-    get_object_or_404(Event, pk=event_id)
+    event = get_object_or_404(Event, pk=event_id)
     submissions = EventSubmission.objects.filter(
-        status__in=['pending', 'approved']
+        registration__event=event,
+        status__in=['pending', 'approved'],
     )
     attendee_users = User.objects.filter(
         id__in=submissions.values_list('user_id', flat=True)
@@ -4091,6 +4213,33 @@ def toggle_newsletter(request):
     return Response({'receives_newsletter': profile.receives_newsletter})
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def newsletter_unsubscribe(request, token):
+    """Token-based unsubscribe that works without login."""
+    from django.core import signing
+    from django.http import HttpResponse as DjangoHttpResponse
+    try:
+        user_pk = signing.loads(token, max_age=86400 * 90)  # 90-day expiry
+    except signing.BadSignature:
+        return DjangoHttpResponse(
+            render_to_string('legal/unsubscribe.html', {'error': True}),
+            content_type='text/html',
+        )
+
+    try:
+        user = User.objects.get(pk=user_pk, is_active=True)
+        user.profile.receives_newsletter = False
+        user.profile.save(update_fields=['receives_newsletter'])
+    except User.DoesNotExist:
+        pass  # User deleted — no-op, still show success page
+
+    return DjangoHttpResponse(
+        render_to_string('legal/unsubscribe.html', {'error': False}),
+        content_type='text/html',
+    )
+
+
 # ══════════════════════════════════════════════════════════════
 # Weekly Report Generation
 # ══════════════════════════════════════════════════════════════
@@ -4104,14 +4253,33 @@ def generate_weekly_report(request):
     now = timezone.now()
     week_start = now - timedelta(days=7)
 
+    from django.db.models import Sum
+
+    new_users_count = User.objects.filter(date_joined__gte=week_start).count()
+    active_users_count = UserSession.objects.filter(created_at__gte=week_start).values('user').distinct().count()
+    views_agg = ContentAnalytics.objects.filter(date__gte=week_start.date()).aggregate(total=Sum('views'))
+    total_views = views_agg['total'] or 0
+    eng_agg = ContentAnalytics.objects.filter(date__gte=week_start.date()).aggregate(
+        likes=Sum('likes'), shares=Sum('shares'), comments=Sum('comments')
+    )
+    total_engagements = (eng_agg['likes'] or 0) + (eng_agg['shares'] or 0) + (eng_agg['comments'] or 0)
+
+    report_data = {
+        'new_users': new_users_count,
+        'active_users': active_users_count,
+        'total_views': total_views,
+        'total_engagements': total_engagements,
+    }
+
     report = WeeklyReport.objects.create(
         week_start=week_start,
         week_end=now,
-        new_users=User.objects.filter(date_joined__gte=week_start).count(),
-        active_users=UserSession.objects.filter(last_activity__gte=week_start).values('user').distinct().count(),
-        total_views=ContentAnalytics.objects.filter(date__gte=week_start.date()).aggregate(total=models.Sum('views'))['total'] or 0,
-        total_engagements=ContentAnalytics.objects.filter(date__gte=week_start.date()).aggregate(total=models.Sum('likes') + models.Sum('shares') + models.Sum('comments'))['total'] or 0,
+        new_users=new_users_count,
+        active_users=active_users_count,
+        total_views=total_views,
+        total_engagements=total_engagements,
         top_content={},
+        report_data=report_data,
     )
     return Response(WeeklyReportSerializer(report).data, status=201)
 
@@ -4142,6 +4310,7 @@ class EventAgendaItemViewSet(viewsets.ReadOnlyModelViewSet):
 def article_share_card(request, pk):
     """Return an HTML page with Open Graph meta tags for article sharing."""
     from django.http import HttpResponse
+    from django.utils.html import escape as esc
     import re
 
     article = get_object_or_404(Article, pk=pk)
@@ -4159,26 +4328,32 @@ def article_share_card(request, pk):
 
     share_url = f'https://burundi4africa.com/articles/{article.pk}/share/'
 
+    # Escape all user-controlled values to prevent XSS
+    safe_title = esc(article.title)
+    safe_desc = esc(description)
+    safe_image = esc(image_url)
+    safe_share = esc(share_url)
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{article.title}</title>
+    <title>{safe_title}</title>
 
     <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="{article.title}" />
-    <meta property="og:description" content="{description}" />
-    <meta property="og:image" content="{image_url}" />
-    <meta property="og:url" content="{share_url}" />
+    <meta property="og:title" content="{safe_title}" />
+    <meta property="og:description" content="{safe_desc}" />
+    <meta property="og:image" content="{safe_image}" />
+    <meta property="og:url" content="{safe_share}" />
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="Burundi Chairmanship" />
 
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="{article.title}" />
-    <meta name="twitter:description" content="{description}" />
-    <meta name="twitter:image" content="{image_url}" />
+    <meta name="twitter:title" content="{safe_title}" />
+    <meta name="twitter:description" content="{safe_desc}" />
+    <meta name="twitter:image" content="{safe_image}" />
 
     <style>
         body {{

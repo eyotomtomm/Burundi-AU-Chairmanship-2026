@@ -1,0 +1,161 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Segment - Burundi Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-4xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8">
+      <a href="{% url 'custom_admin:segment_list' %}" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 mb-4">
+        <span class="material-symbols-outlined text-sm">arrow_back</span> Back to Segments
+      </a>
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-4xl text-purple-600 dark:text-purple-400">group_work</span>
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white">{{ action }} Segment</h1>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
+      <form method="POST">
+        {% csrf_token %}
+
+        <!-- Name -->
+        <div class="mb-6">
+          <label for="name" class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Segment Name *</label>
+          <input type="text" id="name" name="name" required
+                 value="{{ segment.name|default:'' }}"
+                 class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                 placeholder="e.g., Gold badge holders in Bujumbura">
+        </div>
+
+        <!-- Description -->
+        <div class="mb-6">
+          <label for="description" class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Description</label>
+          <textarea id="description" name="description" rows="3"
+                    class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Describe the purpose of this segment...">{{ segment.description|default:'' }}</textarea>
+        </div>
+
+        <!-- Dynamic toggle -->
+        <div class="mb-6">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="is_dynamic" id="is_dynamic"
+                   {% if segment.is_dynamic %}checked{% endif %}
+                   class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500">
+            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Dynamic segment</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">(Automatically updates based on filter criteria)</span>
+          </label>
+        </div>
+
+        <!-- Dynamic filters section -->
+        <div id="dynamic-filters" class="mb-6 p-6 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 {% if not segment.is_dynamic %}hidden{% endif %}">
+          <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-4">Filter Criteria</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Gender -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Gender</label>
+              <select name="filter_gender" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm">
+                <option value="">Any</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <!-- Badge type -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Badge Type</label>
+              <select name="filter_badge" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm">
+                <option value="">Any</option>
+                <option value="gold">Gold</option>
+                <option value="blue">Blue</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+
+            <!-- Nationality -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Nationality</label>
+              <select name="filter_nationality" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm">
+                <option value="">Any</option>
+                {% for code, name in nationality_choices %}
+                <option value="{{ code }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Language preference -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Preferred Language</label>
+              <select name="filter_language" class="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm">
+                <option value="">Any</option>
+                <option value="en">English</option>
+                <option value="fr">French</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Preview count -->
+          <div class="mt-4 flex items-center gap-3">
+            <button type="button" id="preview-btn"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm font-medium rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors">
+              <span class="material-symbols-outlined text-sm">preview</span> Preview Count
+            </button>
+            <span id="preview-result" class="text-sm text-slate-600 dark:text-slate-400"></span>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex items-center gap-3">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+            <span class="material-symbols-outlined">save</span>
+            {{ action }} Segment
+          </button>
+          <a href="{% url 'custom_admin:segment_list' %}"
+             class="inline-flex items-center gap-2 px-6 py-3 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('is_dynamic').addEventListener('change', function() {
+  document.getElementById('dynamic-filters').classList.toggle('hidden', !this.checked);
+});
+
+document.getElementById('preview-btn')?.addEventListener('click', function() {
+  const form = this.closest('form');
+  const data = {
+    gender: form.querySelector('[name=filter_gender]').value,
+    badge_type: form.querySelector('[name=filter_badge]').value,
+    nationality: form.querySelector('[name=filter_nationality]').value,
+    language: form.querySelector('[name=filter_language]').value,
+  };
+  // Remove empty keys
+  Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
+
+  const resultEl = document.getElementById('preview-result');
+  resultEl.textContent = 'Calculating...';
+
+  fetch("{% url 'custom_admin:segment_preview' %}", {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value,
+    },
+    body: JSON.stringify(data),
+  })
+  .then(r => r.json())
+  .then(d => { resultEl.textContent = d.count + ' user(s) match'; })
+  .catch(() => { resultEl.textContent = 'Error previewing'; });
+});
+</script>
+{% endblock %}

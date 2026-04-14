@@ -1,0 +1,146 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Translation Queue - Burundi Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="material-symbols-outlined text-4xl text-indigo-600 dark:text-indigo-400">translate</span>
+        <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Translation Queue</h1>
+      </div>
+      <p class="text-slate-600 dark:text-slate-400">Manage content translations between English and French.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-4 text-center">
+        <div class="text-2xl font-bold text-slate-900 dark:text-white">{{ total }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Total</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-4 text-center">
+        <div class="text-2xl font-bold text-amber-600 dark:text-amber-400">{{ pending }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Pending</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-4 text-center">
+        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ in_progress }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">In Progress</div>
+      </div>
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-4 text-center">
+        <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ completed }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Completed</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-6 flex flex-wrap gap-2">
+      <a href="{% url 'custom_admin:translation_queue_list' %}"
+         class="px-4 py-2 rounded-lg text-sm font-medium border {% if current_filter == 'all' %}bg-indigo-600 text-white border-indigo-600{% else %}bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+        All
+      </a>
+      <a href="?status=pending"
+         class="px-4 py-2 rounded-lg text-sm font-medium border {% if current_filter == 'pending' %}bg-amber-600 text-white border-amber-600{% else %}bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+        Pending
+      </a>
+      <a href="?status=in_progress"
+         class="px-4 py-2 rounded-lg text-sm font-medium border {% if current_filter == 'in_progress' %}bg-blue-600 text-white border-blue-600{% else %}bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+        In Progress
+      </a>
+      <a href="?status=completed"
+         class="px-4 py-2 rounded-lg text-sm font-medium border {% if current_filter == 'completed' %}bg-emerald-600 text-white border-emerald-600{% else %}bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700{% endif %}">
+        Completed
+      </a>
+    </div>
+
+    <!-- Queue list -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      {% if items %}
+        <div class="divide-y divide-slate-200 dark:divide-slate-700">
+          {% for item in items %}
+          <div class="p-6 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-1">
+                  <h3 class="text-lg font-semibold text-slate-900 dark:text-white truncate">#{{ item.pk }} — {{ item.content_type|default:"Content" }}</h3>
+                  {% if item.status == 'pending' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-full">Pending</span>
+                  {% elif item.status == 'in_progress' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">In Progress</span>
+                  {% elif item.status == 'completed' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium rounded-full">
+                      <span class="material-symbols-outlined text-sm">check_circle</span> Completed
+                    </span>
+                  {% endif %}
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  {% if item.assigned_to %}
+                  <span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-sm">person</span> {{ item.assigned_to.username }}</span>
+                  {% else %}
+                  <span class="inline-flex items-center gap-1 text-amber-600"><span class="material-symbols-outlined text-sm">person_off</span> Unassigned</span>
+                  {% endif %}
+                  <span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-sm">schedule</span> {{ item.created_at|date:"M d, Y H:i" }}</span>
+                  {% if item.completed_at %}
+                  <span class="inline-flex items-center gap-1 text-emerald-600"><span class="material-symbols-outlined text-sm">check</span> Completed {{ item.completed_at|date:"M d, Y H:i" }}</span>
+                  {% endif %}
+                </div>
+                {% if item.notes %}
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ item.notes|truncatechars:200 }}</p>
+                {% endif %}
+              </div>
+              <div class="flex-shrink-0">
+                <form method="POST" action="{% url 'custom_admin:translation_queue_update' item.pk %}" class="flex items-center gap-2">
+                  {% csrf_token %}
+                  <select name="status" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm">
+                    <option value="pending" {% if item.status == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="in_progress" {% if item.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                    <option value="completed" {% if item.status == 'completed' %}selected{% endif %}>Completed</option>
+                  </select>
+                  <select name="assigned_to" class="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm">
+                    <option value="">Unassigned</option>
+                    {% for staff in staff_users %}
+                    <option value="{{ staff.pk }}" {% if item.assigned_to_id == staff.pk %}selected{% endif %}>{{ staff.username }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit"
+                          class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg">
+                    <span class="material-symbols-outlined text-sm">save</span> Update
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if items.has_other_pages %}
+        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-750 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <div class="text-sm text-slate-600 dark:text-slate-400">
+            Page {{ items.number }} of {{ items.paginator.num_pages }}
+          </div>
+          <div class="flex items-center gap-2">
+            {% if items.has_previous %}
+              <a href="?{% if current_filter != 'all' %}status={{ current_filter }}&{% endif %}page={{ items.previous_page_number }}" class="px-3 py-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-600">&lsaquo;</a>
+            {% endif %}
+            <span class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg">{{ items.number }}</span>
+            {% if items.has_next %}
+              <a href="?{% if current_filter != 'all' %}status={{ current_filter }}&{% endif %}page={{ items.next_page_number }}" class="px-3 py-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-300 dark:border-slate-600">&rsaquo;</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="p-12 text-center">
+          <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
+            <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-500">translate</span>
+          </div>
+          <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">No translation requests</h3>
+          <p class="text-slate-600 dark:text-slate-400">The translation queue is empty.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -73,6 +73,7 @@ ADMIN_MENU_GROUPS = [
         ('email_campaigns_list',      'Email Campaigns',        'send'),
         ('email_logs_list',           'Email Logs',             'list_alt'),
         ('email_inbox',               'Email Inbox',            'inbox'),
+        ('newsletter_editions_list',  'Newsletters',            'newspaper'),
     ]),
     ('Directory & Locations', [
         ('contact_directory_list',    'Contact Directory',      'contacts'),
@@ -234,6 +235,8 @@ def get_required_section(url_name):
         return 'email_logs_list'
     if url_name.startswith('email_inbox') or url_name == 'email_inbox':
         return 'email_inbox'
+    if url_name.startswith('newsletter'):
+        return 'newsletter_editions_list'
     if url_name.startswith('email_'):
         return 'email_templates_list'
 

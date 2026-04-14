@@ -33,7 +33,7 @@ class MoreTab extends StatefulWidget {
   State<MoreTab> createState() => _MoreTabState();
 }
 
-class _MoreTabState extends State<MoreTab> {
+class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   final GlobalKey _shareMenuKey = GlobalKey();
 
   // Feature toggles (loaded from SharedPreferences, set by admin via API)
@@ -45,7 +45,23 @@ class _MoreTabState extends State<MoreTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadFeatureFlags();
+    // Also fetch flags directly from API to ensure fresh values
+    _fetchFeatureFlagsFromApi();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadFeatureFlags();
+    }
   }
 
   Future<void> _loadFeatureFlags() async {
@@ -57,6 +73,25 @@ class _MoreTabState extends State<MoreTab> {
           _discussionsEnabled = prefs.getBool('feature_discussions_enabled') ?? true;
           _pollsEnabled = prefs.getBool('feature_polls_enabled') ?? true;
           _newsletterEnabled = prefs.getBool('feature_newsletter_enabled') ?? true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchFeatureFlagsFromApi() async {
+    try {
+      final settings = await ApiService().getSettings();
+      if (settings != null && mounted) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('feature_bookmarks_enabled', settings.bookmarksEnabled);
+        await prefs.setBool('feature_discussions_enabled', settings.discussionsEnabled);
+        await prefs.setBool('feature_polls_enabled', settings.pollsEnabled);
+        await prefs.setBool('feature_newsletter_enabled', settings.newsletterEnabled);
+        setState(() {
+          _bookmarksEnabled = settings.bookmarksEnabled;
+          _discussionsEnabled = settings.discussionsEnabled;
+          _pollsEnabled = settings.pollsEnabled;
+          _newsletterEnabled = settings.newsletterEnabled;
         });
       }
     } catch (_) {}
@@ -91,7 +126,7 @@ class _MoreTabState extends State<MoreTab> {
         child: RefreshIndicator(
           onRefresh: () async {
             HapticFeedback.mediumImpact();
-            await _loadFeatureFlags();
+            await _fetchFeatureFlagsFromApi();
             if (mounted) setState(() {});
           },
           color: AppColors.burundiGreen,

@@ -67,12 +67,15 @@
                         <span class="material-symbols-outlined text-sm">edit</span>
                         Edit
                     </a>
-                    <a href="{% url 'custom_admin:feature_card_delete' card.pk %}"
-                       onclick="return confirm('Are you sure you want to delete this feature card?');"
-                       class="bg-error-container text-white font-headline font-bold rounded-lg py-2 px-4 hover:bg-error transition-all flex items-center justify-center gap-2">
-                        <span class="material-symbols-outlined text-sm">delete</span>
-                        Delete
-                    </a>
+                    <form method="post" action="{% url 'custom_admin:feature_card_delete' card.pk %}" class="inline"
+                          onsubmit="return confirm('Are you sure you want to delete this feature card?');">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="bg-error-container text-white font-headline font-bold rounded-lg py-2 px-4 hover:bg-error transition-all flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined text-sm">delete</span>
+                            Delete
+                        </button>
+                    </form>
                 </div>
             </div>
             {% empty %}

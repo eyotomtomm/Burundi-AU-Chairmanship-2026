@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,8 +10,11 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/api_service.dart';
+import '../../../widgets/login_gate.dart';
 import '../../../widgets/shimmer_loading.dart';
+import '../../../widgets/liked_by_avatars.dart';
 import '../../magazine/pdf_viewer_screen.dart';
+import '../../news/article_detail_screen.dart';
 
 class MagazineTab extends StatefulWidget {
   const MagazineTab({super.key});
@@ -45,7 +47,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) setState(() {});
     });
-    _magazinePageController = PageController(viewportFraction: 0.85);
+    _magazinePageController = PageController();
     _loadData();
   }
 
@@ -98,10 +100,17 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     try {
       final result = await ApiService().toggleMagazineLike(edition.id);
       if (mounted) {
+        List<Liker> likers = [];
+        if (result['recent_likers'] is List) {
+          likers = (result['recent_likers'] as List)
+              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+              .toList();
+        }
         setState(() {
           _editions![index] = edition.copyWith(
             isLiked: result['is_liked'],
             likeCount: result['like_count'],
+            recentLikers: likers,
           );
         });
       }
@@ -461,88 +470,97 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
         ),
       );
     }
-    return Column(
+
+    // Separate featured from rest
+    final featured = filtered.where((e) => e.isFeatured).toList();
+    final rest = filtered.where((e) => !e.isFeatured).toList();
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
+    // Total pages for 2-per-view carousel (guests see only 1 page)
+    final pageCount = isAuth
+        ? (rest.length / 2).ceil()
+        : (rest.isEmpty ? 0 : 1);
+
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 100),
       children: [
-        Expanded(
-          child: AnimatedBuilder(
-            animation: _magazinePageController,
-            builder: (context, child) {
-              return PageView.builder(
-                controller: _magazinePageController,
-                onPageChanged: (index) {
-                  setState(() => _currentMagazinePage = index);
-                },
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  double value = 0.0;
-                  if (_magazinePageController.position.haveDimensions) {
-                    value = ((_magazinePageController.page ?? 0) - index);
-                    value = (value * 0.8).clamp(-1.0, 1.0);
-                  }
+        // Featured Hero Section
+        if (featured.isNotEmpty)
+          _buildFeaturedHero(context, featured.first, langCode, isDark),
 
-                  final angle = value * math.pi / 2;
-                  final mag = filtered[index];
-
-                  // Hide pages that have fully rotated away
-                  if (angle.abs() >= math.pi / 2) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return Center(
-                    child: Transform(
-                      alignment: value >= 0
-                          ? Alignment.centerLeft
-                          : Alignment.centerRight,
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.001)
-                        ..rotateY(angle),
-                      child: _buildMagazineFlipCard(context, mag, langCode, isDark),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        // Page indicator dots
-        if (filtered.length > 1)
-          Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(filtered.length, (index) {
-                final isActive = index == _currentMagazinePage;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: isActive ? 24 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.burundiGreen
-                        : AppColors.burundiGreen.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(4),
+        // 2-per-view carousel
+        if (rest.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 310,
+            child: PageView.builder(
+              controller: _magazinePageController,
+              onPageChanged: (index) {
+                setState(() => _currentMagazinePage = index);
+              },
+              itemCount: pageCount,
+              itemBuilder: (context, pageIndex) {
+                final startIdx = pageIndex * 2;
+                final endIdx = (startIdx + 2).clamp(0, rest.length);
+                final pageMags = rest.sublist(startIdx, endIdx);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: pageMags.map((mag) {
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: _buildMagazineCard(context, mag, langCode, isDark),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 );
-              }),
+              },
             ),
           ),
+          // Page indicator dots
+          if (pageCount > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(pageCount, (index) {
+                  final isActive = index == _currentMagazinePage;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: isActive ? 24 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? AppColors.burundiGreen
+                          : AppColors.burundiGreen.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
+        // Login gate banner for guests — replaces any remaining magazine content.
+        if (!isAuth) const LoginGateBanner(),
       ],
     );
   }
 
-  Widget _buildMagazineFlipCard(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
+  Widget _buildFeaturedHero(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
     return GestureDetector(
       onTap: () => _openPdf(context, magazine),
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        height: 220,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.18),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -551,187 +569,81 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Full cover image
               CachedNetworkImage(
                 imageUrl: magazine.coverImageUrl,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.burundiGreen,
-                        AppColors.burundiGreen.withValues(alpha: 0.7),
-                      ],
-                    ),
-                  ),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
+                  color: AppColors.burundiGreen.withValues(alpha: 0.2),
+                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
                 ),
                 errorWidget: (_, _, _) => Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.burundiGreen,
-                        AppColors.burundiGreen.withValues(alpha: 0.7),
-                      ],
+                      colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
                     ),
                   ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.auto_stories, size: 56, color: Colors.white54),
-                      SizedBox(height: 8),
-                      Text('Magazine', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  child: const Center(child: Icon(Icons.auto_stories, size: 48, color: Colors.white54)),
+                ),
+              ),
+              // Dark gradient overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.3),
+                      Colors.black.withValues(alpha: 0.8),
                     ],
+                    stops: const [0.2, 0.5, 1.0],
                   ),
                 ),
               ),
-
-              // Dark gradient overlay at bottom for text readability
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 180,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.4),
-                        Colors.black.withValues(alpha: 0.85),
-                      ],
-                      stops: const [0.0, 0.4, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-
               // Featured badge
-              if (magazine.isFeatured)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.auGold,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      'FEATURED',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Info button (top-right)
               Positioned(
-                top: 16,
-                right: 16,
-                child: GestureDetector(
-                  onTap: () => _showMagInfo(context, magazine, langCode),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.info_outline, size: 18, color: AppColors.burundiGreen),
+                top: 14,
+                left: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.auGold,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'FEATURED',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1),
                   ),
                 ),
               ),
-
-              // PDF badge
-              if (magazine.hasPdf)
-                Positioned(
-                  top: 16,
-                  left: magazine.isFeatured ? 110 : 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.burundiRed,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.picture_as_pdf, size: 13, color: Colors.white),
-                        SizedBox(width: 4),
-                        Text('PDF', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Bottom content overlay
+              // Bottom content
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title
                       Text(
                         magazine.getTitle(langCode),
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'HeatherGreen',
-                          height: 1.2,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black45,
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                          color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold,
+                          fontFamily: 'HeatherGreen', height: 1.2,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2, overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
-                      // Issue date
+                      const SizedBox(height: 4),
                       Text(
                         DateFormat('MMMM yyyy').format(magazine.publishDate),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.85),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
                       ),
-                      const SizedBox(height: 12),
-                      // Stats row
+                      const SizedBox(height: 10),
                       Row(
                         children: [
                           _flipCardStat(Icons.visibility, '${magazine.viewCount}'),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           GestureDetector(
                             onTap: () => _toggleLike(magazine),
                             child: _flipCardStat(
@@ -740,12 +652,13 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                               iconColor: magazine.isLiked ? Colors.red : null,
                             ),
                           ),
-                          if (magazine.pageCount > 0) ...[
-                            const SizedBox(width: 14),
-                            _flipCardStat(Icons.description, '${magazine.pageCount} pages'),
-                          ],
+                          const SizedBox(width: 8),
+                          LikedByAvatars(
+                            likers: magazine.recentLikers,
+                            totalLikes: magazine.likeCount,
+                            avatarRadius: 10,
+                          ),
                           const Spacer(),
-                          // Read button
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                             decoration: BoxDecoration(
@@ -758,12 +671,8 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                                 const Icon(Icons.menu_book, size: 14, color: Colors.white),
                                 const SizedBox(width: 6),
                                 Text(
-                                  langCode == 'fr' ? 'Lire' : 'Read',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  langCode == 'fr' ? 'Lire' : 'Read Now',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
@@ -776,6 +685,129 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMagazineCard(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
+    return GestureDetector(
+      onTap: () => _openPdf(context, magazine),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cover image
+            Expanded(
+              flex: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: CachedNetworkImage(
+                      imageUrl: magazine.coverImageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, _) => Container(
+                        color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                      errorWidget: (_, _, _) => Container(
+                        color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                        child: const Center(child: Icon(Icons.auto_stories, size: 36, color: AppColors.burundiGreen)),
+                      ),
+                    ),
+                  ),
+                  // Info button
+                  Positioned(
+                    top: 6, right: 6,
+                    child: GestureDetector(
+                      onTap: () => _showMagInfo(context, magazine, langCode),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.info_outline, size: 14, color: AppColors.burundiGreen),
+                      ),
+                    ),
+                  ),
+                  if (magazine.hasPdf)
+                    Positioned(
+                      bottom: 6, left: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.burundiRed,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('PDF', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Title and stats
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      magazine.getTitle(langCode),
+                      style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkText : AppColors.lightText,
+                      ),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('MMM yyyy').format(magazine.publishDate),
+                      style: TextStyle(fontSize: 10, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => _toggleLike(magazine),
+                          child: Icon(
+                            magazine.isLiked ? Icons.favorite : Icons.favorite_border,
+                            size: 14, color: magazine.isLiked ? Colors.red : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Text('${magazine.likeCount}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: LikedByAvatars(
+                            likers: magazine.recentLikers,
+                            totalLikes: magazine.likeCount,
+                            avatarRadius: 8,
+                            overlap: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -980,6 +1012,100 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
         ),
       );
     }
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
+
+    Widget buildArticleTile(Article article) {
+      final catColor = article.category?.parsedColor ?? AppColors.info;
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => ArticleDetailScreen(article: article),
+            ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Image / category color
+              Container(
+                width: 100,
+                height: 110,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [catColor, catColor.withValues(alpha: 0.6)]),
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+                ),
+                child: Center(
+                  child: Icon(Icons.article, color: Colors.white.withValues(alpha: 0.6), size: 32),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: catColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              article.category?.getDisplayName(langCode) ?? '',
+                              style: TextStyle(color: catColor, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            DateFormat('d/M/yyyy').format(article.publishDate),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        article.getTitle(langCode),
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        article.getContent(langCode),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
         HapticFeedback.mediumImpact();
@@ -988,88 +1114,35 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
       },
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        itemCount: filtered.length,
+        itemCount: LoginGate.itemCountFor(
+          actualCount: filtered.length,
+          isAuthenticated: isAuth,
+        ),
         itemBuilder: (context, index) {
-          final article = filtered[index];
-          final catColor = article.category?.parsedColor ?? AppColors.info;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Image / category color
-                Container(
-                  width: 100,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [catColor, catColor.withValues(alpha: 0.6)]),
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.article, color: Colors.white.withValues(alpha: 0.6), size: 32),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: catColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                article.category?.getDisplayName(langCode) ?? '',
-                                style: TextStyle(color: catColor, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              DateFormat('d/M/yyyy').format(article.publishDate),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          article.getTitle(langCode),
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          article.getContent(langCode),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          final slot = LoginGate.slotFor(
+            index: index,
+            actualCount: filtered.length,
+            isAuthenticated: isAuth,
           );
+          switch (slot) {
+            case LoginGateSlot.free:
+              return buildArticleTile(filtered[index]);
+            case LoginGateSlot.banner:
+              return const LoginGateBanner(
+                margin: EdgeInsets.only(bottom: 12),
+              );
+            case LoginGateSlot.blurred:
+              final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+              if (dataIndex == null || dataIndex >= filtered.length) {
+                return const SizedBox.shrink();
+              }
+              return LockedContentWrap(
+                locked: true,
+                child: buildArticleTile(filtered[dataIndex]),
+              );
+            case LoginGateSlot.hidden:
+              return const SizedBox.shrink();
+          }
         },
       ),
     );

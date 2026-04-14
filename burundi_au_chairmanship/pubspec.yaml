@@ -1,7 +1,7 @@
 name: burundi_au_chairmanship
-description: Burundi AU Chairmanship Official App - Digital Magazine, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
+description: Burundi Chairmanship Official App - Digital Magazine, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
 publish_to: 'none'
-version: 1.0.0+11
+version: 1.1.0+12
 
 environment:
   sdk: ^3.10.8
@@ -81,6 +81,7 @@ dependencies:
 
   # Error Tracking & Performance Monitoring
   sentry_flutter: ^8.3.0
+  image_cropper: ^12.2.0
 
 dev_dependencies:
   flutter_test:

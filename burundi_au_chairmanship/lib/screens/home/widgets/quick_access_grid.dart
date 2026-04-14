@@ -41,9 +41,14 @@ class QuickAccessGrid extends StatelessWidget {
         final badgeText = item['badgeText'] as String? ?? '';
         final badgeColorHex = item['badgeColor'] as String? ?? '';
 
+        final isLocked = item['locked'] == true;
+        final itemColor = isLocked ? Colors.grey : AppColors.burundiGreen;
+
         return GestureDetector(
           onTap: item['onTap'] as VoidCallback,
-          child: SizedBox(
+          child: Opacity(
+            opacity: isLocked ? 0.55 : 1.0,
+            child: SizedBox(
             width: itemWidth,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -55,16 +60,16 @@ class QuickAccessGrid extends StatelessWidget {
                       width: 58,
                       height: 58,
                       decoration: BoxDecoration(
-                        color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                        color: itemColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.burundiGreen.withValues(alpha: 0.2),
+                          color: itemColor.withValues(alpha: 0.2),
                           width: 1.5,
                         ),
                       ),
                       child: Icon(
                         item['icon'] as IconData,
-                        color: AppColors.burundiGreen,
+                        color: itemColor,
                         size: 26,
                       ),
                     ),
@@ -128,6 +133,7 @@ class QuickAccessGrid extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           ),
         );
       }).toList(),

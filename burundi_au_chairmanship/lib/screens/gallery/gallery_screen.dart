@@ -3,9 +3,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
 import 'album_detail_screen.dart';
@@ -49,6 +52,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
+    final featuredAlbums = albums.where((a) => a['is_featured'] == true).toList();
     return Scaffold(
       body: _isLoading
           ? const ShimmerVideoGridSkeleton()
@@ -113,46 +118,71 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final featuredAlbums = albums.where((a) => a['is_featured'] == true).toList();
-                          if (index >= featuredAlbums.length) return null;
-                          final album = featuredAlbums[index];
-                          return _buildFeaturedAlbumCard(album);
+                          final slot = LoginGate.slotFor(
+                            index: index,
+                            actualCount: featuredAlbums.length,
+                            isAuthenticated: isAuth,
+                          );
+                          switch (slot) {
+                            case LoginGateSlot.free:
+                              return _buildFeaturedAlbumCard(featuredAlbums[index], isAuth);
+                            case LoginGateSlot.banner:
+                              return const LoginGateBanner(
+                                margin: EdgeInsets.only(bottom: 16),
+                              );
+                            case LoginGateSlot.blurred:
+                              final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                              if (dataIndex == null || dataIndex >= featuredAlbums.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return LockedContentWrap(
+                                locked: true,
+                                child: _buildFeaturedAlbumCard(featuredAlbums[dataIndex], isAuth),
+                              );
+                            case LoginGateSlot.hidden:
+                              return const SizedBox.shrink();
+                          }
                         },
-                      ),
-                    ),
-                  ),
-
-                  // All Albums
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                    sliver: SliverToBoxAdapter(
-                      child: const Text(
-                        'All Albums',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                        childCount: LoginGate.itemCountFor(
+                          actualCount: featuredAlbums.length,
+                          isAuthenticated: isAuth,
                         ),
                       ),
                     ),
                   ),
 
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.85,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (index >= albums.length) return null;
-                          return _buildAlbumGridItem(albums[index]);
-                        },
+                  // All Albums (hidden for guests — gallery grid is members-only)
+                  if (isAuth) ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                      sliver: SliverToBoxAdapter(
+                        child: const Text(
+                          'All Albums',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    SliverPadding(
+                      padding: const EdgeInsets.all(16),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 0.85,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index >= albums.length) return null;
+                            return _buildAlbumGridItem(albums[index], isAuth);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
 
                   const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
                 ],
@@ -184,7 +214,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  Widget _buildFeaturedAlbumCard(Map<String, dynamic> album) {
+  Widget _buildFeaturedAlbumCard(Map<String, dynamic> album, bool isAuth) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -316,7 +346,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  Widget _buildAlbumGridItem(Map<String, dynamic> album) {
+  Widget _buildAlbumGridItem(Map<String, dynamic> album, bool isAuth) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: Material(

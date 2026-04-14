@@ -9,6 +9,8 @@ import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
 import 'article_detail_screen.dart';
@@ -75,6 +77,7 @@ class _NewsScreenState extends State<NewsScreen> {
     final l10n = AppLocalizations.of(context);
     final langCode = Provider.of<LanguageProvider>(context).languageCode;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
     return Scaffold(
       body: FutureBuilder<List<Article>>(
@@ -110,7 +113,7 @@ class _NewsScreenState extends State<NewsScreen> {
                 // Featured articles carousel (multiple)
                 if (featured.isNotEmpty)
                   SliverToBoxAdapter(
-                    child: _buildFeaturedCarousel(featured, langCode, isDark, l10n),
+                    child: _buildFeaturedCarousel(featured, langCode, isDark, l10n, isAuth),
                   ),
 
                 // Category filter chips
@@ -136,9 +139,35 @@ class _NewsScreenState extends State<NewsScreen> {
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                              return _buildArticleCard(context, filtered[index], langCode, isDark, l10n);
+                              final slot = LoginGate.slotFor(
+                                index: index,
+                                actualCount: filtered.length,
+                                isAuthenticated: isAuth,
+                              );
+                              switch (slot) {
+                                case LoginGateSlot.free:
+                                  return _buildArticleCard(context, filtered[index], langCode, isDark, l10n, isAuth);
+                                case LoginGateSlot.banner:
+                                  return const LoginGateBanner(
+                                    margin: EdgeInsets.only(bottom: 12),
+                                  );
+                                case LoginGateSlot.blurred:
+                                  final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                                  if (dataIndex == null || dataIndex >= filtered.length) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return LockedContentWrap(
+                                    locked: true,
+                                    child: _buildArticleCard(context, filtered[dataIndex], langCode, isDark, l10n, isAuth),
+                                  );
+                                case LoginGateSlot.hidden:
+                                  return const SizedBox.shrink();
+                              }
                             },
-                            childCount: filtered.length,
+                            childCount: LoginGate.itemCountFor(
+                              actualCount: filtered.length,
+                              isAuthenticated: isAuth,
+                            ),
                           ),
                         ),
                       ),
@@ -182,7 +211,7 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Widget _buildFeaturedCarousel(List<Article> featured, String langCode, bool isDark, AppLocalizations l10n) {
+  Widget _buildFeaturedCarousel(List<Article> featured, String langCode, bool isDark, AppLocalizations l10n, bool isAuth) {
     return Column(
       children: [
         SizedBox(
@@ -194,7 +223,7 @@ class _NewsScreenState extends State<NewsScreen> {
             itemBuilder: (context, index) {
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
-                child: _buildFeaturedCard(featured[index], langCode, isDark, l10n),
+                child: _buildFeaturedCard(featured[index], langCode, isDark, l10n, isAuth),
               );
             },
           ),
@@ -219,7 +248,7 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Widget _buildFeaturedCard(Article article, String langCode, bool isDark, AppLocalizations l10n) {
+  Widget _buildFeaturedCard(Article article, String langCode, bool isDark, AppLocalizations l10n, bool isAuth) {
     return GestureDetector(
       onTap: () => _openDetail(article),
       child: Container(
@@ -386,7 +415,7 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Widget _buildArticleCard(BuildContext context, Article article, String langCode, bool isDark, AppLocalizations l10n) {
+  Widget _buildArticleCard(BuildContext context, Article article, String langCode, bool isDark, AppLocalizations l10n, bool isAuth) {
     final catColor = article.category?.parsedColor ?? AppColors.burundiGreen;
     final catLabel = article.category?.getDisplayName(langCode) ?? '';
 

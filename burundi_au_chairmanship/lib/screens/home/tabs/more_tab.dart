@@ -591,8 +591,8 @@ class _MoreTabState extends State<MoreTab> {
                         }
 
                         await Share.share(
-                          'Check out the Burundi AU Chairmanship 2026 app! 🇧🇮\n\n$appLink',
-                          subject: 'Burundi AU Chairmanship 2026 App',
+                          'Check out the Burundi Chairmanship 2026 app! 🇧🇮\n\n$appLink',
+                          subject: 'Burundi Chairmanship 2026 App',
                           sharePositionOrigin: sharePositionOrigin,
                         );
                       },
@@ -930,7 +930,7 @@ class _MoreTabState extends State<MoreTab> {
 
   void _showAboutDialog(BuildContext context, AppLocalizations l10n) async {
     // Fetch about info from backend, fallback to hardcoded values
-    String description = 'Official application for the Burundi African Union Chairmanship 2026.';
+    String description = 'Official application for the Burundi Chairmanship 2026.';
     String summitTheme = AppConstants.summitTheme;
     String developerName = 'Eyosias Tamene';
     String developerUrl = 'https://eyosias.dev';

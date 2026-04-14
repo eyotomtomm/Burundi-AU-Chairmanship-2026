@@ -244,8 +244,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
     final impacts = _tList('impact_areas');
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      transform: Matrix4.translationValues(0, -20, 0),
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,

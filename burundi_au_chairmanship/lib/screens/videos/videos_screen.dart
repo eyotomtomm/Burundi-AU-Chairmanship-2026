@@ -3,8 +3,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
 import 'video_detail_screen.dart';
@@ -89,6 +92,7 @@ class _VideosScreenState extends State<VideosScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
     return Scaffold(
       body: _isLoading
@@ -169,10 +173,35 @@ class _VideosScreenState extends State<VideosScreen> {
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          if (index >= filteredVideos.length) return null;
-                          final video = filteredVideos[index];
-                          return _buildVideoCard(video, isDark);
+                          final slot = LoginGate.slotFor(
+                            index: index,
+                            actualCount: filteredVideos.length,
+                            isAuthenticated: isAuth,
+                          );
+                          switch (slot) {
+                            case LoginGateSlot.free:
+                              return _buildVideoCard(filteredVideos[index], isDark);
+                            case LoginGateSlot.banner:
+                              return const LoginGateBanner(
+                                margin: EdgeInsets.only(bottom: 16),
+                              );
+                            case LoginGateSlot.blurred:
+                              final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                              if (dataIndex == null || dataIndex >= filteredVideos.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return LockedContentWrap(
+                                locked: true,
+                                child: _buildVideoCard(filteredVideos[dataIndex], isDark),
+                              );
+                            case LoginGateSlot.hidden:
+                              return const SizedBox.shrink();
+                          }
                         },
+                        childCount: LoginGate.itemCountFor(
+                          actualCount: filteredVideos.length,
+                          isAuthenticated: isAuth,
+                        ),
                       ),
                     ),
                   ),

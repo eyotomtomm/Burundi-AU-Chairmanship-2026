@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
@@ -27,9 +28,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _completionMessage = '';
   bool _completionLoaded = false;
 
+  late final AuthProvider _authProvider;
+
   @override
   void initState() {
     super.initState();
+    _authProvider = context.read<AuthProvider>();
+    _authProvider.addListener(_onAuthChanged);
+    _loadProfileCompletion();
+  }
+
+  @override
+  void dispose() {
+    _authProvider.removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    // Re-fetch completion whenever profile data changes
     _loadProfileCompletion();
   }
 
@@ -39,8 +55,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final data = await api.getProfileCompletion();
       if (mounted) {
         setState(() {
-          _completionPercent = (data['completion_percentage'] as num?)?.toDouble() ?? 0.0;
-          _completionMessage = data['message'] as String? ?? '';
+          _completionPercent = (data['percentage'] as num?)?.toDouble() ?? 0.0;
+          final fields = data['fields'] as Map<String, dynamic>? ?? {};
+          final missing = fields.entries.where((e) => e.value == false).map((e) => e.key).toList();
+          _completionMessage = missing.isEmpty ? '' : 'Missing: ${missing.join(', ')}';
           _completionLoaded = true;
         });
       }
@@ -62,7 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             slivers: [
               // Header with gradient
               SliverAppBar(
-                expandedHeight: 200,
+                expandedHeight: 280,
                 pinned: true,
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -1180,6 +1198,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (image == null) return;
 
+      // Crop the image
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: image.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 85,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Profile Photo',
+            toolbarColor: AppColors.burundiGreen,
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: AppColors.burundiGreen,
+            cropStyle: CropStyle.circle,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop Profile Photo',
+            cropStyle: CropStyle.circle,
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+          ),
+        ],
+      );
+
+      if (croppedFile == null) return;
+
       // Show loading dialog
       if (context.mounted) {
         showDialog(
@@ -1192,7 +1237,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       // Upload to backend
-      final imageFile = File(image.path);
+      final imageFile = File(croppedFile.path);
       final success = await authProvider.uploadProfilePicture(imageFile);
 
       if (context.mounted) {

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../../services/api_service.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/environment.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../widgets/login_gate.dart';
 import '../../../widgets/shimmer_loading.dart';
 
 class AgendaTab extends StatefulWidget {
@@ -72,45 +75,41 @@ class _AgendaTabState extends State<AgendaTab> {
     final isDark = theme.brightness == Brightness.dark;
     final langCode = Localizations.localeOf(context).languageCode;
     final l10n = AppLocalizations.of(context);
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            HapticFeedback.mediumImpact();
-            await _loadAgendas();
-          },
-          color: AppColors.burundiGreen,
-          child: CustomScrollView(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          await _loadAgendas();
+        },
+        color: AppColors.burundiGreen,
+        child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
-            // Header
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.translate('priority_agenda'),
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                        letterSpacing: -0.5,
-                      ),
+            // Gradient app bar — matches magazine/weather style
+            SliverAppBar(
+              expandedHeight: 120,
+              pinned: true,
+              automaticallyImplyLeading: false,
+              foregroundColor: Colors.white,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(
+                  l10n.translate('priority_agenda'),
+                  style: const TextStyle(
+                    fontFamily: 'HeatherGreen',
+                    fontSize: 20,
+                    color: Colors.white,
+                  ),
+                ),
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Burundi\'s AU Chairmanship 2026',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: isDark ? Colors.white60 : Colors.black45,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -132,34 +131,39 @@ class _AgendaTabState extends State<AgendaTab> {
                 ),
               )
             else
-              // Agenda cards from API
+              // Agenda cards from API (gated for guests: 1 free + banner + 2 blurred)
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final agenda = _agendas![index];
-                      String rawTitle = langCode == 'fr' && agenda['title_fr'] != null && (agenda['title_fr'] as String).isNotEmpty
-                          ? agenda['title_fr'] as String
-                          : agenda['title'] as String;
-                      // Format: replace underscores/hyphens with spaces, capitalize words
-                      if (rawTitle.contains('_') || rawTitle.contains('-')) {
-                        rawTitle = rawTitle.replaceAll('_', ' ').replaceAll('-', ' ');
-                        rawTitle = rawTitle.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
-                      }
-                      final title = rawTitle;
-                      final description = langCode == 'fr' && agenda['description_fr'] != null && (agenda['description_fr'] as String).isNotEmpty
-                          ? agenda['description_fr'] as String
-                          : agenda['description'] as String;
-                      final slug = agenda['slug'] as String;
-                      final iconName = agenda['icon_name'] as String? ?? 'star';
-                      final icon = _getIconFromName(iconName);
-                      final color = _getColorForSlug(slug);
-                      final heroImage = agenda['hero_image'];
+                      final slot = LoginGate.slotFor(
+                        index: index,
+                        actualCount: _agendas!.length,
+                        isAuthenticated: isAuth,
+                        freeItems: LoginGate.agendaFreeItems,
+                      );
 
-                      return Padding(
-                        padding: EdgeInsets.only(bottom: index < _agendas!.length - 1 ? 16 : 0),
-                        child: _buildAgendaCard(
+                      Widget buildCardFor(int dataIndex) {
+                        final agenda = _agendas![dataIndex];
+                        String rawTitle = langCode == 'fr' && agenda['title_fr'] != null && (agenda['title_fr'] as String).isNotEmpty
+                            ? agenda['title_fr'] as String
+                            : agenda['title'] as String;
+                        if (rawTitle.contains('_') || rawTitle.contains('-')) {
+                          rawTitle = rawTitle.replaceAll('_', ' ').replaceAll('-', ' ');
+                          rawTitle = rawTitle.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : w).join(' ');
+                        }
+                        final title = rawTitle;
+                        final description = langCode == 'fr' && agenda['description_fr'] != null && (agenda['description_fr'] as String).isNotEmpty
+                            ? agenda['description_fr'] as String
+                            : agenda['description'] as String;
+                        final slug = agenda['slug'] as String;
+                        final iconName = agenda['icon_name'] as String? ?? 'star';
+                        final icon = _getIconFromName(iconName);
+                        final color = _getColorForSlug(slug);
+                        final heroImage = agenda['hero_image'];
+
+                        return _buildAgendaCard(
                           context: context,
                           title: title,
                           subtitle: description,
@@ -167,21 +171,48 @@ class _AgendaTabState extends State<AgendaTab> {
                           color: color,
                           isDark: isDark,
                           heroImage: heroImage,
-                          onTap: () {
-                            // Navigate to detail page using slug
-                            Navigator.pushNamed(context, '/$slug');
-                          },
-                        ),
-                      );
+                          onTap: () => Navigator.pushNamed(context, '/$slug'),
+                        );
+                      }
+
+                      switch (slot) {
+                        case LoginGateSlot.free:
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: buildCardFor(index),
+                          );
+                        case LoginGateSlot.banner:
+                          return const LoginGateBanner(
+                            margin: EdgeInsets.only(bottom: 16),
+                          );
+                        case LoginGateSlot.blurred:
+                          final dataIndex = LoginGate.dataIndexFor(index, LoginGate.agendaFreeItems);
+                          if (dataIndex == null || dataIndex >= _agendas!.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: LockedContentWrap(
+                              locked: true,
+                              borderRadius: const BorderRadius.all(Radius.circular(24)),
+                              child: buildCardFor(dataIndex),
+                            ),
+                          );
+                        case LoginGateSlot.hidden:
+                          return const SizedBox.shrink();
+                      }
                     },
-                    childCount: _agendas!.length,
+                    childCount: LoginGate.itemCountFor(
+                      actualCount: _agendas!.length,
+                      isAuthenticated: isAuth,
+                      freeItems: LoginGate.agendaFreeItems,
+                    ),
                   ),
                 ),
               ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
-        ),
         ),
       ),
     );

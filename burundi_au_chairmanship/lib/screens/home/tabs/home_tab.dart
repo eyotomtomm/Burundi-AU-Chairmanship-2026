@@ -24,12 +24,12 @@ import '../../../services/firebase_messaging_service.dart';
 import '../../news/article_detail_screen.dart';
 import '../../feature_card/feature_card_detail_screen.dart';
 import '../../events/event_detail_screen.dart';
-import '../../priority_agenda_detail_screen.dart';
 import '../painters/zigzag_line_painter.dart';
 import '../painters/card_pattern_painter.dart';
 import '../widgets/quick_access_grid.dart';
 import '../widgets/news_card.dart';
 import '../widgets/event_card.dart';
+import '../../../widgets/login_gate.dart';
 import '../../../widgets/shimmer_loading.dart';
 
 class HomeTab extends StatefulWidget {
@@ -413,6 +413,7 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final langCode = context.watch<LanguageProvider>().languageCode;
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
     if (_isLoading) return const ShimmerHomeTabSkeleton();
 
@@ -541,28 +542,38 @@ class _HomeTabState extends State<HomeTab> {
                 context,
                 langCode == 'fr' ? 'Prochains Événements' : 'Upcoming Events',
                 showSeeAll: true,
-                onSeeAll: () => widget.onSwitchTab?.call(2),
+                onSeeAll: () => Navigator.pushNamed(context, '/events'),
               ),
             ),
           ),
           SliverToBoxAdapter(
             child: SizedBox(
               height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _apiEventCards!.length,
-                itemBuilder: (context, index) {
-                  final event = _apiEventCards![index];
-                  return EventCard(
-                    event: event,
-                    langCode: langCode,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (_) => EventDetailScreen(event: event),
-                        ),
+              child: Builder(
+                builder: (context) {
+                  final total = _apiEventCards!.length;
+                  final freeShown = isAuth ? total : (total < 2 ? total : 2);
+                  final itemCount = isAuth ? total : freeShown + 1;
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      if (!isAuth && index == freeShown) {
+                        return const LoginGateCarouselCard(width: 260, height: 200);
+                      }
+                      final event = _apiEventCards![index];
+                      return EventCard(
+                        event: event,
+                        langCode: langCode,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) => EventDetailScreen(event: event),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -583,13 +594,23 @@ class _HomeTabState extends State<HomeTab> {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 220,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _apiMagazines!.length,
-                itemBuilder: (context, index) {
-                  final magazine = _apiMagazines![index];
-                  return _buildMagazineCard(context, magazine, langCode);
+              child: Builder(
+                builder: (context) {
+                  final total = _apiMagazines!.length;
+                  final freeShown = isAuth ? total : (total < 2 ? total : 2);
+                  final itemCount = isAuth ? total : freeShown + 1;
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      if (!isAuth && index == freeShown) {
+                        return const LoginGateCarouselCard(width: 160, height: 220);
+                      }
+                      final magazine = _apiMagazines![index];
+                      return _buildMagazineCard(context, magazine, langCode, isAuth);
+                    },
+                  );
                 },
               ),
             ),
@@ -607,13 +628,23 @@ class _HomeTabState extends State<HomeTab> {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 110,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _trendingItems!.length > 5 ? 5 : _trendingItems!.length,
-                itemBuilder: (context, index) {
-                  final item = _trendingItems![index];
-                  return _buildTrendingCard(item, index + 1, langCode);
+              child: Builder(
+                builder: (context) {
+                  final capped = _trendingItems!.length > 5 ? 5 : _trendingItems!.length;
+                  final freeShown = isAuth ? capped : (capped < 2 ? capped : 2);
+                  final itemCount = isAuth ? capped : freeShown + 1;
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      if (!isAuth && index == freeShown) {
+                        return const LoginGateCarouselCard(width: 240, height: 110);
+                      }
+                      final item = _trendingItems![index];
+                      return _buildTrendingCard(item, index + 1, langCode, isAuth);
+                    },
+                  );
                 },
               ),
             ),
@@ -631,21 +662,31 @@ class _HomeTabState extends State<HomeTab> {
           SliverToBoxAdapter(
             child: SizedBox(
               height: 260,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _articles.length,
-                itemBuilder: (context, index) {
-                  final article = _articles[index];
-                  return NewsCard(
-                    article: article,
-                    langCode: langCode,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        CupertinoPageRoute(
-                          builder: (_) => ArticleDetailScreen(article: article),
-                        ),
+              child: Builder(
+                builder: (context) {
+                  final total = _articles.length;
+                  final freeShown = isAuth ? total : (total < 2 ? total : 2);
+                  final itemCount = isAuth ? total : freeShown + 1;
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      if (!isAuth && index == freeShown) {
+                        return const LoginGateCarouselCard(width: 280, height: 260);
+                      }
+                      final article = _articles[index];
+                      return NewsCard(
+                        article: article,
+                        langCode: langCode,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) => ArticleDetailScreen(article: article),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -666,7 +707,7 @@ class _HomeTabState extends State<HomeTab> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildPriorityAgendasSection(context),
+              child: _buildPriorityAgendasSection(context, isAuth),
             ),
           ),
         ],
@@ -1298,6 +1339,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildQuickAccessGrid(BuildContext context, AppLocalizations l10n) {
     final langCode = Localizations.localeOf(context).languageCode;
+    final isLoggedIn = context.read<AuthProvider>().isAuthenticated;
     final List<Map<String, dynamic>> items = [];
 
     // Use API data if available
@@ -1362,7 +1404,7 @@ class _HomeTabState extends State<HomeTab> {
     // Append hardcoded quick access items (only if not already in the API response)
     final hardcodedItems = <Map<String, dynamic>>[
       // --- New items ---
-      if (!isDuplicate('tab:1', 'Magazines', 'Magazines'))
+      if (!isDuplicate('/magazine', 'Magazine', 'Magazine'))
         <String, dynamic>{
           'title': langCode == 'fr' ? 'Magazines' : 'Magazines',
           'icon': Icons.menu_book_rounded,
@@ -1380,14 +1422,14 @@ class _HomeTabState extends State<HomeTab> {
           'badgeColor': '',
           'onTap': () => Navigator.pushNamed(context, '/live-feeds'),
         },
-      if (!isDuplicate('tab:2', 'Events', '\u00c9v\u00e9nements'))
+      if (!isDuplicate('/events', 'Events', '\u00c9v\u00e9nements'))
         <String, dynamic>{
           'title': langCode == 'fr' ? '\u00c9v\u00e9nements' : 'Events',
           'icon': Icons.event_rounded,
           'hasLiveDot': false,
           'badgeText': '',
           'badgeColor': '',
-          'onTap': () => widget.onSwitchTab?.call(2),
+          'onTap': () => Navigator.pushNamed(context, '/events'),
         },
       if (!isDuplicate('/resources', 'Resources', 'Ressources'))
         <String, dynamic>{
@@ -1403,9 +1445,48 @@ class _HomeTabState extends State<HomeTab> {
           'title': langCode == 'fr' ? 'Assistance' : 'Support',
           'icon': Icons.support_agent_rounded,
           'hasLiveDot': false,
+          'badgeText': isLoggedIn ? '' : (langCode == 'fr' ? 'Connexion' : 'Sign in'),
+          'badgeColor': isLoggedIn ? '' : '#9E9E9E',
+          'locked': !isLoggedIn,
+          'onTap': isLoggedIn
+              ? () => Navigator.pushNamed(context, '/support')
+              : () => Navigator.pushNamed(context, '/auth'),
+        },
+      if (!isDuplicate('/news', 'News', 'Actualités'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Actualités' : 'News',
+          'icon': Icons.article_rounded,
+          'hasLiveDot': false,
           'badgeText': '',
           'badgeColor': '',
-          'onTap': () => Navigator.pushNamed(context, '/support'),
+          'onTap': () => Navigator.pushNamed(context, '/news'),
+        },
+      if (!isDuplicate('/translate', 'Translate', 'Traduire'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Traduire' : 'Translate',
+          'icon': Icons.translate_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/translate'),
+        },
+      if (!isDuplicate('/weather', 'Weather', 'Météo'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Météo' : 'Weather',
+          'icon': Icons.cloud_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/weather'),
+        },
+      if (!isDuplicate('/calendar', 'Calendar', 'Calendrier'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Calendrier' : 'Calendar',
+          'icon': Icons.calendar_month_rounded,
+          'hasLiveDot': false,
+          'badgeText': '',
+          'badgeColor': '',
+          'onTap': () => Navigator.pushNamed(context, '/events'),
         },
       // --- Existing items ---
       if (!isDuplicate('/gallery', 'Gallery', 'Galerie'))
@@ -1441,7 +1522,7 @@ class _HomeTabState extends State<HomeTab> {
     return QuickAccessGrid(items: items);
   }
 
-  Widget _buildPriorityAgendasSection(BuildContext context) {
+  Widget _buildPriorityAgendasSection(BuildContext context, bool isAuth) {
     // Use API data if available, otherwise show empty
     final agendas = _apiPriorityAgendas ?? [];
 
@@ -1454,8 +1535,21 @@ class _HomeTabState extends State<HomeTab> {
       'peace-security': [const Color(0xFF1B5E20), const Color(0xFF2E7D32)],
     };
 
-    return Column(
-      children: agendas.map((agenda) {
+    // Agenda-specific labels
+    final Map<String, Map<String, String>> slugLabels = {
+      'water-sanitation': {'en': 'SDG 6', 'fr': 'ODD 6', 'icon_label': 'water_drop'},
+      'arise-initiative': {'en': 'AU 2063', 'fr': 'UA 2063', 'icon_label': 'trending_up'},
+      'peace-security': {'en': 'APSA', 'fr': 'AAPS', 'icon_label': 'shield'},
+    };
+
+    // Login gate: 1 free, then banner, then blurred
+    final totalCount = LoginGate.itemCountFor(
+      actualCount: agendas.length,
+      isAuthenticated: isAuth,
+      freeItems: LoginGate.agendaFreeItems,
+    );
+
+    Widget buildAgendaCard(Map<String, dynamic> agenda) {
         final slug = agenda['slug'] as String?;
         final title = langCode == 'fr' ? (agenda['title_fr'] ?? agenda['title']) : agenda['title'];
         final description = langCode == 'fr' ? (agenda['description_fr'] ?? agenda['description']) : agenda['description'];
@@ -1464,33 +1558,37 @@ class _HomeTabState extends State<HomeTab> {
         final fallbackColors = (slug != null && slugColors.containsKey(slug))
             ? slugColors[slug]!
             : [AppColors.burundiGreen, AppColors.auGold];
+        final label = (slug != null && slugLabels.containsKey(slug))
+            ? (langCode == 'fr' ? slugLabels[slug]!['fr']! : slugLabels[slug]!['en']!)
+            : '';
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
+        return InkWell(
             onTap: () {
-              Navigator.push(
-                context,
-                CupertinoPageRoute(
-                  builder: (context) => PriorityAgendaDetailScreen(agenda: agenda),
-                ),
-              );
+              final agendaSlug = agenda['slug'] as String?;
+              if (agendaSlug != null) {
+                Navigator.pushNamed(context, '/$agendaSlug');
+              }
             },
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             child: Container(
-              height: 130,
+              height: 140,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: fallbackColors[0].withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: fallbackColors[0].withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: fallbackColors[1].withValues(alpha: 0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -1524,57 +1622,121 @@ class _HomeTabState extends State<HomeTab> {
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: fallbackColors,
+                            colors: [
+                              fallbackColors[0],
+                              Color.lerp(fallbackColors[0], fallbackColors[1], 0.5)!,
+                              fallbackColors[1],
+                            ],
+                            stops: const [0.0, 0.6, 1.0],
                           ),
                         ),
                       ),
 
-                    // Dark overlay for text readability (stronger on images)
-                    if (hasImage)
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.65),
-                              Colors.black.withValues(alpha: 0.3),
-                            ],
+                    // Color-tinted overlay for depth (uses theme color instead of pure black)
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            fallbackColors[0].withValues(alpha: hasImage ? 0.5 : 0.15),
+                            Colors.black.withValues(alpha: hasImage ? 0.55 : 0.25),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Glossy shimmer highlight (diagonal)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: const Alignment(-1.0, -1.0),
+                              end: const Alignment(0.0, 0.0),
+                              colors: [
+                                Colors.white.withValues(alpha: 0.12),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                            ),
                           ),
                         ),
-                      )
-                    else
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.3),
-                              Colors.black.withValues(alpha: 0.05),
+                      ),
+                    ),
+
+                    // Badge label (top-left)
+                    if (label.isNotEmpty)
+                      Positioned(
+                        top: 10,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: fallbackColors[1].withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
                             ],
+                          ),
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              shadows: [
+                                Shadow(color: Colors.black26, blurRadius: 2),
+                              ],
+                            ),
                           ),
                         ),
                       ),
 
                     // Content
                     Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.fromLTRB(20, label.isNotEmpty ? 32 : 16, 16, 16),
                       child: Row(
                         children: [
+                          // Icon with glow effect
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.15),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.25),
+                                  Colors.white.withValues(alpha: 0.1),
+                                ],
                               ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: fallbackColors[1].withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
+                                ),
+                              ],
                             ),
                             child: Icon(
                               _getIconFromAgenda(agenda),
-                              size: 32,
+                              size: 30,
                               color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: fallbackColors[1].withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -1586,19 +1748,34 @@ class _HomeTabState extends State<HomeTab> {
                                 Text(
                                   title as String,
                                   style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
                                     color: Colors.white,
-                                    letterSpacing: 0.3,
+                                    letterSpacing: 0.2,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black38,
+                                        blurRadius: 4,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   description as String,
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    height: 1.3,
+                                    fontSize: 12.5,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    height: 1.35,
+                                    shadows: const [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        blurRadius: 3,
+                                      ),
+                                    ],
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -1606,28 +1783,93 @@ class _HomeTabState extends State<HomeTab> {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.2),
+                                  Colors.white.withValues(alpha: 0.08),
+                                ],
+                              ),
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.15),
+                              ),
                             ),
                             child: const Icon(
-                              Icons.arrow_forward_ios,
+                              Icons.arrow_forward_ios_rounded,
                               color: Colors.white,
-                              size: 16,
+                              size: 14,
                             ),
                           ),
                         ],
+                      ),
+                    ),
+
+                    // Bottom accent strip
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 3,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              fallbackColors[1],
+                              fallbackColors[0],
+                              fallbackColors[1],
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
         );
-      }).toList(),
+    }
+
+    return Column(
+      children: List.generate(totalCount, (index) {
+        final slot = LoginGate.slotFor(
+          index: index,
+          actualCount: agendas.length,
+          isAuthenticated: isAuth,
+          freeItems: LoginGate.agendaFreeItems,
+        );
+        switch (slot) {
+          case LoginGateSlot.free:
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: buildAgendaCard(agendas[index]),
+            );
+          case LoginGateSlot.banner:
+            return const LoginGateBanner(
+              margin: EdgeInsets.only(bottom: 14),
+            );
+          case LoginGateSlot.blurred:
+            final dataIndex = LoginGate.dataIndexFor(index, LoginGate.agendaFreeItems);
+            if (dataIndex == null || dataIndex >= agendas.length) {
+              return const SizedBox.shrink();
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: LockedContentWrap(
+                locked: true,
+                borderRadius: const BorderRadius.all(Radius.circular(18)),
+                child: buildAgendaCard(agendas[dataIndex]),
+              ),
+            );
+          case LoginGateSlot.hidden:
+            return const SizedBox.shrink();
+        }
+      }),
     );
   }
 
@@ -1756,7 +1998,7 @@ class _HomeTabState extends State<HomeTab> {
     return iconMap[iconName] ?? Icons.star;
   }
 
-  Widget _buildTrendingCard(Map<String, dynamic> item, int rank, String langCode) {
+  Widget _buildTrendingCard(Map<String, dynamic> item, int rank, String langCode, bool isAuth) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final title = item['content_title']?.toString() ?? (langCode == 'fr' ? 'Contenu' : 'Content');
     final contentType = item['content_type']?.toString() ?? 'article';
@@ -1894,7 +2136,7 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  Widget _buildMagazineCard(BuildContext context, MagazineEdition magazine, String langCode) {
+  Widget _buildMagazineCard(BuildContext context, MagazineEdition magazine, String langCode, bool isAuth) {
     final title = magazine.getTitle(langCode);
     return GestureDetector(
       onTap: () {

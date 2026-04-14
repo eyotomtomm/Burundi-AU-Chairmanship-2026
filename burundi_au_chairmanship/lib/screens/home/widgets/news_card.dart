@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
 import '../../../models/magazine_model.dart';
+import '../../../widgets/liked_by_avatars.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;
@@ -216,6 +217,15 @@ class NewsCard extends StatelessWidget {
                                 : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                           ),
                         ),
+                        if (article.recentLikers.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          LikedByAvatars(
+                            likers: article.recentLikers,
+                            totalLikes: article.likeCount,
+                            avatarRadius: 8,
+                            overlap: 6,
+                          ),
+                        ],
                         const Spacer(),
                         Text(
                           article.author,

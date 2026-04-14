@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/african_pattern.dart';
+import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
 
@@ -83,25 +86,129 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                         ],
                       ),
                     )
-                  : AfricanPatternBackground(
-                  opacity: 0.03,
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      HapticFeedback.mediumImpact();
-                      setState(() => _isLoading = true);
-                      await _loadData();
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _grouped.length,
-                      itemBuilder: (context, index) {
-                        final category = _grouped.keys.elementAt(index);
-                        final items = _grouped[category]!;
-                        return _buildCategorySection(context, category, items, langCode);
-                      },
-                    ),
-                  ),
-                ),
+                  : _buildResourcesList(context, langCode),
+    );
+  }
+
+  Widget _buildResourcesList(BuildContext context, String langCode) {
+    final isAuth = context.watch<AuthProvider>().isAuthenticated;
+
+    // Flatten all resources into a single list with category info
+    final allItems = <MapEntry<String, ApiResource>>[];
+    for (final category in _grouped.keys) {
+      for (final item in _grouped[category]!) {
+        allItems.add(MapEntry(category, item));
+      }
+    }
+
+    final itemCount = LoginGate.itemCountFor(
+      actualCount: allItems.length,
+      isAuthenticated: isAuth,
+    );
+
+    return AfricanPatternBackground(
+      opacity: 0.03,
+      child: RefreshIndicator(
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          setState(() => _isLoading = true);
+          await _loadData();
+        },
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            final slot = LoginGate.slotFor(
+              index: index,
+              actualCount: allItems.length,
+              isAuthenticated: isAuth,
+            );
+
+            Widget buildItem(int dataIndex) {
+              final entry = allItems[dataIndex];
+              final color = _categoryColor(entry.key);
+              return _buildResourceItem(context, entry.value, color, langCode);
+            }
+
+            // Show category header before the first item in each category
+            Widget maybePrefixHeader(int dataIndex, Widget child) {
+              if (dataIndex == 0) {
+                final entry = allItems[dataIndex];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCategoryHeader(context, entry.key, _grouped[entry.key]!, langCode),
+                    child,
+                  ],
+                );
+              }
+              final prevCategory = allItems[dataIndex - 1].key;
+              final curCategory = allItems[dataIndex].key;
+              if (prevCategory != curCategory) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 24),
+                    _buildCategoryHeader(context, curCategory, _grouped[curCategory]!, langCode),
+                    child,
+                  ],
+                );
+              }
+              return child;
+            }
+
+            switch (slot) {
+              case LoginGateSlot.free:
+                return maybePrefixHeader(index, buildItem(index));
+              case LoginGateSlot.banner:
+                return const LoginGateBanner(
+                  margin: EdgeInsets.symmetric(vertical: 12),
+                );
+              case LoginGateSlot.blurred:
+                final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                if (dataIndex == null || dataIndex >= allItems.length) {
+                  return const SizedBox.shrink();
+                }
+                return LockedContentWrap(
+                  locked: true,
+                  borderRadius: const BorderRadius.all(Radius.circular(12)),
+                  child: buildItem(dataIndex),
+                );
+              case LoginGateSlot.hidden:
+                return const SizedBox.shrink();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryHeader(BuildContext context, String category, List<ApiResource> items, String langCode) {
+    final theme = Theme.of(context);
+    final color = _categoryColor(category);
+    final categoryName = items.first.getCategoryName(langCode);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_categoryIcon(category), color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            categoryName,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -157,40 +264,6 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       default:
         return AppColors.info;
     }
-  }
-
-  Widget _buildCategorySection(BuildContext context, String category, List<ApiResource> items, String langCode) {
-    final theme = Theme.of(context);
-    final color = _categoryColor(category);
-    final categoryName = items.first.getCategoryName(langCode);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(_categoryIcon(category), color: color, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              categoryName,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...items.map((item) => _buildResourceItem(context, item, color, langCode)),
-        const SizedBox(height: 24),
-      ],
-    );
   }
 
   Widget _buildResourceItem(BuildContext context, ApiResource item, Color accentColor, String langCode) {

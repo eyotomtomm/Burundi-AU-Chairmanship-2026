@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/confetti_overlay.dart';
 
@@ -31,7 +33,22 @@ class _EnhancedVerificationScreenState extends State<EnhancedVerificationScreen>
   Timer? _emailTimer;
   int _emailCountdown = 0;
 
-  // Country codes with flags
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill name from profile data
+    final auth = context.read<AuthProvider>();
+    if (auth.userName != null && auth.userName!.isNotEmpty) {
+      final parts = auth.userName!.trim().split(RegExp(r'\s+'));
+      if (parts.isNotEmpty) {
+        _firstNameController.text = parts.first;
+        if (parts.length > 1) {
+          _lastNameController.text = parts.sublist(1).join(' ');
+        }
+      }
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();

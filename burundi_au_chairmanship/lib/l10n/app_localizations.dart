@@ -14,7 +14,7 @@ class AppLocalizations {
   static final Map<String, Map<String, String>> _localizedValues = {
     'en': {
       // App
-      'app_name': 'Burundi AU Chairmanship',
+      'app_name': 'Burundi Chairmanship',
       'welcome': 'Welcome',
       'continue': 'Continue',
       'skip': 'Skip',
@@ -53,8 +53,8 @@ class AppLocalizations {
       'create_account_text': 'Create your account to get started',
 
       // Home
-      'au_chairmanship': 'AU Chairmanship 2025',
-      'burundi_chairmanship': 'Burundi AU Chairmanship',
+      'au_chairmanship': 'Burundi Chairmanship 2025',
+      'burundi_chairmanship': 'Burundi Chairmanship',
       'explore_features': 'Explore Features',
       'latest_news': 'Latest News',
       'upcoming_events': 'Upcoming Events',
@@ -186,6 +186,13 @@ class AppLocalizations {
       'password_mismatch': 'Passwords do not match',
       'password_too_short': 'At least 8 characters',
       'field_required': 'Required',
+
+      // Login gate
+      'login_gate_title': 'Sign in to continue',
+      'login_gate_subtitle': 'Unlock the full experience — news, magazines, videos and more.',
+      'login_gate_login': 'Log In',
+      'login_gate_signup': 'Sign Up',
+      'login_gate_locked_badge': 'Members only',
     },
     'fr': {
       // App
@@ -361,6 +368,13 @@ class AppLocalizations {
       'password_mismatch': 'Les mots de passe ne correspondent pas',
       'password_too_short': 'Au moins 8 caractères',
       'field_required': 'Obligatoire',
+
+      // Login gate
+      'login_gate_title': 'Connectez-vous pour continuer',
+      'login_gate_subtitle': 'Débloquez toute l\'expérience — actualités, magazines, vidéos et plus.',
+      'login_gate_login': 'Se connecter',
+      'login_gate_signup': 'S\'inscrire',
+      'login_gate_locked_badge': 'Réservé aux membres',
     },
   };
 

@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/confetti_overlay.dart';
 
@@ -157,6 +159,24 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       final key = platform['key'] as String;
       _socialMediaActive[key] = false;
       _socialMediaControllers[key] = TextEditingController();
+    }
+    // Pre-fill from profile data
+    final auth = context.read<AuthProvider>();
+    if (auth.userName != null && auth.userName!.isNotEmpty) {
+      _fullNameController.text = auth.userName!;
+    }
+    if (auth.phoneNumber != null && auth.phoneNumber!.isNotEmpty) {
+      _phoneController.text = auth.phoneNumber!;
+    }
+    if (auth.gender != null && auth.gender!.isNotEmpty) {
+      _selectedGender = auth.gender;
+    }
+    if (auth.nationality != null && auth.nationality!.isNotEmpty) {
+      // Match against the nationality codes in the list
+      final code = auth.nationality!;
+      if (_nationalities.any((n) => n['code'] == code)) {
+        _selectedNationality = code;
+      }
     }
   }
 

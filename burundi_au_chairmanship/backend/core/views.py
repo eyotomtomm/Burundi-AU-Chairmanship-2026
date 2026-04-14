@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 from .models import (
     HeroSlide, MagazineEdition, MagazineLike, Article, EmbassyLocation,
     Event, LiveFeed, Resource, AppSettings,
-    FeatureCard, ArticleComment, ArticleLike, Category, UserProfile,
+    FeatureCard, ArticleComment, ArticleCommentMention, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryAlbumLike, GalleryPhoto, Video, VideoLike, SocialMediaLink,
     Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
     WeatherCity, EventRegistration, RegistrationFormField, EventSubmission,
@@ -42,9 +42,10 @@ from .models import (
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
     EventComment, CommentMention, NewsletterEdition,
     EventAgendaItem, LinkedAccount,
-    DeviceToken,
+    DeviceToken, NotificationEvent,
 )
 from .serializers import (
+    get_recent_likers,
     HeroSlideSerializer, MagazineEditionSerializer, ArticleSerializer,
     EmbassyLocationSerializer, EventSerializer, LiveFeedSerializer,
     ResourceSerializer, AppSettingsSerializer,
@@ -390,7 +391,7 @@ def deactivate_account(request):
             subject='Burundi4Africa - Account Deactivated',
             message=(
                 f'Hello {user.first_name or user.username},\n\n'
-                'Your Burundi AU Chairmanship 2026 account has been deactivated.\n\n'
+                'Your Burundi Chairmanship 2026 account has been deactivated.\n\n'
                 'Your data is safe and your account is just paused. '
                 'You can reactivate it anytime by simply logging back in.\n\n'
                 'If you did not request this, please contact us immediately.\n\n'
@@ -439,7 +440,7 @@ def delete_account(request):
             subject='Burundi4Africa - Account Deletion Scheduled',
             message=(
                 f'Hello {user.first_name or user.username},\n\n'
-                'Your Burundi AU Chairmanship 2026 account has been scheduled for permanent deletion.\n\n'
+                'Your Burundi Chairmanship 2026 account has been scheduled for permanent deletion.\n\n'
                 f'Your data will be permanently removed on {deletion_date}.\n\n'
                 'Changed your mind? Simply log back in before that date to cancel '
                 'the deletion and reactivate your account.\n\n'
@@ -783,10 +784,17 @@ def register_fcm_token(request):
     try:
         user = request.user if request.user.is_authenticated else None
 
+        # Normalize and validate preferred language (defaults to 'en' for
+        # older clients that don't send the field).
+        preferred_language = (request.data.get('preferred_language') or 'en').lower()
+        if preferred_language not in ('en', 'fr'):
+            preferred_language = 'en'
+
         defaults = {
             'is_active': True,
             'device_type': request.data.get('device_type', ''),
             'device_os': request.data.get('device_os', ''),
+            'preferred_language': preferred_language,
         }
 
         if user:
@@ -798,7 +806,8 @@ def register_fcm_token(request):
         )
 
         return Response({
-            'message': 'FCM token registered successfully'
+            'message': 'FCM token registered successfully',
+            'preferred_language': preferred_language,
         })
 
     except Exception as e:
@@ -832,6 +841,17 @@ def update_fcm_token(request):
         profile.fcm_token = fcm_token
         profile.save(update_fields=['fcm_token'])
 
+        # Prefer the client-supplied device language; fall back to the user's
+        # profile preference so the device always matches the authenticated
+        # user's language preference after login.
+        preferred_language = (
+            request.data.get('preferred_language')
+            or profile.preferred_language
+            or 'en'
+        ).lower()
+        if preferred_language not in ('en', 'fr'):
+            preferred_language = 'en'
+
         # Link existing token (possibly anonymous) to the current user,
         # or create a new one. Since token is unique, use update_or_create
         # with token as the lookup field.
@@ -842,11 +862,13 @@ def update_fcm_token(request):
                 'is_active': True,
                 'device_type': profile.device_type,
                 'device_os': profile.device_os,
+                'preferred_language': preferred_language,
             }
         )
 
         return Response({
-            'message': 'FCM token updated successfully'
+            'message': 'FCM token updated successfully',
+            'preferred_language': preferred_language,
         })
 
     except Exception as e:
@@ -892,13 +914,25 @@ def deactivate_fcm_token(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_language_preference(request):
-    """Update user's preferred language for push notifications."""
+    """Update user's preferred language for push notifications.
+
+    Returns ``updated=False`` when the value is already in sync so the
+    client can skip diagnostic logging on idempotent startup re-syncs.
+    """
     language = request.data.get('preferred_language', 'en')
     if language not in ('en', 'fr'):
         return Response({'error': 'Invalid language'}, status=status.HTTP_400_BAD_REQUEST)
-    request.user.profile.preferred_language = language
-    request.user.profile.save(update_fields=['preferred_language'])
-    return Response({'preferred_language': language})
+    profile = request.user.profile
+    updated = profile.preferred_language != language
+    if updated:
+        profile.preferred_language = language
+        profile.save(update_fields=['preferred_language'])
+    # Always propagate to device tokens so anonymous-registered tokens that
+    # were later linked to this user pick up the language change too.
+    DeviceToken.objects.filter(user=request.user).update(
+        preferred_language=language
+    )
+    return Response({'preferred_language': language, 'updated': updated})
 
 
 @api_view(['POST'])
@@ -915,6 +949,43 @@ def update_device_info(request):
     profile.last_active = timezone.now()
     profile.save(update_fields=['device_type', 'device_os', 'app_version', 'last_active'])
     return Response({'message': 'Device info updated'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def heartbeat(request):
+    """Lightweight presence ping used for the "users online now" counter.
+
+    Called every 60 seconds by the Flutter app while it is foregrounded.
+    Updates:
+      * ``UserProfile.last_active`` when the caller is authenticated.
+      * ``DeviceToken.updated_at`` when an ``X-FCM-Token`` header is present,
+        so anonymous devices are counted too.
+
+    Returns a minimal payload to keep the request cheap. This endpoint must
+    stay fast — it runs on every active device on a tight interval.
+    """
+    now = timezone.now()
+    bumped_user = False
+    bumped_device = False
+
+    if request.user.is_authenticated:
+        UserProfile.objects.filter(user_id=request.user.pk).update(last_active=now)
+        bumped_user = True
+
+    fcm_token = request.headers.get('X-FCM-Token') or request.META.get('HTTP_X_FCM_TOKEN')
+    if fcm_token:
+        # ``updated_at`` is auto_now=True, so any .save()/update() refreshes it.
+        updated = DeviceToken.objects.filter(token=fcm_token, is_active=True).update(
+            updated_at=now
+        )
+        bumped_device = bool(updated)
+
+    return Response({
+        'ok': True,
+        'user': bumped_user,
+        'device': bumped_device,
+    })
 
 
 @api_view(['GET'])
@@ -1024,7 +1095,11 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             is_liked = True
 
         edition.refresh_from_db()
-        return Response({'like_count': edition.like_count, 'is_liked': is_liked})
+        return Response({
+            'like_count': edition.like_count,
+            'is_liked': is_liked,
+            'recent_likers': get_recent_likers(MagazineLike, 'edition', edition, request),
+        })
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1148,9 +1223,17 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
         POST is throttled to prevent spam (10/min).
         """
+        import re
         article = self.get_object()
         if request.method == 'GET':
-            comments = article.comments.select_related('user', 'user__profile').all()
+            # Return only top-level comments; replies are nested via the serializer.
+            comments = (
+                article.comments
+                .filter(parent__isnull=True)
+                .select_related('user', 'user__profile')
+                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .order_by('-created_at')
+            )
             serializer = ArticleCommentSerializer(comments, many=True, context={'request': request})
             return Response(serializer.data)
         # POST — require auth
@@ -1174,7 +1257,39 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         from django.utils.html import escape
         content = escape(content)
 
-        comment = ArticleComment.objects.create(user=request.user, article=article, content=content)
+        # Optional threading — flatten any deeper nesting to 1 level.
+        parent_id = request.data.get('parent')
+        parent = None
+        if parent_id:
+            try:
+                parent = ArticleComment.objects.get(pk=parent_id, article=article)
+                if parent.parent_id is not None:
+                    parent = parent.parent
+            except ArticleComment.DoesNotExist:
+                return Response({'detail': 'Parent comment not found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        comment = ArticleComment.objects.create(
+            user=request.user, article=article, parent=parent, content=content,
+        )
+
+        # Parse @mentions and notify mentioned users (best-effort, never blocks).
+        # Uses privacy-safe sanitized handles (username is the user's email in DB).
+        from .utils import resolve_mentioned_users, user_handle
+        mentioned_users = resolve_mentioned_users(content, exclude_user=request.user)
+        for mu in mentioned_users:
+            ArticleCommentMention.objects.get_or_create(comment=comment, mentioned_user=mu)
+            try:
+                from .tasks import send_push_notification_async
+                name = request.user.get_full_name().strip() or user_handle(request.user)
+                send_push_notification_async.delay(
+                    user_ids=[mu.id],
+                    title=f'{name} mentioned you',
+                    body=f'"{content[:80]}" in {article.title[:40]}',
+                    data={'type': 'article_comment', 'article_id': str(article.id)},
+                )
+            except Exception:
+                pass
+
         serializer = ArticleCommentSerializer(comment, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -1186,9 +1301,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             comment = ArticleComment.objects.get(pk=comment_id, article_id=pk)
         except ArticleComment.DoesNotExist:
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
-        if comment.user != request.user:
+        if comment.user != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
-        comment.delete()
+        comment.delete()  # CASCADE deletes any replies too
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
@@ -1211,6 +1326,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({
             'is_liked': is_liked,
             'like_count': article.like_count,
+            'recent_likers': get_recent_likers(ArticleLike, 'article', article, request),
         })
 
 
@@ -1290,7 +1406,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         ics_content = (
             "BEGIN:VCALENDAR\r\n"
             "VERSION:2.0\r\n"
-            "PRODID:-//Burundi AU Chairmanship//Events//EN\r\n"
+            "PRODID:-//Burundi Chairmanship//Events//EN\r\n"
             "CALSCALE:GREGORIAN\r\n"
             "METHOD:PUBLISH\r\n"
             "BEGIN:VEVENT\r\n"
@@ -1383,7 +1499,11 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             GalleryAlbum.objects.filter(pk=album.pk).update(like_count=F('like_count') + 1)
             is_liked = True
         album.refresh_from_db()
-        return Response({'like_count': album.like_count, 'is_liked': is_liked})
+        return Response({
+            'like_count': album.like_count,
+            'is_liked': is_liked,
+            'recent_likers': get_recent_likers(GalleryAlbumLike, 'album', album, request),
+        })
 
 
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1426,7 +1546,11 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             Video.objects.filter(pk=video.pk).update(like_count=F('like_count') + 1)
             is_liked = True
         video.refresh_from_db()
-        return Response({'like_count': video.like_count, 'is_liked': is_liked})
+        return Response({
+            'like_count': video.like_count,
+            'is_liked': is_liked,
+            'recent_likers': get_recent_likers(VideoLike, 'video', video, request),
+        })
 
     @action(detail=True, methods=['get'], url_path='chapters', permission_classes=[AllowAny])
     def chapters(self, request, pk=None):
@@ -1522,17 +1646,68 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         count = notifications.exclude(read_by=request.user).count()
         return Response({'unread_count': count})
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='opened')
+    def _resolve_device_token(self, request):
+        """Look up the DeviceToken row for the X-FCM-Token header (if any)."""
+        token_value = request.headers.get('X-FCM-Token') or request.META.get('HTTP_X_FCM_TOKEN')
+        if not token_value:
+            return None
+        try:
+            return DeviceToken.objects.filter(token=token_value).first()
+        except Exception:
+            return None
+
+    def _record_event(self, notification, request, event_type):
+        """Create a NotificationEvent row (idempotent per unique constraint)."""
+        user = request.user if request.user.is_authenticated else None
+        device_token = self._resolve_device_token(request)
+        language = ''
+        if user is not None:
+            try:
+                language = getattr(user.profile, 'preferred_language', '') or ''
+            except Exception:
+                language = ''
+        try:
+            NotificationEvent.objects.get_or_create(
+                notification=notification,
+                user=user,
+                device_token=device_token,
+                event_type=event_type,
+                defaults={'language': language},
+            )
+        except Exception:
+            # Analytics must never break the request path
+            logger.exception('Failed to record notification event')
+        if event_type == 'opened':
+            Notification.objects.filter(pk=notification.pk).update(
+                opened_count=models.F('opened_count') + 1
+            )
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny], url_path='event')
+    def event(self, request, pk=None):
+        """
+        Generic engagement event endpoint.
+        Accepts: delivered / displayed / opened / dismissed.
+        Anonymous-friendly (attribution falls back to device_token header).
+        """
+        event_type = request.data.get('type')
+        valid_types = ['delivered', 'displayed', 'opened', 'dismissed']
+        if event_type not in valid_types:
+            return Response(
+                {'error': f'invalid type, must be one of {valid_types}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        notification = self.get_object()
+        self._record_event(notification, request, event_type)
+        return Response({'ok': True, 'type': event_type, 'notification_id': notification.pk})
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny], url_path='opened')
     def opened(self, request, pk=None):
         """
-        Track that a user opened/tapped a push notification.
-        Increments the opened_count on the Notification.
-        Called from Flutter when a push notification is tapped.
+        Back-compat wrapper for older app versions. Proxies to ``event`` with
+        ``type='opened'`` so legacy installs keep incrementing open counts.
         """
         notification = self.get_object()
-        Notification.objects.filter(pk=notification.pk).update(
-            opened_count=models.F('opened_count') + 1
-        )
+        self._record_event(notification, request, 'opened')
         return Response({
             'message': 'Notification open tracked',
             'notification_id': notification.pk,
@@ -1697,8 +1872,6 @@ def home_feed(request):
     settings = AppSettings.objects.first()
 
     # Combine both event types: EventRegistration (with forms) and Event (informational)
-    from django.utils import timezone
-
     # Get events with registration
     event_registrations = EventRegistration.objects.filter(
         is_active=True
@@ -2063,7 +2236,7 @@ class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
         ics_content = (
             "BEGIN:VCALENDAR\r\n"
             "VERSION:2.0\r\n"
-            "PRODID:-//Burundi AU Chairmanship//Events//EN\r\n"
+            "PRODID:-//Burundi Chairmanship//Events//EN\r\n"
             "CALSCALE:GREGORIAN\r\n"
             "METHOD:PUBLISH\r\n"
             "BEGIN:VEVENT\r\n"
@@ -2147,7 +2320,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">African Union Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Burundi Chairmanship 2026-2027</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -2190,7 +2363,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; African Union Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Burundi Chairmanship 2026-2027</p>
     </div>
   </div>
 </div>
@@ -2200,7 +2373,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 plain_message = f"Dear {user.get_full_name() or user.username},\n\nThank you for registering for {event_reg.event_title}.\n\n"
                 if event_reg.confirmation_message:
                     plain_message += f"{event_reg.confirmation_message}\n\n"
-                plain_message += "Best regards,\nBurundi AU Chairmanship Team"
+                plain_message += "Best regards,\nBurundi Chairmanship Team"
 
                 send_mail(
                     subject=subject,
@@ -3792,10 +3965,31 @@ def profile_completion(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def whats_new(request):
-    """Get recent app releases / changelog."""
-    releases = AppRelease.objects.order_by('-released_at')[:10]
-    serializer = AppReleaseSerializer(releases, many=True)
-    return Response(serializer.data)
+    """Get the What's New popup content for the currently-installed app version.
+
+    Query params:
+      - ``version`` (optional): semver string like ``1.1.0``. When provided and
+        a matching published ``AppRelease`` exists, its highlights are returned
+        so the client shows the admin-authored content instead of its hardcoded
+        fallback. When no match exists (or no version supplied), the latest
+        published release is returned so the client can decide what to display.
+    """
+    requested_version = (request.GET.get('version') or '').strip()
+    qs = AppRelease.objects.filter(is_published=True).order_by('-version_code')
+
+    release = None
+    if requested_version:
+        release = qs.filter(version=requested_version).first()
+    if release is None:
+        release = qs.first()
+
+    if release is None:
+        return Response({'release': None, 'releases': []})
+
+    serializer = AppReleaseSerializer(release)
+    # Also return the 10 most recent published releases for changelog screens
+    recent = AppReleaseSerializer(qs[:10], many=True)
+    return Response({'release': serializer.data, 'releases': recent.data})
 
 
 # ══════════════════════════════════════════════════════════════
@@ -3839,25 +4033,22 @@ def event_comments(request, event_id):
         event=event, user=request.user, parent=parent, content=content,
     )
 
-    # Parse @mentions
-    mention_pattern = re.compile(r'@(\w+)')
-    usernames = mention_pattern.findall(content)
-    if usernames:
-        mentioned_users = User.objects.filter(username__in=usernames)
-        for mu in mentioned_users:
-            if mu != request.user:
-                CommentMention.objects.get_or_create(comment=comment, mentioned_user=mu)
-                try:
-                    from .tasks import send_push_notification_async
-                    name = request.user.get_full_name() or request.user.username
-                    send_push_notification_async.delay(
-                        user_ids=[mu.id],
-                        title=f'{name} mentioned you',
-                        body=f'"{content[:80]}..." in {event.name}',
-                        data={'type': 'event_comment', 'event_id': str(event.id)}
-                    )
-                except Exception:
-                    pass
+    # Parse @mentions (privacy-safe — username is stored as email in DB)
+    from .utils import resolve_mentioned_users, user_handle
+    mentioned_users = resolve_mentioned_users(content, exclude_user=request.user)
+    for mu in mentioned_users:
+        CommentMention.objects.get_or_create(comment=comment, mentioned_user=mu)
+        try:
+            from .tasks import send_push_notification_async
+            name = request.user.get_full_name().strip() or user_handle(request.user)
+            send_push_notification_async.delay(
+                user_ids=[mu.id],
+                title=f'{name} mentioned you',
+                body=f'"{content[:80]}..." in {event.name}',
+                data={'type': 'event_comment', 'event_id': str(event.id)}
+            )
+        except Exception:
+            pass
 
     serializer = EventCommentSerializer(comment, context={'request': request})
     return Response(serializer.data, status=201)
@@ -3981,7 +4172,7 @@ def article_share_card(request, pk):
     <meta property="og:image" content="{image_url}" />
     <meta property="og:url" content="{share_url}" />
     <meta property="og:type" content="article" />
-    <meta property="og:site_name" content="Burundi AU Chairmanship" />
+    <meta property="og:site_name" content="Burundi Chairmanship" />
 
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />

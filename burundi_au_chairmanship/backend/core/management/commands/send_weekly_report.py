@@ -169,7 +169,7 @@ class Command(BaseCommand):
     <div style="background:linear-gradient(135deg,#1a1a1a 0%,#745B17 100%);border-radius:16px;padding:32px;margin-bottom:24px;">
       <h1 style="color:#ffffff;margin:0 0 8px 0;font-size:24px;">Weekly Analytics Digest</h1>
       <p style="color:#e5c374;margin:0;font-size:14px;">{m['week_start']} &mdash; {m['week_end']}</p>
-      <p style="color:rgba(255,255,255,0.7);margin:8px 0 0 0;font-size:12px;">Burundi AU Chairmanship App</p>
+      <p style="color:rgba(255,255,255,0.7);margin:8px 0 0 0;font-size:12px;">Burundi Chairmanship App</p>
     </div>
 
     <!-- KPI Cards -->
@@ -306,7 +306,7 @@ class Command(BaseCommand):
 
     <!-- Footer -->
     <div style="text-align:center;padding:16px;color:#94a3b8;font-size:11px;">
-      <p style="margin:0;">This is an automated report from the Burundi AU Chairmanship Admin Portal.</p>
+      <p style="margin:0;">This is an automated report from the Burundi Chairmanship Admin Portal.</p>
       <p style="margin:4px 0 0 0;">Generated on {m['report_date']}. To unsubscribe, remove your staff status in the admin panel.</p>
     </div>
   </div>
@@ -320,7 +320,7 @@ class Command(BaseCommand):
         lines = [
             f"WEEKLY ANALYTICS DIGEST",
             f"{m['week_start']} - {m['week_end']}",
-            f"Burundi AU Chairmanship App",
+            f"Burundi Chairmanship App",
             f"",
             f"=== KEY METRICS ===",
             f"Total Users:        {m['total_users']}",
@@ -347,7 +347,7 @@ class Command(BaseCommand):
             f"Resolved This Week: {m['resolved_this_week']}",
             f"",
             f"---",
-            f"This is an automated report from the Burundi AU Chairmanship Admin Portal.",
+            f"This is an automated report from the Burundi Chairmanship Admin Portal.",
         ]
         return '\n'.join(lines)
 

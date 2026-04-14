@@ -1,5 +1,5 @@
 """
-Custom throttling classes for the Burundi AU Chairmanship API.
+Custom throttling classes for the Burundi Chairmanship API.
 
 Provides rate limiting to prevent abuse and manipulation of analytics.
 """

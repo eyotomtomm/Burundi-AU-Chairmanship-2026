@@ -156,7 +156,7 @@ class EventCard extends StatelessWidget {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(Icons.celebration, color: const Color(0xFFF0D060).withValues(alpha: 0.9), size: 13),
+                            Icon(Icons.calendar_month_rounded, color: const Color(0xFFF0D060).withValues(alpha: 0.9), size: 13),
                             const SizedBox(width: 4),
                             Text(
                               _formatDate(event.eventDate!),

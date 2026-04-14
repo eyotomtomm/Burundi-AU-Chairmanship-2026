@@ -252,10 +252,10 @@ def send_weekly_newsletter():
     <h2>This Week's Highlights</h2>
     {'<h3>Recent Articles</h3><ul>' + articles_html + '</ul>' if articles_html else ''}
     {'<h3>Upcoming Events</h3><ul>' + events_html + '</ul>' if events_html else ''}
-    <p>Stay connected with the Burundi AU Chairmanship.</p>
+    <p>Stay connected with the Burundi Chairmanship.</p>
     """
 
-    subject = f"Burundi AU Chairmanship - Weekly Digest ({now.strftime('%b %d, %Y')})"
+    subject = f"Burundi Chairmanship - Weekly Digest ({now.strftime('%b %d, %Y')})"
 
     # Get subscribers
     subscribers = UserProfile.objects.filter(

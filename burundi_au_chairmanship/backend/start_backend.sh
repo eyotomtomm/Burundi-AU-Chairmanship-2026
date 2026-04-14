@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Burundi AU Chairmanship Backend Startup Script
+# Burundi Chairmanship Backend Startup Script
 # This script sets up environment variables, creates a superuser (if needed), and starts the Django server
 
 echo "=================================================="
-echo "Burundi AU Chairmanship Backend"
+echo "Burundi Chairmanship Backend"
 echo "=================================================="
 echo ""
 

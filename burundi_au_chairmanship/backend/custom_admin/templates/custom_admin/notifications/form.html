@@ -1,7 +1,7 @@
 {% extends 'custom_admin/base.html' %}
 {% load static %}
 
-{% block title %}{% if notification %}Edit Notification{% else %}Create Notification{% endif %} - Burundi AU Chairmanship{% endblock %}
+{% block title %}{% if notification %}Edit Notification{% else %}Create Notification{% endif %} - Burundi Chairmanship{% endblock %}
 
 {% block content %}
 <div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
@@ -493,8 +493,14 @@
                                 <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
                             </div>
                             <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                Only send to users who have this language set. Push content is always sent in the user's preferred language.
+                                Users with this language preference will receive the matching version; others are skipped. Leave empty to send bilingually.
                             </p>
+                            <div id="frLangWarning" class="hidden mt-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                                <p class="text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                                    <span class="material-symbols-outlined text-[16px] mt-0.5">warning</span>
+                                    <span>You are targeting French users but the French title or message is empty. French users would silently receive the English version. Please fill in both French fields.</span>
+                                </p>
+                            </div>
                         </div>
 
                         <!-- Audience Count Preview -->
@@ -506,7 +512,7 @@
                                         <p class="text-sm font-medium text-blue-900 dark:text-blue-300">
                                             Target Audience: <span id="audienceCount" class="text-lg font-bold">--</span> users
                                         </p>
-                                        <p class="text-xs text-blue-700 dark:text-blue-400">Based on current targeting filters. Click "Preview Count" to refresh.</p>
+                                        <p class="text-xs text-blue-700 dark:text-blue-400" id="audienceLangSplit">Based on current targeting filters. Click "Preview Count" to refresh.</p>
                                     </div>
                                     <button type="button" onclick="previewAudienceCount()" class="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
                                         Preview Count
@@ -685,10 +691,29 @@ function previewAudienceCount() {
     .then(r => r.json())
     .then(data => {
         countEl.textContent = data.count + ' / ' + data.total + ' total';
+        const splitEl = document.getElementById('audienceLangSplit');
+        if (splitEl && data.by_language) {
+            splitEl.textContent = (data.by_language.en || 0) + ' EN · ' + (data.by_language.fr || 0) + ' FR';
+        }
     })
     .catch(() => {
         countEl.textContent = 'Error';
     });
+}
+
+function updateFrLangWarning() {
+    const target = document.getElementById('target_language');
+    const titleFr = document.getElementById('title_fr');
+    const messageFr = document.getElementById('message_fr');
+    const warning = document.getElementById('frLangWarning');
+    if (!target || !warning) return;
+    const missingFr = !((titleFr && titleFr.value.trim()) &&
+                        (messageFr && messageFr.value.trim()));
+    if (target.value === 'fr' && missingFr) {
+        warning.classList.remove('hidden');
+    } else {
+        warning.classList.add('hidden');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -697,6 +722,14 @@ document.addEventListener('DOMContentLoaded', function() {
         globalCheckbox.addEventListener('change', toggleTargeting);
         toggleTargeting();
     }
+    ['target_language', 'title_fr', 'message_fr'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateFrLangWarning);
+            el.addEventListener('change', updateFrLangWarning);
+        }
+    });
+    updateFrLangWarning();
 });
 </script>
 {% endblock %}

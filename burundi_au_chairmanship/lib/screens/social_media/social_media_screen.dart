@@ -20,7 +20,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   static final List<Map<String, dynamic>> _mockSocialMedia = [
     {
       'platform': 'facebook',
-      'display_name': 'Burundi AU Chairmanship',
+      'display_name': 'Burundi Chairmanship',
       'handle': '@BurundiAU2026',
       'url': 'https://facebook.com/BurundiAU2026',
       'follower_count': '125K',
@@ -38,11 +38,11 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     },
     {
       'platform': 'instagram',
-      'display_name': 'Burundi AU Chairmanship',
+      'display_name': 'Burundi Chairmanship',
       'handle': '@burundiauchair2026',
       'url': 'https://instagram.com/burundiauchair2026',
       'follower_count': '67K',
-      'description': 'Photos and stories from the AU Chairmanship',
+      'description': 'Photos and stories from the Burundi Chairmanship',
       'icon_color': '#E4405F',
     },
     {
@@ -56,8 +56,8 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     },
     {
       'platform': 'linkedin',
-      'display_name': 'Burundi AU Chairmanship 2026',
-      'handle': 'Burundi AU Chairmanship',
+      'display_name': 'Burundi Chairmanship 2026',
+      'handle': 'Burundi Chairmanship',
       'url': 'https://linkedin.com/company/burundi-au-chairmanship',
       'follower_count': '28K',
       'description': 'Professional network and policy updates',

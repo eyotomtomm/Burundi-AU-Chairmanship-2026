@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
+import 'painters/page_curl_painter.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfUrl;
@@ -25,7 +26,7 @@ class PdfViewerScreen extends StatefulWidget {
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
-class _PdfViewerScreenState extends State<PdfViewerScreen> {
+class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderStateMixin {
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
   late PdfViewerController _pdfViewerController;
   int _currentPage = 0;
@@ -45,10 +46,25 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   String? _cachedFilePath;
   String? _cacheError;
 
+  // Page curl animation
+  late AnimationController _curlController;
+  bool _curlForward = true;
+
+  // Shimmer animation
+  late AnimationController _shimmerController;
+
   @override
   void initState() {
     super.initState();
     _pdfViewerController = PdfViewerController();
+    _curlController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _enableScreenProtection();
     _loadPdf();
     _recordView();
@@ -336,6 +352,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void dispose() {
     _pdfViewerController.dispose();
+    _curlController.dispose();
+    _shimmerController.dispose();
     _disableScreenProtection();
     super.dispose();
   }
@@ -459,15 +477,135 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 }
               },
               onPageChanged: (details) {
+                final newPage = details.newPageNumber - 1;
+                _curlForward = newPage > _currentPage;
                 setState(() {
-                  _currentPage = details.newPageNumber - 1;
+                  _currentPage = newPage;
                 });
+                // Trigger page curl animation
+                _curlController.forward(from: 0.0).then((_) {
+                  if (mounted) _curlController.reverse();
+                });
+                // Trigger shimmer on page load
+                _shimmerController.forward(from: 0.0);
               },
               onZoomLevelChanged: (details) {
                 setState(() {
                   _currentZoom = details.newZoomLevel;
                 });
               },
+            ),
+
+          // Glossy surface gradient overlay (subtle shimmer)
+          if (_cachedFilePath != null && !_isLoading)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment(-1.0, -0.5),
+                      end: Alignment(1.0, 0.5),
+                      colors: [
+                        Colors.transparent,
+                        Color(0x0DFFFFFF),
+                        Colors.transparent,
+                        Color(0x0AFFFFFF),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 0.25, 0.5, 0.75, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Left edge shadow (book spine effect)
+          if (_cachedFilePath != null && !_isLoading)
+            Positioned(
+              left: 0, top: 0, bottom: 0,
+              width: 12,
+              child: IgnorePointer(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0x26000000),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Right edge shadow
+          if (_cachedFilePath != null && !_isLoading)
+            Positioned(
+              right: 0, top: 0, bottom: 0,
+              width: 8,
+              child: IgnorePointer(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
+                      colors: [
+                        Color(0x1A000000),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Page curl animation on swipe
+          if (_cachedFilePath != null && !_isLoading)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _curlController,
+                  builder: (context, child) {
+                    return CustomPaint(
+                      painter: PageCurlPainter(
+                        progress: _curlController.value,
+                        isForward: _curlForward,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+          // Shimmer on page load
+          if (_cachedFilePath != null && !_isLoading)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _shimmerController,
+                  builder: (context, child) {
+                    final dx = _shimmerController.value * 3.0 - 1.0;
+                    return Opacity(
+                      opacity: (1.0 - _shimmerController.value).clamp(0.0, 0.4),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment(dx, -0.3),
+                            end: Alignment(dx + 1.0, 0.3),
+                            colors: const [
+                              Colors.transparent,
+                              Color(0x15FFFFFF),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
 
           // Caching progress indicator (replaces old generic spinner)

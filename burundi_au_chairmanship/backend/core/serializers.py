@@ -2,12 +2,13 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from .models import (
+    MagazineLike, ArticleLike, GalleryAlbumLike, VideoLike,
     HeroSlide, MagazineEdition, MagazineImage, Article, EmbassyLocation,
     Event, LiveFeed, Resource, Notification, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
-    VerificationRequest, VerificationSocialMedia, WeatherCity, EventRegistration, RegistrationFormField,
+    VerificationRequest, VerificationSocialMedia, WeatherCity, EventCategory, EventRegistration, RegistrationFormField,
     EventSubmission, FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     SupportTicket, TicketMessage, Popup,
     # New models
@@ -84,9 +85,11 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
 
     def get_name(self, obj):
-        """Return full name from first_name + last_name, falling back to first_name only."""
+        """Return full name from first_name + last_name, falling back to a safe handle.
+        Never exposes the raw username (which is the user's email in this app)."""
+        from .utils import user_handle
         full = f'{obj.first_name} {obj.last_name}'.strip()
-        return full or obj.username
+        return full or user_handle(obj)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -166,17 +169,41 @@ class MagazineImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'caption', 'caption_fr', 'order']
 
 
+def get_recent_likers(like_model, content_field, obj, request):
+    """Return the 3 most recent likers with profile info."""
+    likes = like_model.objects.filter(
+        **{content_field: obj}
+    ).select_related('user', 'user__profile').order_by('-created_at')[:3]
+    result = []
+    for like in likes:
+        user = like.user
+        pic = None
+        if hasattr(user, 'profile') and user.profile.profile_picture:
+            if request:
+                pic = request.build_absolute_uri(user.profile.profile_picture.url)
+            else:
+                pic = user.profile.profile_picture.url
+        from .utils import user_handle
+        result.append({
+            'user_id': user.id,
+            'name': f'{user.first_name} {user.last_name}'.strip() or user_handle(user),
+            'profile_picture': pic,
+        })
+    return result
+
+
 class MagazineEditionSerializer(serializers.ModelSerializer):
     effective_pdf_url = serializers.SerializerMethodField()
     images = MagazineImageSerializer(many=True, read_only=True)
     is_liked = serializers.BooleanField(read_only=True, default=False)
+    recent_likers = serializers.SerializerMethodField()
 
     class Meta:
         model = MagazineEdition
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'cover_image', 'pdf_file', 'external_url', 'effective_pdf_url',
                   'publish_date', 'is_featured', 'view_count', 'like_count',
-                  'page_count', 'file_size', 'images', 'is_liked']
+                  'page_count', 'file_size', 'images', 'is_liked', 'recent_likers']
 
     def get_effective_pdf_url(self, obj):
         if obj.pdf_file:
@@ -186,19 +213,36 @@ class MagazineEditionSerializer(serializers.ModelSerializer):
             return obj.pdf_file.url
         return obj.external_url or ''
 
+    def get_recent_likers(self, obj):
+        request = self.context.get('request')
+        return get_recent_likers(MagazineLike, 'edition', obj, request)
+
 
 class ArticleCommentSerializer(serializers.ModelSerializer):
+    """Serializer for article comments with nested replies, @mentions, and username handle."""
     user_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ArticleComment
-        fields = ['id', 'user_id', 'user_name', 'profile_picture', 'content', 'created_at']
-        read_only_fields = ['id', 'user_id', 'user_name', 'profile_picture', 'created_at']
+        fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
+                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+        read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
+                            'badge_type', 'created_at', 'replies', 'reply_count']
 
     def get_user_name(self, obj):
-        return obj.user.first_name or obj.user.username
+        # Never fall back to the raw username (which IS the user's email in this app).
+        from .utils import user_handle
+        return obj.user.get_full_name().strip() or user_handle(obj.user)
+
+    def get_username(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.user)
 
     def get_profile_picture(self, obj):
         if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
@@ -206,6 +250,23 @@ class ArticleCommentSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.user.profile.profile_picture.url)
         return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
+            return obj.user.profile.badge_type
+        return None
+
+    def get_replies(self, obj):
+        # Only nest replies under top-level comments
+        if obj.parent_id is not None:
+            return []
+        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        return ArticleCommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_count(self, obj):
+        if obj.parent_id is not None:
+            return 0
+        return obj.replies.count()
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -228,13 +289,19 @@ class ArticleSerializer(serializers.ModelSerializer):
     is_liked = serializers.BooleanField(read_only=True, default=False)
     thumbnail_url = serializers.CharField(read_only=True)
     medium_url = serializers.CharField(read_only=True)
+    recent_likers = serializers.SerializerMethodField()
 
     class Meta:
         model = Article
         fields = ['id', 'title', 'title_fr', 'content', 'content_fr',
                   'image', 'thumbnail_url', 'medium_url',
                   'author', 'category', 'publish_date', 'is_featured',
-                  'view_count', 'comment_count', 'like_count', 'is_liked', 'media']
+                  'view_count', 'comment_count', 'like_count', 'is_liked', 'media',
+                  'recent_likers']
+
+    def get_recent_likers(self, obj):
+        request = self.context.get('request')
+        return get_recent_likers(ArticleLike, 'article', obj, request)
 
 
 class EmbassyLocationSerializer(serializers.ModelSerializer):
@@ -254,12 +321,23 @@ class EventSerializer(serializers.ModelSerializer):
 
 
 class LiveFeedSerializer(serializers.ModelSerializer):
+    event_name = serializers.CharField(source='event.name', read_only=True, default=None)
+    event_date = serializers.DateTimeField(source='event.event_date', read_only=True, default=None)
+    speakers = serializers.SerializerMethodField()
+
     class Meta:
         model = LiveFeed
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'event', 'event_name', 'event_date', 'speakers',
                   'stream_url', 'stream_type',
                   'meeting_id', 'passcode', 'thumbnail', 'status',
                   'viewer_count', 'duration', 'scheduled_time']
+
+    def get_speakers(self, obj):
+        if not obj.event_id:
+            return []
+        qs = obj.event.event_speakers.filter(is_active=True).order_by('order', 'name')
+        return EventSpeakerSerializer(qs, many=True, context=self.context).data
 
 
 class ResourceSerializer(serializers.ModelSerializer):
@@ -407,12 +485,18 @@ class GalleryPhotoSerializer(serializers.ModelSerializer):
 class GalleryAlbumSerializer(serializers.ModelSerializer):
     photos = GalleryPhotoSerializer(many=True, read_only=True)
     is_liked = serializers.BooleanField(read_only=True, default=False)
+    recent_likers = serializers.SerializerMethodField()
 
     class Meta:
         model = GalleryAlbum
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'cover_image', 'photo_count', 'view_count', 'like_count',
-                  'created_at', 'is_featured', 'display_order', 'photos', 'is_liked']
+                  'created_at', 'is_featured', 'display_order', 'photos', 'is_liked',
+                  'recent_likers']
+
+    def get_recent_likers(self, obj):
+        request = self.context.get('request')
+        return get_recent_likers(GalleryAlbumLike, 'album', obj, request)
 
 
 class VideoChapterSerializer(serializers.ModelSerializer):
@@ -434,13 +518,14 @@ class VideoSerializer(serializers.ModelSerializer):
     is_liked = serializers.BooleanField(read_only=True, default=False)
     chapters = VideoChapterSerializer(many=True, read_only=True)
     subtitles = VideoSubtitleSerializer(many=True, read_only=True)
+    recent_likers = serializers.SerializerMethodField()
 
     class Meta:
         model = Video
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
                   'video_url', 'thumbnail', 'duration', 'category', 'view_count',
                   'like_count', 'publish_date', 'is_featured', 'is_liked',
-                  'chapters', 'subtitles']
+                  'chapters', 'subtitles', 'recent_likers']
 
     def get_video_url(self, obj):
         """Return video_file URL if exists, otherwise return video_url"""
@@ -450,6 +535,10 @@ class VideoSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.video_file.url)
             return obj.video_file.url
         return obj.video_url
+
+    def get_recent_likers(self, obj):
+        request = self.context.get('request')
+        return get_recent_likers(VideoLike, 'video', obj, request)
 
 
 class SocialMediaLinkSerializer(serializers.ModelSerializer):
@@ -650,8 +739,15 @@ class RegistrationFormFieldSerializer(serializers.ModelSerializer):
                   'options', 'validation_regex', 'help_text', 'help_text_fr', 'order']
 
 
+class EventCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventCategory
+        fields = ['id', 'name', 'name_fr', 'icon_name', 'color']
+
+
 class EventRegistrationSerializer(serializers.ModelSerializer):
     form_fields = RegistrationFormFieldSerializer(many=True, read_only=True)
+    category_data = EventCategorySerializer(source='category', read_only=True)
     has_registered = serializers.SerializerMethodField()
     user_submission_status = serializers.SerializerMethodField()
     user_submission_id = serializers.SerializerMethodField()
@@ -661,13 +757,14 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EventRegistration
-        fields = ['id', 'card_type', 'event_title', 'event_title_fr',
+        fields = ['id', 'card_type', 'event_type', 'category_data', 'event_title', 'event_title_fr',
                   'event_description', 'event_description_fr', 'event_poster',
                   'event_date', 'event_end_date', 'venue', 'venue_fr', 'venue_address',
                   'contact_email', 'contact_phone',
                   'is_registration_enabled', 'registration_deadline',
                   'max_registrations', 'allow_proxy_registration',
                   'confirmation_message', 'confirmation_message_fr',
+                  'show_photos', 'show_attendees', 'show_comments',
                   'is_active', 'order',
                   'form_fields', 'has_registered', 'user_submission_status',
                   'user_submission_id',
@@ -754,7 +851,8 @@ class TicketMessageSerializer(serializers.ModelSerializer):
                             'is_read', 'created_at']
 
     def get_sender_name(self, obj):
-        return obj.sender.first_name or obj.sender.username
+        from .utils import user_handle
+        return obj.sender.first_name or user_handle(obj.sender)
 
 
 class SupportTicketListSerializer(serializers.ModelSerializer):
@@ -1035,9 +1133,10 @@ class ConversationSerializer(serializers.ModelSerializer):
                   'last_message_at', 'created_at']
 
     def get_participant_names(self, obj):
+        from .utils import user_handle
         request = self.context.get('request')
         return [
-            {'id': u.id, 'name': f'{u.first_name} {u.last_name}'.strip() or u.username}
+            {'id': u.id, 'name': f'{u.first_name} {u.last_name}'.strip() or user_handle(u)}
             for u in obj.participants.all()
             if not request or u != request.user
         ]
@@ -1065,7 +1164,8 @@ class DirectMessageSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'sender', 'is_read', 'read_at', 'created_at']
 
     def get_sender_name(self, obj):
-        return f'{obj.sender.first_name} {obj.sender.last_name}'.strip() or obj.sender.username
+        from .utils import user_handle
+        return f'{obj.sender.first_name} {obj.sender.last_name}'.strip() or user_handle(obj.sender)
 
 
 class DiscussionSerializer(serializers.ModelSerializer):
@@ -1081,7 +1181,8 @@ class DiscussionSerializer(serializers.ModelSerializer):
                             'last_reply_at', 'created_at']
 
     def get_author_name(self, obj):
-        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or obj.author.username
+        from .utils import user_handle
+        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or user_handle(obj.author)
 
     def get_author_badge(self, obj):
         if hasattr(obj.author, 'profile') and obj.author.profile.is_verified:
@@ -1099,7 +1200,8 @@ class DiscussionReplySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'author', 'like_count', 'created_at', 'updated_at']
 
     def get_author_name(self, obj):
-        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or obj.author.username
+        from .utils import user_handle
+        return f'{obj.author.first_name} {obj.author.last_name}'.strip() or user_handle(obj.author)
 
 
 class PollOptionSerializer(serializers.ModelSerializer):
@@ -1190,7 +1292,8 @@ class LiveQAQuestionSerializer(serializers.ModelSerializer):
                             'answer', 'answered_at', 'created_at']
 
     def get_user_name(self, obj):
-        return f'{obj.user.first_name} {obj.user.last_name}'.strip() or obj.user.username
+        from .utils import user_handle
+        return f'{obj.user.first_name} {obj.user.last_name}'.strip() or user_handle(obj.user)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1241,12 +1344,24 @@ class ScheduledMaintenanceSerializer(serializers.ModelSerializer):
         return None
 
 
+class AppReleaseHighlightSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import AppReleaseHighlight
+        model = AppReleaseHighlight
+        fields = ['id', 'order', 'icon_name',
+                  'title_en', 'title_fr', 'subtitle_en', 'subtitle_fr']
+
+
 class AppReleaseSerializer(serializers.ModelSerializer):
+    highlights = AppReleaseHighlightSerializer(many=True, read_only=True)
+
     class Meta:
         model = AppRelease
         fields = ['id', 'version', 'version_code', 'title', 'title_fr',
                   'release_notes', 'release_notes_fr', 'is_force_update',
-                  'min_supported_version', 'android_url', 'ios_url', 'released_at']
+                  'min_supported_version', 'android_url', 'ios_url',
+                  'popup_delay_seconds', 'is_published', 'released_at',
+                  'highlights']
 
 
 class ContentAnalyticsSerializer(serializers.ModelSerializer):
@@ -1312,6 +1427,7 @@ class LinkedAccountSerializer(serializers.ModelSerializer):
 class EventCommentSerializer(serializers.ModelSerializer):
     """Serializer for event comments with nested replies and @mention highlighting."""
     user_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     profile_picture = serializers.SerializerMethodField()
     badge_type = serializers.SerializerMethodField()
@@ -1321,13 +1437,18 @@ class EventCommentSerializer(serializers.ModelSerializer):
     class Meta:
         from .models import EventComment
         model = EventComment
-        fields = ['id', 'event', 'user_id', 'user_name', 'profile_picture', 'badge_type',
+        fields = ['id', 'event', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
                   'parent', 'content', 'is_approved', 'created_at', 'replies', 'reply_count']
-        read_only_fields = ['id', 'user_id', 'user_name', 'profile_picture', 'badge_type',
+        read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
                             'is_approved', 'created_at', 'replies', 'reply_count']
 
     def get_user_name(self, obj):
-        return obj.user.get_full_name() or obj.user.username
+        from .utils import user_handle
+        return obj.user.get_full_name().strip() or user_handle(obj.user)
+
+    def get_username(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.user)
 
     def get_profile_picture(self, obj):
         if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
@@ -1374,7 +1495,8 @@ class EventAttendeeSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'badge_type', 'nationality']
 
     def get_name(self, obj):
-        return obj.get_full_name() or obj.username
+        from .utils import user_handle
+        return obj.get_full_name() or user_handle(obj)
 
     def get_badge_type(self, obj):
         if hasattr(obj, 'profile') and obj.profile.is_verified:

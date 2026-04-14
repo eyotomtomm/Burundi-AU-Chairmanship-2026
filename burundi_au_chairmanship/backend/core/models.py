@@ -124,6 +124,13 @@ class UserProfile(models.Model):
     # Newsletter preference
     receives_newsletter = models.BooleanField(default=True, help_text='User opted in for weekly newsletter')
 
+    # Admin section permissions (staff users only; superusers have implicit full access)
+    admin_sections = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of admin section keys this staff user can access. Ignored for superusers.'
+    )
+
     # Device tracking
     device_type = models.CharField(max_length=50, blank=True, help_text='e.g. iPhone 15, Samsung Galaxy S24')
     device_os = models.CharField(max_length=50, blank=True, help_text='e.g. iOS 17.4, Android 14')
@@ -391,14 +398,37 @@ class Article(models.Model):
 class ArticleComment(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='article_comments')
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='comments')
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies',
+        help_text='Parent comment for threaded replies (1 level deep).'
+    )
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['article', '-created_at']),
+            models.Index(fields=['parent']),
+        ]
 
     def __str__(self):
         return f"{self.user.username} on {self.article.title[:30]}"
+
+
+class ArticleCommentMention(models.Model):
+    """Tracks @mentions in article comments (mirror of CommentMention for events)."""
+    comment = models.ForeignKey(ArticleComment, on_delete=models.CASCADE, related_name='mentions')
+    mentioned_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='article_comment_mentions')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('comment', 'mentioned_user')
+        verbose_name = 'Article Comment Mention'
+        verbose_name_plural = 'Article Comment Mentions'
+
+    def __str__(self):
+        return f"@{self.mentioned_user.username} in article comment #{self.comment_id}"
 
 
 class ArticleLike(models.Model):
@@ -539,6 +569,11 @@ class LiveFeed(models.Model):
     title_fr = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     description_fr = models.TextField(blank=True)
+    event = models.ForeignKey(
+        'Event', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='live_feeds',
+        help_text='Optional — link this webinar to an event so it inherits the event\'s speakers.',
+    )
     stream_url = models.URLField()
     stream_type = models.CharField(
         max_length=20, choices=STREAM_TYPE_CHOICES, default='video',
@@ -797,6 +832,23 @@ class FeatureCardMedia(models.Model):
         return self.video_url or ''
 
 
+class EventCategory(models.Model):
+    name = models.CharField(max_length=100)
+    name_fr = models.CharField(max_length=100, blank=True)
+    icon_name = models.CharField(max_length=50, default='event', help_text='Material icon name')
+    color = models.CharField(max_length=7, default='#1B5E20', help_text='Hex color')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Event Category'
+        verbose_name_plural = 'Event Categories'
+
+
 class EventRegistration(models.Model):
     """Standalone event registration — no longer tied to FeatureCard"""
     CARD_TYPE_CHOICES = [
@@ -807,6 +859,15 @@ class EventRegistration(models.Model):
     ]
 
     card_type = models.CharField(max_length=20, choices=CARD_TYPE_CHOICES, default='event')
+
+    EVENT_TYPE_CHOICES = [
+        ('in_person', 'In Person'),
+        ('online', 'Online / Webinar'),
+        ('hybrid', 'Hybrid'),
+        ('info', 'Information Only'),
+    ]
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, default='in_person')
+    category = models.ForeignKey(EventCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='events')
 
     # Event details
     event_title = models.CharField(max_length=300)
@@ -834,6 +895,11 @@ class EventRegistration(models.Model):
     confirmation_message = models.TextField(blank=True, help_text='Message sent to user after registration')
     confirmation_message_fr = models.TextField(blank=True)
     allow_proxy_registration = models.BooleanField(default=False, help_text='Allow users to register on behalf of others')
+
+    # Feature toggles
+    show_photos = models.BooleanField(default=True, help_text='Allow attendees to upload & view photos')
+    show_attendees = models.BooleanField(default=True, help_text='Show attendee list & count')
+    show_comments = models.BooleanField(default=True, help_text='Allow comments/discussion')
 
     # Display
     is_active = models.BooleanField(default=True, help_text='Show/hide in app')
@@ -1099,6 +1165,14 @@ class Notification(models.Model):
     push_sent = models.BooleanField(default=False, help_text='Has push notification been sent?')
     push_sent_at = models.DateTimeField(blank=True, null=True)
     push_recipient_count = models.IntegerField(default=0, help_text='Number of users who received push')
+    push_recipient_en = models.IntegerField(
+        default=0,
+        help_text='Number of devices that received the English version'
+    )
+    push_recipient_fr = models.IntegerField(
+        default=0,
+        help_text='Number of devices that received the French version'
+    )
     opened_count = models.IntegerField(default=0, help_text='Number of times users opened/tapped this notification')
 
     # Status
@@ -1126,6 +1200,24 @@ class Notification(models.Model):
         if self.push_recipient_count > 0:
             return round((self.opened_count / self.push_recipient_count) * 100, 1)
         return 0
+
+    @property
+    def delivered_count(self):
+        """Number of unique delivery events recorded for this notification."""
+        return self.events.filter(event_type='delivered').count()
+
+    @property
+    def opened_users_count(self):
+        """Number of distinct users who opened this notification."""
+        return self.events.filter(event_type='opened').values('user').distinct().count()
+
+    @property
+    def click_through_rate(self):
+        """CTR = unique openers / delivered (falls back to push_recipient_count)."""
+        denom = self.delivered_count or self.push_recipient_count
+        if not denom:
+            return 0
+        return round((self.opened_users_count / denom) * 100, 1)
 
 
 class DeviceToken(models.Model):
@@ -1155,6 +1247,13 @@ class DeviceToken(models.Model):
         blank=True,
         help_text='e.g. iOS 17.4, Android 14'
     )
+    preferred_language = models.CharField(
+        max_length=5,
+        default='en',
+        blank=True,
+        help_text='Language for push notifications on this device (en/fr). '
+                  'Used to target anonymous devices that have not logged in yet.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1170,6 +1269,63 @@ class DeviceToken(models.Model):
         status = 'active' if self.is_active else 'inactive'
         username = self.user.username if self.user else 'anonymous'
         return f"{username} - {self.token[:20]}... ({status})"
+
+
+class NotificationEvent(models.Model):
+    """Per-recipient engagement events for a push Notification.
+
+    Enables real CTR and open-rate analytics (unique users, not raw taps).
+    A single (notification, user, device_token, event_type) combo is unique.
+    """
+    EVENT_CHOICES = [
+        ('delivered', 'Delivered'),   # Client received FCM payload
+        ('displayed', 'Displayed'),   # Banner shown / OS notification presented
+        ('opened', 'Opened'),         # User tapped the notification
+        ('dismissed', 'Dismissed'),   # User swiped away (best-effort)
+    ]
+
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name='events',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notification_events',
+    )
+    device_token = models.ForeignKey(
+        DeviceToken,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notification_events',
+    )
+    event_type = models.CharField(max_length=20, choices=EVENT_CHOICES)
+    language = models.CharField(max_length=5, blank=True)  # 'en' / 'fr' at send time
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Notification Event'
+        verbose_name_plural = 'Notification Events'
+        indexes = [
+            models.Index(fields=['notification', 'event_type']),
+            models.Index(fields=['created_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['notification', 'user', 'device_token', 'event_type'],
+                name='unique_notif_event_per_recipient',
+            )
+        ]
+
+    def __str__(self):
+        who = self.user.username if self.user else (
+            f"device#{self.device_token_id}" if self.device_token_id else 'anonymous'
+        )
+        return f"{self.notification_id}:{self.event_type}:{who}"
 
 
 class SupportTicket(models.Model):
@@ -1245,7 +1401,7 @@ class AppSettings(models.Model):
     instagram_url = models.URLField(blank=True)
 
     # About page fields (editable from admin)
-    app_description = models.TextField(blank=True, default='Official application for the Burundi African Union Chairmanship 2026.', help_text='Description shown in the About dialog (English)')
+    app_description = models.TextField(blank=True, default='Official application for the Burundi Chairmanship 2026.', help_text='Description shown in the About dialog (English)')
     app_description_fr = models.TextField(blank=True, default='Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.', help_text='Description shown in the About dialog (French)')
     developer_name = models.CharField(max_length=100, blank=True, default='Eyosias Tamene', help_text='Developer/company name shown in About dialog')
     developer_url = models.URLField(blank=True, default='https://eyosias.dev', help_text='Developer website URL')
@@ -1286,7 +1442,7 @@ class AppSettings(models.Model):
 
 
 class PriorityAgenda(models.Model):
-    """Priority agendas for the AU Chairmanship"""
+    """Priority agendas for the Burundi Chairmanship"""
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     slug = models.SlugField(unique=True)
@@ -2924,6 +3080,92 @@ class EmailTemplate(models.Model):
         return f"{self.get_key_display()}"
 
 
+class EmailCampaign(models.Model):
+    """One-off marketing / broadcast email sent from the admin to a user audience."""
+    AUDIENCE_CHOICES = [
+        ('all', 'All active users'),
+        ('language', 'By preferred language'),
+        ('nationality', 'By nationality'),
+        ('verified', 'Verified users only'),
+        ('staff', 'Staff / admins only'),
+        ('custom', 'Custom email list'),
+    ]
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('sending', 'Sending'),
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+    ]
+
+    name = models.CharField(max_length=120, help_text='Internal campaign name')
+    subject = models.CharField(max_length=200)
+    subject_fr = models.CharField(max_length=200, blank=True)
+    body_html = models.TextField(help_text='HTML body. Use {{ user_name }} and {{ user_email }} as placeholders.')
+    body_html_fr = models.TextField(blank=True)
+
+    audience_type = models.CharField(max_length=20, choices=AUDIENCE_CHOICES, default='all')
+    audience_language = models.CharField(max_length=5, blank=True, help_text="When audience_type='language'")
+    audience_nationality = models.CharField(max_length=5, blank=True, help_text="When audience_type='nationality' (ISO code)")
+    custom_recipients = models.TextField(blank=True, help_text='Comma- or newline-separated email list (for custom audience)')
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    recipient_count = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='email_campaigns')
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Email Campaign'
+        verbose_name_plural = 'Email Campaigns'
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+
+
+class EmailLog(models.Model):
+    """Transparent log of every outgoing email (via LoggingEmailBackend)."""
+    STATUS_CHOICES = [
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+    ]
+    CATEGORY_CHOICES = [
+        ('campaign', 'Campaign'),
+        ('verification', 'Verification'),
+        ('otp', 'OTP / Login'),
+        ('event', 'Event'),
+        ('support', 'Support'),
+        ('system', 'System'),
+        ('test', 'Test / Preview'),
+        ('other', 'Other'),
+    ]
+    subject = models.CharField(max_length=255, blank=True)
+    recipients = models.TextField(help_text='Comma-separated recipient emails')
+    from_email = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    error = models.TextField(blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+    body_preview = models.TextField(blank=True, help_text='First ~500 chars of HTML or text body')
+    campaign = models.ForeignKey(EmailCampaign, on_delete=models.SET_NULL, null=True, blank=True, related_name='logs')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Email Log'
+        verbose_name_plural = 'Email Logs'
+        indexes = [
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['category', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_status_display()} → {self.recipients[:60]}"
+
+
 class Webhook(models.Model):
     """Webhook endpoints for external integrations."""
     EVENT_CHOICES = [
@@ -3260,12 +3502,20 @@ class AppRelease(models.Model):
     version_code = models.IntegerField(unique=True, help_text='Integer version code for comparison')
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
-    release_notes = models.TextField(help_text='Markdown-formatted release notes')
+    release_notes = models.TextField(blank=True, help_text='Optional free-form summary (deprecated in favor of highlights)')
     release_notes_fr = models.TextField(blank=True)
     is_force_update = models.BooleanField(default=False, help_text='Force users to update')
     min_supported_version = models.CharField(max_length=20, blank=True, help_text='Minimum app version still supported')
     android_url = models.URLField(blank=True, help_text='Google Play Store URL')
     ios_url = models.URLField(blank=True, help_text='Apple App Store URL')
+    popup_delay_seconds = models.PositiveIntegerField(
+        default=2,
+        help_text='How many seconds after app launch to show the What\'s New popup (0 = immediately).'
+    )
+    is_published = models.BooleanField(
+        default=True,
+        help_text='When unchecked, the popup is hidden from users even if the version matches.'
+    )
     released_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -3276,6 +3526,31 @@ class AppRelease(models.Model):
 
     def __str__(self):
         return f"v{self.version} - {self.title}"
+
+
+class AppReleaseHighlight(models.Model):
+    """Individual changelog item shown inside the What's New popup."""
+    release = models.ForeignKey(
+        AppRelease, on_delete=models.CASCADE, related_name='highlights'
+    )
+    order = models.PositiveIntegerField(default=0, help_text='Display order (lower = shown first).')
+    icon_name = models.CharField(
+        max_length=60,
+        default='star_rounded',
+        help_text='Material icon name (e.g. "forum_rounded", "notifications_active_rounded").',
+    )
+    title_en = models.CharField(max_length=120)
+    title_fr = models.CharField(max_length=120, blank=True)
+    subtitle_en = models.TextField()
+    subtitle_fr = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'App Release Highlight'
+        verbose_name_plural = 'App Release Highlights'
+
+    def __str__(self):
+        return f"{self.release.version} — {self.title_en}"
 
 
 class RateLimitLog(models.Model):

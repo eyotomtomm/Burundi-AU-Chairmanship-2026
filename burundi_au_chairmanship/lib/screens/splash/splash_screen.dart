@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,9 @@ import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../widgets/african_pattern.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/heartbeat_service.dart';
 import '../../widgets/app_update_dialog.dart';
 import '../maintenance/maintenance_screen.dart';
 
@@ -81,6 +84,14 @@ class _SplashScreenState extends State<SplashScreen>
       if (kDebugMode) print('Auth init timed out in splash — proceeding');
     }
     if (!mounted) return;
+
+    // Re-sync language with backend + FCM topics on every cold start.
+    // Fire-and-forget so it never blocks the splash flow.
+    unawaited(context.read<LanguageProvider>().ensureSynced(authProvider));
+
+    // Start presence heartbeat so "users online now" reflects real usage.
+    // Self-manages on AppLifecycleState changes from here on.
+    HeartbeatService.instance.start();
 
     // Check maintenance mode before proceeding
     try {

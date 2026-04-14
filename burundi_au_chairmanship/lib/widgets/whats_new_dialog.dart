@@ -1,62 +1,101 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_colors.dart';
+import '../services/api_service.dart';
 
 /// A modal bottom sheet that shows release highlights ("What's New").
 ///
 /// On each app launch the current version is compared to the last version the
-/// user has acknowledged (persisted via SharedPreferences).  If different, a
-/// beautiful bottom sheet displays hardcoded changelog items with icons.
+/// user has acknowledged (persisted via SharedPreferences). If different, a
+/// beautiful bottom sheet displays changelog items with icons.
+///
+/// Content is loaded in a two-step strategy:
+///   1. First, try fetching `/whats-new/?version=<currentVersion>` from the
+///      backend. If it returns a published AppRelease with highlights, those
+///      are shown (admins can edit them live from the dashboard).
+///   2. If the network call fails, returns nothing, or has no highlights, the
+///      hardcoded fallback [_changelog] is used instead.
 ///
 /// Bilingual support: each item has both an English and French title/subtitle.
 class WhatsNewDialog {
   static const String _lastSeenVersionKey = 'last_seen_version';
 
-  // ── Changelog Items (hardcoded) ────────────────────────────
+  // ── Changelog Items (hardcoded fallback) ──────────────────────
   // Add new items at the TOP of this list for each release.
+  // These are only used if the backend is unreachable or hasn't
+  // published a release matching the current app version.
 
   static const List<_ChangelogItem> _changelog = [
     _ChangelogItem(
-      icon: Icons.speed_rounded,
-      titleEn: 'Improved Performance',
-      titleFr: 'Performance amelioree',
-      subtitleEn: 'Faster load times and smoother animations across the app.',
-      subtitleFr: 'Temps de chargement plus rapides et animations plus fluides.',
+      icon: Icons.forum_rounded,
+      titleEn: 'Threaded Comments & Mentions',
+      titleFr: 'Commentaires en fil et mentions',
+      subtitleEn: 'Reply to any comment and tag people with @mentions on articles and events.',
+      subtitleFr: 'Repondez a un commentaire et mentionnez des utilisateurs avec @ sur les articles et evenements.',
     ),
     _ChangelogItem(
-      icon: Icons.event_available_rounded,
-      titleEn: 'New Event Registration',
-      titleFr: 'Nouvelle inscription aux evenements',
-      subtitleEn: 'Register for upcoming AU events directly from the app.',
-      subtitleFr: 'Inscrivez-vous aux evenements de l\'UA directement depuis l\'application.',
+      icon: Icons.notifications_active_rounded,
+      titleEn: 'Instant In-App Banners',
+      titleFr: 'Bannieres instantanees dans l\'app',
+      subtitleEn: 'Push notifications now slide down from the top while you use the app.',
+      subtitleFr: 'Les notifications push apparaissent en haut pendant que vous utilisez l\'application.',
     ),
     _ChangelogItem(
-      icon: Icons.verified_rounded,
-      titleEn: 'Badge Verification System',
-      titleFr: 'Systeme de verification de badge',
-      subtitleEn: 'Request a Gold or Blue verified badge for your profile.',
-      subtitleFr: 'Demandez un badge verifie Or ou Bleu pour votre profil.',
+      icon: Icons.translate_rounded,
+      titleEn: 'Language-Targeted News',
+      titleFr: 'Actualites ciblees par langue',
+      subtitleEn: 'Receive push notifications in your preferred language — English or French.',
+      subtitleFr: 'Recevez les notifications dans votre langue preferee — anglais ou francais.',
     ),
     _ChangelogItem(
-      icon: Icons.support_agent_rounded,
-      titleEn: 'In-App Support',
-      titleFr: 'Support integre',
-      subtitleEn: 'Create support tickets and chat with our team.',
-      subtitleFr: 'Creez des tickets d\'assistance et discutez avec notre equipe.',
+      icon: Icons.people_alt_rounded,
+      titleEn: 'Users Online Now',
+      titleFr: 'Utilisateurs en ligne',
+      subtitleEn: 'See how many people are active on the app in real time from the home tab.',
+      subtitleFr: 'Voyez en temps reel combien d\'utilisateurs sont actifs depuis l\'accueil.',
     ),
     _ChangelogItem(
-      icon: Icons.bug_report_rounded,
-      titleEn: 'Bug Fixes & Stability',
-      titleFr: 'Corrections de bugs et stabilite',
-      subtitleEn: 'Resolved issues with notifications, login, and content loading.',
-      subtitleFr: 'Problemes resolus avec les notifications, la connexion et le chargement du contenu.',
+      icon: Icons.shield_rounded,
+      titleEn: 'Privacy Hardening',
+      titleFr: 'Renforcement de la confidentialite',
+      subtitleEn: 'Stronger protections for comments, mentions and profile handles.',
+      subtitleFr: 'Protections renforcees pour les commentaires, mentions et identifiants de profil.',
     ),
   ];
+
+  // ── Backend icon name → IconData mapping ─────────────────────
+  // Keep in sync with APP_RELEASE_ICON_CHOICES in custom_admin/views.py.
+  // Unknown names fall back to Icons.star_rounded so broken rows never crash.
+  static const Map<String, IconData> _backendIconMap = {
+    'forum_rounded': Icons.forum_rounded,
+    'notifications_active_rounded': Icons.notifications_active_rounded,
+    'translate_rounded': Icons.translate_rounded,
+    'people_alt_rounded': Icons.people_alt_rounded,
+    'shield_rounded': Icons.shield_rounded,
+    'speed_rounded': Icons.speed_rounded,
+    'bug_report_rounded': Icons.bug_report_rounded,
+    'event_available_rounded': Icons.event_available_rounded,
+    'verified_rounded': Icons.verified_rounded,
+    'auto_awesome_rounded': Icons.auto_awesome_rounded,
+    'palette_rounded': Icons.palette_rounded,
+    'article_rounded': Icons.article_rounded,
+    'menu_book_rounded': Icons.menu_book_rounded,
+    'play_circle_rounded': Icons.play_circle_rounded,
+    'live_tv_rounded': Icons.live_tv_rounded,
+    'map_rounded': Icons.map_rounded,
+    'support_agent_rounded': Icons.support_agent_rounded,
+    'search_rounded': Icons.search_rounded,
+    'download_rounded': Icons.download_rounded,
+    'dark_mode_rounded': Icons.dark_mode_rounded,
+    'accessibility_rounded': Icons.accessibility_rounded,
+    'rocket_launch_rounded': Icons.rocket_launch_rounded,
+    'star_rounded': Icons.star_rounded,
+  };
 
   /// Shows the What's New bottom sheet if the user hasn't seen the current version.
   ///
   /// [context] - the BuildContext.
-  /// [currentVersion] - the current app version (e.g. "1.0.0").
+  /// [currentVersion] - the current app version (e.g. "1.1.0").
   /// [langCode] - "en" or "fr".
   static Future<void> showIfNeeded({
     required BuildContext context,
@@ -67,8 +106,40 @@ class WhatsNewDialog {
       final prefs = await SharedPreferences.getInstance();
       final lastSeen = prefs.getString(_lastSeenVersionKey);
 
-      // Already seen this version
+      // Already seen this version → nothing to do
       if (lastSeen == currentVersion) return;
+
+      // Try backend first. On any failure / empty response fall back to
+      // the hardcoded list so users always see something after an update.
+      List<_ChangelogItem> items = _changelog;
+      String? remoteTitleEn;
+      String? remoteTitleFr;
+      try {
+        final remote = await ApiService().get(
+          'whats-new/?version=$currentVersion',
+        );
+        if (remote is Map && remote['release'] is Map) {
+          final release = remote['release'] as Map;
+          final highlights = (release['highlights'] as List?) ?? const [];
+          if (highlights.isNotEmpty) {
+            items = highlights.map<_ChangelogItem>((h) {
+              final map = h as Map;
+              final iconName = (map['icon_name'] as String?) ?? 'star_rounded';
+              return _ChangelogItem(
+                icon: _backendIconMap[iconName] ?? Icons.star_rounded,
+                titleEn: (map['title_en'] as String?) ?? '',
+                titleFr: (map['title_fr'] as String?) ?? '',
+                subtitleEn: (map['subtitle_en'] as String?) ?? '',
+                subtitleFr: (map['subtitle_fr'] as String?) ?? '',
+              );
+            }).toList();
+            remoteTitleEn = release['title'] as String?;
+            remoteTitleFr = release['title_fr'] as String?;
+          }
+        }
+      } catch (_) {
+        // Network / parse failure → keep the hardcoded fallback list.
+      }
 
       if (!context.mounted) return;
 
@@ -82,6 +153,9 @@ class WhatsNewDialog {
         builder: (sheetContext) => _WhatsNewSheet(
           currentVersion: currentVersion,
           langCode: langCode,
+          items: items,
+          remoteTitleEn: remoteTitleEn,
+          remoteTitleFr: remoteTitleFr,
           onDismiss: () async {
             // Save current version as seen
             await prefs.setString(_lastSeenVersionKey, currentVersion);
@@ -114,8 +188,8 @@ class _ChangelogItem {
     required this.subtitleFr,
   });
 
-  String title(String langCode) => langCode == 'fr' ? titleFr : titleEn;
-  String subtitle(String langCode) => langCode == 'fr' ? subtitleFr : subtitleEn;
+  String title(String langCode) => langCode == 'fr' && titleFr.isNotEmpty ? titleFr : titleEn;
+  String subtitle(String langCode) => langCode == 'fr' && subtitleFr.isNotEmpty ? subtitleFr : subtitleEn;
 }
 
 // ── Bottom Sheet Widget ──────────────────────────────────────
@@ -123,11 +197,17 @@ class _ChangelogItem {
 class _WhatsNewSheet extends StatelessWidget {
   final String currentVersion;
   final String langCode;
+  final List<_ChangelogItem> items;
+  final String? remoteTitleEn;
+  final String? remoteTitleFr;
   final VoidCallback onDismiss;
 
   const _WhatsNewSheet({
     required this.currentVersion,
     required this.langCode,
+    required this.items,
+    required this.remoteTitleEn,
+    required this.remoteTitleFr,
     required this.onDismiss,
   });
 
@@ -136,6 +216,19 @@ class _WhatsNewSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isFr = langCode == 'fr';
     final screenHeight = MediaQuery.of(context).size.height;
+
+    // Use backend-provided titles when available, otherwise the built-in
+    // bilingual default.
+    final String headerTitle;
+    if (isFr && (remoteTitleFr?.isNotEmpty ?? false)) {
+      headerTitle = remoteTitleFr!;
+    } else if (remoteTitleEn?.isNotEmpty ?? false) {
+      headerTitle = remoteTitleEn!;
+    } else {
+      headerTitle = isFr
+          ? 'Nouveautes dans v$currentVersion'
+          : "What's New in v$currentVersion";
+    }
 
     return Container(
       constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
@@ -190,9 +283,8 @@ class _WhatsNewSheet extends StatelessWidget {
 
           // Title
           Text(
-            isFr
-                ? 'Nouveautes dans v$currentVersion'
-                : "What's New in v$currentVersion",
+            headerTitle,
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -221,10 +313,10 @@ class _WhatsNewSheet extends StatelessWidget {
             child: ListView.separated(
               shrinkWrap: true,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              itemCount: WhatsNewDialog._changelog.length,
+              itemCount: items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 4),
               itemBuilder: (context, index) {
-                final item = WhatsNewDialog._changelog[index];
+                final item = items[index];
                 return _ChangelogTile(
                   item: item,
                   langCode: langCode,

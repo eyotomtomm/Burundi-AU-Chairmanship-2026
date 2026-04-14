@@ -140,6 +140,22 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
     }
   }
 
+  Future<void> _copyEmail(String email) async {
+    await Clipboard.setData(ClipboardData(text: email));
+    if (!mounted) return;
+    final isFrench = context.read<LanguageProvider>().isFrench;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isFrench ? 'Email copié: $email' : 'Email copied: $email',
+        ),
+        duration: const Duration(seconds: 2),
+        backgroundColor: AppColors.auGold,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _silentRetry() async {
     try {
       final status = await ApiService().getMaintenanceStatus();
@@ -238,6 +254,21 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
             SafeArea(
               child: Column(
                 children: [
+                  // Top bar with language toggle
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _LanguageToggle(
+                          isFrench: isFrench,
+                          onToggle: () => context
+                              .read<LanguageProvider>()
+                              .toggleLanguage(),
+                        ),
+                      ],
+                    ),
+                  ),
                   const Spacer(),
 
                   // Bottom card with info
@@ -360,6 +391,74 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
 
                               const SizedBox(height: 20),
 
+                              // Copyable contact email chip
+                              if (contactEmail != null &&
+                                  contactEmail.isNotEmpty) ...[
+                                InkWell(
+                                  onTap: () => _copyEmail(contactEmail),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.2),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.mail_outline_rounded,
+                                          size: 18,
+                                          color: AppColors.auGold,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                isFrench
+                                                    ? 'Nous contacter'
+                                                    : 'Contact us',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.7),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              SelectableText(
+                                                contactEmail,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Icon(
+                                          Icons.content_copy_rounded,
+                                          size: 18,
+                                          color: Colors.white
+                                              .withValues(alpha: 0.8),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+
                               // Buttons row
                               Row(
                                 children: [
@@ -480,6 +579,68 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       child: CustomPaint(
         size: MediaQuery.of(context).size,
         painter: _MaintenancePatternPainter(),
+      ),
+    );
+  }
+}
+
+class _LanguageToggle extends StatelessWidget {
+  final bool isFrench;
+  final VoidCallback onToggle;
+
+  const _LanguageToggle({
+    required this.isFrench,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.15),
+          child: InkWell(
+            onTap: onToggle,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.language_rounded,
+                    size: 16,
+                    color: AppColors.auGold,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isFrench ? 'FR' : 'EN',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.swap_horiz_rounded,
+                    size: 14,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

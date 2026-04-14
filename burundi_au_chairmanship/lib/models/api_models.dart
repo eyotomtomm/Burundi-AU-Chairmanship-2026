@@ -41,6 +41,10 @@ class ApiLiveFeed {
   final int viewerCount;
   final String duration;
   final DateTime? scheduledTime;
+  final int? eventId;
+  final String? eventName;
+  final DateTime? eventDate;
+  final List<Map<String, dynamic>> speakers;
 
   ApiLiveFeed({
     required this.id,
@@ -57,6 +61,10 @@ class ApiLiveFeed {
     required this.viewerCount,
     required this.duration,
     this.scheduledTime,
+    this.eventId,
+    this.eventName,
+    this.eventDate,
+    this.speakers = const [],
   });
 
   factory ApiLiveFeed.fromJson(Map<String, dynamic> json) {
@@ -77,6 +85,15 @@ class ApiLiveFeed {
       scheduledTime: json['scheduled_time'] != null
           ? DateTime.tryParse(json['scheduled_time'])
           : null,
+      eventId: json['event'],
+      eventName: json['event_name'],
+      eventDate: json['event_date'] != null
+          ? DateTime.tryParse(json['event_date'])
+          : null,
+      speakers: (json['speakers'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -223,7 +240,7 @@ class AppSettingsModel {
       facebookUrl: json['facebook_url'] ?? '',
       twitterUrl: json['twitter_url'] ?? '',
       instagramUrl: json['instagram_url'] ?? '',
-      appDescription: json['app_description'] ?? 'Official application for the Burundi African Union Chairmanship 2026.',
+      appDescription: json['app_description'] ?? 'Official application for the Burundi Chairmanship 2026.',
       appDescriptionFr: json['app_description_fr'] ?? 'Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.',
       developerName: json['developer_name'] ?? 'Eyosias Tamene',
       developerUrl: json['developer_url'] ?? 'https://eyosias.dev',

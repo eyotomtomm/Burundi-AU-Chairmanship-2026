@@ -64,6 +64,7 @@ urlpatterns = [
     path('auth/deactivate-fcm-token/', views.deactivate_fcm_token, name='deactivate-fcm-token'),
     path('auth/update-device-info/', views.update_device_info, name='update-device-info'),
     path('auth/update-language/', views.update_language_preference, name='update-language'),
+    path('heartbeat/', views.heartbeat, name='heartbeat'),
 
     # Auth - Profile management
     path('auth/profile/', views.profile, name='auth-profile'),

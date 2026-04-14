@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
@@ -1329,12 +1330,10 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         ),
       );
     } else if (feed.isZoom || feed.isTeams || feed.isWebex || feed.isGoogleMeet) {
-      // Meeting platforms → show credentials if available, then in-app WebView
-      if (feed.meetingId.isNotEmpty || feed.passcode.isNotEmpty) {
-        _showMeetingCredentials(feed);
-      } else {
-        _openInWebView(feed);
-      }
+      // Meeting platforms → always show credentials modal, then deep-link to native app.
+      // WebView join doesn't work because these platforms use WebRTC + proprietary SDKs
+      // that are not supported inside flutter's WKWebView / Android WebView.
+      _showMeetingCredentials(feed);
     } else if (feed.streamType == 'external') {
       // Generic external links → in-app WebView
       _openInWebView(feed);
@@ -1349,6 +1348,106 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
     }
   }
 
+  /// Launch the native meeting app using the platform's URL scheme.
+  /// Falls back to a user-friendly error if the app isn't installed.
+  Future<void> _launchMeetingApp(ApiLiveFeed feed) async {
+    final nativeUri = _buildNativeMeetingUri(feed);
+    final webFallbackUri = Uri.tryParse(feed.streamUrl);
+
+    // Try the native scheme first (zoommtg://, msteams://, etc.)
+    if (nativeUri != null) {
+      try {
+        final launched = await launchUrl(
+          nativeUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return;
+      } catch (_) {
+        // Fall through to web fallback
+      }
+    }
+
+    // Native app not installed or scheme failed → try the web URL in the device browser
+    if (webFallbackUri != null) {
+      try {
+        final launched = await launchUrl(
+          webFallbackUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return;
+      } catch (_) {
+        // Show error below
+      }
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Could not open ${feed.platformName}. Please install the ${feed.platformName} app.',
+        ),
+        backgroundColor: AppColors.error,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Build the native-app URL for each supported platform.
+  /// Returns null if there's no reliable native scheme for this platform.
+  Uri? _buildNativeMeetingUri(ApiLiveFeed feed) {
+    final meetingId = feed.meetingId.trim();
+    final passcode = feed.passcode.trim();
+    final webUrl = feed.streamUrl;
+
+    if (feed.isZoom) {
+      // zoommtg://zoom.us/join?confno=123456789&pwd=abcdef
+      if (meetingId.isNotEmpty) {
+        final params = <String, String>{'confno': meetingId};
+        if (passcode.isNotEmpty) params['pwd'] = passcode;
+        return Uri(
+          scheme: 'zoommtg',
+          host: 'zoom.us',
+          path: '/join',
+          queryParameters: params,
+        );
+      }
+      // No meeting ID → rely on the full web URL
+      return Uri.tryParse(webUrl);
+    }
+
+    if (feed.isTeams) {
+      // Microsoft Teams opens meetup-join links via msteams://
+      // Convert https://teams.microsoft.com/l/meetup-join/... → msteams://teams.microsoft.com/l/meetup-join/...
+      final parsed = Uri.tryParse(webUrl);
+      if (parsed != null && parsed.host.contains('teams.microsoft.com')) {
+        return parsed.replace(scheme: 'msteams');
+      }
+      return parsed;
+    }
+
+    if (feed.isWebex) {
+      // Webex deep-link: webex://meet?sitename=...&meetingnumber=...
+      if (meetingId.isNotEmpty) {
+        return Uri(
+          scheme: 'webex',
+          host: 'meet',
+          queryParameters: {'meetingnumber': meetingId},
+        );
+      }
+      return Uri.tryParse(webUrl);
+    }
+
+    if (feed.isGoogleMeet) {
+      // Google Meet has no reliable deep-link scheme across iOS/Android.
+      // Opening the https://meet.google.com/xxx link will open the Meet app
+      // if installed (via Universal Links on iOS / App Links on Android),
+      // or fall back to the web Meet PWA in the browser.
+      return Uri.tryParse(webUrl);
+    }
+
+    return null;
+  }
+
   void _openInWebView(ApiLiveFeed feed) {
     Navigator.push(
       context,
@@ -1361,6 +1460,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   void _showMeetingCredentials(ApiLiveFeed feed) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1368,73 +1468,194 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    _getPlatformIcon(feed.streamType),
-                    color: _getPlatformColor(feed.streamType),
-                    size: 28,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _getPlatformIcon(feed.streamType),
+                      color: _getPlatformColor(feed.streamType),
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Join on ${feed.platformName}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (feed.eventName != null && feed.eventName!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.event,
+                          size: 14,
+                          color: isDark ? Colors.white54 : Colors.black45),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          feed.eventName!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Join on ${feed.platformName}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                ],
+                const SizedBox(height: 16),
+                if (feed.meetingId.isNotEmpty) ...[
+                  _buildCredentialRow(
+                    'Meeting ID',
+                    feed.meetingId,
+                    Icons.tag,
+                    isDark,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (feed.passcode.isNotEmpty) ...[
+                  _buildCredentialRow(
+                    'Passcode',
+                    feed.passcode,
+                    Icons.lock_outline,
+                    isDark,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (feed.meetingId.isEmpty && feed.passcode.isEmpty) ...[
+                  Text(
+                    'You will be redirected to the ${feed.platformName} app to join this meeting.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (feed.speakers.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _buildSpeakersSection(feed.speakers, isDark),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _launchMeetingApp(feed);
+                    },
+                    icon: const Icon(Icons.login_rounded),
+                    label: Text('Open ${feed.platformName} app'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _getPlatformColor(feed.streamType),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (feed.meetingId.isNotEmpty) ...[
-                _buildCredentialRow(
-                  'Meeting ID',
-                  feed.meetingId,
-                  Icons.tag,
-                  isDark,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: MediaQuery.of(ctx).viewPadding.bottom + 8),
               ],
-              if (feed.passcode.isNotEmpty) ...[
-                _buildCredentialRow(
-                  'Passcode',
-                  feed.passcode,
-                  Icons.lock_outline,
-                  isDark,
-                ),
-                const SizedBox(height: 8),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _openInWebView(feed);
-                  },
-                  icon: const Icon(Icons.login_rounded),
-                  label: Text('Join ${feed.platformName}'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _getPlatformColor(feed.streamType),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(height: MediaQuery.of(ctx).viewPadding.bottom + 8),
-            ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSpeakersSection(
+      List<Map<String, dynamic>> speakers, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.record_voice_over,
+                size: 16, color: isDark ? Colors.white70 : Colors.black54),
+            const SizedBox(width: 6),
+            Text(
+              'Speakers (${speakers.length})',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white70 : Colors.black54,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 92,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: speakers.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) {
+              final s = speakers[i];
+              final photo = s['photo'] as String?;
+              final name = (s['name'] as String?) ?? '';
+              final title = (s['title'] as String?) ?? '';
+              return SizedBox(
+                width: 92,
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.grey[200],
+                      backgroundImage: (photo != null && photo.isNotEmpty)
+                          ? CachedNetworkImageProvider(photo)
+                          : null,
+                      child: (photo == null || photo.isEmpty)
+                          ? Icon(Icons.person,
+                              size: 28,
+                              color:
+                                  isDark ? Colors.white54 : Colors.black45)
+                          : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (title.isNotEmpty)
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: isDark ? Colors.white54 : Colors.black45,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -1497,8 +1718,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         title: feed.getTitle(langCode),
         description: feed.getDescription(langCode).isNotEmpty
             ? feed.getDescription(langCode)
-            : 'Burundi AU Chairmanship Live Event',
-        location: 'Burundi AU Chairmanship App - Live Feeds',
+            : 'Burundi Chairmanship Live Event',
+        location: 'Burundi Chairmanship App - Live Feeds',
         startDate: startTime,
         endDate: endTime,
         allDay: false,

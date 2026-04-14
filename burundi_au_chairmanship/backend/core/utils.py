@@ -1,10 +1,81 @@
 """
-Utility functions for the Burundi AU Chairmanship app.
+Utility functions for the Burundi Chairmanship app.
 """
 
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+# ── Privacy-safe user handle ─────────────────────────────────
+# Django `User.username` is set to the user's email on registration, so we
+# MUST never expose it raw to other users. This helper produces a stable,
+# non-leaking handle derived from the local part (before the @) of the email,
+# stripped of anything that isn't safe for an @mention.
+
+_UNSAFE_HANDLE_CHARS = re.compile(r'[^A-Za-z0-9_]')
+
+
+def sanitize_handle(raw_username):
+    """Return a privacy-safe @mention handle for a given Django username.
+
+    Rules:
+      • If the username contains "@", strip everything from "@" onward
+        (prevents email-domain leakage in public comment API responses).
+      • Replace any non-word characters with an empty string so the handle
+        matches ``@(\\w+)`` used in mention parsing.
+      • Empty result falls back to ``"user{id}"`` is handled by the caller;
+        this function just returns the sanitized string (possibly empty).
+    """
+    if not raw_username:
+        return ''
+    local = raw_username.split('@', 1)[0]
+    return _UNSAFE_HANDLE_CHARS.sub('', local)
+
+
+def user_handle(user):
+    """Safe handle for a User object, with a stable fallback."""
+    if not user:
+        return ''
+    h = sanitize_handle(getattr(user, 'username', ''))
+    return h or f'user{user.pk}'
+
+
+def resolve_mentioned_users(content, exclude_user=None):
+    """Parse @mentions in ``content`` and return User objects whose sanitized
+    handle exactly matches any mentioned handle (case-insensitive).
+
+    This is the privacy-safe replacement for the old
+    ``User.objects.filter(username__in=...)`` lookup which accidentally
+    required users to type the user's email.
+    """
+    from django.contrib.auth.models import User  # local import to avoid cycles
+
+    raw_handles = re.findall(r'@(\w+)', content or '')
+    if not raw_handles:
+        return []
+    # Build a lowercase set for matching.
+    wanted = {h.lower() for h in raw_handles}
+    # Pull every candidate whose email local-part *could* contain one of the
+    # handles. Using ``istartswith`` on username (email) is the cheapest query
+    # that reliably includes every potential match.
+    qs = User.objects.filter(is_active=True)
+    if exclude_user is not None:
+        qs = qs.exclude(pk=exclude_user.pk)
+    candidates = []
+    for handle in wanted:
+        candidates.extend(qs.filter(username__istartswith=handle))
+    # Deduplicate and verify the sanitized handle exactly matches.
+    seen = set()
+    matched = []
+    for user in candidates:
+        if user.pk in seen:
+            continue
+        seen.add(user.pk)
+        if sanitize_handle(user.username).lower() in wanted:
+            matched.append(user)
+    return matched
 
 
 # ── Admin Audit Trail ─────────────────────────────────────────

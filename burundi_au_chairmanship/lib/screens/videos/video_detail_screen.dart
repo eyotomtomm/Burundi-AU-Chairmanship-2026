@@ -9,6 +9,7 @@ import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/liked_by_avatars.dart';
 
 class VideoDetailScreen extends StatefulWidget {
   final Map<String, dynamic> video;
@@ -32,6 +33,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   bool _isLoading = true;
   bool _isLiked = false;
   int _likeCount = 0;
+  List<Liker> _recentLikers = [];
 
   // Chapters
   List<Map<String, dynamic>> _chapters = [];
@@ -45,6 +47,11 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     super.initState();
     _isLiked = widget.video['is_liked'] == true;
     _likeCount = widget.video['like_count'] ?? 0;
+    if (widget.video['recent_likers'] is List) {
+      _recentLikers = (widget.video['recent_likers'] as List)
+          .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+          .toList();
+    }
     // Parse chapters and subtitles from video data
     if (widget.video['chapters'] != null) {
       _chapters = List<Map<String, dynamic>>.from(widget.video['chapters']);
@@ -75,9 +82,16 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     try {
       final result = await ApiService().toggleVideoLike(widget.video['id'].toString());
       if (mounted) {
+        List<Liker> likers = [];
+        if (result['recent_likers'] is List) {
+          likers = (result['recent_likers'] as List)
+              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+              .toList();
+        }
         setState(() {
           _isLiked = result['is_liked'] == true;
           _likeCount = result['like_count'] ?? _likeCount;
+          _recentLikers = likers;
         });
       }
     } catch (_) {
@@ -449,6 +463,14 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             ],
                           ),
                         ),
+                        if (_recentLikers.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          LikedByAvatars(
+                            likers: _recentLikers,
+                            totalLikes: _likeCount,
+                            avatarRadius: 10,
+                          ),
+                        ],
                         const SizedBox(width: 16),
                         if (widget.video['duration'] != null) ...[
                           Icon(Icons.access_time,

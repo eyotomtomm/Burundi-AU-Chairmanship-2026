@@ -1,9 +1,18 @@
 {% load static %}<!DOCTYPE html>
-<html class="light" lang="en">
+<html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Login | Diplomatic Portal 2026-2027</title>
+<!-- Dark mode detection: runs before any rendering to prevent flash of wrong theme -->
+<script>
+(function() {
+  var theme = localStorage.getItem('admin-theme');
+  if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+</script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -38,6 +47,59 @@ tailwind.config = {
 </script>
 <style>
 .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+/* Dark mode overrides for standalone login page */
+.dark body.bg-surface { background-color: #0B1120 !important; color: #E5E7EB !important; }
+.dark .bg-surface { background-color: #0B1120 !important; }
+.dark .bg-surface-container-lowest { background-color: #111827 !important; }
+.dark .bg-surface-container-low { background-color: #1F2937 !important; }
+.dark .bg-surface-container { background-color: #1F2937 !important; }
+
+/* Left brand panel — keep it dark navy */
+.dark section.bg-primary-container { background-color: #0B1426 !important; }
+
+.dark .text-on-surface { color: #F9FAFB !important; }
+.dark .text-on-background { color: #E5E7EB !important; }
+.dark .text-on-surface-variant { color: #9CA3AF !important; }
+.dark .text-on-primary-container { color: #BBC7DF !important; }
+.dark .text-on-primary-fixed-variant { color: #8899B5 !important; }
+.dark .text-outline { color: #9CA3AF !important; }
+.dark .text-secondary-fixed { color: #E5C374 !important; }
+
+.dark .border-outline-variant { border-color: #374151 !important; }
+.dark .border-surface-container { border-color: #374151 !important; }
+.dark .border-secondary { border-color: #E5C374 !important; }
+
+.dark input::placeholder { color: #6B7280 !important; }
+/* Text inputs only — NOT checkboxes/radios. The Tailwind forms plugin uses
+   currentColor for the checked-state background, so overriding color on a
+   checkbox would make the filled state white-on-white (invisible checkmark). */
+.dark input:not([type="checkbox"]):not([type="radio"]) { color: #F9FAFB !important; }
+
+/* Remember-me checkbox — explicit checked styling so the tick is always
+   visible in both light and dark modes regardless of accent-color quirks. */
+input#remember_me {
+  accent-color: #745b17;
+}
+.dark input#remember_me {
+  accent-color: #E5C374;
+}
+
+.dark .material-symbols-outlined { color: inherit; }
+
+/* Access Portal button — golden accent in dark mode so it stands out */
+.dark button[type="submit"].bg-primary-container {
+  background-color: #E5C374 !important;
+  color: #0B1120 !important;
+  box-shadow: 0 10px 25px -5px rgba(229, 195, 116, 0.25) !important;
+}
+.dark button[type="submit"].bg-primary-container:hover {
+  background-color: #F0D490 !important;
+}
+.dark button[type="submit"].bg-primary-container .text-secondary,
+.dark button[type="submit"].bg-primary-container .material-symbols-outlined {
+  color: #0B1120 !important;
+}
 </style>
 </head>
 <body class="bg-surface font-body text-on-background min-h-screen flex items-center justify-center p-6 selection:bg-secondary-container">
@@ -51,14 +113,29 @@ tailwind.config = {
   <section class="lg:col-span-5 relative min-h-[400px] lg:min-h-[700px] flex flex-col justify-between p-12 bg-primary-container text-white overflow-hidden">
     <div class="absolute inset-0 z-0 opacity-20 bg-gradient-to-br from-secondary/30 to-transparent"></div>
     <div class="relative z-10">
-      <div class="flex flex-col items-start gap-6">
-        <div class="w-20 h-20 bg-white p-2 rounded-lg shadow-xl flex items-center justify-center">
-          <span class="text-4xl font-black text-primary-container font-headline">B</span>
+      <!-- Emblem row: Republic of Burundi · African Union -->
+      <div class="flex items-center gap-4 mb-8">
+        <!-- Republic of Burundi Coat of Arms (top left) -->
+        <div class="w-20 h-20 bg-white rounded-xl shadow-xl flex items-center justify-center ring-2 ring-secondary/30 p-2" title="Republic of Burundi">
+          <img src="{% static 'img/burundi_coat_of_arms.svg' %}" alt="Republic of Burundi" class="w-full h-full object-contain" />
         </div>
-        <div>
-          <span class="font-label text-secondary-fixed text-xs uppercase tracking-[0.2em] mb-2 block">Republic of Burundi</span>
-          <h1 class="font-headline text-3xl font-extrabold leading-tight tracking-tight">African Union Chairmanship 2026-2027</h1>
+        <!-- African Union Emblem — color in light mode, white in dark mode -->
+        <div class="w-20 h-20 rounded-xl shadow-xl flex items-center justify-center ring-2 ring-secondary/30 p-2 bg-white dark:bg-transparent dark:ring-white/20" title="African Union">
+          <!-- Light mode: color version -->
+          <img src="{% static 'img/au_emblem.svg' %}" alt="African Union" class="w-full h-full object-contain block dark:hidden" />
+          <!-- Dark mode: white version (CSS-inverted) -->
+          <img src="{% static 'img/au_emblem.svg' %}" alt="African Union" class="w-full h-full object-contain hidden dark:block" style="filter: brightness(0) invert(1);" />
         </div>
+      </div>
+
+      <div>
+        <span class="font-label text-secondary-fixed text-xs uppercase tracking-[0.2em] mb-2 block">Republic of Burundi</span>
+        <h1 class="font-headline text-3xl font-extrabold leading-tight tracking-tight">Burundi Chairmanship 2026-2027</h1>
+        <p class="mt-3 text-sm text-on-primary-container leading-relaxed">
+          Embassy of the Republic of Burundi &middot; Addis Ababa, Ethiopia
+          <br/>
+          <span class="text-secondary-fixed">In partnership with the African Union</span>
+        </p>
       </div>
     </div>
     <div class="relative z-10 mt-auto">
@@ -74,7 +151,7 @@ tailwind.config = {
     <div class="max-w-md mx-auto w-full">
       <header class="mb-10">
         <h2 class="font-headline text-4xl font-bold text-on-surface mb-3 tracking-tight">Sign In</h2>
-        <p class="text-on-surface-variant font-body leading-relaxed">Welcome to the AU Chairmanship admin portal. Please sign in to manage content and services.</p>
+        <p class="text-on-surface-variant font-body leading-relaxed">Welcome to the Burundi Chairmanship admin portal. Please sign in to manage content and services.</p>
       </header>
 
       {% if messages %}
@@ -119,22 +196,30 @@ tailwind.config = {
       </form>
 
       <script>
+      // Admin-portal convenience: remember username + password in localStorage when
+      // "Remember me" is checked. Passwords are base64-encoded as light obfuscation
+      // (NOT encryption). This is an admin-only portal — the admin is consciously
+      // trading some security for convenience on their own device.
       (function() {
         var saved = localStorage.getItem('admin_remember_user');
         if (saved) {
           try {
             var data = JSON.parse(saved);
             document.getElementById('username').value = data.username || '';
+            if (data.password) {
+              try {
+                document.getElementById('password').value = atob(data.password);
+              } catch(e) {}
+            }
             document.getElementById('remember_me').checked = true;
-            // Focus password field since username is pre-filled
-            document.getElementById('password').focus();
           } catch(e) {}
         }
         document.getElementById('loginForm').addEventListener('submit', function() {
           var cb = document.getElementById('remember_me');
           if (cb.checked) {
             localStorage.setItem('admin_remember_user', JSON.stringify({
-              username: document.getElementById('username').value
+              username: document.getElementById('username').value,
+              password: btoa(document.getElementById('password').value)
             }));
           } else {
             localStorage.removeItem('admin_remember_user');

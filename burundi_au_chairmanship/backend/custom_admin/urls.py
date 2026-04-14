@@ -50,6 +50,12 @@ urlpatterns = [
     path('notifications/<int:pk>/send/', views.notification_send_push, name='notification_send_push'),
     path('notifications/estimate-audience/', views.notification_estimate_audience, name='notification_estimate_audience'),
 
+    # App Releases (What's New popup)
+    path('app-releases/', views.app_releases_list, name='app_releases_list'),
+    path('app-releases/create/', views.app_release_create, name='app_release_create'),
+    path('app-releases/<int:pk>/edit/', views.app_release_edit, name='app_release_edit'),
+    path('app-releases/<int:pk>/delete/', views.app_release_delete, name='app_release_delete'),
+
     # Users
     path('users/', views.users_list, name='users_list'),
     path('users/create/', views.user_create, name='user_create'),
@@ -60,6 +66,7 @@ urlpatterns = [
     # Admin Management (Superuser only)
     path('admin-management/', views.admin_management, name='admin_management'),
     path('admin-management/invite/', views.admin_invite, name='admin_invite'),
+    path('admin-management/<int:pk>/access/', views.admin_edit_access, name='admin_edit_access'),
 
     # Verification Requests
     path('verification-requests/', views.verification_requests_list, name='verification_requests_list'),
@@ -170,6 +177,19 @@ urlpatterns = [
     # Email Templates
     path('email-templates/', views.email_templates_list, name='email_templates_list'),
     path('email-templates/<int:pk>/edit/', views.email_template_edit, name='email_template_edit'),
+
+    # Email Campaigns (marketing blasts)
+    path('email-campaigns/', views.email_campaigns_list, name='email_campaigns_list'),
+    path('email-campaigns/create/', views.email_campaign_create, name='email_campaign_create'),
+    path('email-campaigns/<int:pk>/edit/', views.email_campaign_edit, name='email_campaign_edit'),
+    path('email-campaigns/<int:pk>/send/', views.email_campaign_send, name='email_campaign_send'),
+    path('email-campaigns/<int:pk>/delete/', views.email_campaign_delete, name='email_campaign_delete'),
+
+    # Email Logs (sent + failed history)
+    path('email-logs/', views.email_logs_list, name='email_logs_list'),
+
+    # Email Inbox (IMAP viewer)
+    path('email-inbox/', views.email_inbox, name='email_inbox'),
 
     # Announcement Banners
     path('announcements/', views.announcements_list, name='announcements_list'),

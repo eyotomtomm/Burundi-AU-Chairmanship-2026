@@ -1,0 +1,303 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}{{ action }} App Release - Burundi Chairmanship{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">
+                    {% if action == 'Edit' %}edit_note{% else %}add_circle{% endif %}
+                </span>
+                <h1 class="text-3xl font-bold text-slate-900 dark:text-white">
+                    {{ action }} App Release
+                </h1>
+            </div>
+            <p class="text-slate-600 dark:text-slate-400">
+                {% if action == 'Edit' %}Update the What's New popup content for this release.{% else %}Create a new release and define the bilingual changelog items users will see.{% endif %}
+            </p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+            <div class="mb-4 p-4 rounded-lg {% if message.tags == 'error' %}bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300{% else %}bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Form Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <form method="POST" class="divide-y divide-slate-200 dark:divide-slate-700">
+                {% csrf_token %}
+
+                <!-- Version Section -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">tag</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Version Info</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="version" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Version <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="version" name="version" required maxlength="20"
+                                   value="{{ form_data.version|default:release.version|default:'' }}"
+                                   placeholder="e.g. 1.1.0"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="mt-1 text-xs text-slate-500">Must match the app's <code>AppConstants.appVersion</code>.</p>
+                        </div>
+                        <div>
+                            <label for="version_code" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Version Code <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" id="version_code" name="version_code" required min="1"
+                                   value="{{ form_data.version_code|default:release.version_code|default:'' }}"
+                                   placeholder="e.g. 12"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="mt-1 text-xs text-slate-500">Integer used for comparison. Matches pubspec <code>+N</code>.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bilingual Title -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">title</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Popup Header</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="title" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Title (English) <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="title" name="title" required maxlength="200"
+                                   value="{{ form_data.title|default:release.title|default:'' }}"
+                                   placeholder="e.g. What's New in v1.1.0"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label for="title_fr" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Titre (Français)
+                            </label>
+                            <input type="text" id="title_fr" name="title_fr" maxlength="200"
+                                   value="{{ form_data.title_fr|default:release.title_fr|default:'' }}"
+                                   placeholder="e.g. Nouveautés dans v1.1.0"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Highlights -->
+                <div class="p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">list_alt</span>
+                            <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Highlights (Changelog Items)</h2>
+                        </div>
+                        <button type="button" onclick="addHighlight()"
+                                class="inline-flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors duration-150">
+                            <span class="material-symbols-outlined text-sm">add</span>
+                            Add Highlight
+                        </button>
+                    </div>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        Each highlight is a single row shown to users inside the What's New bottom sheet. Order is top-to-bottom.
+                    </p>
+
+                    <div id="highlightsContainer" class="space-y-4">
+                        {% for h in highlights %}
+                        <div class="highlight-row p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900/40">
+                            <div class="flex items-start justify-between mb-3">
+                                <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Highlight #<span class="highlight-number">{{ forloop.counter }}</span></span>
+                                <button type="button" onclick="removeHighlight(this)" class="text-red-600 hover:text-red-700">
+                                    <span class="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Icon</label>
+                                    <select name="highlight_icon[]" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">
+                                        {% for val, label in icon_choices %}
+                                        <option value="{{ val }}" {% if val == h.icon_name %}selected{% endif %}>{{ label }} ({{ val }})</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div></div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Title (EN) *</label>
+                                    <input type="text" name="highlight_title_en[]" maxlength="120" value="{{ h.title_en }}" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Titre (FR)</label>
+                                    <input type="text" name="highlight_title_fr[]" maxlength="120" value="{{ h.title_fr }}" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Subtitle (EN) *</label>
+                                    <textarea name="highlight_subtitle_en[]" rows="2" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">{{ h.subtitle_en }}</textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sous-titre (FR)</label>
+                                    <textarea name="highlight_subtitle_fr[]" rows="2" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">{{ h.subtitle_fr }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div id="highlightsEmpty" class="{% if highlights %}hidden{% endif %} text-center py-8 text-slate-400 dark:text-slate-500 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                        No highlights yet — click <strong>Add Highlight</strong> to create one.
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">tune</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Settings</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="popup_delay_seconds" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Popup Delay (seconds)
+                            </label>
+                            <input type="number" id="popup_delay_seconds" name="popup_delay_seconds" min="0" max="30"
+                                   value="{{ form_data.popup_delay_seconds|default:release.popup_delay_seconds|default:'2' }}"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="mt-1 text-xs text-slate-500">How long after the app opens to show the popup.</p>
+                        </div>
+                        <div>
+                            <label for="released_at" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Released At
+                            </label>
+                            <input type="datetime-local" id="released_at" name="released_at"
+                                   value="{{ release.released_at|date:'Y-m-d\TH:i'|default:'' }}"
+                                   class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="mt-1 text-xs text-slate-500">Defaults to now if left empty.</p>
+                        </div>
+                        <div class="md:col-span-2 flex items-center gap-6 flex-wrap">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="is_published" class="w-4 h-4 rounded" {% if release.is_published or action == 'Create' %}checked{% endif %}>
+                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Published (visible to users)</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="is_force_update" class="w-4 h-4 rounded" {% if release.is_force_update %}checked{% endif %}>
+                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Force Update</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Optional: Store URLs for update prompts -->
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">store</span>
+                        <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Store URLs (Optional)</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="android_url" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Google Play URL</label>
+                            <input type="url" id="android_url" name="android_url" value="{{ form_data.android_url|default:release.android_url|default:'' }}" class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label for="ios_url" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">App Store URL</label>
+                            <input type="url" id="ios_url" name="ios_url" value="{{ form_data.ios_url|default:release.ios_url|default:'' }}" class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label for="min_supported_version" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Min Supported Version</label>
+                            <input type="text" id="min_supported_version" name="min_supported_version" maxlength="20" value="{{ form_data.min_supported_version|default:release.min_supported_version|default:'' }}" class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="p-6 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between">
+                    <a href="{% url 'custom_admin:app_releases_list' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors duration-150">
+                        <span class="material-symbols-outlined text-sm">arrow_back</span>
+                        Cancel
+                    </a>
+                    <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                        <span class="material-symbols-outlined text-sm">save</span>
+                        {{ action }} Release
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Icon options (rendered once, reused by addHighlight) -->
+<template id="iconOptionsTpl">
+    {% for val, label in icon_choices %}
+    <option value="{{ val }}">{{ label }} ({{ val }})</option>
+    {% endfor %}
+</template>
+
+<script>
+function renumberHighlights() {
+  document.querySelectorAll('#highlightsContainer .highlight-row .highlight-number').forEach(function(el, i) {
+    el.textContent = (i + 1);
+  });
+  const container = document.getElementById('highlightsContainer');
+  const empty = document.getElementById('highlightsEmpty');
+  if (container.children.length === 0) {
+    empty.classList.remove('hidden');
+  } else {
+    empty.classList.add('hidden');
+  }
+}
+
+function addHighlight() {
+  const container = document.getElementById('highlightsContainer');
+  const iconOptions = document.getElementById('iconOptionsTpl').innerHTML;
+  const row = document.createElement('div');
+  row.className = 'highlight-row p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900/40';
+  row.innerHTML = `
+    <div class="flex items-start justify-between mb-3">
+      <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Highlight #<span class="highlight-number"></span></span>
+      <button type="button" onclick="removeHighlight(this)" class="text-red-600 hover:text-red-700">
+        <span class="material-symbols-outlined text-sm">close</span>
+      </button>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Icon</label>
+        <select name="highlight_icon[]" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">
+          ${iconOptions}
+        </select>
+      </div>
+      <div></div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Title (EN) *</label>
+        <input type="text" name="highlight_title_en[]" maxlength="120" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Titre (FR)</label>
+        <input type="text" name="highlight_title_fr[]" maxlength="120" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Subtitle (EN) *</label>
+        <textarea name="highlight_subtitle_en[]" rows="2" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Sous-titre (FR)</label>
+        <textarea name="highlight_subtitle_fr[]" rows="2" class="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white"></textarea>
+      </div>
+    </div>
+  `;
+  container.appendChild(row);
+  renumberHighlights();
+}
+
+function removeHighlight(btn) {
+  btn.closest('.highlight-row').remove();
+  renumberHighlights();
+}
+
+renumberHighlights();
+</script>
+{% endblock %}

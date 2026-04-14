@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
+import '../services/firebase_messaging_service.dart';
+import 'auth_provider.dart';
 
 class LanguageProvider extends ChangeNotifier {
   Locale _locale = const Locale('en');
@@ -33,13 +35,27 @@ class LanguageProvider extends ChangeNotifier {
       notifyListeners();
 
       // Sync language preference with backend for push notification targeting
-      _syncLanguageWithBackend(languageCode);
+      await _syncLanguageWithBackend(languageCode);
+      // Sync FCM topics so the topic broadcast path is also language-aware
+      await FirebaseMessagingService().syncLanguageTopics(languageCode);
     }
   }
 
   Future<void> toggleLanguage() async {
     final newLang = _locale.languageCode == 'en' ? 'fr' : 'en';
     await setLanguage(newLang);
+  }
+
+  /// Idempotent startup re-sync: ensures the backend + FCM topics always
+  /// match whatever language is persisted locally, even after cold starts,
+  /// app updates, or OS upgrades. Safe to call multiple times.
+  Future<void> ensureSynced(AuthProvider auth) async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(AppConstants.languageKey) ?? 'en';
+    if (auth.isAuthenticated) {
+      await _syncLanguageWithBackend(code);
+    }
+    await FirebaseMessagingService().syncLanguageTopics(code);
   }
 
   /// Sync language preference to backend so push notifications are language-targeted

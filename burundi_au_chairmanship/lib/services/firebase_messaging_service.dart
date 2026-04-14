@@ -7,11 +7,12 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
+import '../widgets/in_app_notification_banner.dart';
 
 /// Top-level function for handling background messages
 ///
 /// This must be a top-level function (not a class method) to work with
-/// Firebase background message handlers
+/// Firebase background message handlers.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Only log in debug mode to prevent sensitive data leakage
@@ -19,6 +20,20 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print('Background message received: ${message.messageId}');
     print('Title: ${message.notification?.title}');
     print('Body: ${message.notification?.body}');
+  }
+  // Log delivery event (fire-and-forget). Safe to call from a background
+  // isolate because ApiService() is a lightweight singleton with its own
+  // http client and SharedPreferences-backed auth headers.
+  final nid = message.data['notification_id']?.toString();
+  if (nid != null && nid.isNotEmpty && nid != '0') {
+    try {
+      await ApiService().post(
+        'notifications/$nid/event/',
+        {'type': 'delivered'},
+      );
+    } catch (_) {
+      /* analytics must never break the handler */
+    }
   }
 }
 
@@ -37,8 +52,17 @@ class FirebaseMessagingService {
 
   GlobalKey<NavigatorState>? _navigatorKey;
 
+  /// Static handle to the navigator key so standalone helpers (e.g. banner
+  /// tap handlers) can navigate without a BuildContext.
+  static GlobalKey<NavigatorState>? navigatorKey;
+
   /// The current FCM token (cached for logout deactivation)
   String? _currentToken;
+
+  /// Public read-only access to the cached FCM token so other services
+  /// (heartbeat, event tracking) can attach it as an ``X-FCM-Token`` header
+  /// without round-tripping to Firebase.
+  String? get currentToken => _currentToken;
 
   /// Track processed message IDs to prevent duplicate notifications
   final Set<String> _processedMessageIds = {};
@@ -52,6 +76,7 @@ class FirebaseMessagingService {
   /// Should be called during app startup
   Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
     _navigatorKey = navigatorKey;
+    FirebaseMessagingService.navigatorKey = navigatorKey;
     // Request notification permissions
     NotificationSettings settings = await _messaging.requestPermission(
       alert: true,
@@ -163,7 +188,7 @@ class FirebaseMessagingService {
         ),
         content: Text(
           isEnglish
-              ? 'Enable notifications to receive important updates about events, news, and announcements from the AU Chairmanship.'
+              ? 'Enable notifications to receive important updates about events, news, and announcements from the Burundi Chairmanship.'
               : 'Activez les notifications pour recevoir les mises \u00e0 jour importantes sur les \u00e9v\u00e9nements, les actualit\u00e9s et les annonces de la Pr\u00e9sidence de l\'UA.',
           style: const TextStyle(fontSize: 14, height: 1.4),
         ),
@@ -228,14 +253,21 @@ class FirebaseMessagingService {
     );
   }
 
-  /// Handle foreground messages by showing a local notification
+  /// Handle foreground messages
   ///
-  /// When the app is in the foreground, Firebase doesn't automatically show
-  /// notifications, so we use flutter_local_notifications to display them.
+  /// Shows a Firebase-style slide-down in-app banner while the app is
+  /// foregrounded. Records ``delivered`` + ``displayed`` engagement events
+  /// so the admin dashboard can compute real CTR.
   /// Includes deduplication to prevent showing the same notification multiple times.
   void _handleForegroundMessage(RemoteMessage message) {
     if (kDebugMode) {
       print('Foreground message received: ${message.messageId}');
+    }
+
+    // Log delivery ASAP (before dedupe) so the backend sees every unique arrival
+    final nid = message.data['notification_id']?.toString();
+    if (nid != null && nid.isNotEmpty && nid != '0') {
+      _trackEvent(nid, 'delivered');
     }
 
     // Deduplication: generate a stable ID from messageId or content hash
@@ -254,32 +286,83 @@ class FirebaseMessagingService {
     }
 
     final notification = message.notification;
-    if (notification != null) {
-      // Use stable notification ID from messageId to prevent system-level duplicates
-      final notificationId = messageId.hashCode.abs() % 2147483647;
+    if (notification == null) return;
 
-      _localNotifications.show(
-        id: notificationId,
-        title: notification.title,
-        body: notification.body,
-        notificationDetails: NotificationDetails(
-          android: AndroidNotificationDetails(
-            'default_channel',
-            'Default Notifications',
-            channelDescription: 'Default notification channel for general updates',
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: _buildPayload(message),
+    final title = notification.title ?? '';
+    final body = notification.body;
+    final imageUrl = notification.android?.imageUrl ??
+        notification.apple?.imageUrl ??
+        message.data['image'] as String?;
+
+    // Prefer the in-app banner when we have a live context
+    final ctx = _navigatorKey?.currentContext;
+    if (ctx != null && title.isNotEmpty) {
+      InAppBanner.show(
+        ctx,
+        title: title,
+        body: body,
+        imageUrl: imageUrl,
+        notificationId: nid,
+        onTap: () {
+          if (nid != null) _trackEvent(nid, 'opened');
+          _navigateForMessage(message);
+        },
       );
+      if (nid != null && nid.isNotEmpty && nid != '0') {
+        _trackEvent(nid, 'displayed');
+      }
+      return;
     }
+
+    // Fallback: native local notification if we somehow have no context
+    final notificationId = messageId.hashCode.abs() % 2147483647;
+    _localNotifications.show(
+      id: notificationId,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          'default_channel',
+          'Default Notifications',
+          channelDescription: 'Default notification channel for general updates',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: _buildPayload(message),
+    );
+    if (nid != null && nid.isNotEmpty && nid != '0') {
+      _trackEvent(nid, 'displayed');
+    }
+  }
+
+  /// Shared navigation for a RemoteMessage — used by both tap and banner tap.
+  void _navigateForMessage(RemoteMessage message) {
+    if (_navigatorKey?.currentState == null) return;
+    final data = message.data;
+    final actionType = data['action_type'];
+    final actionValue = data['action_value'];
+    if (actionType == 'route' &&
+        actionValue != null &&
+        actionValue.toString().isNotEmpty) {
+      _navigatorKey?.currentState?.pushNamed(actionValue.toString());
+      return;
+    }
+    final type = data['type'];
+    final routes = {
+      'article': '/news',
+      'magazine': '/magazine',
+      'event': '/calendar',
+      'gallery': '/gallery',
+      'video': '/videos',
+    };
+    _navigatorKey?.currentState?.pushNamed(routes[type] ?? '/notifications');
   }
 
   /// Build notification payload including notification_id for open tracking
@@ -381,22 +464,41 @@ class FirebaseMessagingService {
     }
   }
 
-  /// Track that a notification was opened by calling the backend API
-  Future<void> _trackNotificationOpened(String notificationId) async {
+  /// Track a notification engagement event (delivered/displayed/opened/dismissed)
+  /// on the backend. Always fire-and-forget — analytics must never break the app.
+  Future<void> _trackEvent(String notificationId, String type) async {
     try {
       await ApiService().post(
-        'notifications/$notificationId/opened/',
-        {},
-        auth: true,
+        'notifications/$notificationId/event/',
+        {'type': type},
+        extraHeaders: _currentToken != null
+            ? {'X-FCM-Token': _currentToken!}
+            : null,
       );
       if (kDebugMode) {
-        print('Notification open tracked: #$notificationId');
+        print('Notification event tracked: #$notificationId / $type');
       }
     } catch (e) {
-      // Non-critical - don't let tracking failures affect user experience
       if (kDebugMode) {
-        print('Failed to track notification open: $e');
+        print('Failed to track notification event ($type): $e');
       }
+    }
+  }
+
+  /// Back-compat shim: older code paths called ``_trackNotificationOpened``.
+  Future<void> _trackNotificationOpened(String notificationId) =>
+      _trackEvent(notificationId, 'opened');
+
+  /// Read the user's current in-app language from SharedPreferences so the
+  /// messaging service can forward it to the backend without pulling in a
+  /// Provider dependency from this non-widget context.
+  Future<String> _currentLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final code = prefs.getString(AppConstants.languageKey) ?? 'en';
+      return (code == 'fr') ? 'fr' : 'en';
+    } catch (_) {
+      return 'en';
     }
   }
 
@@ -405,9 +507,10 @@ class FirebaseMessagingService {
   /// ensuring all devices can receive global push notifications.
   Future<void> _sendTokenToBackend(String token) async {
     try {
-      await ApiService().registerFCMToken(token);
+      final lang = await _currentLanguage();
+      await ApiService().registerFCMToken(token, preferredLanguage: lang);
       if (kDebugMode) {
-        print('FCM token registered with backend successfully');
+        print('FCM token registered with backend successfully (lang=$lang)');
       }
     } catch (e) {
       // Security: Only log detailed errors in debug mode
@@ -423,9 +526,13 @@ class FirebaseMessagingService {
   Future<void> linkTokenToUser() async {
     try {
       if (_currentToken != null) {
-        await ApiService().updateFCMToken(_currentToken!);
+        final lang = await _currentLanguage();
+        await ApiService().updateFCMToken(
+          _currentToken!,
+          preferredLanguage: lang,
+        );
         if (kDebugMode) {
-          print('FCM token linked to user successfully');
+          print('FCM token linked to user successfully (lang=$lang)');
         }
       }
     } catch (e) {
@@ -475,6 +582,41 @@ class FirebaseMessagingService {
       );
     } catch (e) {
       if (kDebugMode) print('Failed to report device info: $e');
+    }
+  }
+
+  /// Sync FCM topic subscriptions to match the user's current language.
+  ///
+  /// Subscribes to ``notif_<code>`` and unsubscribes from the other. Allows
+  /// admins to broadcast via FCM Topics API in addition to DB targeting.
+  Future<void> syncLanguageTopics(String code) async {
+    try {
+      if (code == 'fr') {
+        await _messaging.subscribeToTopic('notif_fr');
+        await _messaging.unsubscribeFromTopic('notif_en');
+      } else {
+        await _messaging.subscribeToTopic('notif_en');
+        await _messaging.unsubscribeFromTopic('notif_fr');
+      }
+      // Also push the language onto the DeviceToken row so anonymous-targeted
+      // sends bucket this device correctly even before the user logs in.
+      if (_currentToken != null) {
+        try {
+          await ApiService().registerFCMToken(
+            _currentToken!,
+            preferredLanguage: code,
+          );
+        } catch (_) {
+          // Non-critical — topic subscription is the primary signal.
+        }
+      }
+      if (kDebugMode) {
+        print('Language topics synced for: $code');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to sync language topics: $e');
+      }
     }
   }
 

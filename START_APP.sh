@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Burundi AU Chairmanship App - Startup Script
+# Burundi Chairmanship App - Startup Script
 # This script helps you start both backend and frontend
 
-echo "🇧🇮 Burundi AU Chairmanship App - Startup"
+echo "🇧🇮 Burundi Chairmanship App - Startup"
 echo "=========================================="
 echo ""
 

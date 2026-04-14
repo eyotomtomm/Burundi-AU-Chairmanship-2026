@@ -20,7 +20,7 @@ from .models import (
 # ═══════════════════════════════════════════════════════════════
 #  ADMIN SITE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-admin.site.site_header = 'Burundi AU Chairmanship 2026'
+admin.site.site_header = 'Burundi Chairmanship 2026'
 admin.site.site_title = 'Admin Panel'
 admin.site.index_title = 'Content Management System'
 
@@ -1128,7 +1128,7 @@ class PriorityAgendaAdmin(admin.ModelAdmin):
     PRIORITY AGENDAS - Key focus areas and initiatives
 
     HELP:
-    Priority agendas are the main focus areas of the AU Chairmanship.
+    Priority agendas are the main focus areas of the Burundi Chairmanship.
     Examples: Water & Sanitation, Economic Development, Peace & Security
 
     HOW TO USE:

@@ -41,8 +41,22 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Allow launching native meeting apps (Zoom, Teams, Webex) from Live Feeds.
+	     Without these entries, iOS 9+ silently blocks canLaunchUrl / launchUrl for custom schemes. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>zoommtg</string>
+		<string>zoomus</string>
+		<string>msteams</string>
+		<string>webex</string>
+		<string>webexstart</string>
+		<string>https</string>
+		<string>http</string>
+		<string>tel</string>
+		<string>mailto</string>
+	</array>
 	<key>NSCalendarsUsageDescription</key>
-	<string>We need access to your calendar to add AU Chairmanship events and meeting reminders to your personal calendar.</string>
+	<string>We need access to your calendar to add Burundi Chairmanship events and meeting reminders to your personal calendar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need camera access to allow you to take photos for your profile or to scan QR codes at embassy events.</string>
 	<key>NSContactsUsageDescription</key>

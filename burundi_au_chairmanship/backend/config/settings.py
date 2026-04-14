@@ -79,10 +79,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.middleware.firebase_auth.FirebaseAuthenticationMiddleware',  # Firebase auth
     'core.middleware.session_tracking.SessionTrackingMiddleware',  # Analytics session tracking
+    'core.middleware.last_active.LastActiveMiddleware',  # "Users online now" heartbeat (throttled 60s)
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.rate_limit_logger.RateLimitLoggingMiddleware',  # Log 429 throttled requests
     'custom_admin.middleware.activity_logger.AdminActivityLoggerMiddleware',  # Log admin staff actions
+    'custom_admin.permissions.AdminSectionPermissionMiddleware',  # Per-section access control for staff
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -98,6 +100,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'custom_admin.context_processors.admin_sections',
             ],
         },
     },
@@ -301,8 +304,8 @@ REST_FRAMEWORK = {
 
 # ─── drf-spectacular (OpenAPI / Swagger) ──────────────────────
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Burundi AU Chairmanship API',
-    'DESCRIPTION': 'REST API for the Burundi AU Chairmanship 2026 mobile application',
+    'TITLE': 'Burundi Chairmanship API',
+    'DESCRIPTION': 'REST API for the Burundi Chairmanship 2026 mobile application',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
@@ -323,13 +326,16 @@ SIMPLE_JWT = {
 }
 
 # ─── Admin Session Settings ──────────────────────────────────
-# Auto-logout after 30 minutes of inactivity (admin portal security)
-SESSION_COOKIE_AGE = 1800  # 30 minutes in seconds
-SESSION_SAVE_EVERY_REQUEST = True  # Reset timeout on every request (activity-based)
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Also expire when browser closes
+# Default: 30 days. The admin login view explicitly calls set_expiry() based
+# on the "Remember me for 30 days" checkbox, so this is only the fallback for
+# sessions where set_expiry was never called.
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days in seconds
+SESSION_SAVE_EVERY_REQUEST = True  # Refresh cookie Max-Age on every request
+# Note: SESSION_EXPIRE_AT_BROWSER_CLOSE intentionally NOT set (defaults to False).
+# Setting it to True caused "Remember me" to be ignored in some edge cases.
 
 # ─── Custom Admin Settings ────────────────────────────────────
-CUSTOM_ADMIN_SITE_TITLE = 'Burundi AU Chairmanship 2026'
+CUSTOM_ADMIN_SITE_TITLE = 'Burundi Chairmanship 2026'
 CUSTOM_ADMIN_SITE_HEADER = 'Content Management System'
 
 # ─── Security Headers (always active) ────────────────────────
@@ -365,9 +371,12 @@ if DEBUG:
         'django.core.mail.backends.console.EmailBackend'
     )
 else:
+    # Use our custom LoggingEmailBackend by default so every outgoing email
+    # (campaigns, verifications, OTPs, events, support) is recorded in
+    # EmailLog and visible on the admin "Email Logs" page.
     EMAIL_BACKEND = os.environ.get(
         'EMAIL_BACKEND',
-        'django.core.mail.backends.smtp.EmailBackend'
+        'core.email_backend.LoggingEmailBackend'
     )
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
@@ -377,8 +386,19 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
-    'Burundi AU Chairmanship <info@burundi4africa.com>'
+    'Burundi Chairmanship <info@burundi4africa.com>'
 )
+
+# ─── IMAP Inbox (admin "Email Inbox" viewer) ─────────────────
+# Optional. If set, the admin can view recent received emails in the
+# custom admin panel without opening Gmail. Defaults to the same account
+# used for SMTP so no extra config is needed for most setups.
+IMAP_HOST = os.environ.get('IMAP_HOST', 'imap.gmail.com')
+IMAP_PORT = int(os.environ.get('IMAP_PORT', '993'))
+IMAP_USE_SSL = os.environ.get('IMAP_USE_SSL', 'True').lower() in ('true', '1', 'yes')
+IMAP_USER = os.environ.get('IMAP_USER', EMAIL_HOST_USER)
+IMAP_PASSWORD = os.environ.get('IMAP_PASSWORD', EMAIL_HOST_PASSWORD)
+IMAP_MAILBOX = os.environ.get('IMAP_MAILBOX', 'INBOX')
 
 # Fix SSL certificate verification on DigitalOcean / Docker containers
 try:

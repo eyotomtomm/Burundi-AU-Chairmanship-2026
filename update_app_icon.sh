@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🎨 Updating Burundi AU Chairmanship App Icon"
+echo "🎨 Updating Burundi Chairmanship App Icon"
 echo "============================================="
 echo ""
 

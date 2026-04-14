@@ -1,6 +1,6 @@
 {% extends 'custom_admin/base.html' %}
 
-{% block title %}Admin Team Management - AU Chairmanship Admin{% endblock %}
+{% block title %}Admin Team Management - Burundi Chairmanship Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
@@ -67,9 +67,9 @@
           <tr>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Admin</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Role</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Access</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Last Session</th>
-            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Joined</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
           </tr>
         </thead>
@@ -113,6 +113,28 @@
               {% endif %}
             </td>
             <td class="px-6 py-4">
+              {% if admin.is_superuser %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span class="material-symbols-outlined text-sm">all_inclusive</span>
+                Full access
+              </span>
+              {% else %}
+                {% with count=admin.allowed_sections_set|length %}
+                {% if count == 0 %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                  <span class="material-symbols-outlined text-sm">lock</span>
+                  No access
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span class="material-symbols-outlined text-sm">key</span>
+                  {{ count }} / {{ total_menus }} menus
+                </span>
+                {% endif %}
+                {% endwith %}
+              {% endif %}
+            </td>
+            <td class="px-6 py-4">
               {% if admin.is_active %}
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -133,10 +155,6 @@
               <p class="text-sm text-slate-400 italic">Never logged in</p>
               {% endif %}
             </td>
-            <td class="px-6 py-4">
-              <p class="text-sm text-slate-700">{{ admin.date_joined|date:"M d, Y" }}</p>
-              <p class="text-xs text-slate-400">{{ admin.date_joined|date:"g:i A" }}</p>
-            </td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-1">
                 <a href="{% url 'custom_admin:user_edit' admin.pk %}"
@@ -144,6 +162,16 @@
                    title="Edit admin">
                   <span class="material-symbols-outlined text-xl">edit</span>
                 </a>
+                {% if not admin.is_superuser %}
+                <button type="button"
+                        class="open-access-btn p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Edit access permissions"
+                        data-admin-id="{{ admin.pk }}"
+                        data-admin-username="{{ admin.username }}"
+                        data-admin-sections="{% for s in admin.allowed_sections_set %}{{ s }}{% if not forloop.last %},{% endif %}{% endfor %}">
+                  <span class="material-symbols-outlined text-xl">key</span>
+                </button>
+                {% endif %}
                 {% if admin != request.user %}
                 <form method="post" action="{% url 'custom_admin:user_toggle_staff' admin.pk %}" class="inline"
                       onsubmit="return confirm('Are you sure you want to {{ admin.is_staff|yesno:"remove staff access from,grant staff access to" }} {{ admin.username }}?');">
@@ -181,8 +209,8 @@
 </div>
 
 <!-- Invite Admin Modal -->
-<div id="inviteModal" class="hidden fixed inset-0 bg-black/50 z-[90] flex items-center justify-center backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+<div id="inviteModal" class="hidden fixed inset-0 bg-black/50 z-[90] flex items-center justify-center backdrop-blur-sm p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden">
     <div class="bg-gradient-to-r from-purple-600 to-purple-700 px-8 py-6">
       <h3 class="text-xl font-bold text-white flex items-center gap-2">
         <span class="material-symbols-outlined">person_add</span>
@@ -218,10 +246,42 @@
 
       <div>
         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Role</label>
-        <select name="role" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-          <option value="staff">Staff (content management)</option>
+        <select id="inviteRoleSelect" name="role" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <option value="staff">Staff (choose sections below)</option>
           <option value="superuser">Super Admin (full access)</option>
         </select>
+      </div>
+
+      <!-- Menu permissions checklist (hidden when role = superuser) -->
+      <div id="inviteSectionsWrapper">
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-sm font-semibold text-slate-700">Menu Access</label>
+          <div class="flex items-center gap-2">
+            <button type="button" id="inviteSelectAll" class="text-xs font-semibold text-purple-600 hover:text-purple-700">Select all</button>
+            <span class="text-slate-300">·</span>
+            <button type="button" id="inviteClearAll" class="text-xs font-semibold text-slate-500 hover:text-slate-700">Clear all</button>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">Tick each menu this admin is allowed to see and open. The Dashboard is always accessible.</p>
+        <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+          {% for group_label, menus in all_menu_groups %}
+          <div class="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs uppercase tracking-wider text-slate-600 font-bold">{{ group_label }}</p>
+              <button type="button" class="invite-group-toggle text-xs font-semibold text-purple-600 hover:text-purple-700 px-2 py-0.5 rounded hover:bg-purple-50" data-group="invite-{{ forloop.counter }}">Toggle all</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1" data-group-name="invite-{{ forloop.counter }}">
+              {% for key, label, icon in menus %}
+              <label class="flex items-center gap-2 p-2 rounded-md hover:bg-white cursor-pointer transition-colors border border-transparent hover:border-slate-200">
+                <input type="checkbox" name="sections" value="{{ key }}" class="invite-section-cb rounded border-slate-300 text-purple-600 focus:ring-purple-500">
+                <span class="material-symbols-outlined text-base text-slate-500">{{ icon }}</span>
+                <span class="text-xs font-medium text-slate-700 truncate">{{ label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
 
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -253,14 +313,148 @@
   </div>
 </div>
 
+<!-- Edit Access Modal -->
+<div id="accessModal" class="hidden fixed inset-0 bg-black/50 z-[90] flex items-center justify-center backdrop-blur-sm p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden">
+    <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-8 py-6">
+      <h3 class="text-xl font-bold text-white flex items-center gap-2">
+        <span class="material-symbols-outlined">key</span>
+        Edit Access Permissions
+      </h3>
+      <p class="text-indigo-200 text-sm mt-1">Adjust which sections <strong id="accessModalUsername" class="text-white"></strong> can access</p>
+    </div>
+
+    <form id="accessForm" method="post" action="" class="p-8 space-y-5">
+      {% csrf_token %}
+
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-slate-500">Tick each menu this admin is allowed to see and open. Dashboard is always accessible.</p>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" id="accessSelectAll" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Select all</button>
+          <span class="text-slate-300">·</span>
+          <button type="button" id="accessClearAll" class="text-xs font-semibold text-slate-500 hover:text-slate-700">Clear all</button>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+        {% for group_label, menus in all_menu_groups %}
+        <div class="border-b border-slate-200 last:border-0 pb-3 last:pb-0">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs uppercase tracking-wider text-slate-600 font-bold">{{ group_label }}</p>
+            <button type="button" class="access-group-toggle text-xs font-semibold text-indigo-600 hover:text-indigo-700 px-2 py-0.5 rounded hover:bg-indigo-50" data-group="access-{{ forloop.counter }}">Toggle all</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1" data-group-name="access-{{ forloop.counter }}">
+            {% for key, label, icon in menus %}
+            <label class="flex items-center gap-2 p-2 rounded-md hover:bg-white cursor-pointer transition-colors border border-transparent hover:border-slate-200">
+              <input type="checkbox" name="sections" value="{{ key }}" class="access-section-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" data-key="{{ key }}">
+              <span class="material-symbols-outlined text-base text-slate-500">{{ icon }}</span>
+              <span class="text-xs font-medium text-slate-700 truncate">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="document.getElementById('accessModal').classList.add('hidden')"
+                class="flex-1 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50 transition-all">
+          Cancel
+        </button>
+        <button type="submit"
+                class="flex-1 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm inline-flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-sm">save</span>
+          Save Permissions
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
-// Close modal on backdrop click
-document.getElementById('inviteModal').addEventListener('click', function(e) {
+// ─── Invite modal: backdrop + escape ───────────────────────────
+const inviteModal = document.getElementById('inviteModal');
+inviteModal.addEventListener('click', function(e) {
   if (e.target === this) this.classList.add('hidden');
 });
-// Close on Escape key
+
+// ─── Invite modal: role toggle (hide sections when superuser) ──
+const roleSelect = document.getElementById('inviteRoleSelect');
+const sectionsWrapper = document.getElementById('inviteSectionsWrapper');
+function updateInviteSectionsVisibility() {
+  sectionsWrapper.style.display = roleSelect.value === 'superuser' ? 'none' : '';
+}
+roleSelect.addEventListener('change', updateInviteSectionsVisibility);
+updateInviteSectionsVisibility();
+
+// Invite select-all / clear-all
+document.getElementById('inviteSelectAll').addEventListener('click', function() {
+  document.querySelectorAll('.invite-section-cb').forEach(cb => cb.checked = true);
+});
+document.getElementById('inviteClearAll').addEventListener('click', function() {
+  document.querySelectorAll('.invite-section-cb').forEach(cb => cb.checked = false);
+});
+
+// ─── Edit Access modal ─────────────────────────────────────────
+const accessModal = document.getElementById('accessModal');
+const accessForm = document.getElementById('accessForm');
+const accessUsername = document.getElementById('accessModalUsername');
+
+accessModal.addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
+document.querySelectorAll('.open-access-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const id = btn.getAttribute('data-admin-id');
+    const username = btn.getAttribute('data-admin-username');
+    const raw = btn.getAttribute('data-admin-sections') || '';
+    const current = raw.split(',').map(s => s.trim()).filter(Boolean);
+
+    accessUsername.textContent = username;
+    accessForm.action = "{% url 'custom_admin:admin_edit_access' 0 %}".replace('/0/', '/' + id + '/');
+
+    // Reset + pre-check
+    document.querySelectorAll('.access-section-cb').forEach(function(cb) {
+      cb.checked = current.indexOf(cb.getAttribute('data-key')) !== -1;
+    });
+
+    accessModal.classList.remove('hidden');
+  });
+});
+
+document.getElementById('accessSelectAll').addEventListener('click', function() {
+  document.querySelectorAll('.access-section-cb').forEach(cb => cb.checked = true);
+});
+document.getElementById('accessClearAll').addEventListener('click', function() {
+  document.querySelectorAll('.access-section-cb').forEach(cb => cb.checked = false);
+});
+
+// ─── Per-group "All" toggles ──────────────────────────────────
+function toggleGroup(groupName, checkboxClass) {
+  const container = document.querySelector('[data-group-name="' + groupName + '"]');
+  if (!container) return;
+  const boxes = container.querySelectorAll('input.' + checkboxClass);
+  const anyUnchecked = Array.from(boxes).some(cb => !cb.checked);
+  boxes.forEach(cb => cb.checked = anyUnchecked);
+}
+document.querySelectorAll('.invite-group-toggle').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    toggleGroup(btn.getAttribute('data-group'), 'invite-section-cb');
+  });
+});
+document.querySelectorAll('.access-group-toggle').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    toggleGroup(btn.getAttribute('data-group'), 'access-section-cb');
+  });
+});
+
+// ─── Shared: Escape key closes any open modal ──────────────────
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') document.getElementById('inviteModal').classList.add('hidden');
+  if (e.key === 'Escape') {
+    inviteModal.classList.add('hidden');
+    accessModal.classList.add('hidden');
+  }
 });
 </script>
 {% endblock %}

@@ -10,7 +10,7 @@ def _email_wrapper(content):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Burundi AU Chairmanship</title>
+<title>Burundi Chairmanship</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f7fa;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f4f7fa;">
@@ -18,7 +18,7 @@ def _email_wrapper(content):
 <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
 <!-- Header -->
 <tr><td style="background:linear-gradient(135deg,#1B5E20 0%,#2E7D32 100%);padding:32px 40px;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">Burundi AU Chairmanship</h1>
+<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">Burundi Chairmanship</h1>
 <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:12px;text-transform:uppercase;letter-spacing:2px;">2026 - 2027</p>
 </td></tr>
 <!-- Content -->
@@ -48,12 +48,12 @@ def seed_email_templates(apps, schema_editor):
     templates = [
         {
             'key': 'welcome',
-            'subject': 'Welcome to Burundi AU Chairmanship',
+            'subject': 'Welcome to Burundi Chairmanship',
             'subject_fr': 'Bienvenue au Burundi Presidence de l\'UA',
             'body_html': _email_wrapper("""
 <h2 style="margin:0 0 16px;color:#1B5E20;font-size:24px;font-weight:700;">Welcome, {{{{ username }}}}!</h2>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 20px;">
-Thank you for joining the Burundi AU Chairmanship app. We are delighted to have you as part of our community.
+Thank you for joining the Burundi Chairmanship app. We are delighted to have you as part of our community.
 </p>
 <p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 24px;">
 Stay informed about the latest events, news, and initiatives during Burundi's historic chairmanship of the African Union.
@@ -67,7 +67,7 @@ Stay informed about the latest events, news, and initiatives during Burundi's hi
 If you have any questions, feel free to reach out to our support team through the app.
 </p>"""),
             'body_html_fr': '',
-            'body_text': 'Welcome to Burundi AU Chairmanship, {{ username }}! Thank you for joining our community.',
+            'body_text': 'Welcome to Burundi Chairmanship, {{ username }}! Thank you for joining our community.',
             'body_text_fr': '',
             'is_active': True,
         },

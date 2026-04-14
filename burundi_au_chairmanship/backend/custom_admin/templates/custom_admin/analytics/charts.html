@@ -39,7 +39,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">New user registrations per day over the last {{ period }} days</p>
     </div>
-    <canvas id="userGrowthChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="userGrowthChart"></canvas></div>
   </div>
 
   <!-- 2. Content Published (Stacked Bar Chart) -->
@@ -51,7 +51,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Articles, magazines, and videos published per week over the last 12 weeks</p>
     </div>
-    <canvas id="contentChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="contentChart"></canvas></div>
   </div>
 
   <!-- 3. Engagement Metrics (Multi-Line Chart) -->
@@ -63,7 +63,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Daily likes, comments, reactions, and bookmarks over the last {{ period|default:"30" }} days</p>
     </div>
-    <canvas id="engagementChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="engagementChart"></canvas></div>
   </div>
 
   <!-- 4. User Demographics (Doughnut Chart) -->
@@ -75,7 +75,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Users by nationality (top 10 + Other)</p>
     </div>
-    <canvas id="demographicsChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="demographicsChart"></canvas></div>
   </div>
 
   <!-- 5. Event Activity (Bar Chart) -->
@@ -87,7 +87,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Registrations per event (top 10 events by submissions)</p>
     </div>
-    <canvas id="eventChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="eventChart"></canvas></div>
   </div>
 
   <!-- 6. Support Tickets (Line Chart) -->
@@ -99,7 +99,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Tickets opened vs resolved per week over the last 8 weeks</p>
     </div>
-    <canvas id="ticketChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="ticketChart"></canvas></div>
   </div>
 
   <!-- 7. Traffic by Hour (Area Chart) -->
@@ -111,7 +111,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Average successful logins by hour of day (last 7 days)</p>
     </div>
-    <canvas id="trafficChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="trafficChart"></canvas></div>
   </div>
 
   <!-- 8. Badge Distribution (Pie Chart) -->
@@ -123,7 +123,7 @@
       </div>
       <p class="text-xs text-on-surface-variant">Users by verification badge type (Gold, Blue, None)</p>
     </div>
-    <canvas id="badgeChart" height="220"></canvas>
+    <div class="relative" style="height: 260px;"><canvas id="badgeChart"></canvas></div>
   </div>
 
 </div>
@@ -135,24 +135,32 @@
 // ============================================================
 // Shared config
 // ============================================================
+const isDark = document.documentElement.classList.contains('dark');
+const gridColor = isDark ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9';
+const tickColor = isDark ? '#CBD5E1' : '#64748b';
+const chartBorderColor = isDark ? '#1F2937' : '#ffffff';
+
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 12;
-Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,23,42,0.9)';
+Chart.defaults.color = tickColor;
+Chart.defaults.borderColor = gridColor;
+Chart.defaults.plugins.tooltip.backgroundColor = isDark ? 'rgba(15,23,42,0.95)' : 'rgba(15,23,42,0.9)';
 Chart.defaults.plugins.tooltip.cornerRadius = 8;
 Chart.defaults.plugins.tooltip.titleFont = { weight: 'bold', size: 13 };
 Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.titleColor = '#F9FAFB';
+Chart.defaults.plugins.tooltip.bodyColor = '#F9FAFB';
 
-const gridColor = '#f1f5f9';
 const baseOptions = {
   responsive: true,
   maintainAspectRatio: false,
   interaction: { intersect: false, mode: 'index' },
   plugins: {
-    legend: { labels: { font: { size: 11 }, padding: 16, usePointStyle: true, pointStyleWidth: 12 } },
+    legend: { labels: { font: { size: 11 }, padding: 16, usePointStyle: true, pointStyleWidth: 12, color: tickColor } },
   },
   scales: {
-    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { font: { size: 11 } } },
-    x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { font: { size: 11 }, color: tickColor } },
+    x: { grid: { display: false }, ticks: { font: { size: 10 }, color: tickColor } }
   }
 };
 
@@ -263,7 +271,7 @@ if (demoLabels.length > 0) {
         data: demoCounts,
         backgroundColor: doughnutColors.slice(0, demoLabels.length),
         borderWidth: 2,
-        borderColor: '#fff',
+        borderColor: chartBorderColor,
         hoverOffset: 8,
       }]
     },
@@ -347,7 +355,7 @@ new Chart(document.getElementById('ticketChart'), {
         tension: 0.4,
         fill: true,
         pointBackgroundColor: '#ef4444',
-        pointBorderColor: '#fff',
+        pointBorderColor: chartBorderColor,
         pointBorderWidth: 2,
         pointRadius: 4,
         pointHoverRadius: 7,
@@ -360,7 +368,7 @@ new Chart(document.getElementById('ticketChart'), {
         tension: 0.4,
         fill: true,
         pointBackgroundColor: '#22c55e',
-        pointBorderColor: '#fff',
+        pointBorderColor: chartBorderColor,
         pointBorderWidth: 2,
         pointRadius: 4,
         pointHoverRadius: 7,
@@ -412,7 +420,7 @@ new Chart(document.getElementById('badgeChart'), {
     labels: bgLabels,
     datasets: [{
       data: bgData,
-      backgroundColor: ['#f59e0b', '#3b82f6', '#e2e8f0'],
+      backgroundColor: isDark ? ['#FBBF24', '#60A5FA', '#475569'] : ['#f59e0b', '#3b82f6', '#e2e8f0'],
       borderWidth: 2,
       borderColor: '#fff',
       hoverOffset: 8,

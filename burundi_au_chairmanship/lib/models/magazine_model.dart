@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/liked_by_avatars.dart';
 
 class MagazineImage {
   final int id;
@@ -49,6 +50,7 @@ class MagazineEdition {
   final String fileSize;
   final List<MagazineImage> images;
   final bool isLiked;
+  final List<Liker> recentLikers;
 
   MagazineEdition({
     required this.id,
@@ -68,6 +70,7 @@ class MagazineEdition {
     this.fileSize = '',
     this.images = const [],
     this.isLiked = false,
+    this.recentLikers = const [],
   });
 
   factory MagazineEdition.fromJson(Map<String, dynamic> json) {
@@ -75,6 +78,13 @@ class MagazineEdition {
     if (json['images'] is List) {
       imageList = (json['images'] as List)
           .map((img) => MagazineImage.fromJson(img as Map<String, dynamic>))
+          .toList();
+    }
+
+    List<Liker> likerList = [];
+    if (json['recent_likers'] is List) {
+      likerList = (json['recent_likers'] as List)
+          .map((l) => Liker.fromJson(l as Map<String, dynamic>))
           .toList();
     }
 
@@ -96,10 +106,11 @@ class MagazineEdition {
       fileSize: json['file_size'] ?? '',
       images: imageList,
       isLiked: json['is_liked'] == true,
+      recentLikers: likerList,
     );
   }
 
-  MagazineEdition copyWith({int? likeCount, bool? isLiked}) {
+  MagazineEdition copyWith({int? likeCount, bool? isLiked, List<Liker>? recentLikers}) {
     return MagazineEdition(
       id: id,
       title: title,
@@ -118,6 +129,7 @@ class MagazineEdition {
       fileSize: fileSize,
       images: images,
       isLiked: isLiked ?? this.isLiked,
+      recentLikers: recentLikers ?? this.recentLikers,
     );
   }
 
@@ -227,6 +239,7 @@ class Article {
   final int likeCount;
   final bool isLiked;
   final List<ArticleMedia> media;
+  final List<Liker> recentLikers;
 
   Article({
     required this.id,
@@ -244,6 +257,7 @@ class Article {
     this.likeCount = 0,
     this.isLiked = false,
     this.media = const [],
+    this.recentLikers = const [],
   });
 
   factory Article.fromJson(Map<String, dynamic> json) {
@@ -257,6 +271,13 @@ class Article {
     if (json['media'] is List) {
       mediaList = (json['media'] as List)
           .map((m) => ArticleMedia.fromJson(m as Map<String, dynamic>))
+          .toList();
+    }
+
+    List<Liker> likerList = [];
+    if (json['recent_likers'] is List) {
+      likerList = (json['recent_likers'] as List)
+          .map((l) => Liker.fromJson(l as Map<String, dynamic>))
           .toList();
     }
 
@@ -276,6 +297,7 @@ class Article {
       likeCount: json['like_count'] ?? 0,
       isLiked: json['is_liked'] == true,
       media: mediaList,
+      recentLikers: likerList,
     );
   }
 
@@ -287,6 +309,7 @@ class Article {
     int? commentCount,
     int? likeCount,
     bool? isLiked,
+    List<Liker>? recentLikers,
   }) {
     return Article(
       id: id,
@@ -304,6 +327,7 @@ class Article {
       likeCount: likeCount ?? this.likeCount,
       isLiked: isLiked ?? this.isLiked,
       media: media,
+      recentLikers: recentLikers ?? this.recentLikers,
     );
   }
 
@@ -314,28 +338,50 @@ class Article {
 class ArticleComment {
   final int id;
   final int userId;
-  final String userName;
+  final String userName;      // Display name ("John Doe" or fallback to username)
+  final String username;      // Handle used in @mentions
   final String? profilePicture;
+  final String? badgeType;    // 'GOLD' | 'BLUE' | null
+  final int? parentId;
   final String content;
   final DateTime createdAt;
+  final List<ArticleComment> replies;
+  final int replyCount;
 
   ArticleComment({
     required this.id,
     required this.userId,
     required this.userName,
+    this.username = '',
     this.profilePicture,
+    this.badgeType,
+    this.parentId,
     required this.content,
     required this.createdAt,
+    this.replies = const [],
+    this.replyCount = 0,
   });
 
   factory ArticleComment.fromJson(Map<String, dynamic> json) {
+    final rawReplies = json['replies'];
+    final parsedReplies = rawReplies is List
+        ? rawReplies
+            .whereType<Map<String, dynamic>>()
+            .map(ArticleComment.fromJson)
+            .toList()
+        : <ArticleComment>[];
     return ArticleComment(
       id: json['id'] ?? 0,
       userId: json['user_id'] ?? 0,
       userName: json['user_name'] ?? '',
+      username: json['username'] ?? '',
       profilePicture: json['profile_picture'],
+      badgeType: json['badge_type'],
+      parentId: json['parent'] is int ? json['parent'] as int : null,
       content: json['content'] ?? '',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      replies: parsedReplies,
+      replyCount: json['reply_count'] ?? parsedReplies.length,
     );
   }
 }

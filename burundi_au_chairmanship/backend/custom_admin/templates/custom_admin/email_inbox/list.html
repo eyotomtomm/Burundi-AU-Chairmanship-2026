@@ -1,0 +1,97 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Email Inbox - Burundi Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8 flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">inbox</span>
+          <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Email Inbox</h1>
+        </div>
+        <p class="text-slate-600 dark:text-slate-400">Read-only view of recent received emails — no Gmail needed.</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="{% url 'custom_admin:email_campaigns_list' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+          <span class="material-symbols-outlined text-sm">send</span> Campaigns
+        </a>
+        <a href="{% url 'custom_admin:email_logs_list' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
+          <span class="material-symbols-outlined text-sm">history</span> Sent logs
+        </a>
+        <a href="{% url 'custom_admin:email_inbox' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+          <span class="material-symbols-outlined text-sm">refresh</span> Refresh
+        </a>
+      </div>
+    </div>
+
+    {% if not configured %}
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 rounded-xl p-6">
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-amber-600">warning</span>
+        <div class="text-sm text-amber-900 dark:text-amber-100">
+          <p class="font-semibold mb-1">IMAP not configured.</p>
+          <p>Set the following environment variables to enable the inbox viewer (or leave blank to reuse your SMTP credentials):</p>
+          <ul class="list-disc ml-5 mt-2 space-y-0.5 font-mono text-xs">
+            <li><code>IMAP_HOST</code> (default: imap.gmail.com)</li>
+            <li><code>IMAP_PORT</code> (default: 993)</li>
+            <li><code>IMAP_USER</code> (default: EMAIL_HOST_USER)</li>
+            <li><code>IMAP_PASSWORD</code> (default: EMAIL_HOST_PASSWORD)</li>
+            <li><code>IMAP_MAILBOX</code> (default: INBOX)</li>
+          </ul>
+          <p class="mt-2 text-xs">For Gmail accounts, use an <a href="https://support.google.com/accounts/answer/185833" class="underline font-semibold">App Password</a>, not your regular password.</p>
+        </div>
+      </div>
+    </div>
+    {% elif error %}
+    <div class="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-xl p-6">
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-red-600">error</span>
+        <div class="text-sm text-red-900 dark:text-red-100">
+          <p class="font-semibold mb-1">Could not connect to IMAP server.</p>
+          <p class="font-mono text-xs break-all">{{ error }}</p>
+          <p class="mt-2">Connected as <strong>{{ imap_user }}</strong> on <strong>{{ imap_host }}</strong> mailbox <strong>{{ mailbox }}</strong>.</p>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="mb-4 text-xs text-slate-500 dark:text-slate-400">
+      Connected as <span class="font-mono">{{ imap_user }}</span> @ <span class="font-mono">{{ imap_host }}</span> / {{ mailbox }} · showing last {{ messages_list|length }} message(s)
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      {% if messages_list %}
+      <div class="divide-y divide-slate-200 dark:divide-slate-700">
+        {% for m in messages_list %}
+        <div class="p-4 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="material-symbols-outlined text-slate-400 text-sm">mail</span>
+                <span class="text-sm font-semibold text-slate-900 dark:text-white truncate">{{ m.from }}</span>
+              </div>
+              <div class="text-sm text-slate-700 dark:text-slate-200 font-medium truncate">{{ m.subject }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">To: {{ m.to }}</div>
+            </div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap flex-shrink-0">{{ m.date|slice:":25" }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="p-12 text-center">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
+          <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-500">inbox</span>
+        </div>
+        <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">Inbox is empty</h3>
+        <p class="text-slate-600 dark:text-slate-400">No messages in {{ mailbox }}.</p>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

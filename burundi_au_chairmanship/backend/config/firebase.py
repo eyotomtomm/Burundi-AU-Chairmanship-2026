@@ -1,5 +1,5 @@
 """
-Firebase Admin SDK initialization and utilities for the Burundi AU Chairmanship backend.
+Firebase Admin SDK initialization and utilities for the Burundi Chairmanship backend.
 
 This module initializes the Firebase Admin SDK and provides functions for verifying
 Firebase ID tokens sent from the Flutter mobile app.

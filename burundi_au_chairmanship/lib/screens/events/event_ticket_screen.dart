@@ -317,7 +317,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                   ),
                 ),
                 child: Text(
-                  'Burundi AU Chairmanship 2025',
+                  'Burundi Chairmanship 2025',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

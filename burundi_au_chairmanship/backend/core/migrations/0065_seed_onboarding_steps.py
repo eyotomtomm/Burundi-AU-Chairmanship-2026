@@ -12,9 +12,9 @@ def create_onboarding_steps(apps, schema_editor):
 
     steps = [
         {
-            'title': 'Welcome to Burundi AU Chairmanship',
+            'title': 'Welcome to Burundi Chairmanship',
             'title_fr': 'Bienvenue au Pr\u00e9sidence de l\'UA du Burundi',
-            'description': 'Stay connected with Burundi\'s African Union Chairmanship 2026-2027. Get the latest news, events, and exclusive content right at your fingertips.',
+            'description': 'Stay connected with Burundi\'s Burundi Chairmanship 2026-2027. Get the latest news, events, and exclusive content right at your fingertips.',
             'description_fr': 'Restez connect\u00e9 avec la Pr\u00e9sidence de l\'Union Africaine du Burundi 2026-2027. Acc\u00e9dez aux derni\u00e8res nouvelles, \u00e9v\u00e9nements et contenus exclusifs.',
             'icon_name': 'waving_hand',
             'order': 1,
@@ -22,7 +22,7 @@ def create_onboarding_steps(apps, schema_editor):
         {
             'title': 'Explore Features',
             'title_fr': 'Explorer les fonctionnalit\u00e9s',
-            'description': 'Browse articles, watch live feeds, view the photo gallery, read magazines, and discover Burundi\'s priority agendas for the AU Chairmanship.',
+            'description': 'Browse articles, watch live feeds, view the photo gallery, read magazines, and discover Burundi\'s priority agendas for the Burundi Chairmanship.',
             'description_fr': 'Parcourez les articles, regardez les diffusions en direct, consultez la galerie photo, lisez les magazines et d\u00e9couvrez les agendas prioritaires du Burundi.',
             'icon_name': 'explore',
             'order': 2,
@@ -46,7 +46,7 @@ def create_onboarding_steps(apps, schema_editor):
         {
             'title': 'Stay Informed',
             'title_fr': 'Restez inform\u00e9',
-            'description': 'Enable push notifications to never miss important updates, event reminders, and breaking news about the AU Chairmanship.',
+            'description': 'Enable push notifications to never miss important updates, event reminders, and breaking news about the Burundi Chairmanship.',
             'description_fr': 'Activez les notifications push pour ne jamais manquer les mises \u00e0 jour importantes, les rappels d\'\u00e9v\u00e9nements et les nouvelles de la Pr\u00e9sidence de l\'UA.',
             'icon_name': 'notifications_active',
             'order': 5,

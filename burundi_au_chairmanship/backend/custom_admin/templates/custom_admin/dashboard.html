@@ -8,7 +8,7 @@
   <div>
     <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Strategic Overview</span>
     <h1 class="text-3xl font-bold text-on-surface font-headline leading-tight">Welcome, {{ user.get_full_name|default:user.username }}</h1>
-    <p class="text-on-surface-variant mt-2 max-w-2xl">Welcome to the command portal. Here is the current state of digital engagement for the AU Chairmanship.</p>
+    <p class="text-on-surface-variant mt-2 max-w-2xl">Welcome to the command portal. Here is the current state of digital engagement for the Burundi Chairmanship.</p>
   </div>
   <button onclick="toggleCustomizePanel()" class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm" title="Customize Dashboard">
     <span class="material-symbols-outlined text-lg">settings</span>
@@ -318,12 +318,12 @@
     <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
       <div class="flex justify-between items-center mb-8 cursor-pointer" onclick="collapseWidget('engagement-chart')">
         <div>
-          <h4 class="text-base font-semibold">App Engagement</h4>
-          <p class="text-sm text-on-surface-variant">Last 30 days overview</p>
+          <h4 class="text-base font-semibold">New Sign-ups &amp; Events</h4>
+          <p class="text-sm text-on-surface-variant">Daily count — last 30 days</p>
         </div>
         <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2"><span class="w-3 h-3 bg-primary rounded-full"></span><span class="text-xs font-medium">Users</span></div>
-          <div class="flex items-center gap-2"><span class="w-3 h-3 bg-secondary rounded-full"></span><span class="text-xs font-medium">Events</span></div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 bg-primary rounded-full"></span><span class="text-xs font-medium">New Users</span></div>
+          <div class="flex items-center gap-2"><span class="w-3 h-3 bg-secondary rounded-full"></span><span class="text-xs font-medium">New Events</span></div>
           <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-engagement-chart">expand_less</span>
         </div>
       </div>
@@ -344,6 +344,10 @@
       </div>
       <div class="widget-body" id="body-content-summary">
         <div class="space-y-6">
+          <div>
+            <div class="flex justify-between mb-2"><span class="text-sm font-medium">Articles</span><span class="text-sm font-bold">{{ articles|default:"0" }}</span></div>
+            <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden"><div class="bg-emerald-400/70 h-full rounded-full" style="width: {% widthratio articles total_content 100 %}%"></div></div>
+          </div>
           <div>
             <div class="flex justify-between mb-2"><span class="text-sm font-medium">Events</span><span class="text-sm font-bold">{{ events|default:"0" }}</span></div>
             <div class="w-full bg-white/10 h-2 rounded-full overflow-hidden"><div class="bg-secondary h-full rounded-full" style="width: {% widthratio events total_content 100 %}%"></div></div>
@@ -371,13 +375,30 @@
       <div class="flex justify-between items-center mb-6 cursor-pointer" onclick="collapseWidget('user-growth')">
         <div>
           <h4 class="text-lg font-bold">User Growth</h4>
-          <p class="text-sm text-on-surface-variant">New registrations over the last 30 days</p>
+          <p class="text-sm text-on-surface-variant">{{ growth_last_30|default:"0" }} new in last 30 days · {{ growth_prev_30|default:"0" }} in previous 30 days</p>
         </div>
         <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-lg">
+          {% if growth_trend_direction == 'up' %}
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-lg" title="Compared to previous 30 days">
             <span class="material-symbols-outlined text-emerald-600 text-sm">trending_up</span>
-            <span class="text-xs font-bold text-emerald-600">30-day trend</span>
+            <span class="text-xs font-bold text-emerald-600">+{{ growth_trend_pct }}%</span>
           </div>
+          {% elif growth_trend_direction == 'down' %}
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-lg" title="Compared to previous 30 days">
+            <span class="material-symbols-outlined text-red-600 text-sm">trending_down</span>
+            <span class="text-xs font-bold text-red-600">{{ growth_trend_pct }}%</span>
+          </div>
+          {% elif growth_trend_direction == 'new' %}
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-sky-50 rounded-lg" title="No sign-ups in previous 30 days">
+            <span class="material-symbols-outlined text-sky-600 text-sm">auto_awesome</span>
+            <span class="text-xs font-bold text-sky-600">New growth</span>
+          </div>
+          {% else %}
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg" title="No change vs previous 30 days">
+            <span class="material-symbols-outlined text-slate-500 text-sm">trending_flat</span>
+            <span class="text-xs font-bold text-slate-500">No change</span>
+          </div>
+          {% endif %}
           <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-user-growth">expand_less</span>
         </div>
       </div>
@@ -405,11 +426,98 @@
     </div>
   </div>
 
+  <!-- Language Distribution Donut -->
+  <div id="widget-language-distribution" class="dashboard-widget col-span-12 lg:col-span-4">
+    <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+      <div class="flex justify-between items-center mb-6 cursor-pointer" onclick="collapseWidget('language-distribution')">
+        <div>
+          <h4 class="text-lg font-bold">Language Distribution</h4>
+          <p class="text-sm text-on-surface-variant">App users by preferred language</p>
+        </div>
+        <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-language-distribution">expand_less</span>
+      </div>
+      <div class="widget-body" id="body-language-distribution">
+        <canvas id="languageChart" height="200"></canvas>
+        <div class="flex items-center justify-center gap-6 mt-4">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+            <span class="text-xs font-medium">EN ({{ language_en|default:"0" }})</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-amber-500 rounded-full"></span>
+            <span class="text-xs font-medium">FR ({{ language_fr|default:"0" }})</span>
+          </div>
+        </div>
+        {% if language_total %}
+        <div class="text-center text-xs text-on-surface-variant mt-2">
+          FR share: {% widthratio language_fr language_total 100 %}%
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Engagement -->
+  <div id="widget-notif-engagement" class="dashboard-widget col-span-12 lg:col-span-8">
+    <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
+      <div class="flex justify-between items-center mb-6 cursor-pointer" onclick="collapseWidget('notif-engagement')">
+        <div>
+          <h4 class="text-lg font-bold">Notification Engagement</h4>
+          <p class="text-sm text-on-surface-variant">
+            Last 30 days &middot; CTR {{ notif_ctr_30d|default:"0" }}%
+            {% if notif_engagement_is_estimated %}
+            <span class="ml-1 text-amber-600 dark:text-amber-400" title="No client-side delivery events yet — showing sent as delivered">· estimated</span>
+            {% endif %}
+          </p>
+        </div>
+        <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-notif-engagement">expand_less</span>
+      </div>
+      <div class="widget-body" id="body-notif-engagement">
+        {% if has_notif_engagement_data %}
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="p-4 rounded-lg bg-surface-container-low text-center">
+            <div class="text-xs text-on-surface-variant uppercase tracking-wider">Sent</div>
+            <div class="text-2xl font-bold mt-1">{{ notif_sent_30d|default:"0" }}</div>
+          </div>
+          <div class="p-4 rounded-lg bg-surface-container-low text-center">
+            <div class="text-xs text-on-surface-variant uppercase tracking-wider">
+              Delivered{% if notif_engagement_is_estimated %} <span class="text-amber-500">*</span>{% endif %}
+            </div>
+            <div class="text-2xl font-bold mt-1 text-emerald-600">{{ notif_delivered_30d|default:"0" }}</div>
+          </div>
+          <div class="p-4 rounded-lg bg-surface-container-low text-center">
+            <div class="text-xs text-on-surface-variant uppercase tracking-wider">Opened</div>
+            <div class="text-2xl font-bold mt-1 text-indigo-600">{{ notif_opened_30d|default:"0" }}</div>
+          </div>
+        </div>
+        <canvas id="notifEngagementChart" height="180"></canvas>
+        {% if notif_engagement_is_estimated %}
+        <p class="text-xs text-on-surface-variant mt-3">
+          <span class="text-amber-500">*</span> No client-side delivery events received yet. Delivered count falls back to recipient count until the updated app rolls out.
+        </p>
+        {% endif %}
+        {% else %}
+        <div class="py-12 flex flex-col items-center text-center text-on-surface-variant">
+          <span class="material-symbols-outlined text-5xl mb-3 text-slate-400">campaign</span>
+          <p class="text-sm font-medium mb-1">No push notifications sent in the last 30 days</p>
+          <p class="text-xs">Send a notification to start tracking delivery and open rates.</p>
+          <a href="{% url 'custom_admin:notification_create' %}" class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-xs font-semibold no-underline">
+            <span class="material-symbols-outlined text-sm">add</span> New Notification
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
   <!-- Content Engagement Bar Chart -->
   <div id="widget-content-engagement" class="dashboard-widget col-span-12 lg:col-span-5">
     <div class="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
       <div class="flex justify-between items-center mb-6 cursor-pointer" onclick="collapseWidget('content-engagement')">
-        <h4 class="text-lg font-bold">Content Engagement</h4>
+        <div>
+          <h4 class="text-lg font-bold">Content Engagement</h4>
+          <p class="text-sm text-on-surface-variant">Total views &amp; likes per content type</p>
+        </div>
         <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-content-engagement">expand_less</span>
       </div>
       <div class="widget-body" id="body-content-engagement">
@@ -789,19 +897,70 @@ document.addEventListener('DOMContentLoaded', function() {
 //  CHARTS (existing functionality preserved)
 // ═══════════════════════════════════════════════════════════
 
-// Engagement chart
+// Dark mode aware chart theming
+var isDark = document.documentElement.classList.contains('dark');
+var gridColor = isDark ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9';
+var tickColor = isDark ? '#CBD5E1' : '#64748b';
+var chartBorderColor = isDark ? '#1F2937' : '#ffffff';
+var lineSeriesColor = isDark ? '#E5E7EB' : '#000';
+var lineSeriesFill = isDark ? 'rgba(229, 231, 235, 0.08)' : 'rgba(0,0,0,0.05)';
+
+// Set Chart.js global defaults for dark mode
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.color = tickColor;
+  Chart.defaults.borderColor = gridColor;
+}
+
+// Engagement chart — New sign-ups and new events per day (last 30 days)
 var ctx1 = document.getElementById('engagementChart');
 if (ctx1) {
   new Chart(ctx1, {
     type: 'line',
     data: {
-      labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+      labels: {{ growth_labels_json|safe }},
       datasets: [
-        { label: 'Users', data: [{{ users|default:"0" }}, {{ users|default:"0" }}, {{ users|default:"0" }}, {{ users|default:"0" }}], borderColor: '#000', backgroundColor: 'rgba(0,0,0,0.05)', tension: 0.4, fill: true },
-        { label: 'Events', data: [{{ events|default:"0" }}, {{ events|default:"0" }}, {{ events|default:"0" }}, {{ events|default:"0" }}], borderColor: '#745b17', backgroundColor: 'rgba(116,91,23,0.05)', tension: 0.4, fill: true }
+        {
+          label: 'New Users',
+          data: {{ growth_data_json|safe }},
+          borderColor: lineSeriesColor,
+          backgroundColor: lineSeriesFill,
+          tension: 0.4,
+          fill: true,
+          pointRadius: 2,
+          pointHoverRadius: 6,
+          borderWidth: 2.5,
+        },
+        {
+          label: 'New Events',
+          data: {{ events_30d_data_json|safe }},
+          borderColor: '#E5C374',
+          backgroundColor: 'rgba(229,195,116,0.08)',
+          tension: 0.4,
+          fill: true,
+          pointRadius: 2,
+          pointHoverRadius: 6,
+          borderWidth: 2.5,
+        }
       ]
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+    options: {
+      responsive: true,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
+          padding: 12,
+          cornerRadius: 8,
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0, color: tickColor } },
+        x: { grid: { display: false }, ticks: { color: tickColor, maxRotation: 45, maxTicksLimit: 10, font: { size: 10 } } }
+      }
+    }
   });
 }
 
@@ -814,12 +973,14 @@ if (ctx2) {
       labels: ['Articles', 'Events', 'Magazines', 'Hero Slides'],
       datasets: [{
         data: [{{ articles|default:"0" }}, {{ events|default:"0" }}, {{ magazines|default:"0" }}, {{ hero_slides|default:"0" }}],
-        backgroundColor: ['#000000', '#101c2e80', '#745b17', '#101c2e40'],
+        backgroundColor: isDark
+          ? ['#BBC7DF', '#93A5CF', '#E5C374', '#8899B5']
+          : ['#000000', '#101c2e80', '#745b17', '#101c2e40'],
         borderRadius: 8,
         barThickness: 40,
       }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } } }
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: tickColor } }, x: { grid: { display: false }, ticks: { color: tickColor } } } }
   });
 }
 
@@ -850,7 +1011,9 @@ if (growthCtx) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1e293b',
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
           titleFont: { size: 12, weight: '600' },
           bodyFont: { size: 12 },
           padding: 12,
@@ -858,35 +1021,61 @@ if (growthCtx) {
         }
       },
       scales: {
-        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0, font: { size: 11 } } },
-        x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 }, maxTicksLimit: 10 } }
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0, color: tickColor, font: { size: 11 } } },
+        x: { grid: { display: false }, ticks: { color: tickColor, maxRotation: 45, font: { size: 10 }, maxTicksLimit: 10 } }
       }
     }
   });
 }
 
-// === Content Engagement Bar Chart ===
+// === Content Engagement Grouped Bar Chart (Views + Likes per content type) ===
 var engCtx = document.getElementById('contentEngagementChart');
 if (engCtx) {
   new Chart(engCtx, {
     type: 'bar',
     data: {
-      labels: ['Article Views', 'Article Likes', 'Magazine Views', 'Videos'],
-      datasets: [{
-        label: 'Count',
-        data: [{{ article_views|default:"0" }}, {{ article_likes|default:"0" }}, {{ magazine_views|default:"0" }}, {{ video_count|default:"0" }}],
-        backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'],
-        borderRadius: 8,
-        barThickness: 36,
-      }]
+      labels: {{ engagement_labels_json|safe }},
+      datasets: [
+        {
+          label: 'Views',
+          data: {{ engagement_views_json|safe }},
+          backgroundColor: isDark ? '#60A5FA' : '#3b82f6',
+          borderRadius: 6,
+          barPercentage: 0.7,
+          categoryPercentage: 0.6,
+        },
+        {
+          label: 'Likes',
+          data: {{ engagement_likes_json|safe }},
+          backgroundColor: isDark ? '#F472B6' : '#ec4899',
+          borderRadius: 6,
+          barPercentage: 0.7,
+          categoryPercentage: 0.6,
+        }
+      ]
     },
     options: {
       responsive: true,
       indexAxis: 'y',
-      plugins: { legend: { display: false } },
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: { color: tickColor, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 10, padding: 12 }
+        },
+        tooltip: {
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
+          padding: 12,
+          cornerRadius: 8,
+        }
+      },
       scales: {
-        x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
-        y: { grid: { display: false } }
+        x: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0, color: tickColor } },
+        y: { grid: { display: false }, ticks: { color: tickColor, font: { size: 12, weight: '600' } } }
       }
     }
   });
@@ -897,7 +1086,9 @@ var countryCtx = document.getElementById('countriesChart');
 if (countryCtx) {
   var countryLabels = {{ country_labels_json|safe }};
   var countryCounts = {{ country_counts_json|safe }};
-  var countryColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+  var countryColors = isDark
+    ? ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#F472B6', '#22D3EE', '#A3E635']
+    : ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
   new Chart(countryCtx, {
     type: 'pie',
@@ -907,7 +1098,7 @@ if (countryCtx) {
         data: countryCounts,
         backgroundColor: countryColors.slice(0, countryLabels.length),
         borderWidth: 2,
-        borderColor: '#ffffff',
+        borderColor: chartBorderColor,
       }]
     },
     options: {
@@ -915,7 +1106,9 @@ if (countryCtx) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1e293b',
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
           padding: 12,
           cornerRadius: 8,
         }
@@ -944,9 +1137,11 @@ if (verifCtx) {
       labels: ['Verified', 'Pending', 'Unverified'],
       datasets: [{
         data: [{{ verified_count|default:"0" }}, {{ pending_verif|default:"0" }}, {{ unverified_count|default:"0" }}],
-        backgroundColor: ['#10b981', '#f59e0b', '#e2e8f0'],
+        backgroundColor: isDark
+          ? ['#34D399', '#FBBF24', '#475569']
+          : ['#10b981', '#f59e0b', '#e2e8f0'],
         borderWidth: 3,
-        borderColor: '#ffffff',
+        borderColor: chartBorderColor,
         hoverOffset: 8,
       }]
     },
@@ -956,13 +1151,115 @@ if (verifCtx) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1e293b',
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
           padding: 12,
           cornerRadius: 8,
         }
       }
     }
   });
+}
+
+// === Language Distribution Donut Chart ===
+var langCtx = document.getElementById('languageChart');
+if (langCtx) {
+  new Chart(langCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['English', 'Français'],
+      datasets: [{
+        data: [{{ language_en|default:"0" }}, {{ language_fr|default:"0" }}],
+        backgroundColor: isDark ? ['#60A5FA', '#FBBF24'] : ['#3b82f6', '#f59e0b'],
+        borderColor: chartBorderColor,
+        borderWidth: 3,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
+          padding: 12,
+          cornerRadius: 8,
+        }
+      }
+    }
+  });
+}
+
+// === Notification Engagement Bar Chart (Top 5) ===
+var notifCtx = document.getElementById('notifEngagementChart');
+if (notifCtx) {
+  var topNotifLabels = {{ top_notif_labels_json|default:"[]"|safe }};
+  var topNotifDelivered = {{ top_notif_delivered_json|default:"[]"|safe }};
+  var topNotifOpened = {{ top_notif_opened_json|default:"[]"|safe }};
+  if (topNotifLabels.length === 0) {
+    // No data — replace canvas with a placeholder so the widget doesn't look empty
+    var placeholder = document.createElement('p');
+    placeholder.className = 'text-xs text-on-surface-variant text-center py-6';
+    placeholder.textContent = 'Per-notification breakdown will appear once you send more campaigns.';
+    notifCtx.parentNode.replaceChild(placeholder, notifCtx);
+  } else {
+  new Chart(notifCtx, {
+    type: 'bar',
+    data: {
+      labels: topNotifLabels,
+      datasets: [
+        {
+          label: 'Delivered',
+          data: topNotifDelivered,
+          backgroundColor: isDark ? '#34D399' : '#10b981',
+          borderColor: chartBorderColor,
+          borderWidth: 1,
+          borderRadius: 6,
+        },
+        {
+          label: 'Opened',
+          data: topNotifOpened,
+          backgroundColor: isDark ? '#818CF8' : '#6366f1',
+          borderColor: chartBorderColor,
+          borderWidth: 1,
+          borderRadius: 6,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { color: tickColor }
+        },
+        tooltip: {
+          backgroundColor: isDark ? '#0F172A' : '#1e293b',
+          titleColor: '#F9FAFB',
+          bodyColor: '#F9FAFB',
+          padding: 12,
+          cornerRadius: 8,
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor, drawBorder: false },
+          ticks: { color: tickColor, maxRotation: 30, minRotation: 0 }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: gridColor, drawBorder: false },
+          ticks: { color: tickColor, precision: 0 }
+        }
+      }
+    }
+  });
+  } // end else (topNotifLabels has data)
 }
 </script>
 {% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Email Campaign - Burundi Chairmanship Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:email_campaigns_list' %}" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+      <span class="material-symbols-outlined text-slate-600 dark:text-slate-300">arrow_back</span>
+    </a>
+    <h1 class="text-3xl font-bold text-slate-900 dark:text-white">{{ action }} Email Campaign</h1>
+  </div>
+
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Basic info -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-slate-200 dark:border-slate-700 space-y-6">
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+        <span class="material-symbols-outlined text-blue-600">info</span> Campaign info
+      </h2>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Name <span class="text-red-500">*</span></label>
+        <input type="text" name="name" required value="{{ campaign.name|default:'' }}" placeholder="e.g. April Newsletter 2026"
+               class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white">
+        <p class="text-xs text-slate-500 mt-1">Internal name — not shown to recipients.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Subject (EN) <span class="text-red-500">*</span></label>
+          <input type="text" name="subject" required value="{{ campaign.subject|default:'' }}"
+                 class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Subject (FR)</label>
+          <input type="text" name="subject_fr" value="{{ campaign.subject_fr|default:'' }}"
+                 class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white">
+        </div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-slate-200 dark:border-slate-700 space-y-6">
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+        <span class="material-symbols-outlined text-emerald-600">article</span> Body (HTML)
+      </h2>
+      <div class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-900 dark:text-blue-100">
+        Placeholders: <code>{{ '{{ user_name }}' }}</code>, <code>{{ '{{ user_email }}' }}</code>, <code>{{ '{{ app_name }}' }}</code>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Body HTML (EN) <span class="text-red-500">*</span></label>
+        <textarea name="body_html" rows="10" required
+                  class="w-full font-mono text-xs border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 dark:text-white">{{ campaign.body_html|default:'' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Body HTML (FR)</label>
+        <textarea name="body_html_fr" rows="10"
+                  class="w-full font-mono text-xs border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 dark:text-white">{{ campaign.body_html_fr|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Audience -->
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-8 border border-slate-200 dark:border-slate-700 space-y-6">
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+        <span class="material-symbols-outlined text-amber-600">group</span> Audience
+      </h2>
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Send to</label>
+        <select name="audience_type" id="audience_type" onchange="toggleAudienceFields()"
+                class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white">
+          <option value="all" {% if campaign.audience_type == 'all' %}selected{% endif %}>All active users</option>
+          <option value="language" {% if campaign.audience_type == 'language' %}selected{% endif %}>By preferred language</option>
+          <option value="nationality" {% if campaign.audience_type == 'nationality' %}selected{% endif %}>By nationality (ISO country code)</option>
+          <option value="verified" {% if campaign.audience_type == 'verified' %}selected{% endif %}>Verified users only</option>
+          <option value="staff" {% if campaign.audience_type == 'staff' %}selected{% endif %}>Staff / admins only</option>
+          <option value="custom" {% if campaign.audience_type == 'custom' %}selected{% endif %}>Custom email list</option>
+        </select>
+      </div>
+
+      <div id="audience_language_field" style="display:none">
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Language</label>
+        <select name="audience_language" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white">
+          <option value="en" {% if campaign.audience_language == 'en' %}selected{% endif %}>English</option>
+          <option value="fr" {% if campaign.audience_language == 'fr' %}selected{% endif %}>Français</option>
+        </select>
+      </div>
+
+      <div id="audience_nationality_field" style="display:none">
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Nationality (ISO country code, e.g. BI, US, FR)</label>
+        <input type="text" name="audience_nationality" maxlength="5" value="{{ campaign.audience_nationality|default:'' }}"
+               class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 text-sm dark:text-white uppercase">
+      </div>
+
+      <div id="audience_custom_field" style="display:none">
+        <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1.5">Custom recipients</label>
+        <textarea name="custom_recipients" rows="4" placeholder="one@example.com, two@example.com&#10;three@example.com"
+                  class="w-full font-mono text-xs border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-lg py-2.5 px-4 dark:text-white">{{ campaign.custom_recipients|default:'' }}</textarea>
+        <p class="text-xs text-slate-500 mt-1">Comma- or newline-separated. Invalid entries are skipped.</p>
+      </div>
+
+      {% if campaign and campaign.recipient_count %}
+      <div class="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-sm text-emerald-900 dark:text-emerald-100">
+        <span class="font-semibold">Current resolved audience:</span> {{ campaign.recipient_count }} recipient(s)
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3">
+      <a href="{% url 'custom_admin:email_campaigns_list' %}" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50 dark:hover:bg-slate-700">Cancel</a>
+      <button type="submit" class="bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:shadow-lg transition-all shadow-sm">Save as Draft</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleAudienceFields() {
+  const type = document.getElementById('audience_type').value;
+  document.getElementById('audience_language_field').style.display = (type === 'language') ? 'block' : 'none';
+  document.getElementById('audience_nationality_field').style.display = (type === 'nationality') ? 'block' : 'none';
+  document.getElementById('audience_custom_field').style.display = (type === 'custom') ? 'block' : 'none';
+}
+toggleAudienceFields();
+</script>
+{% endblock %}

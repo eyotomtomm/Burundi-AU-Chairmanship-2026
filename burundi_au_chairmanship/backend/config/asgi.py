@@ -1,5 +1,5 @@
 """
-ASGI config for the Burundi AU Chairmanship project.
+ASGI config for the Burundi Chairmanship project.
 
 Supports both HTTP and WebSocket connections via Django Channels.
 WebSocket routes are defined in core.routing.

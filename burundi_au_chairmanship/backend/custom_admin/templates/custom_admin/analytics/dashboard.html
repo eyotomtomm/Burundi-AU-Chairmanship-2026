@@ -573,6 +573,16 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Dark mode aware chart theming
+const isDark = document.documentElement.classList.contains('dark');
+const gridColor = isDark ? 'rgba(148, 163, 184, 0.15)' : '#f1f5f9';
+const tickColor = isDark ? '#CBD5E1' : '#64748b';
+
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.color = tickColor;
+  Chart.defaults.borderColor = gridColor;
+}
+
 // User Growth Line Chart
 const months = {{ months_json|safe }};
 const counts = {{ month_counts_json|safe }};
@@ -584,11 +594,11 @@ new Chart(document.getElementById('userGrowthChart'), {
     datasets: [{
       label: 'New Users',
       data: counts,
-      borderColor: '#000',
-      backgroundColor: 'rgba(0,0,0,0.05)',
+      borderColor: isDark ? '#E5E7EB' : '#000',
+      backgroundColor: isDark ? 'rgba(229,231,235,0.08)' : 'rgba(0,0,0,0.05)',
       tension: 0.4,
       fill: true,
-      pointBackgroundColor: '#745b17',
+      pointBackgroundColor: '#E5C374',
       pointRadius: 4,
     }]
   },
@@ -596,8 +606,8 @@ new Chart(document.getElementById('userGrowthChart'), {
     responsive: true,
     plugins: { legend: { display: false } },
     scales: {
-      y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-      x: { grid: { display: false } }
+      y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: tickColor } },
+      x: { grid: { display: false }, ticks: { color: tickColor } }
     }
   }
 });
@@ -614,7 +624,7 @@ if (natLabels.length > 0) {
       datasets: [{
         label: 'Users',
         data: natCounts,
-        backgroundColor: '#1EB53A',
+        backgroundColor: isDark ? '#34D399' : '#1EB53A',
         borderRadius: 4,
       }]
     },
@@ -623,8 +633,8 @@ if (natLabels.length > 0) {
       indexAxis: 'y',
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-        y: { grid: { display: false } }
+        x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: tickColor } },
+        y: { grid: { display: false }, ticks: { color: tickColor } }
       }
     }
   });
@@ -644,7 +654,7 @@ if (ipLabels.length > 0) {
       datasets: [{
         label: 'Sessions',
         data: ipCounts,
-        backgroundColor: '#745B17',
+        backgroundColor: isDark ? '#E5C374' : '#745B17',
         borderRadius: 4,
       }]
     },
@@ -653,8 +663,8 @@ if (ipLabels.length > 0) {
       indexAxis: 'y',
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-        y: { grid: { display: false } }
+        x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: tickColor } },
+        y: { grid: { display: false }, ticks: { color: tickColor } }
       }
     }
   });
@@ -666,7 +676,9 @@ if (ipLabels.length > 0) {
 const osLabels = {{ os_labels_json|safe }};
 const osCounts = {{ os_counts_json|safe }};
 
-const chartColors = ['#000000', '#745B17', '#1EB53A', '#e5c374', '#c5c6cd', '#64748b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
+const chartColors = isDark
+  ? ['#BBC7DF', '#E5C374', '#34D399', '#FBBF24', '#94A3B8', '#CBD5E1', '#F87171', '#60A5FA', '#A78BFA', '#F472B6']
+  : ['#000000', '#745B17', '#1EB53A', '#e5c374', '#c5c6cd', '#64748b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 if (osLabels.length > 0) {
   new Chart(document.getElementById('osChart'), {
@@ -697,7 +709,9 @@ if (osLabels.length > 0) {
 const deviceTypeLabels = {{ device_type_labels_json|safe }};
 const deviceTypeCounts = {{ device_type_counts_json|safe }};
 
-const deviceTypeColors = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#6366f1'];
+const deviceTypeColors = isDark
+  ? ['#60A5FA', '#F87171', '#4ADE80', '#FBBF24', '#A78BFA', '#F472B6', '#2DD4BF', '#FB923C', '#94A3B8', '#818CF8']
+  : ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#6366f1'];
 
 if (deviceTypeLabels.length > 0) {
   new Chart(document.getElementById('deviceTypeChart'), {

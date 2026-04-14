@@ -46,6 +46,7 @@ import 'screens/support/ticket_conversation_screen.dart';
 import 'screens/support/contact_support_screen.dart';
 import 'screens/verification/verification_request_screen.dart';
 import 'screens/trending/trending_screen.dart';
+import 'screens/events/events_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -256,6 +257,7 @@ class BurundiAUApp extends StatelessWidget {
                 '/contact-support': (context) => const ContactSupportScreen(),
                 '/verification-request': (context) => const VerificationRequestScreen(),
                 '/trending': (context) => const TrendingScreen(),
+                '/events': (context) => const EventsScreen(),
               };
 
               final builder = routes[settings.name];

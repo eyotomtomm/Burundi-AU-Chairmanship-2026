@@ -43,14 +43,14 @@ def send_email_otp(user, email):
         )
 
         # Build email content
-        subject = 'Burundi AU Chairmanship - Email Verification OTP'
+        subject = 'Burundi Chairmanship - Email Verification OTP'
         message = (
             f'Hello {user.username},\n\n'
             f'Your email verification OTP code is: {otp_code}\n\n'
             f'This code will expire in 10 minutes.\n\n'
             f'If you did not request this code, please ignore this email.\n\n'
             f'Best regards,\n'
-            f'Burundi AU Chairmanship Team'
+            f'Burundi Chairmanship Team'
         )
 
         # Verify email configuration before sending

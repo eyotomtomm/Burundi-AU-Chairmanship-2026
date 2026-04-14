@@ -1,1 +1,1 @@
-# Middleware package for Burundi AU Chairmanship backend
+# Middleware package for Burundi Chairmanship backend

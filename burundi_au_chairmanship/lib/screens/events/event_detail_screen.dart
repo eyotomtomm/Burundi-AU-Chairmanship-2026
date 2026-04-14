@@ -76,9 +76,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     _startCountdown();
     _loadSpeakers();
     _loadAgendaItems();
-    _loadComments();
-    _loadPhotos();
-    _loadAttendees();
+    if (_event.showComments) _loadComments();
+    if (_event.showPhotos) _loadPhotos();
+    if (_event.showAttendees) _loadAttendees();
   }
 
   void _initFormControllers() {
@@ -327,13 +327,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   const SizedBox(height: 20),
 
                   // Photos section
-                  _buildPhotosSection(isDark),
+                  if (_event.showPhotos) _buildPhotosSection(isDark),
 
                   // Attendees section
-                  _buildAttendeesSection(isDark),
+                  if (_event.showAttendees) _buildAttendeesSection(isDark),
 
                   // Comments section
-                  _buildCommentsSection(isDark),
+                  if (_event.showComments) _buildCommentsSection(isDark),
 
                   const SizedBox(height: 40),
                 ],
@@ -545,7 +545,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Burundi AU Chairmanship 2025',
+                              'Burundi Chairmanship 2025',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.7),
@@ -1004,8 +1004,78 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       return _buildRegistrationClosed(isDark);
     }
 
+    // Not authenticated → show sign-in prompt
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isAuthenticated) {
+      return _buildSignInToRegister(langCode, isDark);
+    }
+
     // Registration is open → show registration form
     return _buildRegistrationForm(langCode, isDark);
+  }
+
+  Widget _buildSignInToRegister(String langCode, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            color: AppColors.burundiGreen.withValues(alpha: 0.6),
+            size: 40,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            langCode == 'fr' ? 'Connexion requise' : 'Sign In Required',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            langCode == 'fr'
+                ? 'Connectez-vous pour vous inscrire à cet événement'
+                : 'Sign in to register for this event',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white54 : Colors.black45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/auth'),
+              icon: const Icon(Icons.login_rounded, size: 20),
+              label: Text(
+                langCode == 'fr' ? 'Se connecter' : 'Sign In',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildRegisteredConfirmation(String langCode, bool isDark) {
@@ -2320,6 +2390,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark, AuthProvider auth, {required bool isReply}) {
     final userName = comment['user_name'] ?? 'User';
+    final username = (comment['username'] as String?) ?? '';
     final userId = comment['user_id'] as int?;
     final content = comment['content'] ?? '';
     final createdAt = comment['created_at'] as String?;
@@ -2379,12 +2450,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          userName,
-                          style: TextStyle(
-                            fontSize: isReply ? 13 : 14,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white : Colors.black87,
+                        Flexible(
+                          child: Text(
+                            userName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: isReply ? 13 : 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
                           ),
                         ),
                         if (badgeType != null && badgeType.isNotEmpty) ...[
@@ -2395,9 +2469,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             color: badgeType == 'GOLD' ? const Color(0xFFD4AF37) : Colors.blue,
                           ),
                         ],
+                        if (username.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              '@$username',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white54 : Colors.black54,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         Text(
-                          timeAgo,
+                          '· $timeAgo',
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? Colors.white30 : Colors.black38,

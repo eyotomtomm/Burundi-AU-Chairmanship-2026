@@ -1,7 +1,7 @@
 {% extends 'custom_admin/base.html' %}
 {% load static %}
 
-{% block title %}{% if reg %}Edit{% else %}Create{% endif %} Event Registration - AU Chairmanship Admin{% endblock %}
+{% block title %}{% if reg %}Edit{% else %}Create{% endif %} Event Registration - Burundi Chairmanship Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
@@ -46,14 +46,34 @@
                 </div>
 
                 <div>
+                    <label for="event_type" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Type</label>
+                    <select id="event_type" name="event_type" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required>
+                        <option value="in_person" {% if reg and reg.event_type == 'in_person' %}selected{% endif %}>In Person</option>
+                        <option value="online" {% if reg and reg.event_type == 'online' %}selected{% endif %}>Online / Webinar</option>
+                        <option value="hybrid" {% if reg and reg.event_type == 'hybrid' %}selected{% endif %}>Hybrid</option>
+                        <option value="info" {% if reg and reg.event_type == 'info' %}selected{% endif %}>Information Only</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="category" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Category</label>
+                    <select id="category" name="category" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+                        <option value="">-- No Category --</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if reg and reg.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
                     <label for="event_title" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Title (EN) <span class="text-red-500">*</span></label>
                     <input type="text" id="event_title" name="event_title" value="{{ reg.event_title|default:'' }}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required>
                 </div>
 
                 <!-- Row 2: Event Start Date + Event End Date -->
                 <div>
-                    <label for="event_date" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Start Date <span class="text-red-500">*</span></label>
-                    <input type="datetime-local" id="event_date" name="event_date" value="{% if reg.event_date %}{{ reg.event_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white" required>
+                    <label for="event_date" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Event Start Date</label>
+                    <input type="datetime-local" id="event_date" name="event_date" value="{% if reg.event_date %}{{ reg.event_date|date:'Y-m-d\TH:i' }}{% endif %}" class="w-full border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 rounded-lg py-3 px-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
                 </div>
 
                 <div>
@@ -149,6 +169,21 @@
                 <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                     <label for="is_registration_enabled" class="font-medium text-slate-700 dark:text-slate-300">Enable Registration</label>
                     <input type="checkbox" id="is_registration_enabled" name="is_registration_enabled" {% if reg.is_registration_enabled %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                </div>
+
+                <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <label for="show_photos" class="font-medium text-slate-700 dark:text-slate-300">Show Photos</label>
+                    <input type="checkbox" id="show_photos" name="show_photos" {% if reg.show_photos or not reg %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                </div>
+
+                <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <label for="show_attendees" class="font-medium text-slate-700 dark:text-slate-300">Show Attendees</label>
+                    <input type="checkbox" id="show_attendees" name="show_attendees" {% if reg.show_attendees or not reg %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
+                </div>
+
+                <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <label for="show_comments" class="font-medium text-slate-700 dark:text-slate-300">Show Comments</label>
+                    <input type="checkbox" id="show_comments" name="show_comments" {% if reg.show_comments or not reg %}checked{% endif %} class="w-5 h-5 text-blue-600 bg-white border-slate-300 rounded focus:ring-blue-500 focus:ring-2">
                 </div>
 
                 <div>

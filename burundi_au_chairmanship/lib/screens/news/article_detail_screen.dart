@@ -16,6 +16,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/translate_button.dart';
+import '../../widgets/liked_by_avatars.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -31,7 +32,10 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   List<ArticleComment> _comments = [];
   bool _loadingComments = true;
   final _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   bool _postingComment = false;
+  int? _replyingToId;
+  String? _replyingToName;
 
   // Reading progress tracking
   final ScrollController _scrollController = ScrollController();
@@ -64,6 +68,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _commentController.dispose();
+    _commentFocusNode.dispose();
     super.dispose();
   }
 
@@ -171,6 +176,14 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     }
   }
 
+  int _totalCommentCount(List<ArticleComment> list) {
+    int n = 0;
+    for (final c in list) {
+      n += 1 + c.replyCount;
+    }
+    return n;
+  }
+
   Future<void> _loadComments() async {
     try {
       final comments = await ApiService().getArticleComments(_article.id);
@@ -178,12 +191,36 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         setState(() {
           _comments = comments;
           _loadingComments = false;
-          _article = _article.copyWith(commentCount: comments.length);
+          _article = _article.copyWith(commentCount: _totalCommentCount(comments));
         });
       }
     } catch (_) {
       if (mounted) setState(() => _loadingComments = false);
     }
+  }
+
+  void _startReply(ArticleComment comment) {
+    setState(() {
+      _replyingToId = comment.id;
+      _replyingToName = comment.username.isNotEmpty ? comment.username : comment.userName;
+    });
+    // Prefill @mention so the target user actually gets notified.
+    if (comment.username.isNotEmpty) {
+      final prefix = '@${comment.username} ';
+      _commentController.text = prefix;
+      _commentController.selection = TextSelection.fromPosition(
+        TextPosition(offset: prefix.length),
+      );
+    }
+    _commentFocusNode.requestFocus();
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingToId = null;
+      _replyingToName = null;
+    });
+    _commentController.clear();
   }
 
   Future<void> _postComment() async {
@@ -192,14 +229,26 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
     setState(() => _postingComment = true);
     try {
-      final comment = await ApiService().postArticleComment(_article.id, text);
-      if (mounted) {
+      final comment = await ApiService().postArticleComment(
+        _article.id,
+        text,
+        parentId: _replyingToId,
+      );
+      if (!mounted) return;
+      // Reload to get the fresh nested tree from the server (handles
+      // reply attribution + @mention expansion correctly).
+      _commentController.clear();
+      _replyingToId = null;
+      _replyingToName = null;
+      setState(() => _postingComment = false);
+      // Optimistic update for top-level, full reload otherwise.
+      if (comment.parentId == null) {
         setState(() {
           _comments.insert(0, comment);
-          _article = _article.copyWith(commentCount: _comments.length);
-          _commentController.clear();
-          _postingComment = false;
+          _article = _article.copyWith(commentCount: _totalCommentCount(_comments));
         });
+      } else {
+        await _loadComments();
       }
     } catch (e) {
       if (mounted) {
@@ -273,10 +322,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     try {
       final result = await ApiService().toggleArticleLike(_article.id);
       if (mounted) {
+        List<Liker> likers = [];
+        if (result['recent_likers'] is List) {
+          likers = (result['recent_likers'] as List)
+              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+              .toList();
+        }
         setState(() {
           _article = _article.copyWith(
             isLiked: result['is_liked'],
             likeCount: result['like_count'],
+            recentLikers: likers,
           );
         });
       }
@@ -546,6 +602,27 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       ],
                     ),
                   ),
+                  // Liked-by avatars
+                  if (_article.recentLikers.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12, left: 4),
+                      child: Row(
+                        children: [
+                          LikedByAvatars(
+                            likers: _article.recentLikers,
+                            totalLikes: _article.likeCount,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _article.likeCount == 1 ? '1 like' : '${_article.likeCount} likes',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 24),
 
                   // Article content
@@ -757,42 +834,84 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
                   // Comment input or login prompt
                   if (auth.isAuthenticated)
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _commentController,
-                            decoration: InputDecoration(
-                              hintText: l10n.translate('add_comment'),
-                              hintStyle: TextStyle(fontSize: 14),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                        if (_replyingToName != null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.auGold.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.auGold.withValues(alpha: 0.3),
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: AppColors.auGold),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             ),
-                            style: TextStyle(fontSize: 14),
-                            maxLines: null,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.reply_rounded,
+                                    size: 16, color: AppColors.auGold),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Replying to @$_replyingToName',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.auGold,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: _cancelReply,
+                                  child: const Icon(Icons.close_rounded,
+                                      size: 16, color: AppColors.auGold),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: _postingComment ? null : _postComment,
-                          icon: _postingComment
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.send_rounded, color: AppColors.auGold),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _commentController,
+                                focusNode: _commentFocusNode,
+                                decoration: InputDecoration(
+                                  hintText: _replyingToName != null
+                                      ? 'Write a reply…'
+                                      : l10n.translate('add_comment'),
+                                  hintStyle: TextStyle(fontSize: 14),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppColors.auGold),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                ),
+                                style: TextStyle(fontSize: 14),
+                                maxLines: null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: _postingComment ? null : _postComment,
+                              icon: _postingComment
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.send_rounded, color: AppColors.auGold),
+                            ),
+                          ],
                         ),
                       ],
                     )
@@ -837,7 +956,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     )
                   else
                     ...List.generate(_comments.length, (index) {
-                      return _buildCommentTile(_comments[index], auth, l10n, isDark);
+                      return _buildCommentTile(_comments[index], auth, l10n, isDark, isReply: false);
                     }),
 
                   const SizedBox(height: 40),
@@ -962,77 +1081,183 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     );
   }
 
-  Widget _buildCommentTile(ArticleComment comment, AuthProvider auth, AppLocalizations l10n, bool isDark) {
+  Widget _buildCommentTile(
+    ArticleComment comment,
+    AuthProvider auth,
+    AppLocalizations l10n,
+    bool isDark, {
+    required bool isReply,
+  }) {
     final isOwn = auth.isAuthenticated && auth.userId == comment.userId;
+    final avatarRadius = isReply ? 14.0 : 18.0;
+    final nameSize = isReply ? 12.5 : 13.0;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+      padding: EdgeInsets.only(left: isReply ? 44.0 : 0.0, bottom: 12),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.auGold.withValues(alpha: 0.15),
-            backgroundImage: comment.profilePicture != null
-                ? CachedNetworkImageProvider(comment.profilePicture!)
-                : null,
-            child: comment.profilePicture == null
-                ? Text(
-                    comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.auGold,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 12),
-          // Content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: avatarRadius,
+                backgroundColor: AppColors.auGold.withValues(alpha: 0.15),
+                backgroundImage: comment.profilePicture != null
+                    ? CachedNetworkImageProvider(comment.profilePicture!)
+                    : null,
+                child: comment.profilePicture == null
+                    ? Text(
+                        comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.auGold,
+                          fontSize: isReply ? 11 : 13,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      comment.userName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkText : AppColors.lightText,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            comment.userName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: nameSize,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkText : AppColors.lightText,
+                            ),
+                          ),
+                        ),
+                        if (comment.badgeType != null && comment.badgeType!.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.verified,
+                            size: 14,
+                            color: comment.badgeType == 'GOLD'
+                                ? const Color(0xFFD4AF37)
+                                : Colors.blue,
+                          ),
+                        ],
+                        if (comment.username.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              '@${comment.username}',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isDark
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 6),
+                        Text(
+                          '· ${_timeAgo(comment.createdAt, l10n)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (isOwn)
+                          GestureDetector(
+                            onTap: () => _deleteComment(comment),
+                            child: Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _timeAgo(comment.createdAt, l10n),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (isOwn)
+                    const SizedBox(height: 4),
+                    _buildMentionRichText(comment.content, isDark),
+                    if (!isReply && auth.isAuthenticated) ...[
+                      const SizedBox(height: 6),
                       GestureDetector(
-                        onTap: () => _deleteComment(comment),
-                        child: Icon(Icons.delete_outline_rounded, size: 18,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                        onTap: () => _startReply(comment),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.reply_rounded, size: 14, color: AppColors.auGold),
+                            SizedBox(width: 4),
+                            Text(
+                              'Reply',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.auGold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  comment.content,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? AppColors.darkText : AppColors.lightText,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          if (!isReply && comment.replies.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Column(
+                children: comment.replies
+                    .map((reply) => _buildCommentTile(reply, auth, l10n, isDark, isReply: true))
+                    .toList(),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMentionRichText(String content, bool isDark) {
+    final mentionRegex = RegExp(r'@(\w+)');
+    final spans = <TextSpan>[];
+    int lastEnd = 0;
+
+    for (final match in mentionRegex.allMatches(content)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: content.substring(lastEnd, match.start)));
+      }
+      spans.add(TextSpan(
+        text: match.group(0),
+        style: const TextStyle(
+          color: AppColors.auGold,
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+      lastEnd = match.end;
+    }
+    if (lastEnd < content.length) {
+      spans.add(TextSpan(text: content.substring(lastEnd)));
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: 14,
+          color: isDark ? AppColors.darkText : AppColors.lightText,
+          height: 1.4,
+        ),
+        children: spans.isEmpty ? [TextSpan(text: content)] : spans,
       ),
     );
   }

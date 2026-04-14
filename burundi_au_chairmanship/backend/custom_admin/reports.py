@@ -378,7 +378,7 @@ def _build_header(title, subtitle=None):
 
     elements = []
     # App branding line
-    elements.append(Paragraph('Burundi AU Chairmanship 2026-2027', sub_style))
+    elements.append(Paragraph('Burundi Chairmanship 2026-2027', sub_style))
     elements.append(Paragraph(title, header_style))
     if subtitle:
         elements.append(Paragraph(subtitle, sub_style))
@@ -479,7 +479,7 @@ def _page_footer(canvas, doc):
     canvas.setFillColor(colors.HexColor('#94A3B8'))
     canvas.drawCentredString(
         A4[0] / 2, 15 * mm,
-        f'AU Chairmanship Diplomatic Portal  |  Page {doc.page}'
+        f'Burundi Chairmanship Diplomatic Portal  |  Page {doc.page}'
     )
     canvas.restoreState()
 
@@ -496,7 +496,7 @@ def generate_analytics_pdf(stats_dict):
         buf, pagesize=A4,
         topMargin=25 * mm, bottomMargin=25 * mm,
         leftMargin=20 * mm, rightMargin=20 * mm,
-        title='Analytics Report - AU Chairmanship',
+        title='Analytics Report - Burundi Chairmanship',
     )
 
     elements = []

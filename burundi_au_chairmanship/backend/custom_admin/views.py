@@ -26,7 +26,7 @@ from core.models import (
     LiveFeed, Video, GalleryAlbum, GalleryPhoto, EmbassyLocation, Resource,
     Notification, Category, PriorityAgenda, SocialMediaLink,
     QuickAccessMenuItem, HeroTextContent, WeatherCity,
-    EventRegistration, EventSubmission, RegistrationFormField, AppSettings, User,
+    EventCategory, EventRegistration, EventSubmission, RegistrationFormField, AppSettings, User,
     UserProfile, VerificationRequest,
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     AuditLogEntry, SupportTicket, TicketMessage,
@@ -42,6 +42,24 @@ from core.models import (
     TranslationRequest, VideoChapter,
     ArticleComment, EventComment,
     DeviceToken,
+    AppRelease, AppReleaseHighlight,
+    ArticleLike,
+)
+
+# Email-related views live in custom_admin/email_views.py. Re-exported here so
+# existing urls.py references like `views.email_campaigns_list` keep resolving.
+from .email_views import (  # noqa: F401
+    email_templates_list,
+    email_template_edit,
+    email_template_preview,
+    email_template_send_test,
+    email_campaigns_list,
+    email_campaign_create,
+    email_campaign_edit,
+    email_campaign_send,
+    email_campaign_delete,
+    email_logs_list,
+    email_inbox,
 )
 
 
@@ -65,6 +83,8 @@ def admin_login(request):
                 request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
             else:
                 request.session.set_expiry(0)  # Browser close
+            # Force-save so _session_expiry is persisted before the redirect
+            request.session.save()
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
             return redirect('custom_admin:dashboard')
         else:
@@ -86,14 +106,22 @@ def admin_logout(request):
 def dashboard(request):
     import json
     from datetime import timedelta
-    users_count = User.objects.count()
-    articles_count = Article.objects.count()
+    # Exclude staff/admin accounts — "App Users" should reflect real end users only
+    users_count = User.objects.filter(is_staff=False).count()
+    # Only count articles that are actually published (not drafts/archived)
+    articles_count = Article.objects.filter(status='published').count()
     events_count = Event.objects.count()
     magazines_count = MagazineEdition.objects.count()
     hero_slides_count = HeroSlide.objects.filter(is_active=True).count()
     live_feeds_active = LiveFeed.objects.filter(status='live').count()
     total_content = articles_count + events_count + magazines_count + hero_slides_count
-    active_today = User.objects.filter(last_login__gte=timezone.now() - timedelta(days=1)).count()
+    # Use UserProfile.last_active (bumped by LastActiveMiddleware on every
+    # authenticated API request, throttled to 60s) instead of last_login,
+    # which only fires on credential re-entry and misses JWT refresh-token sessions.
+    active_today = UserProfile.objects.filter(
+        last_active__gte=timezone.now() - timedelta(days=1),
+        user__is_staff=False,
+    ).count()
 
     # Account alerts
     deletion_scheduled = UserProfile.objects.filter(
@@ -103,26 +131,82 @@ def dashboard(request):
         is_deactivated=True, is_scheduled_for_deletion=False
     ).select_related('user').order_by('-deactivated_at')
 
-    # Device & activity stats
+    # "Users online now" — presence signal updated by:
+    #   * LastActiveMiddleware on every authenticated API hit (throttled 60s)
+    #   * The /api/heartbeat/ endpoint every 60s from foregrounded Flutter apps
+    # We union authenticated active profiles with anonymous device tokens
+    # (refreshed by heartbeat via X-FCM-Token header) and deduplicate so a
+    # single physical device can't inflate the count.
     from datetime import timedelta as td
-    live_users = UserProfile.objects.filter(
-        last_active__gte=timezone.now() - td(minutes=5)
-    ).count()
+    from core.models import DeviceToken
+    live_window = timezone.now() - td(minutes=5)
+    authed_user_ids = set(
+        UserProfile.objects.filter(last_active__gte=live_window)
+        .values_list('user_id', flat=True)
+    )
+    # Anonymous devices: tokens with no linked user, recently bumped.
+    anon_device_count = DeviceToken.objects.filter(
+        user__isnull=True,
+        is_active=True,
+        updated_at__gte=live_window,
+    ).values('token').distinct().count()
+    live_users = len(authed_user_ids) + anon_device_count
 
-    # --- User growth (last 30 days) ---
+    # --- User growth + Event activity (last 30 days) ---
     now = timezone.now()
     growth_labels = []
     growth_data = []
+    events_30d_data = []
     for i in range(29, -1, -1):
         day = (now - timedelta(days=i)).date()
         growth_labels.append(day.strftime('%b %d'))
-        growth_data.append(User.objects.filter(date_joined__date=day).count())
+        growth_data.append(
+            User.objects.filter(date_joined__date=day, is_staff=False).count()
+        )
+        events_30d_data.append(
+            Event.objects.filter(created_at__date=day).count()
+        )
 
-    # --- Content engagement ---
+    # --- User growth trend: last 30 days vs previous 30 days ---
+    growth_last_30 = sum(growth_data)
+    growth_prev_30 = User.objects.filter(
+        date_joined__gte=now - timedelta(days=60),
+        date_joined__lt=now - timedelta(days=30),
+        is_staff=False,
+    ).count()
+    if growth_prev_30 > 0:
+        growth_trend_pct = round(
+            ((growth_last_30 - growth_prev_30) / growth_prev_30) * 100
+        )
+    elif growth_last_30 > 0:
+        # Previous window had 0 sign-ups but this one has some → brand-new growth
+        growth_trend_pct = None  # render as "New" instead of a percentage
+    else:
+        growth_trend_pct = 0
+    # direction: 'up' (>0), 'down' (<0), 'flat' (=0), 'new' (None)
+    if growth_trend_pct is None:
+        growth_trend_direction = 'new'
+    elif growth_trend_pct > 0:
+        growth_trend_direction = 'up'
+    elif growth_trend_pct < 0:
+        growth_trend_direction = 'down'
+    else:
+        growth_trend_direction = 'flat'
+
+    # --- Content engagement (views + likes across all content types) ---
     article_views = Article.objects.aggregate(s=Sum('view_count'))['s'] or 0
     article_likes = Article.objects.aggregate(s=Sum('like_count'))['s'] or 0
     magazine_views = MagazineEdition.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    magazine_likes = MagazineEdition.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    gallery_views = GalleryAlbum.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    gallery_likes = GalleryAlbum.objects.aggregate(s=Sum('like_count'))['s'] or 0
+    video_views = Video.objects.aggregate(s=Sum('view_count'))['s'] or 0
+    video_likes = Video.objects.aggregate(s=Sum('like_count'))['s'] or 0
     video_count = Video.objects.count()
+
+    engagement_labels = ['Articles', 'Magazines', 'Gallery', 'Videos']
+    engagement_views = [article_views, magazine_views, gallery_views, video_views]
+    engagement_likes = [article_likes, magazine_likes, gallery_likes, video_likes]
 
     # --- Top countries ---
     nationality_data = list(
@@ -138,6 +222,83 @@ def dashboard(request):
     verified_count = UserProfile.objects.filter(is_verified=True).count()
     pending_verif = VerificationRequest.objects.filter(status='pending').count()
     unverified_count = users_count - verified_count
+
+    # --- Language distribution (real app users only) ---
+    lang_agg = (
+        UserProfile.objects
+        .filter(user__is_staff=False, user__is_active=True)
+        .values('preferred_language')
+        .annotate(count=Count('id'))
+    )
+    lang_map = {row['preferred_language']: row['count'] for row in lang_agg}
+    language_en = lang_map.get('en', 0)
+    language_fr = lang_map.get('fr', 0)
+    language_total = language_en + language_fr
+
+    # --- Push notification engagement (last 30 days) ---
+    # We blend two data sources so the widget is useful immediately, even
+    # before client-side event tracking rolls out to devices:
+    #
+    #   1. Legacy counters (push_recipient_count / opened_count) — already
+    #      populated on every historical send via the Notification row itself.
+    #      These are raw send/tap counts (not unique users).
+    #   2. NotificationEvent rows — precise per-user events recorded by the
+    #      new Flutter client. Gives us unique-user CTR once data accrues.
+    #
+    # The widget reports the maximum of (events, legacy) for each metric so
+    # neither pipeline hides historical data from the other.
+    from core.models import NotificationEvent
+    notif_30d = Notification.objects.filter(
+        push_sent=True,
+        push_sent_at__gte=now - timedelta(days=30),
+    )
+    notif_sent_30d = notif_30d.aggregate(s=Sum('push_recipient_count'))['s'] or 0
+    # Legacy per-notification open counter sum (raw taps, not unique users)
+    legacy_opened_30d = notif_30d.aggregate(s=Sum('opened_count'))['s'] or 0
+
+    event_delivered_30d = NotificationEvent.objects.filter(
+        notification__in=notif_30d, event_type='delivered',
+    ).count()
+    event_opened_30d = NotificationEvent.objects.filter(
+        notification__in=notif_30d, event_type='opened',
+    ).values('user').distinct().count()
+
+    # "Delivered" falls back to sent when no client telemetry exists yet.
+    # Once client events start flowing they take precedence.
+    notif_delivered_30d = event_delivered_30d or notif_sent_30d
+    # "Opened" uses whichever source knows more — unique events or raw taps.
+    notif_opened_30d = max(event_opened_30d, legacy_opened_30d)
+    notif_ctr_30d = (
+        round((notif_opened_30d / notif_delivered_30d) * 100, 1)
+        if notif_delivered_30d else 0
+    )
+    notif_engagement_is_estimated = (
+        event_delivered_30d == 0 and notif_sent_30d > 0
+    )
+
+    # Top 5 by open-rate — look at the 20 most recent sends. Per-notification
+    # metrics use the same fallback rules (events first, legacy otherwise).
+    def _delivered_for(n):
+        d = n.delivered_count
+        return d or n.push_recipient_count
+
+    def _opened_for(n):
+        return max(n.opened_users_count, n.opened_count)
+
+    recent_sends = list(notif_30d.order_by('-push_sent_at')[:20])
+    ranked = sorted(
+        [
+            (n.title[:24], _delivered_for(n), _opened_for(n))
+            for n in recent_sends
+        ],
+        # sort by raw open-rate; ties and empties go to the bottom
+        key=lambda t: (t[2] / t[1] if t[1] else 0, t[2]),
+        reverse=True,
+    )[:5]
+    top_notif_labels = json.dumps([t[0] for t in ranked])
+    top_notif_delivered = json.dumps([t[1] for t in ranked])
+    top_notif_opened = json.dumps([t[2] for t in ranked])
+    has_notif_engagement_data = bool(recent_sends)
 
     stats = {
         'users': users_count,
@@ -157,15 +318,42 @@ def dashboard(request):
         # Chart data (JSON-serialized)
         'growth_labels_json': json.dumps(growth_labels),
         'growth_data_json': json.dumps(growth_data),
+        'events_30d_data_json': json.dumps(events_30d_data),
+        'growth_trend_pct': growth_trend_pct,
+        'growth_trend_direction': growth_trend_direction,
+        'growth_last_30': growth_last_30,
+        'growth_prev_30': growth_prev_30,
         'article_views': article_views,
         'article_likes': article_likes,
         'magazine_views': magazine_views,
+        'magazine_likes': magazine_likes,
+        'gallery_views': gallery_views,
+        'gallery_likes': gallery_likes,
+        'video_views': video_views,
+        'video_likes': video_likes,
         'video_count': video_count,
+        'engagement_labels_json': json.dumps(engagement_labels),
+        'engagement_views_json': json.dumps(engagement_views),
+        'engagement_likes_json': json.dumps(engagement_likes),
         'country_labels_json': json.dumps(country_labels),
         'country_counts_json': json.dumps(country_counts),
         'verified_count': verified_count,
         'pending_verif': pending_verif,
         'unverified_count': unverified_count,
+        # Language distribution
+        'language_en': language_en,
+        'language_fr': language_fr,
+        'language_total': language_total,
+        # Notification engagement
+        'notif_sent_30d': notif_sent_30d,
+        'notif_delivered_30d': notif_delivered_30d,
+        'notif_opened_30d': notif_opened_30d,
+        'notif_ctr_30d': notif_ctr_30d,
+        'notif_engagement_is_estimated': notif_engagement_is_estimated,
+        'has_notif_engagement_data': has_notif_engagement_data,
+        'top_notif_labels_json': top_notif_labels,
+        'top_notif_delivered_json': top_notif_delivered,
+        'top_notif_opened_json': top_notif_opened,
     }
     return render(request, 'custom_admin/dashboard.html', stats)
 
@@ -635,8 +823,54 @@ def notifications_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+def _validate_notification_language_fields(request):
+    """Return an error message when language targeting is inconsistent with
+    the bilingual fields provided, or ``None`` if the form is OK.
+
+    Rules:
+      * Title + message are required (basic sanity check).
+      * When ``target_language='fr'`` → at least ``title_fr`` must be set,
+        otherwise FR users would silently receive the English title.
+      * When ``target_language='en'`` → at least ``title`` must be set
+        (already covered by the sanity check but explicit for symmetry).
+    """
+    title = (request.POST.get('title') or '').strip()
+    message = (request.POST.get('message') or '').strip()
+    title_fr = (request.POST.get('title_fr') or '').strip()
+    message_fr = (request.POST.get('message_fr') or '').strip()
+    target_language = (request.POST.get('target_language') or '').strip()
+
+    if not title or not message:
+        return 'Title and message are required.'
+
+    if target_language == 'fr' and not title_fr:
+        return (
+            'You targeted French users but the French title is empty. '
+            'Please provide a French title so FR users don\'t receive the English version.'
+        )
+
+    if target_language == 'fr' and not message_fr:
+        return (
+            'You targeted French users but the French message is empty. '
+            'Please provide a French message so FR users don\'t receive the English version.'
+        )
+
+    return None
+
+
 def notification_create(request):
     if request.method == 'POST':
+        # Bilingual consistency validation
+        validation_error = _validate_notification_language_fields(request)
+        if validation_error:
+            messages.error(request, validation_error)
+            from core.models import NATIONALITY_CHOICES
+            return render(request, 'custom_admin/notifications/form.html', {
+                'action': 'Create',
+                'nationality_choices': NATIONALITY_CHOICES,
+                'form_data': request.POST,
+            })
+
         # Parse scheduled_at datetime
         scheduled_at = None
         scheduled_at_str = request.POST.get('scheduled_at', '').strip()
@@ -728,6 +962,17 @@ def notification_create(request):
 def notification_edit(request, pk):
     notification = get_object_or_404(Notification, pk=pk)
     if request.method == 'POST':
+        # Bilingual consistency validation
+        validation_error = _validate_notification_language_fields(request)
+        if validation_error:
+            messages.error(request, validation_error)
+            from core.models import NATIONALITY_CHOICES
+            return render(request, 'custom_admin/notifications/form.html', {
+                'action': 'Edit',
+                'notification': notification,
+                'nationality_choices': NATIONALITY_CHOICES,
+                'form_data': request.POST,
+            })
         notification.title = request.POST.get('title')
         notification.title_fr = request.POST.get('title_fr', '')
         notification.message = request.POST.get('message')
@@ -798,6 +1043,283 @@ def notification_delete(request, pk):
     notification.delete()
     messages.success(request, 'Notification deleted successfully!')
     return redirect('custom_admin:notifications_list')
+
+
+# ══════════════════════════════════════════════════════════════
+# What's New / App Releases
+# ══════════════════════════════════════════════════════════════
+
+# Curated list of Material icon names admins can pick from.
+# Keep in sync with ``_backendIconMap`` in ``lib/widgets/whats_new_dialog.dart``.
+APP_RELEASE_ICON_CHOICES = [
+    ('forum_rounded', 'Comments / Chat'),
+    ('notifications_active_rounded', 'Notifications'),
+    ('translate_rounded', 'Languages'),
+    ('people_alt_rounded', 'Users / Social'),
+    ('shield_rounded', 'Privacy / Security'),
+    ('speed_rounded', 'Performance'),
+    ('bug_report_rounded', 'Bug Fixes'),
+    ('event_available_rounded', 'Events'),
+    ('verified_rounded', 'Verification'),
+    ('auto_awesome_rounded', 'New Feature'),
+    ('palette_rounded', 'Design / Theme'),
+    ('article_rounded', 'Articles'),
+    ('menu_book_rounded', 'Magazine'),
+    ('play_circle_rounded', 'Videos'),
+    ('live_tv_rounded', 'Live Feeds'),
+    ('map_rounded', 'Locations'),
+    ('support_agent_rounded', 'Support'),
+    ('search_rounded', 'Search'),
+    ('download_rounded', 'Downloads'),
+    ('dark_mode_rounded', 'Dark Mode'),
+    ('accessibility_rounded', 'Accessibility'),
+    ('rocket_launch_rounded', 'Launch / Release'),
+    ('star_rounded', 'General Highlight'),
+]
+
+
+def _parse_highlights_from_post(post_data):
+    """Parse dynamic highlight rows from a submitted form.
+
+    The form posts arrays via the naming convention
+    ``highlight_icon[]``, ``highlight_title_en[]``, etc. We zip them together
+    and drop any row missing a title or subtitle so empty rows don't
+    persist junk data.
+    """
+    icons = post_data.getlist('highlight_icon[]')
+    title_ens = post_data.getlist('highlight_title_en[]')
+    title_frs = post_data.getlist('highlight_title_fr[]')
+    subtitle_ens = post_data.getlist('highlight_subtitle_en[]')
+    subtitle_frs = post_data.getlist('highlight_subtitle_fr[]')
+
+    rows = []
+    for i, title_en in enumerate(title_ens):
+        icon = (icons[i] if i < len(icons) else '').strip() or 'star_rounded'
+        t_en = (title_en or '').strip()
+        t_fr = (title_frs[i] if i < len(title_frs) else '').strip()
+        s_en = (subtitle_ens[i] if i < len(subtitle_ens) else '').strip()
+        s_fr = (subtitle_frs[i] if i < len(subtitle_frs) else '').strip()
+        if not t_en or not s_en:
+            continue
+        rows.append({
+            'icon_name': icon,
+            'title_en': t_en,
+            'title_fr': t_fr,
+            'subtitle_en': s_en,
+            'subtitle_fr': s_fr,
+        })
+    return rows
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def app_releases_list(request):
+    releases = AppRelease.objects.all().prefetch_related('highlights').order_by('-version_code')
+    paginator = Paginator(releases, 20)
+    page = request.GET.get('page')
+    releases = paginator.get_page(page)
+    return render(request, 'custom_admin/app_releases/list.html', {
+        'releases': releases,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def app_release_create(request):
+    if request.method == 'POST':
+        version = (request.POST.get('version') or '').strip()
+        version_code_str = (request.POST.get('version_code') or '').strip()
+        title = (request.POST.get('title') or '').strip()
+
+        if not version or not version_code_str or not title:
+            messages.error(request, 'Version, version code, and title are required.')
+            return render(request, 'custom_admin/app_releases/form.html', {
+                'action': 'Create',
+                'icon_choices': APP_RELEASE_ICON_CHOICES,
+                'form_data': request.POST,
+                'highlights': _parse_highlights_from_post(request.POST),
+            })
+
+        try:
+            version_code = int(version_code_str)
+        except ValueError:
+            messages.error(request, 'Version code must be an integer.')
+            return render(request, 'custom_admin/app_releases/form.html', {
+                'action': 'Create',
+                'icon_choices': APP_RELEASE_ICON_CHOICES,
+                'form_data': request.POST,
+                'highlights': _parse_highlights_from_post(request.POST),
+            })
+
+        released_at_str = (request.POST.get('released_at') or '').strip()
+        released_at = timezone.now()
+        if released_at_str:
+            from django.utils.dateparse import parse_datetime
+            parsed = parse_datetime(released_at_str)
+            if parsed is not None:
+                released_at = parsed
+
+        popup_delay_str = (request.POST.get('popup_delay_seconds') or '2').strip()
+        try:
+            popup_delay = max(0, int(popup_delay_str))
+        except ValueError:
+            popup_delay = 2
+
+        try:
+            release = AppRelease.objects.create(
+                version=version,
+                version_code=version_code,
+                title=title,
+                title_fr=(request.POST.get('title_fr') or '').strip(),
+                release_notes=(request.POST.get('release_notes') or '').strip(),
+                release_notes_fr=(request.POST.get('release_notes_fr') or '').strip(),
+                is_force_update=request.POST.get('is_force_update') == 'on',
+                is_published=request.POST.get('is_published') == 'on',
+                min_supported_version=(request.POST.get('min_supported_version') or '').strip(),
+                android_url=(request.POST.get('android_url') or '').strip(),
+                ios_url=(request.POST.get('ios_url') or '').strip(),
+                popup_delay_seconds=popup_delay,
+                released_at=released_at,
+            )
+        except Exception as exc:
+            messages.error(request, f'Could not create release: {exc}')
+            return render(request, 'custom_admin/app_releases/form.html', {
+                'action': 'Create',
+                'icon_choices': APP_RELEASE_ICON_CHOICES,
+                'form_data': request.POST,
+                'highlights': _parse_highlights_from_post(request.POST),
+            })
+
+        for order, row in enumerate(_parse_highlights_from_post(request.POST)):
+            AppReleaseHighlight.objects.create(release=release, order=order, **row)
+
+        log_admin_action(
+            request, 'create', 'AppRelease',
+            object_id=release.pk, object_repr=f'v{release.version}'
+        )
+        messages.success(request, f"Release v{release.version} created.")
+        return redirect('custom_admin:app_releases_list')
+
+    return render(request, 'custom_admin/app_releases/form.html', {
+        'action': 'Create',
+        'icon_choices': APP_RELEASE_ICON_CHOICES,
+        'highlights': [],
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def app_release_edit(request, pk):
+    release = get_object_or_404(AppRelease, pk=pk)
+
+    if request.method == 'POST':
+        version = (request.POST.get('version') or '').strip()
+        version_code_str = (request.POST.get('version_code') or '').strip()
+        title = (request.POST.get('title') or '').strip()
+
+        if not version or not version_code_str or not title:
+            messages.error(request, 'Version, version code, and title are required.')
+            return render(request, 'custom_admin/app_releases/form.html', {
+                'action': 'Edit',
+                'release': release,
+                'icon_choices': APP_RELEASE_ICON_CHOICES,
+                'highlights': _parse_highlights_from_post(request.POST),
+                'form_data': request.POST,
+            })
+
+        try:
+            version_code = int(version_code_str)
+        except ValueError:
+            messages.error(request, 'Version code must be an integer.')
+            return render(request, 'custom_admin/app_releases/form.html', {
+                'action': 'Edit',
+                'release': release,
+                'icon_choices': APP_RELEASE_ICON_CHOICES,
+                'highlights': _parse_highlights_from_post(request.POST),
+                'form_data': request.POST,
+            })
+
+        released_at_str = (request.POST.get('released_at') or '').strip()
+        if released_at_str:
+            from django.utils.dateparse import parse_datetime
+            parsed = parse_datetime(released_at_str)
+            if parsed is not None:
+                release.released_at = parsed
+
+        popup_delay_str = (request.POST.get('popup_delay_seconds') or '2').strip()
+        try:
+            popup_delay = max(0, int(popup_delay_str))
+        except ValueError:
+            popup_delay = 2
+
+        release.version = version
+        release.version_code = version_code
+        release.title = title
+        release.title_fr = (request.POST.get('title_fr') or '').strip()
+        release.release_notes = (request.POST.get('release_notes') or '').strip()
+        release.release_notes_fr = (request.POST.get('release_notes_fr') or '').strip()
+        release.is_force_update = request.POST.get('is_force_update') == 'on'
+        release.is_published = request.POST.get('is_published') == 'on'
+        release.min_supported_version = (request.POST.get('min_supported_version') or '').strip()
+        release.android_url = (request.POST.get('android_url') or '').strip()
+        release.ios_url = (request.POST.get('ios_url') or '').strip()
+        release.popup_delay_seconds = popup_delay
+
+        try:
+            release.save()
+        except Exception as exc:
+            messages.error(request, f'Could not save release: {exc}')
+            return render(request, 'custom_admin/app_releases/form.html', {
+                'action': 'Edit',
+                'release': release,
+                'icon_choices': APP_RELEASE_ICON_CHOICES,
+                'highlights': _parse_highlights_from_post(request.POST),
+                'form_data': request.POST,
+            })
+
+        # Replace highlights wholesale — simpler than diffing in a dynamic form.
+        release.highlights.all().delete()
+        for order, row in enumerate(_parse_highlights_from_post(request.POST)):
+            AppReleaseHighlight.objects.create(release=release, order=order, **row)
+
+        log_admin_action(
+            request, 'update', 'AppRelease',
+            object_id=release.pk, object_repr=f'v{release.version}'
+        )
+        messages.success(request, f"Release v{release.version} updated.")
+        return redirect('custom_admin:app_releases_list')
+
+    highlights = [
+        {
+            'icon_name': h.icon_name,
+            'title_en': h.title_en,
+            'title_fr': h.title_fr,
+            'subtitle_en': h.subtitle_en,
+            'subtitle_fr': h.subtitle_fr,
+        }
+        for h in release.highlights.all()
+    ]
+    return render(request, 'custom_admin/app_releases/form.html', {
+        'action': 'Edit',
+        'release': release,
+        'icon_choices': APP_RELEASE_ICON_CHOICES,
+        'highlights': highlights,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def app_release_delete(request, pk):
+    release = get_object_or_404(AppRelease, pk=pk)
+    version = release.version
+    log_admin_action(
+        request, 'delete', 'AppRelease',
+        object_id=pk, object_repr=f'v{version}'
+    )
+    release.delete()
+    messages.success(request, f"Release v{version} deleted.")
+    return redirect('custom_admin:app_releases_list')
 
 
 @login_required(login_url='custom_admin:login')
@@ -871,6 +1393,10 @@ def notification_estimate_audience(request):
 
     count = profiles.count()
 
+    # Split by language (before anonymous devices, which have no language)
+    en_count = profiles.filter(preferred_language='en').count()
+    fr_count = profiles.filter(preferred_language='fr').count()
+
     # Include anonymous device tokens for global notifications
     if is_global:
         anonymous_count = DeviceToken.objects.filter(
@@ -883,7 +1409,11 @@ def notification_estimate_audience(request):
     # Add anonymous device count to total as well
     total += DeviceToken.objects.filter(user__isnull=True, is_active=True).count()
 
-    return JsonResponse({'count': count, 'total': total})
+    return JsonResponse({
+        'count': count,
+        'total': total,
+        'by_language': {'en': en_count, 'fr': fr_count},
+    })
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1063,15 +1593,27 @@ def user_toggle_staff(request, pk):
 @user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
 def admin_management(request):
     """Superadmin page to view/manage other admin (staff) users."""
+    from .permissions import ADMIN_MENUS, ADMIN_MENU_GROUPS, MENU_KEYS
     admins = User.objects.filter(
         Q(is_staff=True) | Q(is_superuser=True)
     ).select_related('profile').order_by('-last_login')
+
+    # Attach allowed-menu list to each admin for template rendering
+    for a in admins:
+        try:
+            raw = a.profile.admin_sections or []
+        except Exception:
+            raw = []
+        a.allowed_sections_set = set(raw) & MENU_KEYS
 
     return render(request, 'custom_admin/admin_management/list.html', {
         'admins': admins,
         'total_admins': admins.count(),
         'superadmins': admins.filter(is_superuser=True).count(),
         'staff_only': admins.filter(is_staff=True, is_superuser=False).count(),
+        'all_sections': ADMIN_MENUS,        # flat list (back-compat)
+        'all_menu_groups': ADMIN_MENU_GROUPS, # grouped list for display
+        'total_menus': len(ADMIN_MENUS),
     })
 
 
@@ -1114,15 +1656,24 @@ def admin_invite(request):
         user.is_superuser = (role == 'superuser')
         user.save()
 
+        # Save per-section permissions (staff only; superusers have full access)
+        from .permissions import SECTION_KEYS
+        selected_sections = [s for s in request.POST.getlist('sections') if s in SECTION_KEYS]
+        try:
+            user.profile.admin_sections = selected_sections
+            user.profile.save(update_fields=['admin_sections'])
+        except Exception:
+            logger.exception('Failed to save admin_sections on invite')
+
         # Send invitation email
         try:
             from django.core.mail import send_mail
             from django.conf import settings as conf_settings
-            subject = 'Admin Portal Access — Burundi AU Chairmanship 2026'
+            subject = 'Admin Portal Access — Burundi Chairmanship 2026'
             message = (
                 f'Dear {first_name or username},\n\n'
                 f'You have been granted {"Super Admin" if role == "superuser" else "Staff"} access '
-                f'to the Burundi AU Chairmanship Admin Portal.\n\n'
+                f'to the Burundi Chairmanship Admin Portal.\n\n'
                 f'Your login credentials:\n'
                 f'  Portal URL: https://api.burundi4africa.com/admin/\n'
                 f'  Username: {username}\n'
@@ -1130,7 +1681,7 @@ def admin_invite(request):
                 f'Please change your password after your first login.\n\n'
                 f'For questions, contact info@burundi4africa.com\n\n'
                 f'Best regards,\n'
-                f'Burundi AU Chairmanship Team\n'
+                f'Burundi Chairmanship Team\n'
                 f'Ministère des Affaires Étrangères'
             )
             send_mail(
@@ -1150,6 +1701,35 @@ def admin_invite(request):
             )
 
         return redirect('custom_admin:admin_management')
+
+    return redirect('custom_admin:admin_management')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
+@require_POST
+def admin_edit_access(request, pk):
+    """Update the per-section permissions of an existing admin user."""
+    from .permissions import SECTION_KEYS
+    target = get_object_or_404(User, pk=pk)
+
+    if target.is_superuser:
+        messages.info(request, f'{target.username} is a Super Admin — permissions are unrestricted.')
+        return redirect('custom_admin:admin_management')
+
+    selected = [s for s in request.POST.getlist('sections') if s in SECTION_KEYS]
+    try:
+        target.profile.admin_sections = selected
+        target.profile.save(update_fields=['admin_sections'])
+        log_admin_action(
+            request, 'update', 'UserProfile', object_id=target.pk,
+            object_repr=target.username,
+            changes={'admin_sections': {'new': selected}},
+        )
+        messages.success(request, f'Access updated for {target.username} ({len(selected)} sections).')
+    except Exception:
+        logger.exception('Failed to update admin_sections')
+        messages.error(request, 'Failed to update access. Please try again.')
 
     return redirect('custom_admin:admin_management')
 
@@ -1215,7 +1795,7 @@ def verification_request_review(request, pk):
                 user = ver_request.user
                 send_mail(
                     subject='Congratulations! Your Account is Verified',
-                    message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Burundi AU Chairmanship community.\n\nBest regards,\nB4Africa Team',
+                    message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Burundi Chairmanship community.\n\nBest regards,\nB4Africa Team',
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
                     fail_silently=True,
@@ -1606,6 +2186,8 @@ def event_registration_create(request):
     if request.method == 'POST':
         reg = EventRegistration.objects.create(
             card_type=request.POST.get('card_type', 'event'),
+            event_type=request.POST.get('event_type', 'in_person'),
+            category_id=request.POST.get('category') or None,
             event_title=request.POST.get('event_title', ''),
             event_title_fr=request.POST.get('event_title_fr', ''),
             event_description=request.POST.get('event_description', ''),
@@ -1625,6 +2207,9 @@ def event_registration_create(request):
             send_confirmation_email=request.POST.get('send_confirmation_email') == 'on',
             confirmation_message=request.POST.get('confirmation_message', ''),
             confirmation_message_fr=request.POST.get('confirmation_message_fr', ''),
+            show_photos=request.POST.get('show_photos') == 'on',
+            show_attendees=request.POST.get('show_attendees') == 'on',
+            show_comments=request.POST.get('show_comments') == 'on',
             is_active=request.POST.get('is_active') == 'on',
             order=request.POST.get('order') or 0,
         )
@@ -1634,6 +2219,7 @@ def event_registration_create(request):
     import json as _json
     return render(request, 'custom_admin/event_registrations/form.html', {
         'action': 'Create',
+        'categories': EventCategory.objects.filter(is_active=True),
         'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)),
     })
 
@@ -1644,6 +2230,8 @@ def event_registration_edit(request, pk):
     reg = get_object_or_404(EventRegistration, pk=pk)
     if request.method == 'POST':
         reg.card_type = request.POST.get('card_type', 'event')
+        reg.event_type = request.POST.get('event_type', 'in_person')
+        reg.category_id = request.POST.get('category') or None
         reg.event_title = request.POST.get('event_title', '')
         reg.event_title_fr = request.POST.get('event_title_fr', '')
         reg.event_description = request.POST.get('event_description', '')
@@ -1664,6 +2252,9 @@ def event_registration_edit(request, pk):
         reg.send_confirmation_email = request.POST.get('send_confirmation_email') == 'on'
         reg.confirmation_message = request.POST.get('confirmation_message', '')
         reg.confirmation_message_fr = request.POST.get('confirmation_message_fr', '')
+        reg.show_photos = request.POST.get('show_photos') == 'on'
+        reg.show_attendees = request.POST.get('show_attendees') == 'on'
+        reg.show_comments = request.POST.get('show_comments') == 'on'
         reg.is_active = request.POST.get('is_active') == 'on'
         reg.order = request.POST.get('order') or 0
         reg.save()
@@ -1681,6 +2272,7 @@ def event_registration_edit(request, pk):
     return render(request, 'custom_admin/event_registrations/form.html', {
         'reg': reg,
         'action': 'Edit',
+        'categories': EventCategory.objects.filter(is_active=True),
         'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)),
         'existing_fields_json': _json.dumps(existing_fields, default=str),
     })
@@ -1783,7 +2375,7 @@ def event_submission_review(request, pk):
         <span style="font-size:28px;font-weight:900;color:#276749;">&#10003;</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Approved</h1>
-      <p style="color:#9ae6b4;font-size:14px;margin:0;">African Union Chairmanship 2026-2027</p>
+      <p style="color:#9ae6b4;font-size:14px;margin:0;">Burundi Chairmanship 2026-2027</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -1818,14 +2410,14 @@ def event_submission_review(request, pk):
 
                     html_message += f'''
       <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
-        You can view your ticket and event details in the Burundi AU Chairmanship app.
+        You can view your ticket and event details in the Burundi Chairmanship app.
       </p>
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
         If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; African Union Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Burundi Chairmanship 2026-2027</p>
     </div>
   </div>
 </div>
@@ -1835,7 +2427,7 @@ def event_submission_review(request, pk):
                     plain_message = f"Dear {user.get_full_name() or user.username},\n\nYour registration for {event_reg.event_title} has been approved.\n\n"
                     if submission.admin_notes:
                         plain_message += f"Note from organizer: {submission.admin_notes}\n\n"
-                    plain_message += "You can view your ticket and event details in the Burundi AU Chairmanship app.\n\nBest regards,\nBurundi AU Chairmanship Team"
+                    plain_message += "You can view your ticket and event details in the Burundi Chairmanship app.\n\nBest regards,\nBurundi Chairmanship Team"
 
                     send_mail(
                         subject=subject,
@@ -1875,7 +2467,7 @@ def event_submission_review(request, pk):
         <span style="font-size:28px;font-weight:900;color:#9b2c2c;">!</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Not Approved</h1>
-      <p style="color:#feb2b2;font-size:14px;margin:0;">African Union Chairmanship 2026-2027</p>
+      <p style="color:#feb2b2;font-size:14px;margin:0;">Burundi Chairmanship 2026-2027</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -1901,7 +2493,7 @@ def event_submission_review(request, pk):
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; African Union Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Burundi Chairmanship 2026-2027</p>
     </div>
   </div>
 </div>
@@ -1911,7 +2503,7 @@ def event_submission_review(request, pk):
                     plain_message = f"Dear {user.get_full_name() or user.username},\n\nWe regret to inform you that your registration for {event_reg.event_title} could not be approved at this time.\n\n"
                     if submission.admin_notes:
                         plain_message += f"Reason: {submission.admin_notes}\n\n"
-                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundi4africa.com'}.\n\nBest regards,\nBurundi AU Chairmanship Team"
+                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundi4africa.com'}.\n\nBest regards,\nBurundi Chairmanship Team"
 
                     send_mail(
                         subject=subject,
@@ -2294,9 +2886,11 @@ def live_feed_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
         scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
+        event_id = request.POST.get('event') or None
         LiveFeed.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
+            event_id=event_id,
             stream_url=request.POST.get('stream_url'),
             thumbnail=request.FILES.get('thumbnail'),
             status=request.POST.get('status', 'upcoming'),
@@ -2307,7 +2901,12 @@ def live_feed_create(request):
         )
         messages.success(request, f'Live feed created as {content_status}!')
         return redirect('custom_admin:live_feeds_list')
-    return render(request, 'custom_admin/live_feeds/form.html', {'action': 'Create', 'prefill_date': request.GET.get('date', '')})
+    events = Event.objects.all().order_by('-event_date')
+    return render(request, 'custom_admin/live_feeds/form.html', {
+        'action': 'Create',
+        'events': events,
+        'prefill_date': request.GET.get('date', ''),
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -2317,6 +2916,7 @@ def live_feed_edit(request, pk):
     if request.method == 'POST':
         feed.title = request.POST.get('title')
         feed.title_fr = request.POST.get('title_fr', '')
+        feed.event_id = request.POST.get('event') or None
         feed.stream_url = request.POST.get('stream_url')
         if request.FILES.get('thumbnail'):
             feed.thumbnail = request.FILES.get('thumbnail')
@@ -2328,7 +2928,12 @@ def live_feed_edit(request, pk):
         feed.save()
         messages.success(request, 'Live feed updated successfully!')
         return redirect('custom_admin:live_feeds_list')
-    return render(request, 'custom_admin/live_feeds/form.html', {'feed': feed, 'action': 'Edit'})
+    events = Event.objects.all().order_by('-event_date')
+    return render(request, 'custom_admin/live_feeds/form.html', {
+        'feed': feed,
+        'action': 'Edit',
+        'events': events,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -2703,7 +3308,7 @@ def support_ticket_update_status(request, pk):
             'Your support ticket has been resolved. '
             'We hope we were able to help!\n\n'
             'Please rate your experience to help us improve our service. '
-            'Thank you for using Burundi AU Chairmanship support.'
+            'Thank you for using Burundi Chairmanship support.'
         )
         TicketMessage.objects.create(
             ticket=ticket,
@@ -3383,66 +3988,6 @@ def contact_directory_delete(request, pk):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  EMAIL TEMPLATES
-# ═══════════════════════════════════════════════════════════════
-
-@login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
-def email_templates_list(request):
-    templates = EmailTemplate.objects.all().order_by('key')
-    return render(request, 'custom_admin/email_templates/list.html', {'templates': templates})
-
-
-@login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
-def email_template_edit(request, pk):
-    import re as re_module
-    template = get_object_or_404(EmailTemplate, pk=pk)
-    if request.method == 'POST':
-        # Check if this is a test email send request
-        if request.POST.get('send_test'):
-            test_email = request.POST.get('test_email', request.user.email)
-            body_html = request.POST.get('body_html', template.body_html)
-            subject = request.POST.get('subject', template.subject)
-            # Replace template variables with sample data
-            sample_data = {
-                'user_name': request.user.get_full_name() or request.user.username,
-                'user_email': request.user.email,
-                'app_name': 'Burundi AU Chairmanship',
-                'action_url': 'https://burundi4africa.com',
-                'otp_code': '123456',
-                'event_name': 'Sample Event',
-                'event_date': 'January 15, 2026',
-            }
-            for key, val in sample_data.items():
-                body_html = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, body_html)
-                subject = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, subject)
-            try:
-                from django.core.mail import send_mail
-                send_mail(
-                    subject=f'[TEST] {subject}',
-                    message='',
-                    html_message=body_html,
-                    from_email=None,
-                    recipient_list=[test_email],
-                    fail_silently=False,
-                )
-                return JsonResponse({'success': True})
-            except Exception as e:
-                return JsonResponse({'success': False, 'error': str(e)})
-
-        template.subject = request.POST.get('subject')
-        template.subject_fr = request.POST.get('subject_fr', '')
-        template.body_html = request.POST.get('body_html')
-        template.body_html_fr = request.POST.get('body_html_fr', '')
-        template.is_active = request.POST.get('is_active') == 'on'
-        template.save()
-        messages.success(request, 'Email template updated successfully!')
-        return redirect('custom_admin:email_templates_list')
-    return render(request, 'custom_admin/email_templates/form.html', {'template': template})
-
-
-# ═══════════════════════════════════════════════════════════════
 #  ANNOUNCEMENT BANNERS
 # ═══════════════════════════════════════════════════════════════
 
@@ -3520,7 +4065,7 @@ def event_speakers_list(request):
     event_filter = request.GET.get('event')
     if event_filter:
         speakers = speakers.filter(event_id=event_filter)
-    events = Event.objects.all().order_by('-date')
+    events = Event.objects.all().order_by('-event_date')
     return render(request, 'custom_admin/event_speakers/list.html', {
         'speakers': speakers,
         'events': events,
@@ -3546,7 +4091,7 @@ def event_speaker_create(request):
         )
         messages.success(request, 'Speaker added successfully!')
         return redirect('custom_admin:event_speakers_list')
-    events = Event.objects.all().order_by('-date')
+    events = Event.objects.all().order_by('-event_date')
     return render(request, 'custom_admin/event_speakers/form.html', {'action': 'Create', 'events': events})
 
 
@@ -3569,7 +4114,7 @@ def event_speaker_edit(request, pk):
         speaker.save()
         messages.success(request, 'Speaker updated successfully!')
         return redirect('custom_admin:event_speakers_list')
-    events = Event.objects.all().order_by('-date')
+    events = Event.objects.all().order_by('-event_date')
     return render(request, 'custom_admin/event_speakers/form.html', {'speaker': speaker, 'action': 'Edit', 'events': events})
 
 
@@ -3658,15 +4203,19 @@ def maintenance_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def maintenance_create(request):
     if request.method == 'POST':
-        ScheduledMaintenance.objects.create(
+        window = ScheduledMaintenance.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
             starts_at=request.POST.get('starts_at'),
             ends_at=request.POST.get('ends_at'),
+            contact_email=request.POST.get('contact_email', ''),
             is_active=request.POST.get('is_active') == 'on',
         )
+        if request.FILES.get('image'):
+            window.image = request.FILES.get('image')
+            window.save()
         messages.success(request, 'Maintenance window created successfully!')
         return redirect('custom_admin:maintenance_list')
     return render(request, 'custom_admin/maintenance/form.html', {'action': 'Create'})
@@ -3683,7 +4232,12 @@ def maintenance_edit(request, pk):
         window.description_fr = request.POST.get('description_fr', '')
         window.starts_at = request.POST.get('starts_at')
         window.ends_at = request.POST.get('ends_at')
+        window.contact_email = request.POST.get('contact_email', '')
         window.is_active = request.POST.get('is_active') == 'on'
+        if request.FILES.get('image'):
+            window.image = request.FILES.get('image')
+        if request.POST.get('remove_image') == 'on':
+            window.image = None
         window.save()
         messages.success(request, 'Maintenance window updated successfully!')
         return redirect('custom_admin:maintenance_list')
@@ -3871,12 +4425,49 @@ def bulk_content_action(request):
 #  GLOBAL SEARCH
 # ═══════════════════════════════════════════════════════════════
 
+def _search_admin_menus(query, user, limit=10):
+    """Match sidebar menu labels against a query, filtered by permissions.
+
+    Returns a list of {title, subtitle, url, icon} dicts ready to drop into
+    either the JSON API or the full-page results. Menu keys come from
+    permissions.ADMIN_MENUS (single source of truth for the sidebar).
+    """
+    from django.urls import reverse, NoReverseMatch
+    from .permissions import ADMIN_MENUS, user_can_access
+
+    q = (query or '').strip().lower()
+    if not q:
+        return []
+
+    items = []
+    for key, label, icon in ADMIN_MENUS:
+        if q not in label.lower() and q not in key.lower():
+            continue
+        if not user_can_access(user, key):
+            continue
+        try:
+            url = reverse(f'custom_admin:{key}')
+        except NoReverseMatch:
+            continue
+        items.append({
+            'title': label,
+            'subtitle': 'Navigation',
+            'url': url,
+            'icon': icon,
+            'key': key,
+        })
+        if len(items) >= limit:
+            break
+    return items
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def admin_global_search(request):
     """Full-page search results view."""
     query = request.GET.get('q', '').strip()
     results = {
+        'menus': [],
         'users': [],
         'articles': [],
         'events': [],
@@ -3886,6 +4477,7 @@ def admin_global_search(request):
     }
 
     if query and len(query) >= 2:
+        results['menus'] = _search_admin_menus(query, request.user, limit=20)
         results['users'] = User.objects.filter(
             Q(username__icontains=query) |
             Q(email__icontains=query) |
@@ -3948,6 +4540,12 @@ def admin_global_search_api(request):
     total_count = 0
     max_per_category = 5
     max_total = 20
+
+    # --- Navigation (sidebar menus) ---
+    menu_items = _search_admin_menus(query, request.user, limit=max_per_category)
+    if menu_items:
+        categories.append({'category': 'Navigation', 'items': menu_items})
+        total_count += len(menu_items)
 
     # --- Users ---
     users = User.objects.filter(
@@ -5726,94 +6324,6 @@ def widget_data(request):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  EMAIL TEMPLATE PREVIEW & SEND TEST (AJAX endpoints)
-# ═══════════════════════════════════════════════════════════════
-
-@login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
-@require_POST
-def email_template_preview(request, pk):
-    """POST returns rendered HTML with sample data for live preview."""
-    import re as re_module
-
-    template = get_object_or_404(EmailTemplate, pk=pk)
-    body_html = request.POST.get('body_html', template.body_html)
-
-    sample_context = {
-        'username': 'John Doe',
-        'user_name': 'John Doe',
-        'user_email': 'john@example.com',
-        'otp_code': '123456',
-        'expiry_minutes': '10',
-        'app_name': 'Burundi AU Chairmanship',
-        'badge_type': 'Gold',
-        'event_name': 'Sample Event',
-        'event_date': 'April 15, 2026',
-        'ticket_number': 'TK-001',
-        'reset_link': 'https://burundi4africa.com/reset',
-        'action_url': 'https://burundi4africa.com',
-    }
-
-    rendered = body_html
-    for key, val in sample_context.items():
-        rendered = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, rendered)
-
-    return JsonResponse({
-        'html': rendered,
-        'subject': template.subject,
-    })
-
-
-@login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
-@require_POST
-def email_template_send_test(request, pk):
-    """POST sends a test email to specified address using template with sample data."""
-    import re as re_module
-
-    template = get_object_or_404(EmailTemplate, pk=pk)
-    recipient_email = request.POST.get('recipient_email', request.user.email)
-
-    if not recipient_email:
-        return JsonResponse({'success': False, 'error': 'No recipient email provided'}, status=400)
-
-    sample_context = {
-        'username': request.user.get_full_name() or request.user.username,
-        'user_name': request.user.get_full_name() or request.user.username,
-        'user_email': request.user.email,
-        'otp_code': '123456',
-        'expiry_minutes': '10',
-        'app_name': 'Burundi AU Chairmanship',
-        'badge_type': 'Gold',
-        'event_name': 'AU Summit 2026',
-        'event_date': 'April 15, 2026',
-        'ticket_number': 'TK-001',
-        'reset_link': 'https://burundi4africa.com/reset',
-        'action_url': 'https://burundi4africa.com',
-    }
-
-    body_html = template.body_html
-    subject = template.subject
-    for key, val in sample_context.items():
-        body_html = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, body_html)
-        subject = re_module.sub(r'\{\{\s*' + key + r'\s*\}\}', val, subject)
-
-    try:
-        from django.core.mail import send_mail
-        send_mail(
-            subject=f'[TEST] {subject}',
-            message='',
-            html_message=body_html,
-            from_email=None,
-            recipient_list=[recipient_email],
-            fail_silently=False,
-        )
-        return JsonResponse({'success': True, 'message': f'Test email sent to {recipient_email}'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-
-
-# ═══════════════════════════════════════════════════════════════
 #  CONTENT CALENDAR
 # ═══════════════════════════════════════════════════════════════
 
@@ -6319,7 +6829,11 @@ def maintenance_schedule(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def ab_test_list(request):
     """List all A/B tests."""
-    tests_qs = ABTest.objects.annotate(participant_count=Count('participants'))
+    tests_qs = (
+        ABTest.objects
+        .annotate(participant_count=Count('participants'))
+        .order_by('-created_at')
+    )
     paginator = Paginator(tests_qs, 20)
     page = request.GET.get('page')
     tests = paginator.get_page(page)
@@ -7054,3 +7568,5 @@ def auto_translate(request):
 
     except Exception as e:
         return JsonResponse({'error': f'Translation failed: {str(e)}'}, status=500)
+
+

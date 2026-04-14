@@ -53,6 +53,35 @@
   </div>
   {% endif %}
 
+  {% if results.menus %}
+  <!-- Navigation / Menus Section -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+        <span class="material-symbols-outlined text-slate-700 text-lg">menu</span>
+      </div>
+      <h2 class="text-lg font-bold text-on-surface font-headline">Navigation</h2>
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{{ results.menus|length }}</span>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-outline-variant">
+        {% for menu in results.menus %}
+        <a href="{{ menu.url }}" class="flex items-center gap-3 px-5 py-4 hover:bg-surface-container-low transition-colors border-b border-outline-variant sm:border-b-0 last:border-b-0">
+          <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-slate-700">{{ menu.icon }}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-on-surface truncate">{{ menu.title }}</p>
+            <p class="text-xs text-on-surface-variant truncate">Open page</p>
+          </div>
+          <span class="material-symbols-outlined text-slate-300 flex-shrink-0">arrow_forward</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {% if results.users %}
   <!-- Users Section -->
   <div class="mb-8">

@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Production Release Build — Burundi AU Chairmanship Flutter App
+# Production Release Build — Burundi Chairmanship Flutter App
 # =============================================================================
 # Builds release APK (Android) and IPA (iOS) with production configuration.
 #
@@ -26,7 +26,7 @@ ENVIRONMENT="production"
 cd "$(dirname "$0")"
 
 echo "========================================="
-echo "  Building Burundi AU Chairmanship"
+echo "  Building Burundi Chairmanship"
 echo "  Environment: $ENVIRONMENT"
 echo "========================================="
 

@@ -76,15 +76,27 @@ class ApiService {
       _get(endpoint, auth: auth);
 
   /// Public POST for simple actions (e.g. record_view, toggle_like)
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body, {bool auth = false}) =>
-      _post(endpoint, body, auth: auth);
+  Future<dynamic> post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool auth = false,
+    Map<String, String>? extraHeaders,
+  }) =>
+      _post(endpoint, body, auth: auth, extraHeaders: extraHeaders);
 
-  Future<dynamic> _post(String endpoint, Map<String, dynamic> body, {bool auth = false}) async {
+  Future<dynamic> _post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool auth = false,
+    Map<String, String>? extraHeaders,
+  }) async {
     try {
+      final headers = await _headers(auth: auth);
+      if (extraHeaders != null) headers.addAll(extraHeaders);
       final response = await _client
           .post(
             Uri.parse('$_baseUrl/$endpoint'),
-            headers: await _headers(auth: auth),
+            headers: headers,
             body: json.encode(body),
           )
           .timeout(const Duration(seconds: 20));
@@ -198,19 +210,45 @@ class ApiService {
     });
   }
 
-  Future<void> updateFCMToken(String fcmToken) async {
+  /// Presence ping used for the admin "users online now" counter.
+  /// Cheap fire-and-forget — safe to call every 60s while foregrounded.
+  /// Accepts both authenticated and anonymous calls; passing [fcmToken]
+  /// lets the backend track anonymous devices via the X-FCM-Token header.
+  Future<void> heartbeat({String? fcmToken}) async {
+    try {
+      await _post(
+        'heartbeat/',
+        const {},
+        auth: true,
+        extraHeaders: fcmToken != null ? {'X-FCM-Token': fcmToken} : null,
+      );
+    } catch (_) {
+      // Presence pings must never surface errors to the user.
+    }
+  }
+
+  Future<void> updateFCMToken(String fcmToken, {String? preferredLanguage}) async {
     await _post('auth/update-fcm-token/', {
       'fcm_token': fcmToken,
+      'preferred_language': ?preferredLanguage,
     }, auth: true);
   }
 
   /// Register FCM token without requiring authentication.
   /// This allows anonymous users to receive global push notifications.
-  Future<void> registerFCMToken(String fcmToken, {String? deviceType, String? deviceOs}) async {
+  /// [preferredLanguage] should be the current in-app language ('en' or 'fr')
+  /// so anonymous devices are correctly bucketed for language-targeted sends.
+  Future<void> registerFCMToken(
+    String fcmToken, {
+    String? deviceType,
+    String? deviceOs,
+    String? preferredLanguage,
+  }) async {
     await _post('register-fcm-token/', {
       'fcm_token': fcmToken,
-      if (deviceType != null) 'device_type': deviceType,
-      if (deviceOs != null) 'device_os': deviceOs,
+      'device_type': ?deviceType,
+      'device_os': ?deviceOs,
+      'preferred_language': ?preferredLanguage,
     }, auth: false);
   }
 
@@ -359,8 +397,16 @@ class ApiService {
     return (data as List).map((j) => ArticleComment.fromJson(j)).toList();
   }
 
-  Future<ArticleComment> postArticleComment(String articleId, String content) async {
-    final data = await _post('articles/$articleId/comments/', {'content': content}, auth: true);
+  Future<ArticleComment> postArticleComment(
+    String articleId,
+    String content, {
+    int? parentId,
+  }) async {
+    final body = <String, dynamic>{
+      'content': content,
+      'parent': ?parentId,
+    };
+    final data = await _post('articles/$articleId/comments/', body, auth: true);
     return ArticleComment.fromJson(data);
   }
 

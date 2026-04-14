@@ -13,6 +13,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/image_gallery_viewer.dart';
+import '../../widgets/liked_by_avatars.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -33,12 +34,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   List<String> _localPhotoPaths = [];
   bool _isLiked = false;
   int _likeCount = 0;
+  List<Liker> _recentLikers = [];
 
   @override
   void initState() {
     super.initState();
     _isLiked = widget.album['is_liked'] == true;
     _likeCount = widget.album['like_count'] ?? 0;
+    if (widget.album['recent_likers'] is List) {
+      _recentLikers = (widget.album['recent_likers'] as List)
+          .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+          .toList();
+    }
     _enableScreenProtection();
     _checkIfDownloaded();
     _recordView();
@@ -69,9 +76,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     try {
       final result = await ApiService().toggleGalleryAlbumLike(widget.album['id'].toString());
       if (mounted) {
+        List<Liker> likers = [];
+        if (result['recent_likers'] is List) {
+          likers = (result['recent_likers'] as List)
+              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+              .toList();
+        }
         setState(() {
           _isLiked = result['is_liked'] == true;
           _likeCount = result['like_count'] ?? _likeCount;
+          _recentLikers = likers;
         });
       }
     } catch (_) {
@@ -338,8 +352,33 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       ),
       body: Stack(
         children: [
-          // Photo Grid
-          GridView.builder(
+          // Photo Grid with liked-by header
+          Column(
+            children: [
+              if (_recentLikers.isNotEmpty || _likeCount > 0)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: Row(
+                    children: [
+                      LikedByAvatars(
+                        likers: _recentLikers,
+                        totalLikes: _likeCount,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _likeCount == 1 ? '1 like' : '$_likeCount likes',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${photos.length} photos',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: GridView.builder(
             padding: const EdgeInsets.all(8),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
@@ -352,6 +391,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               final photo = photos[index];
               return _buildPhotoTile(photo, index);
             },
+          ),
+              ),
+            ],
           ),
 
           // Download progress overlay

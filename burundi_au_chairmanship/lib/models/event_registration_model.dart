@@ -1,6 +1,10 @@
 class EventRegistrationModel {
   final int id;
   final String cardType;
+  final String eventType;
+  final String? categoryName;
+  final String? categoryNameFr;
+  final String? categoryColor;
   final String eventTitle;
   final String eventTitleFr;
   final String eventDescription;
@@ -19,6 +23,9 @@ class EventRegistrationModel {
   final bool allowProxyRegistration;
   final String confirmationMessage;
   final String confirmationMessageFr;
+  final bool showPhotos;
+  final bool showAttendees;
+  final bool showComments;
   final bool isActive;
   final int order;
   final List<RegistrationFormField> formFields;
@@ -32,6 +39,10 @@ class EventRegistrationModel {
   EventRegistrationModel({
     required this.id,
     required this.cardType,
+    this.eventType = 'in_person',
+    this.categoryName,
+    this.categoryNameFr,
+    this.categoryColor,
     required this.eventTitle,
     this.eventTitleFr = '',
     this.eventDescription = '',
@@ -50,6 +61,9 @@ class EventRegistrationModel {
     this.allowProxyRegistration = false,
     this.confirmationMessage = '',
     this.confirmationMessageFr = '',
+    this.showPhotos = true,
+    this.showAttendees = true,
+    this.showComments = true,
     this.isActive = true,
     this.order = 0,
     this.formFields = const [],
@@ -65,6 +79,10 @@ class EventRegistrationModel {
     return EventRegistrationModel(
       id: json['id'] as int,
       cardType: json['card_type'] as String? ?? 'event',
+      eventType: json['event_type'] as String? ?? 'in_person',
+      categoryName: (json['category_data'] as Map<String, dynamic>?)?['name'] as String?,
+      categoryNameFr: (json['category_data'] as Map<String, dynamic>?)?['name_fr'] as String?,
+      categoryColor: (json['category_data'] as Map<String, dynamic>?)?['color'] as String?,
       eventTitle: json['event_title'] as String? ?? '',
       eventTitleFr: json['event_title_fr'] as String? ?? '',
       eventDescription: json['event_description'] as String? ?? '',
@@ -83,6 +101,9 @@ class EventRegistrationModel {
       allowProxyRegistration: json['allow_proxy_registration'] as bool? ?? false,
       confirmationMessage: json['confirmation_message'] as String? ?? '',
       confirmationMessageFr: json['confirmation_message_fr'] as String? ?? '',
+      showPhotos: json['show_photos'] as bool? ?? true,
+      showAttendees: json['show_attendees'] as bool? ?? true,
+      showComments: json['show_comments'] as bool? ?? true,
       isActive: json['is_active'] as bool? ?? true,
       order: json['order'] as int? ?? 0,
       formFields: (json['form_fields'] as List<dynamic>?)
@@ -103,6 +124,9 @@ class EventRegistrationModel {
 
   String getDescription(String langCode) =>
       langCode == 'fr' && eventDescriptionFr.isNotEmpty ? eventDescriptionFr : eventDescription;
+
+  String? getCategoryName(String langCode) =>
+      langCode == 'fr' && (categoryNameFr ?? '').isNotEmpty ? categoryNameFr : categoryName;
 
   String getVenue(String langCode) =>
       langCode == 'fr' && venueFr.isNotEmpty ? venueFr : venue;

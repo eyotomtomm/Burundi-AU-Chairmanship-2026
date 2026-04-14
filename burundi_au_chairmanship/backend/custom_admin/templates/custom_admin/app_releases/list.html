@@ -1,0 +1,182 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}What's New / App Releases - Burundi Chairmanship{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">
+                            campaign
+                        </span>
+                        <h1 class="text-3xl font-bold text-slate-900 dark:text-white">What's New / App Releases</h1>
+                    </div>
+                    <p class="text-slate-600 dark:text-slate-400">Manage the bilingual "What's New" popup that users see after updating the app.</p>
+                </div>
+                <a href="{% url 'custom_admin:app_release_create' %}"
+                   class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                    <span class="material-symbols-outlined">add</span>
+                    <span>New Release</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Info card -->
+        <div class="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-start gap-3">
+            <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 mt-0.5">info</span>
+            <div class="text-sm text-blue-900 dark:text-blue-100 leading-relaxed">
+                The app fetches the release matching the currently-installed version (e.g. <code class="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-800 rounded font-mono text-xs">1.1.0</code>).
+                If found and <strong>Published</strong>, its highlights replace the hardcoded changelog in the app.
+                If no match or the API fails, the app falls back to its built-in list.
+            </div>
+        </div>
+
+        <!-- Releases list -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            {% if releases %}
+                <div class="divide-y divide-slate-200 dark:divide-slate-700">
+                    {% for release in releases %}
+                    <div class="p-6 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors duration-150">
+                        <div class="flex items-start gap-4">
+                            <!-- Version badge -->
+                            <div class="flex-shrink-0">
+                                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white font-bold shadow-lg">
+                                    <span class="text-sm">v{{ release.version }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Content -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between gap-4 mb-2">
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-1">
+                                            {{ release.title }}
+                                        </h3>
+                                        {% if release.title_fr %}
+                                        <p class="text-sm text-slate-600 dark:text-slate-400 italic">
+                                            {{ release.title_fr }}
+                                        </p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        {% if release.is_published %}
+                                        <span class="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium rounded-full">
+                                            <span class="material-symbols-outlined text-sm">check_circle</span>
+                                            Published
+                                        </span>
+                                        {% else %}
+                                        <span class="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-full">
+                                            <span class="material-symbols-outlined text-sm">visibility_off</span>
+                                            Draft
+                                        </span>
+                                        {% endif %}
+                                        {% if release.is_force_update %}
+                                        <span class="inline-flex items-center gap-1 px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium rounded-full">
+                                            <span class="material-symbols-outlined text-sm">priority_high</span>
+                                            Force Update
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Highlights preview -->
+                                <div class="mb-3">
+                                    {% if release.highlights.all %}
+                                        <div class="flex flex-wrap gap-2 mb-1">
+                                            {% for h in release.highlights.all %}
+                                            <span class="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs rounded-lg">
+                                                <span class="material-symbols-outlined text-[14px]">{{ h.icon_name }}</span>
+                                                {{ h.title_en|truncatechars:28 }}
+                                            </span>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <p class="text-sm italic text-slate-500 dark:text-slate-400">No highlights yet — click Edit to add some.</p>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Meta -->
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
+                                        <span class="inline-flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-sm">schedule</span>
+                                            {{ release.released_at|date:"M d, Y" }}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-sm">tag</span>
+                                            Code {{ release.version_code }}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-sm">timer</span>
+                                            {{ release.popup_delay_seconds }}s delay
+                                        </span>
+                                        <span class="inline-flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-sm">list_alt</span>
+                                            {{ release.highlights.all|length }} highlight{{ release.highlights.all|length|pluralize }}
+                                        </span>
+                                    </div>
+                                    <!-- Actions -->
+                                    <div class="flex items-center gap-2">
+                                        <a href="{% url 'custom_admin:app_release_edit' release.pk %}"
+                                           class="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors duration-150">
+                                            <span class="material-symbols-outlined text-sm">edit</span>
+                                            Edit
+                                        </a>
+                                        <form method="POST" action="{% url 'custom_admin:app_release_delete' release.pk %}" class="inline" onsubmit="return confirm('Delete release v{{ release.version|escapejs }}?\n\nThis cannot be undone.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="inline-flex items-center gap-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors duration-150">
+                                                <span class="material-symbols-outlined text-sm">delete</span>
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if releases.has_other_pages %}
+                <div class="px-6 py-4 bg-slate-50 dark:bg-slate-750 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div class="text-sm text-slate-600 dark:text-slate-400">
+                        Page {{ releases.number }} of {{ releases.paginator.num_pages }}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {% if releases.has_previous %}
+                            <a href="?page={{ releases.previous_page_number }}" class="px-3 py-2 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-300 dark:border-slate-600">
+                                <span class="material-symbols-outlined text-sm">chevron_left</span>
+                            </a>
+                        {% endif %}
+                        <span class="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg">{{ releases.number }}</span>
+                        {% if releases.has_next %}
+                            <a href="?page={{ releases.next_page_number }}" class="px-3 py-2 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg border border-slate-300 dark:border-slate-600">
+                                <span class="material-symbols-outlined text-sm">chevron_right</span>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                <!-- Empty state -->
+                <div class="p-12 text-center">
+                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 mb-4">
+                        <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-500">campaign</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">No releases yet</h3>
+                    <p class="text-slate-600 dark:text-slate-400 mb-6">Create your first release to control the What's New popup from the backend.</p>
+                    <a href="{% url 'custom_admin:app_release_create' %}" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
+                        <span class="material-symbols-outlined">add</span>
+                        <span>Create First Release</span>
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

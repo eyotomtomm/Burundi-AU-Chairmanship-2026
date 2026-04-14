@@ -193,6 +193,26 @@ class AppLocalizations {
       'login_gate_login': 'Log In',
       'login_gate_signup': 'Sign Up',
       'login_gate_locked_badge': 'Members only',
+
+      // Content types & screens
+      'bookmarks': 'Bookmarks',
+      'saved_content': 'Saved Content',
+      'no_bookmarks': 'No bookmarks yet',
+      'discussions': 'Discussions',
+      'community_forums': 'Community Forums',
+      'polls': 'Polls',
+      'vote_share_opinion': 'Vote & Share Your Opinion',
+      'magazines': 'Magazines',
+      'videos': 'Videos',
+      'article': 'Article',
+      'video': 'Video',
+      'event': 'Event',
+      'all': 'All',
+
+      // Notifications
+      'no_notifications': 'No notifications yet',
+      'error_loading_notifications': 'Error loading notifications',
+      'notification_preferences': 'Notification Preferences',
     },
     'fr': {
       // App
@@ -375,6 +395,26 @@ class AppLocalizations {
       'login_gate_login': 'Se connecter',
       'login_gate_signup': 'S\'inscrire',
       'login_gate_locked_badge': 'Réservé aux membres',
+
+      // Content types & screens
+      'bookmarks': 'Signets',
+      'saved_content': 'Contenu enregistré',
+      'no_bookmarks': 'Aucun signet pour le moment',
+      'discussions': 'Discussions',
+      'community_forums': 'Forums communautaires',
+      'polls': 'Sondages',
+      'vote_share_opinion': 'Votez et partagez votre avis',
+      'magazines': 'Magazines',
+      'videos': 'Vidéos',
+      'article': 'Article',
+      'video': 'Vidéo',
+      'event': 'Événement',
+      'all': 'Tout',
+
+      // Notifications
+      'no_notifications': 'Aucune notification pour le moment',
+      'error_loading_notifications': 'Erreur de chargement des notifications',
+      'notification_preferences': 'Préférences de notification',
     },
   };
 

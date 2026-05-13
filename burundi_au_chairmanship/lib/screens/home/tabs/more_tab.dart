@@ -650,8 +650,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         } else {
                           // Fallback: Open store listing
                           final appId = Platform.isIOS
-                              ? 'id123456789'
-                              : 'com.burundi.au.chairmanship';
+                              ? '6740047505'
+                              : 'com.b4africa.app';
 
                           await inAppReview.openStoreListing(
                             appStoreId: appId,

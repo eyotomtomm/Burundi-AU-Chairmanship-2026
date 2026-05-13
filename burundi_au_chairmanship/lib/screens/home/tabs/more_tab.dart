@@ -618,8 +618,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         // full literal never appears in the iOS binary
                         // (App Store guideline 2.3.10).
                         final appLink = Platform.isIOS
-                            ? 'https://apps.apple.com/app/burundi-au-chairmanship/id123456789'
-                            : 'https://${'play.goo'}${'gle.com'}/store/apps/details?id=com.burundi.au.chairmanship';
+                            ? 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
+                            : 'https://${'play.goo'}${'gle.com'}/store/apps/details?id=com.b4africa.app';
 
                         Rect? sharePositionOrigin;
                         final renderObject = _shareMenuKey.currentContext?.findRenderObject();

@@ -13,14 +13,14 @@ import '../services/remote_config_service.dart';
 ///   a **dismissible** "Update Available" dialog is shown.
 class AppUpdateDialog {
   static const String _appStoreUrl =
-      'https://apps.apple.com/app/burundi-au-chairmanship/id0000000000';
+      'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505';
 
   // Android store URL is assembled at runtime so the full literal
   // never appears in the iOS binary (App Store guideline 2.3.10).
   static String get _androidStoreUrl {
     const host = 'play.goo';
     const rest = 'gle.com';
-    const path = '/store/apps/details?id=com.burundi4africa.chairmanship';
+    const path = '/store/apps/details?id=com.b4africa.app';
     return 'https://$host$rest$path';
   }
 

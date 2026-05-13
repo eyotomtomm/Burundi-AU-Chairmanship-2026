@@ -78,7 +78,16 @@ class Environment {
   }
 
   /// Base URL for legal/public web pages (privacy policy, terms of service)
-  static String get siteBaseUrl => mediaBaseUrl;
+  static String get siteBaseUrl {
+    switch (current) {
+      case EnvironmentType.production:
+        return 'https://burundi4africa.com';
+      case EnvironmentType.staging:
+        return 'https://staging-api.burundi4africa.com';
+      case EnvironmentType.development:
+        return mediaBaseUrl;
+    }
+  }
 
   /// Check if we're in production
   static bool get isProduction => current == EnvironmentType.production;

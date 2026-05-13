@@ -27,8 +27,8 @@ def handler500_view(request):
 handler500 = 'config.urls.handler500_view'
 
 urlpatterns = [
-    # Root redirects to admin panel
-    path('', RedirectView.as_view(url='/admin/', permanent=False)),
+    # Public landing page
+    path('', TemplateView.as_view(template_name='landing.html'), name='landing'),
     path('admin/', include('custom_admin.urls')),
     path('api/', include('core.urls')),
     path('api/v1/', include('core.urls')),  # Versioned API alias

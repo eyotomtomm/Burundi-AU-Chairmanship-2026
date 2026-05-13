@@ -17,7 +17,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.burundi.au.burundi_au_chairmanship"
+    namespace = "com.b4africa.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -32,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.burundi.au.burundi_au_chairmanship"
+        applicationId = "com.b4africa.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -70,7 +70,7 @@ dependencies {
 
     // Import the Firebase BoM (Bill of Materials)
     // When using the BoM, you don't specify versions in Firebase library dependencies
-    implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
+    implementation(platform("com.google.firebase:firebase-bom:34.13.0"))
 
     // Firebase products
     implementation("com.google.firebase:firebase-analytics")

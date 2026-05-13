@@ -23,7 +23,7 @@ except KeyError:
         "CRITICAL: DJANGO_SECRET_KEY environment variable is not set.\n"
         "This is required for security (session cookies, CSRF tokens, JWT signatures).\n\n"
         "Generate a secure key with:\n"
-        "  python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'\n\n"
+        "  python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'\n\n"
         "Then set it:\n"
         "  export DJANGO_SECRET_KEY='your-generated-key-here'\n\n"
         "For local development, create a .env file or add to your shell profile."
@@ -532,6 +532,12 @@ GEOIP_CITY = 'GeoLite2-City.mmdb'
 # on registration. If not set, reCAPTCHA verification is skipped (development mode).
 RECAPTCHA_SECRET_KEY = os.environ.get('RECAPTCHA_SECRET_KEY', '')
 RECAPTCHA_SITE_KEY = os.environ.get('RECAPTCHA_SITE_KEY', '')
+
+# ─── Twilio SMS Configuration ─────────────────────────────────
+# For phone OTP verification in the verification badge flow
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 
 # ─── Database Backup Configuration ────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')

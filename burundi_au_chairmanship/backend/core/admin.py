@@ -811,31 +811,34 @@ class NotificationAdmin(admin.ModelAdmin):
 
     HOW TO USE:
     1. Choose a notification type (article, event, magazine, etc.)
-    2. Write the title and message
+    2. Write the title and message in English and French
     3. Choose who should receive it:
        - All users (check "is global")
-       - Specific filters (gender, nationality, age)
+       - Specific filters (gender, nationality, age, badge)
        - Specific users (select individually)
-    4. Check "is active" to make it visible in app
+    4. Optionally add an image for rich push notifications
+    5. Optionally set an action (URL or app route) for tap behavior
+    6. Check "is active" to make it visible in the app
+    7. Save the notification, then select it and use the
+       "Send push notification now" action to deliver it
 
-    TARGETING:
-    You can send notifications to specific groups:
-    - By gender (male, female, other)
-    - By nationality/country
-    - By age range (min/max age)
-    - To specific users only
-
-    Leave filters blank to send to everyone.
+    SCHEDULING:
+    Instead of sending immediately, you can schedule notifications:
+    - Set "scheduled at" for a one-time future send
+    - Check "is scheduled" and choose a schedule type for recurring sends
+    - The Celery Beat task will pick up and send scheduled notifications
 
     NOTE:
-    Notifications appear in the app's notification center.
-    Users can tap them to navigate to the related content.
+    After sending, check push_sent, push_recipient_count, and open_rate
+    in the list view or read-only fields to monitor delivery.
     """
-    list_display = ['title', 'notification_type', 'targeting_info', 'is_active', 'created_at']
-    list_filter = ['notification_type', 'is_active', 'is_global', 'target_language', 'created_at']
+    list_display = ['title', 'notification_type', 'targeting_info', 'push_status', 'is_active', 'created_at']
+    list_filter = ['notification_type', 'is_active', 'is_global', 'push_sent', 'target_language', 'created_at']
     search_fields = ['title', 'title_fr', 'message']
     filter_horizontal = ['target_users']
     date_hierarchy = 'created_at'
+    readonly_fields = ['push_sent', 'push_sent_at', 'push_recipient_count', 'push_recipient_en', 'push_recipient_fr']
+    actions = ['send_push_now']
 
     fieldsets = (
         ('Notification Content', {
@@ -843,18 +846,46 @@ class NotificationAdmin(admin.ModelAdmin):
                 'notification_type',
                 ('title', 'title_fr'),
                 ('message', 'message_fr'),
+                'image',
             ],
+        }),
+        ('Tap Action', {
+            'fields': [
+                'action_type',
+                'action_value',
+            ],
+            'description': 'What happens when the user taps the notification. Leave as "No Action" for default behavior.',
+            'classes': ['collapse'],
         }),
         ('Targeting - Who Should See This?', {
             'fields': [
                 'is_global',
                 'target_gender',
                 'target_language',
-                'target_nationality',
+                'target_nationalities',
                 ('target_age_min', 'target_age_max'),
+                ('target_verified_only', 'target_badge_type'),
                 'target_users',
             ],
             'description': 'Check "is global" to send to everyone, or use filters below for specific groups.',
+        }),
+        ('Scheduling', {
+            'fields': [
+                'scheduled_at',
+                'is_scheduled',
+                'schedule_type',
+                'schedule_day',
+                'schedule_time',
+            ],
+            'description': 'Leave blank to send manually via the "Send push notification now" action. Or set a schedule for automatic sending.',
+            'classes': ['collapse'],
+        }),
+        ('Push Delivery Status', {
+            'fields': [
+                'push_sent',
+                'push_sent_at',
+                ('push_recipient_count', 'push_recipient_en', 'push_recipient_fr'),
+            ],
         }),
         ('Settings', {
             'fields': [
@@ -863,20 +894,68 @@ class NotificationAdmin(admin.ModelAdmin):
         }),
     )
 
+    def push_status(self, obj):
+        if obj.push_sent:
+            return format_html(
+                '<span style="color: green;">Sent</span> ({} devices)',
+                obj.push_recipient_count,
+            )
+        if obj.scheduled_at:
+            return format_html(
+                '<span style="color: orange;">Scheduled</span> ({})',
+                obj.scheduled_at.strftime('%Y-%m-%d %H:%M'),
+            )
+        return format_html('<span style="color: gray;">Not sent</span>')
+    push_status.short_description = 'Push Status'
+
     def targeting_info(self, obj):
         if obj.is_global:
             return 'All Users'
         filters = []
         if obj.target_gender:
             filters.append(obj.target_gender)
-        if obj.target_nationality:
-            filters.append(obj.target_nationality)
+        if obj.target_nationalities:
+            filters.append(f'{len(obj.target_nationalities)} countries')
         if obj.target_age_min or obj.target_age_max:
             filters.append(f'Age {obj.target_age_min or "any"}-{obj.target_age_max or "any"}')
         if obj.target_users.exists():
             filters.append(f'{obj.target_users.count()} users')
         return ', '.join(filters) if filters else 'No filters'
     targeting_info.short_description = 'Targeting'
+
+    @admin.action(description='Send push notification now')
+    def send_push_now(self, request, queryset):
+        from core.push_service import send_push_notification
+
+        sent_count = 0
+        skipped_count = 0
+        errors = []
+
+        for notification in queryset:
+            if notification.push_sent:
+                skipped_count += 1
+                continue
+            try:
+                success, failure = send_push_notification(notification)
+                sent_count += 1
+            except Exception as e:
+                errors.append(f'"{notification.title}": {e}')
+
+        parts = []
+        if sent_count:
+            parts.append(f'{sent_count} notification(s) sent successfully.')
+        if skipped_count:
+            parts.append(f'{skipped_count} skipped (already sent).')
+        if errors:
+            parts.append(f'Errors: {"; ".join(errors)}')
+
+        msg = ' '.join(parts) if parts else 'No notifications processed.'
+        if errors:
+            from django.contrib import messages as django_messages
+            self.message_user(request, msg, django_messages.WARNING)
+        else:
+            self.message_user(request, msg)
+    send_push_now.short_description = 'Send push notification now'
 
 
 # ═══════════════════════════════════════════════════════════════

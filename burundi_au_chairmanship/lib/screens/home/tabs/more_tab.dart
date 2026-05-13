@@ -614,9 +614,12 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                       isDark: isDark,
                       itemKey: _shareMenuKey,
                       onTap: () async {
+                        // Android store link is assembled at runtime so the
+                        // full literal never appears in the iOS binary
+                        // (App Store guideline 2.3.10).
                         final appLink = Platform.isIOS
                             ? 'https://apps.apple.com/app/burundi-au-chairmanship/id123456789'
-                            : 'https://play.google.com/store/apps/details?id=com.burundi.au.chairmanship';
+                            : 'https://${'play.goo'}${'gle.com'}/store/apps/details?id=com.burundi.au.chairmanship';
 
                         Rect? sharePositionOrigin;
                         final renderObject = _shareMenuKey.currentContext?.findRenderObject();

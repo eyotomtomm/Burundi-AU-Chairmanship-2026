@@ -123,7 +123,7 @@ class FirebaseAuthService {
         webAuthenticationOptions: Platform.isAndroid
             ? WebAuthenticationOptions(
                 clientId:
-                    'com.burundi.au.burundi_au_chairmanship.service', // Service ID
+                    'com.b4africa.app.service', // Service ID
                 redirectUri: Uri.parse(
                   'https://b4africa-700f7.firebaseapp.com/__/auth/handler',
                 ),

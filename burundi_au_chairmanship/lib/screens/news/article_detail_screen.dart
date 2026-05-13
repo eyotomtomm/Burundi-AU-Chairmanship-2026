@@ -47,6 +47,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   bool _restoredPosition = false;
   double _readingProgress = 0.0;
 
+  // Cached provider reference — safe to use in dispose() where context is invalid
+  late final AuthProvider _authProvider;
+
   // Related articles
   List<Article> _relatedArticles = [];
   bool _loadingRelated = true;
@@ -55,6 +58,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   void initState() {
     super.initState();
     _article = widget.article;
+    _authProvider = Provider.of<AuthProvider>(context, listen: false);
     _recordView();
     _loadComments();
     _loadRelatedArticles();
@@ -95,8 +99,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Future<void> _loadReadingProgress() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (!auth.isAuthenticated) return;
+    if (!_authProvider.isAuthenticated) return;
     try {
       final data = await ApiService().getArticleReadingProgress(_article.id);
       final scrollPos = data['scroll_position'] as int? ?? 0;
@@ -128,8 +131,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Future<void> _saveReadingProgressNow() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (!auth.isAuthenticated || !_scrollController.hasClients) return;
+    if (!_authProvider.isAuthenticated || !_scrollController.hasClients) return;
 
     final scrollPos = _scrollController.offset.toInt();
     final maxScroll = _scrollController.position.maxScrollExtent;

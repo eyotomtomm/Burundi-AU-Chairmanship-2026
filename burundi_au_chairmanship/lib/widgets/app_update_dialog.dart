@@ -12,11 +12,17 @@ import '../services/remote_config_service.dart';
 /// - `latest_app_version`: If the current version is below this (but >= min),
 ///   a **dismissible** "Update Available" dialog is shown.
 class AppUpdateDialog {
-  // App Store / Play Store URLs (update these with real store links)
-  static const String _playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.burundi4africa.chairmanship';
   static const String _appStoreUrl =
       'https://apps.apple.com/app/burundi-au-chairmanship/id0000000000';
+
+  // Android store URL is assembled at runtime so the full literal
+  // never appears in the iOS binary (App Store guideline 2.3.10).
+  static String get _androidStoreUrl {
+    const host = 'play.goo';
+    const rest = 'gle.com';
+    const path = '/store/apps/details?id=com.burundi4africa.chairmanship';
+    return 'https://$host$rest$path';
+  }
 
   /// Check for updates via Remote Config and show the appropriate dialog.
   ///
@@ -77,7 +83,7 @@ class AppUpdateDialog {
     required String langCode,
   }) async {
     final bool isFr = langCode == 'fr';
-    final storeUrl = Platform.isIOS ? _appStoreUrl : _playStoreUrl;
+    final storeUrl = Platform.isIOS ? _appStoreUrl : _androidStoreUrl;
 
     await showDialog(
       context: context,

@@ -70,7 +70,7 @@ dependencies {
 
     // Import the Firebase BoM (Bill of Materials)
     // When using the BoM, you don't specify versions in Firebase library dependencies
-    implementation(platform("com.google.firebase:firebase-bom:34.13.0"))
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
 
     // Firebase products
     implementation("com.google.firebase:firebase-analytics")

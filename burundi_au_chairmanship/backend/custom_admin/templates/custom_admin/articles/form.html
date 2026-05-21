@@ -138,14 +138,22 @@
           <p class="text-sm text-on-surface-variant mt-2">Current image - upload a new one to replace</p>
         </div>
         {% endif %}
-        <input
-          type="file"
-          id="image"
-          name="image"
-          accept="image/*"
-          {% if not article %}required{% endif %}
-          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium hover:file:bg-primary"
-        />
+        <div class="flex items-center gap-3">
+          <input
+            type="file"
+            id="image"
+            name="image"
+            accept="image/*"
+            class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium hover:file:bg-primary"
+          />
+          <button type="button" onclick="openMediaLibrary('image')"
+                  class="inline-flex items-center gap-2 px-4 py-2 bg-secondary-container text-white rounded-lg hover:bg-secondary transition-colors text-sm font-medium whitespace-nowrap">
+            <span class="material-symbols-outlined text-lg">photo_library</span>
+            Browse Media
+          </button>
+        </div>
+        <input type="hidden" id="existing_image_image" name="existing_image_image" value="">
+        <div id="ml_preview_image" class="mt-2 hidden"></div>
         <p class="text-xs text-on-surface-variant mt-2">Recommended: 1200x630px. JPG, PNG, or WebP. Max size: 10 MB</p>
       </div>
 
@@ -285,6 +293,8 @@
     </div>
   </div>
 </div>
+
+{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}

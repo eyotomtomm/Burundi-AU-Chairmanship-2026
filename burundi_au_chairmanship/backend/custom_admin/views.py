@@ -68,6 +68,22 @@ def is_staff(user):
     return user.is_staff or user.is_superuser
 
 
+def _get_existing_or_uploaded(request, field_name):
+    """Return uploaded file, or existing Spaces path, or None.
+
+    Checks for an uploaded file first (request.FILES), then falls back to
+    an ``existing_image_<field_name>`` POST value which is a relative path
+    inside the storage backend (e.g. ``articles/IMG_1646.jpeg``).
+    """
+    uploaded = request.FILES.get(field_name)
+    if uploaded:
+        return uploaded
+    existing_path = (request.POST.get(f'existing_image_{field_name}') or '').strip()
+    if existing_path:
+        return existing_path  # raw string path — assigned directly to the ImageField
+    return None
+
+
 def admin_login(request):
     if request.user.is_authenticated and is_staff(request.user):
         return redirect('custom_admin:dashboard')
@@ -378,7 +394,7 @@ def hero_slide_create(request):
             slide = HeroSlide(
                 label=request.POST.get('label'),
                 label_fr=request.POST.get('label_fr', ''),
-                image=request.FILES.get('image'),
+                image=_get_existing_or_uploaded(request, 'image'),
                 order=request.POST.get('order', 0),
                 is_active=request.POST.get('is_active') == 'on'
             )
@@ -404,8 +420,9 @@ def hero_slide_edit(request, pk):
         try:
             slide.label = request.POST.get('label')
             slide.label_fr = request.POST.get('label_fr', '')
-            if request.FILES.get('image'):
-                slide.image = request.FILES.get('image')
+            _img = _get_existing_or_uploaded(request, 'image')
+            if _img:
+                slide.image = _img
             slide.order = request.POST.get('order', 0)
             slide.is_active = request.POST.get('is_active') == 'on'
             slide.full_clean()
@@ -523,7 +540,7 @@ def article_create(request):
             content=request.POST.get('content'),
             content_fr=request.POST.get('content_fr', ''),
             category_id=request.POST.get('category') if request.POST.get('category') else None,
-            image=request.FILES.get('image'),
+            image=_get_existing_or_uploaded(request, 'image'),
             author=request.POST.get('author', 'Admin'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
             is_featured=request.POST.get('is_featured') == 'on',
@@ -586,8 +603,9 @@ def article_edit(request, pk):
         article.content_fr = new_values['content_fr']
         article.category_id = request.POST.get('category') if request.POST.get('category') else None
         article.author = new_values['author']
-        if request.FILES.get('image'):
-            article.image = request.FILES.get('image')
+        _img = _get_existing_or_uploaded(request, 'image')
+        if _img:
+            article.image = _img
             changes['image'] = {'old': '', 'new': 'new image uploaded'}
         article.is_featured = new_values['is_featured']
         article.is_draft = new_values['is_draft']
@@ -721,7 +739,7 @@ def event_create(request):
             latitude=request.POST.get('latitude', 0),
             longitude=request.POST.get('longitude', 0),
             event_date=request.POST.get('event_date'),
-            image=request.FILES.get('image'),
+            image=_get_existing_or_uploaded(request, 'image'),
             is_active=request.POST.get('is_active') == 'on',
             recurrence_type=request.POST.get('recurrence_type', 'none'),
             recurrence_end_date=request.POST.get('recurrence_end_date') or None,
@@ -760,8 +778,9 @@ def event_edit(request, pk):
         event.latitude = request.POST.get('latitude', 0)
         event.longitude = request.POST.get('longitude', 0)
         event.event_date = request.POST.get('event_date')
-        if request.FILES.get('image'):
-            event.image = request.FILES.get('image')
+        _img = _get_existing_or_uploaded(request, 'image')
+        if _img:
+            event.image = _img
             changes['image'] = {'old': '', 'new': 'new image uploaded'}
         event.is_active = new_values['is_active']
         event.recurrence_type = request.POST.get('recurrence_type', 'none')
@@ -896,7 +915,7 @@ def notification_create(request):
             action_value=request.POST.get('action_value', ''),
             is_global=request.POST.get('is_global') == 'on',
             is_active=request.POST.get('is_active') == 'on',
-            image=request.FILES.get('image'),
+            image=_get_existing_or_uploaded(request, 'image'),
             target_gender=request.POST.get('target_gender', ''),
             target_nationalities=request.POST.getlist('target_nationalities'),
             target_age_min=int(request.POST['target_age_min']) if request.POST.get('target_age_min') else None,
@@ -983,8 +1002,9 @@ def notification_edit(request, pk):
         notification.action_value = request.POST.get('action_value', '')
         notification.is_global = request.POST.get('is_global') == 'on'
         notification.is_active = request.POST.get('is_active') == 'on'
-        if request.FILES.get('image'):
-            notification.image = request.FILES['image']
+        _img = _get_existing_or_uploaded(request, 'image')
+        if _img:
+            notification.image = _img
         notification.target_gender = request.POST.get('target_gender', '')
         notification.target_nationalities = request.POST.getlist('target_nationalities')
         notification.target_age_min = int(request.POST['target_age_min']) if request.POST.get('target_age_min') else None
@@ -1845,7 +1865,7 @@ def magazine_create(request):
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
-            cover_image=request.FILES.get('cover_image'),
+            cover_image=_get_existing_or_uploaded(request, 'cover_image'),
             pdf_file=request.FILES.get('pdf_file'),
             page_count=request.POST.get('page_count', 0),
             file_size=request.POST.get('file_size', ''),
@@ -1877,8 +1897,9 @@ def magazine_edit(request, pk):
         magazine.title_fr = new_values['title_fr']
         magazine.description = new_values['description']
         magazine.description_fr = request.POST.get('description_fr', '')
-        if request.FILES.get('cover_image'):
-            magazine.cover_image = request.FILES.get('cover_image')
+        _ci = _get_existing_or_uploaded(request, 'cover_image')
+        if _ci:
+            magazine.cover_image = _ci
             changes['cover_image'] = {'old': '', 'new': 'new image uploaded'}
         if request.FILES.get('pdf_file'):
             magazine.pdf_file = request.FILES.get('pdf_file')
@@ -2015,8 +2036,8 @@ def feature_card_create(request):
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
-            image=request.FILES.get('image'),
-            icon_image=request.FILES.get('icon_image'),
+            image=_get_existing_or_uploaded(request, 'image'),
+            icon_image=_get_existing_or_uploaded(request, 'icon_image'),
             icon_name=request.POST.get('icon_name', ''),
             gradient_start=request.POST.get('gradient_start', '#1EB53A'),
             gradient_end=request.POST.get('gradient_end', '#4CAF50'),
@@ -2043,10 +2064,12 @@ def feature_card_edit(request, pk):
         card.title_fr = request.POST.get('title_fr', '')
         card.description = request.POST.get('description', '')
         card.description_fr = request.POST.get('description_fr', '')
-        if request.FILES.get('image'):
-            card.image = request.FILES.get('image')
-        if request.FILES.get('icon_image'):
-            card.icon_image = request.FILES.get('icon_image')
+        _img = _get_existing_or_uploaded(request, 'image')
+        if _img:
+            card.image = _img
+        _icon = _get_existing_or_uploaded(request, 'icon_image')
+        if _icon:
+            card.icon_image = _icon
         card.icon_name = request.POST.get('icon_name', '')
         card.gradient_start = request.POST.get('gradient_start', '#1EB53A')
         card.gradient_end = request.POST.get('gradient_end', '#4CAF50')
@@ -2698,7 +2721,7 @@ def gallery_create(request):
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
-            cover_image=request.FILES.get('cover_image'),
+            cover_image=_get_existing_or_uploaded(request, 'cover_image'),
             is_featured=request.POST.get('is_featured') == 'on',
             status=content_status,
             scheduled_publish_date=scheduled_publish_date,
@@ -2723,8 +2746,9 @@ def gallery_edit(request, pk):
         album.title_fr = request.POST.get('title_fr', '')
         album.description = request.POST.get('description', '')
         album.description_fr = request.POST.get('description_fr', '')
-        if request.FILES.get('cover_image'):
-            album.cover_image = request.FILES.get('cover_image')
+        _ci = _get_existing_or_uploaded(request, 'cover_image')
+        if _ci:
+            album.cover_image = _ci
         album.is_featured = request.POST.get('is_featured') == 'on'
         album.status = request.POST.get('content_status', 'published')
         album.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
@@ -2811,7 +2835,7 @@ def video_create(request):
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
             video_url=request.POST.get('video_url', ''),
-            thumbnail=request.FILES.get('thumbnail'),
+            thumbnail=_get_existing_or_uploaded(request, 'thumbnail'),
             duration=request.POST.get('duration', ''),
             category=request.POST.get('category', 'highlight'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
@@ -2841,8 +2865,9 @@ def video_edit(request, pk):
         video.video_url = request.POST.get('video_url', '')
         if request.FILES.get('video_file'):
             video.video_file = request.FILES['video_file']
-        if request.FILES.get('thumbnail'):
-            video.thumbnail = request.FILES.get('thumbnail')
+        _th = _get_existing_or_uploaded(request, 'thumbnail')
+        if _th:
+            video.thumbnail = _th
         video.duration = request.POST.get('duration', '')
         video.category = request.POST.get('category', 'highlight')
         video.is_featured = request.POST.get('is_featured') == 'on'
@@ -2893,7 +2918,7 @@ def live_feed_create(request):
             title_fr=request.POST.get('title_fr', ''),
             event_id=event_id,
             stream_url=request.POST.get('stream_url'),
-            thumbnail=request.FILES.get('thumbnail'),
+            thumbnail=_get_existing_or_uploaded(request, 'thumbnail'),
             status=request.POST.get('status', 'upcoming'),
             duration=request.POST.get('duration', ''),
             scheduled_time=request.POST.get('scheduled_time') or None,
@@ -2919,8 +2944,9 @@ def live_feed_edit(request, pk):
         feed.title_fr = request.POST.get('title_fr', '')
         feed.event_id = request.POST.get('event') or None
         feed.stream_url = request.POST.get('stream_url')
-        if request.FILES.get('thumbnail'):
-            feed.thumbnail = request.FILES.get('thumbnail')
+        _th = _get_existing_or_uploaded(request, 'thumbnail')
+        if _th:
+            feed.thumbnail = _th
         feed.status = request.POST.get('status', 'upcoming')
         feed.duration = request.POST.get('duration', '')
         feed.scheduled_time = request.POST.get('scheduled_time') or None
@@ -7610,4 +7636,92 @@ def newsletter_send_now(request):
     except Exception as e:
         messages.error(request, f'Newsletter send failed: {e}')
     return redirect('custom_admin:newsletter_editions_list')
+
+
+# ─── Media Library (Browse existing Spaces images) ──────────────
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def media_library_api(request):
+    """Return JSON list of images in DO Spaces, grouped by folder."""
+    folder_filter = request.GET.get('folder', '').strip()
+    search_query = request.GET.get('q', '').strip().lower()
+
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+    results = {}
+
+    try:
+        storage = default_storage
+        # List files under the media/ prefix (AWS_LOCATION)
+        prefix = getattr(settings, 'AWS_LOCATION', 'media')
+
+        if hasattr(storage, 'bucket'):
+            # S3/Spaces storage — use boto3 to list objects
+            bucket = storage.bucket
+            s3_prefix = f'{prefix}/' if prefix else ''
+            if folder_filter:
+                s3_prefix = f'{prefix}/{folder_filter}/'
+
+            paginator = bucket.meta.client.get_paginator('list_objects_v2')
+            page_iterator = paginator.paginate(
+                Bucket=bucket.name,
+                Prefix=s3_prefix,
+            )
+            for page in page_iterator:
+                for obj in page.get('Contents', []):
+                    key = obj['Key']
+                    # Strip the media/ prefix for display
+                    rel_path = key[len(prefix) + 1:] if key.startswith(prefix + '/') else key
+                    ext = os.path.splitext(key)[1].lower()
+                    if ext not in image_extensions:
+                        continue
+                    filename = os.path.basename(key)
+                    if search_query and search_query not in filename.lower():
+                        continue
+                    folder = os.path.dirname(rel_path) or 'root'
+                    url = storage.url(rel_path)
+                    results.setdefault(folder, []).append({
+                        'path': rel_path,
+                        'filename': filename,
+                        'url': url,
+                        'size': obj.get('Size', 0),
+                    })
+        else:
+            # Local filesystem storage (development)
+            import pathlib
+            media_root = pathlib.Path(settings.MEDIA_ROOT)
+            if folder_filter:
+                search_dir = media_root / folder_filter
+            else:
+                search_dir = media_root
+            if search_dir.exists():
+                for path in sorted(search_dir.rglob('*')):
+                    if not path.is_file():
+                        continue
+                    if path.suffix.lower() not in image_extensions:
+                        continue
+                    rel_path = str(path.relative_to(media_root))
+                    filename = path.name
+                    if search_query and search_query not in filename.lower():
+                        continue
+                    folder = str(path.relative_to(media_root).parent) or 'root'
+                    url = f'{settings.MEDIA_URL}{rel_path}'
+                    results.setdefault(folder, []).append({
+                        'path': rel_path,
+                        'filename': filename,
+                        'url': url,
+                        'size': path.stat().st_size,
+                    })
+    except Exception as e:
+        logger.exception('Media library API error')
+        return JsonResponse({'error': str(e)}, status=500)
+
+    # Sort folders and files
+    sorted_results = {}
+    for folder in sorted(results.keys()):
+        sorted_results[folder] = sorted(results[folder], key=lambda x: x['filename'])
+
+    return JsonResponse({
+        'folders': sorted_results,
+        'folder_names': list(sorted_results.keys()),
+    })
 

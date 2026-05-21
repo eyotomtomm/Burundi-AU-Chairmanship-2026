@@ -91,10 +91,20 @@
                         <img src="{{ card.image.url }}" alt="Current image" class="w-48 h-48 object-cover rounded-lg">
                     </div>
                     {% endif %}
-                    <input type="file"
-                           name="image"
-                           accept="image/*"
-                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    <div class="flex items-center gap-3">
+                        <input type="file"
+                               id="image"
+                               name="image"
+                               accept="image/*"
+                               class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        <button type="button" onclick="openMediaLibrary('image')"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-secondary-container text-white rounded-lg hover:bg-secondary transition-colors text-sm font-medium whitespace-nowrap">
+                            <span class="material-symbols-outlined text-lg">photo_library</span>
+                            Browse Media
+                        </button>
+                    </div>
+                    <input type="hidden" id="existing_image_image" name="existing_image_image" value="">
+                    <div id="ml_preview_image" class="mt-2 hidden"></div>
                     <p class="text-xs text-on-surface-variant mt-2">Recommended: 800x800px. JPG, PNG, or WebP. Max size: 10 MB</p>
                 </div>
 
@@ -108,10 +118,20 @@
                         <img src="{{ card.icon_image.url }}" alt="Current icon" class="w-16 h-16 object-cover rounded-lg">
                     </div>
                     {% endif %}
-                    <input type="file"
-                           name="icon_image"
-                           accept="image/*"
-                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    <div class="flex items-center gap-3">
+                        <input type="file"
+                               id="icon_image"
+                               name="icon_image"
+                               accept="image/*"
+                               class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        <button type="button" onclick="openMediaLibrary('icon_image')"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-secondary-container text-white rounded-lg hover:bg-secondary transition-colors text-sm font-medium whitespace-nowrap">
+                            <span class="material-symbols-outlined text-lg">photo_library</span>
+                            Browse Media
+                        </button>
+                    </div>
+                    <input type="hidden" id="existing_image_icon_image" name="existing_image_icon_image" value="">
+                    <div id="ml_preview_icon_image" class="mt-2 hidden"></div>
                     <p class="text-xs text-on-surface-variant mt-2">Recommended: 128x128px. PNG with transparency preferred. Max size: 10 MB</p>
                 </div>
 
@@ -461,6 +481,8 @@
     </div>
 </div>
 {% endblock %}
+
+{% include 'custom_admin/includes/media_library_modal.html' %}
 
 {% block extra_js %}
 <script>

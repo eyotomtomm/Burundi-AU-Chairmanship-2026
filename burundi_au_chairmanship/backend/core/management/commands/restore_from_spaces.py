@@ -5,11 +5,12 @@ Run this after seed_data to link existing media files to database records.
 Usage: python manage.py restore_from_spaces
 """
 from django.core.management.base import BaseCommand
+from django.db.models.signals import pre_save
 from django.utils import timezone
 from core.models import (
     Article, MagazineEdition, Event, LiveFeed,
     FeatureCard, HeroSlide, GalleryAlbum, GalleryPhoto,
-    Video, Notification, Category,
+    Video, Notification, Category, _auto_optimize_image,
 )
 
 
@@ -18,6 +19,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write('Restoring records from Spaces media files...\n')
+
+        # Disconnect the image optimization signal so we can save records
+        # that reference existing Spaces files without downloading them
+        models_to_disconnect = [
+            HeroSlide, Article, Event, FeatureCard, MagazineEdition,
+            GalleryAlbum, GalleryPhoto, LiveFeed, Video, Notification,
+        ]
+        for model in models_to_disconnect:
+            pre_save.disconnect(_auto_optimize_image, sender=model)
+        self.stdout.write('  Image optimization signal disconnected')
 
         # ── Categories (needed for articles) ─────────────────────
         cat_politics, _ = Category.objects.get_or_create(
@@ -452,6 +463,10 @@ class Command(BaseCommand):
         from core.models import PriorityAgenda
         PriorityAgenda.objects.filter(slug='water-sanitation').update(
             image='agendas/b4africa_big.jpg') if hasattr(PriorityAgenda, 'image') else None
+
+        # Reconnect the signal
+        for model in models_to_disconnect:
+            pre_save.connect(_auto_optimize_image, sender=model)
 
         self.stdout.write(self.style.SUCCESS(
             '\nAll records restored from Spaces! '

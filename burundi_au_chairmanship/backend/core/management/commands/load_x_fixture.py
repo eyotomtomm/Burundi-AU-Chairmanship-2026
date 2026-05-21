@@ -4,22 +4,18 @@ Load X posts fixture into the database (production-safe).
 Reads fixtures/x_posts_data.json and creates Articles, Events, and LiveFeeds.
 Skips duplicates by title. Does NOT conflict with existing PKs.
 
-For images: if media/x_scrape/ exists locally, attaches images via Django's
-configured storage backend (Spaces in production, local FS in dev).
+Images: Each article's image field is set to the path already uploaded to
+DigitalOcean Spaces (e.g. articles/2008758478886891537_1.jpg).
 
 Usage:
     python manage.py load_x_fixture                # load all
     python manage.py load_x_fixture --dry-run      # preview only
-    python manage.py load_x_fixture --no-images    # skip image uploads
 """
 
 import json
 import os
-import re
-from pathlib import Path
 
 from django.conf import settings
-from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from core.models import Article, Event, LiveFeed, Category
@@ -53,11 +49,6 @@ class Command(BaseCommand):
             help='Preview what would be imported without saving',
         )
         parser.add_argument(
-            '--no-images',
-            action='store_true',
-            help='Skip attaching images (useful if x_scrape dir is not available)',
-        )
-        parser.add_argument(
             '--fixture',
             type=str,
             default='',
@@ -66,7 +57,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options['dry_run']
-        no_images = options['no_images']
 
         fixture_path = options['fixture']
         if not fixture_path:
@@ -84,20 +74,13 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Loaded {len(data)} records from fixture\n')
 
-        # Check for local x_scrape images
-        scrape_dir = Path(os.path.join(settings.BASE_DIR, 'media', 'x_scrape'))
-        has_local_images = scrape_dir.exists() and not no_images
-        if has_local_images:
-            self.stdout.write(f'Local scrape dir found: {scrape_dir}')
-        else:
-            self.stdout.write('No local scrape images (articles will be created without images)')
-
         articles_created = 0
         articles_skipped = 0
         events_created = 0
         events_skipped = 0
         livefeeds_created = 0
         livefeeds_skipped = 0
+        images_linked = 0
         errors = 0
 
         for item in data:
@@ -129,20 +112,11 @@ class Command(BaseCommand):
                             status=item.get('status', 'published'),
                         )
 
-                        # Try to attach image from local x_scrape
-                        if has_local_images:
-                            image_path = item.get('image_path', '')
-                            if image_path:
-                                # image_path looks like "articles/2008758478886891537_1.jpg"
-                                # The original file is in media/x_scrape/ with the tweet_id pattern
-                                local_file = Path(os.path.join(settings.BASE_DIR, 'media', image_path))
-                                if local_file.exists():
-                                    with open(local_file, 'rb') as img_f:
-                                        article.image.save(
-                                            local_file.name,
-                                            ContentFile(img_f.read()),
-                                            save=False,
-                                        )
+                        # Set image path directly — images are already in Spaces
+                        image_path = item.get('image_path', '')
+                        if image_path:
+                            article.image.name = image_path
+                            images_linked += 1
 
                         article.save()
 
@@ -195,7 +169,8 @@ class Command(BaseCommand):
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
-            f'Done! Articles: {articles_created} new / {articles_skipped} skipped, '
+            f'Done! Articles: {articles_created} new ({images_linked} with images) / '
+            f'{articles_skipped} skipped, '
             f'Events: {events_created} new / {events_skipped} skipped, '
             f'LiveFeeds: {livefeeds_created} new / {livefeeds_skipped} skipped, '
             f'Errors: {errors}'

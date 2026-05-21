@@ -3999,8 +3999,9 @@ def _auto_optimize_image(sender, instance, **kwargs):
             continue
         if image.name.endswith('.webp'):
             continue
-        # Only optimize new uploads (file has been changed)
-        if not hasattr(image, 'file'):
+        # Only optimize genuine new uploads — skip files already committed
+        # to storage (e.g. existing paths assigned from the media library).
+        if getattr(image, '_committed', True):
             continue
         try:
             optimize_image(image, max_width=1200)

@@ -31,21 +31,23 @@ def initialize_firebase():
         cred_json = os.environ.get('FIREBASE_CREDENTIALS_JSON', '')
         if cred_json:
             try:
-                # Some platforms mangle \n in the private key — try parsing
-                # as-is first, then replace literal \\n with real newlines.
-                try:
-                    cred_dict = json.loads(cred_json)
-                except json.JSONDecodeError:
-                    cred_dict = json.loads(cred_json.replace('\\n', '\n'))
-                cred = credentials.Certificate(cred_dict)
-                logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_JSON env var")
+                # Some platforms mangle \n in the private key — try multiple
+                # strategies before giving up.
+                for attempt_json in [cred_json, cred_json.replace('\\n', '\n')]:
+                    try:
+                        cred_dict = json.loads(attempt_json)
+                        cred = credentials.Certificate(cred_dict)
+                        logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_JSON env var")
+                        break
+                    except json.JSONDecodeError:
+                        continue
             except (json.JSONDecodeError, ValueError) as e:
-                raise ValueError(
-                    f"Invalid FIREBASE_CREDENTIALS_JSON: {e}\n"
-                    f"Ensure the env var contains valid JSON from your Firebase service account key."
+                logger.warning(
+                    "FIREBASE_CREDENTIALS_JSON env var failed to parse: %s — "
+                    "falling back to credentials file.", e
                 )
 
-        # Method 2: File path
+        # Method 2: File path (also used as fallback if env var is malformed)
         if cred is None:
             cred_path = os.environ.get(
                 'FIREBASE_CREDENTIALS_PATH',

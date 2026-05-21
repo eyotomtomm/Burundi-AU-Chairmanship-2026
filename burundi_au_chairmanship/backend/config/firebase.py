@@ -31,7 +31,12 @@ def initialize_firebase():
         cred_json = os.environ.get('FIREBASE_CREDENTIALS_JSON', '')
         if cred_json:
             try:
-                cred_dict = json.loads(cred_json)
+                # Some platforms mangle \n in the private key — try parsing
+                # as-is first, then replace literal \\n with real newlines.
+                try:
+                    cred_dict = json.loads(cred_json)
+                except json.JSONDecodeError:
+                    cred_dict = json.loads(cred_json.replace('\\n', '\n'))
                 cred = credentials.Certificate(cred_dict)
                 logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_JSON env var")
             except (json.JSONDecodeError, ValueError) as e:

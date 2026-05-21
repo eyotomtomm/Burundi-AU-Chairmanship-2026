@@ -9,8 +9,9 @@ db.sqlite3-journal
 
 # Environment variables - NEVER commit these
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.local.example
 
 # Media files (uploaded by users)
 media/

@@ -23,7 +23,12 @@ burundi_au_chairmanship/backend/media/
 **/__pycache__/
 *.pyc
 
+# Environment secrets (NEVER COMMIT THESE)
+burundi_au_chairmanship/backend/.env.production
+*.env.production
+
 # Firebase credentials (NEVER COMMIT THESE)
+*firebase-adminsdk*.json
 burundi_au_chairmanship/backend/config/firebase-adminsdk.json
 burundi_au_chairmanship/ios/Runner/GoogleService-Info.plist
 burundi_au_chairmanship/android/app/google-services.json

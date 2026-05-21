@@ -407,10 +407,17 @@ class Command(BaseCommand):
                 title=album_data['title'], defaults=album_data)
             if was_created:
                 created_albums += 1
-                for i, photo_path in enumerate(photos):
-                    GalleryPhoto.objects.create(
-                        album=album, image=photo_path, display_order=i + 1)
-                    created_photos += 1
+                # Use raw SQL to bypass GalleryPhoto.save() which tries to
+                # open the image from S3 for compression
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    for i, photo_path in enumerate(photos):
+                        cursor.execute(
+                            "INSERT INTO core_galleryphoto (album_id, image, display_order, caption, caption_fr, photographer, created_at) "
+                            "VALUES (%s, %s, %s, %s, %s, %s, NOW())",
+                            [album.id, photo_path, i + 1, '', '', '']
+                        )
+                        created_photos += 1
                 album.photo_count = len(photos)
                 album.save(update_fields=['photo_count'])
         self.stdout.write(self.style.SUCCESS(

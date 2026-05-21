@@ -6,6 +6,7 @@ Firebase ID tokens sent from the Flutter mobile app.
 """
 
 import os
+import re
 import json
 import logging
 import firebase_admin
@@ -13,6 +14,47 @@ from firebase_admin import credentials, auth, messaging
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_firebase_json(raw):
+    """
+    Parse Firebase credentials JSON that may have been mangled by the
+    hosting platform.  DO App Platform and similar PaaS providers often
+    inject real newline/tab characters into the env var value, breaking
+    the JSON private_key field.  We try several repair strategies.
+    """
+    # Strategy 1: parse as-is
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: replace literal two-char \\n with real newlines
+    try:
+        return json.loads(raw.replace('\\n', '\n'))
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 3: the platform turned \n inside the private_key into real
+    # newlines/whitespace — extract the key, collapse it, and rebuild.
+    try:
+        # Find the private_key value (everything between its quotes)
+        match = re.search(
+            r'"private_key"\s*:\s*"(.*?)"',
+            raw,
+            re.DOTALL,
+        )
+        if match:
+            broken_key = match.group(1)
+            # Replace real whitespace sequences with the literal \n that
+            # PEM format expects between base64 lines.
+            fixed_key = re.sub(r'\s*\n\s*', '\\n', broken_key)
+            fixed_json = raw[:match.start(1)] + fixed_key + raw[match.end(1):]
+            return json.loads(fixed_json)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    raise json.JSONDecodeError("All Firebase JSON repair strategies failed", raw, 0)
 
 
 def initialize_firebase():
@@ -31,16 +73,9 @@ def initialize_firebase():
         cred_json = os.environ.get('FIREBASE_CREDENTIALS_JSON', '')
         if cred_json:
             try:
-                # Some platforms mangle \n in the private key — try multiple
-                # strategies before giving up.
-                for attempt_json in [cred_json, cred_json.replace('\\n', '\n')]:
-                    try:
-                        cred_dict = json.loads(attempt_json)
-                        cred = credentials.Certificate(cred_dict)
-                        logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_JSON env var")
-                        break
-                    except json.JSONDecodeError:
-                        continue
+                cred_dict = _parse_firebase_json(cred_json)
+                cred = credentials.Certificate(cred_dict)
+                logger.info("Firebase Admin SDK initialized from FIREBASE_CREDENTIALS_JSON env var")
             except (json.JSONDecodeError, ValueError) as e:
                 logger.warning(
                     "FIREBASE_CREDENTIALS_JSON env var failed to parse: %s — "

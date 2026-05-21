@@ -288,7 +288,7 @@ def send_weekly_newsletter():
     from django.core.mail import EmailMessage
     from django.conf import settings as django_settings
 
-    site_url = getattr(django_settings, 'SITE_URL', 'https://api.burundi4africa.com').rstrip('/')
+    site_url = getattr(django_settings, 'SITE_URL', 'https://burundi4africa.com').rstrip('/')
 
     unsubscribe_footer = (
         '<hr style="margin:32px 0 16px;border:none;border-top:1px solid #e0e0e0">'

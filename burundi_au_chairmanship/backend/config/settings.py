@@ -43,7 +43,7 @@ else:
         "CRITICAL: DJANGO_ALLOWED_HOSTS environment variable is not set.\n"
         "This is required in production to prevent HTTP Host header attacks.\n\n"
         "Set it to your domain(s):\n"
-        "  export DJANGO_ALLOWED_HOSTS='api.burundi4africa.com,burundi4africa.com'\n\n"
+        "  export DJANGO_ALLOWED_HOSTS='burundi4africa.com,www.burundi4africa.com'\n\n"
         "Multiple hosts should be comma-separated."
     )
 
@@ -261,7 +261,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     'https://burundi4africa.com',
     'https://www.burundi4africa.com',
-    'https://api.burundi4africa.com',
+    'https://burundi4africa.com',
 ]
 if DEBUG:
     CORS_ALLOWED_ORIGINS += [
@@ -357,7 +357,6 @@ if not DEBUG:
     USE_X_FORWARDED_PORT = True
     # Django 4.2+ requires explicit trusted origins for HTTPS CSRF checks
     CSRF_TRUSTED_ORIGINS = [
-        'https://api.burundi4africa.com',
         'https://burundi4africa.com',
         'https://www.burundi4africa.com',
         'https://burundi-au-api-mgo34.ondigitalocean.app',

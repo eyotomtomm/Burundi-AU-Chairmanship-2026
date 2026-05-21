@@ -1676,7 +1676,7 @@ def admin_invite(request):
                 f'You have been granted {"Super Admin" if role == "superuser" else "Staff"} access '
                 f'to the Burundi Chairmanship Admin Portal.\n\n'
                 f'Your login credentials:\n'
-                f'  Portal URL: https://api.burundi4africa.com/admin/\n'
+                f'  Portal URL: https://burundi4africa.com/admin/\n'
                 f'  Username: {username}\n'
                 f'  Temporary Password: {temp_password}\n\n'
                 f'Please change your password after your first login.\n\n'

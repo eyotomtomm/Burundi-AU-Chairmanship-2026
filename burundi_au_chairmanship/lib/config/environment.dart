@@ -56,7 +56,7 @@ class Environment {
     // Otherwise use environment-specific defaults
     switch (current) {
       case EnvironmentType.production:
-        return 'https://api.burundi4africa.com/api';
+        return 'https://burundi4africa.com/api';
       case EnvironmentType.staging:
         return 'https://staging-api.burundi4africa.com/api';
       case EnvironmentType.development:

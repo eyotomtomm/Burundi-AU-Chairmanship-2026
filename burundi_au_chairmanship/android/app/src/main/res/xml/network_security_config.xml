@@ -3,7 +3,7 @@
     <!-- Production: HTTPS only + certificate pinning for API domain -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">burundi4africa.com</domain>
-        <domain includeSubdomains="true">api.burundi4africa.com</domain>
+        <!-- api.burundi4africa.com covered by includeSubdomains on burundi4africa.com -->
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
@@ -12,7 +12,7 @@
             Pins the Google Trust Services intermediate and root CAs used by Cloudflare.
             Expiration set to 2027-06-01 as safety net — after expiry, falls back to
             normal certificate validation (app won't brick).
-            To refresh pins: openssl s_client -servername api.burundi4africa.com -connect api.burundi4africa.com:443 -showcerts
+            To refresh pins: openssl s_client -servername burundi4africa.com -connect burundi4africa.com:443 -showcerts
         -->
         <pin-set expiration="2027-06-01">
             <!-- Google Trust Services WE1 (intermediate CA) -->

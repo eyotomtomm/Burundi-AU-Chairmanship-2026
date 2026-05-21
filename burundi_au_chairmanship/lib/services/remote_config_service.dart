@@ -35,7 +35,7 @@ class RemoteConfigService {
         'latest_app_version': '1.0.0',
         'force_update': false,
         // API URL defaults to production HTTPS
-        'api_base_url': 'https://api.burundi4africa.com/api',
+        'api_base_url': 'https://burundi4africa.com/api',
         'enable_analytics': true,
         'enable_crashlytics': true,
         'cache_duration_hours': 24,

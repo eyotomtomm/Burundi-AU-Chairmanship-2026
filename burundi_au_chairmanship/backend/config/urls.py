@@ -26,6 +26,47 @@ def handler500_view(request):
 
 handler500 = 'config.urls.handler500_view'
 
+
+def _s3_diag(request):
+    """Temporary diagnostic: test DigitalOcean Spaces connectivity."""
+    import json as _json
+    result = {}
+    key = settings.AWS_ACCESS_KEY_ID if hasattr(settings, 'AWS_ACCESS_KEY_ID') else ''
+    secret = settings.AWS_SECRET_ACCESS_KEY if hasattr(settings, 'AWS_SECRET_ACCESS_KEY') else ''
+    bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+    endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', '')
+    result['env'] = {
+        'DO_SPACES_KEY': f'{key[:4]}...{key[-4:]}' if len(key) > 8 else f'(len={len(key)})',
+        'DO_SPACES_SECRET': f'{secret[:4]}...{secret[-4:]}' if len(secret) > 8 else f'(len={len(secret)})',
+        'DO_SPACES_BUCKET': bucket,
+        'DO_SPACES_ENDPOINT': endpoint,
+        'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', 'default'),
+        'DEBUG': settings.DEBUG,
+    }
+    # Test actual S3 connection
+    try:
+        import boto3
+        session = boto3.session.Session()
+        client = session.client(
+            's3',
+            region_name='fra1',
+            endpoint_url=endpoint,
+            aws_access_key_id=key,
+            aws_secret_access_key=secret,
+        )
+        resp = client.list_objects_v2(Bucket=bucket, MaxKeys=1)
+        result['s3_test'] = 'OK'
+        result['s3_key_count'] = resp.get('KeyCount', 0)
+    except Exception as e:
+        result['s3_test'] = 'FAILED'
+        result['s3_error'] = str(e)
+        result['s3_error_type'] = type(e).__name__
+    return HttpResponse(
+        _json.dumps(result, indent=2),
+        content_type='application/json',
+    )
+
+
 urlpatterns = [
     # Public landing page
     path('', TemplateView.as_view(template_name='landing.html'), name='landing'),
@@ -37,6 +78,8 @@ urlpatterns = [
     path('terms-of-service/', TemplateView.as_view(template_name='legal/terms_of_service.html'), name='terms-of-service'),
     path('support/', TemplateView.as_view(template_name='legal/support.html'), name='support'),
     path('delete-account/', TemplateView.as_view(template_name='legal/delete_account.html'), name='delete-account'),
+    # Temporary S3 diagnostic (remove after fixing)
+    path('api/s3-diag/', _s3_diag, name='s3-diag'),
     # OpenAPI schema & documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),

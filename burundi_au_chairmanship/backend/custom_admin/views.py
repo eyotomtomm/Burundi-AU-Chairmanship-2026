@@ -1,4 +1,5 @@
 import csv
+import functools
 import io
 import json
 import logging
@@ -82,6 +83,29 @@ def _get_existing_or_uploaded(request, field_name):
     if existing_path:
         return existing_path  # raw string path — assigned directly to the ImageField
     return None
+
+
+def _catch_upload_errors(view_func):
+    """Decorator: catch file-upload / S3 errors on POST and show a message instead of 500."""
+    @functools.wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        try:
+            return view_func(request, *args, **kwargs)
+        except Exception as exc:
+            if request.method != 'POST':
+                raise
+            err = str(exc)
+            if 'InvalidAccessKeyId' in err or 'credential' in err.lower() or 'AccessDenied' in err:
+                messages.error(
+                    request,
+                    'File upload failed — storage credentials are invalid or expired. '
+                    'Please contact the administrator to update the DigitalOcean Spaces API keys.'
+                )
+            else:
+                logger.exception('Error in %s', view_func.__name__)
+                messages.error(request, f'Failed to save: {err}')
+            return redirect(request.path)
+    return wrapper
 
 
 def admin_login(request):
@@ -523,6 +547,7 @@ def articles_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def article_create(request):
     categories = Category.objects.all()
     if request.method == 'POST':
@@ -566,6 +591,7 @@ def article_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def article_edit(request, pk):
     article = get_object_or_404(Article, pk=pk)
     categories = Category.objects.all()
@@ -726,6 +752,7 @@ def events_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def event_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
@@ -758,6 +785,7 @@ def event_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def event_edit(request, pk):
     event = get_object_or_404(Event, pk=pk)
     if request.method == 'POST':
@@ -878,6 +906,7 @@ def _validate_notification_language_fields(request):
     return None
 
 
+@_catch_upload_errors
 def notification_create(request):
     if request.method == 'POST':
         # Bilingual consistency validation
@@ -979,6 +1008,7 @@ def notification_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def notification_edit(request, pk):
     notification = get_object_or_404(Notification, pk=pk)
     if request.method == 'POST':
@@ -1856,6 +1886,7 @@ def magazines_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def magazine_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
@@ -1882,6 +1913,7 @@ def magazine_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def magazine_edit(request, pk):
     magazine = get_object_or_404(MagazineEdition, pk=pk)
     if request.method == 'POST':
@@ -2029,6 +2061,7 @@ def _save_feature_card_children(request, card):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def feature_card_create(request):
     if request.method == 'POST':
         card = FeatureCard.objects.create(
@@ -2057,6 +2090,7 @@ def feature_card_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def feature_card_edit(request, pk):
     card = get_object_or_404(FeatureCard, pk=pk)
     if request.method == 'POST':
@@ -2206,6 +2240,7 @@ def _save_form_fields(request, reg):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def event_registration_create(request):
     if request.method == 'POST':
         reg = EventRegistration.objects.create(
@@ -2250,6 +2285,7 @@ def event_registration_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def event_registration_edit(request, pk):
     reg = get_object_or_404(EventRegistration, pk=pk)
     if request.method == 'POST':
@@ -2645,6 +2681,7 @@ def priority_agendas_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def priority_agenda_create(request):
     if request.method == 'POST':
         from django.utils.text import slugify
@@ -2668,6 +2705,7 @@ def priority_agenda_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def priority_agenda_edit(request, pk):
     agenda = get_object_or_404(PriorityAgenda, pk=pk)
     if request.method == 'POST':
@@ -2712,6 +2750,7 @@ def gallery_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def gallery_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
@@ -2739,6 +2778,7 @@ def gallery_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def gallery_edit(request, pk):
     album = get_object_or_404(GalleryAlbum, pk=pk)
     if request.method == 'POST':
@@ -2825,6 +2865,7 @@ def _save_video_chapters(request, video):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def video_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
@@ -2855,6 +2896,7 @@ def video_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def video_edit(request, pk):
     video = get_object_or_404(Video, pk=pk)
     if request.method == 'POST':
@@ -2908,6 +2950,7 @@ def live_feeds_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def live_feed_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
@@ -2937,6 +2980,7 @@ def live_feed_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def live_feed_edit(request, pk):
     feed = get_object_or_404(LiveFeed, pk=pk)
     if request.method == 'POST':
@@ -2989,6 +3033,7 @@ def resources_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def resource_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
@@ -3010,6 +3055,7 @@ def resource_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def resource_edit(request, pk):
     resource = get_object_or_404(Resource, pk=pk)
     if request.method == 'POST':
@@ -4102,6 +4148,7 @@ def event_speakers_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def event_speaker_create(request):
     if request.method == 'POST':
         EventSpeaker.objects.create(
@@ -4124,6 +4171,7 @@ def event_speaker_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def event_speaker_edit(request, pk):
     speaker = get_object_or_404(EventSpeaker, pk=pk)
     if request.method == 'POST':
@@ -4168,6 +4216,7 @@ def onboarding_steps_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def onboarding_step_create(request):
     if request.method == 'POST':
         OnboardingStep.objects.create(
@@ -4187,6 +4236,7 @@ def onboarding_step_create(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
 def onboarding_step_edit(request, pk):
     step = get_object_or_404(OnboardingStep, pk=pk)
     if request.method == 'POST':

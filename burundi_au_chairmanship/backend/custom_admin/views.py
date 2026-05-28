@@ -7706,33 +7706,3 @@ def media_library_api(request):
         'folders': sorted_results,
         'folder_names': list(sorted_results.keys()),
     })
-
-
-# ─── Temporary Diagnostic Endpoint ────────────────────────────
-# Remove after debugging create-page 500 errors
-def debug_create_test(request):
-    """Test rendering each create form template to find the 500 error."""
-    import traceback
-    from django.template.loader import render_to_string
-
-    templates_to_test = [
-        ('articles/form.html', {'categories': Category.objects.all(), 'action': 'Create', 'prefill_date': ''}),
-        ('magazines/form.html', {'action': 'Create', 'prefill_date': ''}),
-        ('hero_slides/form.html', {'action': 'Create', 'prefill_date': ''}),
-        ('events/form.html', {'action': 'Create', 'event_categories': [], 'prefill_date': ''}),
-        ('live_feeds/form.html', {'action': 'Create', 'prefill_date': ''}),
-        ('resources/form.html', {'action': 'Create', 'prefill_date': ''}),
-        ('videos/form.html', {'action': 'Create', 'prefill_date': ''}),
-    ]
-
-    results = []
-    for template_name, ctx in templates_to_test:
-        full_name = f'custom_admin/{template_name}'
-        try:
-            html = render_to_string(full_name, ctx, request=request)
-            results.append(f'OK: {template_name} ({len(html)} chars)')
-        except Exception as e:
-            tb = traceback.format_exc()
-            results.append(f'ERROR: {template_name}\n{tb}')
-
-    return HttpResponse('\n\n'.join(results), content_type='text/plain')

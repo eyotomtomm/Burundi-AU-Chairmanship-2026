@@ -96,17 +96,8 @@
                     <img src="{{ video.thumbnail.url }}" alt="Current thumbnail" class="w-48 h-32 object-cover rounded-lg shadow-sm">
                 </div>
                 {% endif %}
-                <div class="flex items-center gap-3">
-                    <input type="file" id="thumbnail" name="thumbnail" accept="image/*"
-                           class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
-                    <button type="button" onclick="openMediaLibrary('thumbnail')"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-secondary-container text-white rounded-lg hover:bg-secondary transition-colors text-sm font-medium whitespace-nowrap">
-                        <span class="material-symbols-outlined text-lg">photo_library</span>
-                        Browse Media
-                    </button>
-                </div>
-                <input type="hidden" id="existing_image_thumbnail" name="existing_image_thumbnail" value="">
-                <div id="ml_preview_thumbnail" class="mt-2 hidden"></div>
+                <input type="file" id="thumbnail" name="thumbnail" accept="image/*"
+                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
                 <p class="text-xs text-on-surface-variant mt-2">Recommended: 1280x720px (16:9). JPG, PNG, or WebP. Max size: 10 MB</p>
             </div>
 
@@ -244,7 +235,6 @@
         </div>
     </form>
 </div>
-{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}

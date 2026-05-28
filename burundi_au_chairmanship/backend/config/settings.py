@@ -85,6 +85,7 @@ MIDDLEWARE = [
     'core.middleware.rate_limit_logger.RateLimitLoggingMiddleware',  # Log 429 throttled requests
     'custom_admin.middleware.activity_logger.AdminActivityLoggerMiddleware',  # Log admin staff actions
     'custom_admin.permissions.AdminSectionPermissionMiddleware',  # Per-section access control for staff
+    'custom_admin.middleware.s3_error_handler.S3UploadErrorMiddleware',  # Catch S3 credential errors on uploads
 ]
 
 ROOT_URLCONF = 'config.urls'

@@ -69,20 +69,11 @@
                 </div>
                 <p class="text-sm text-on-surface-variant mb-2">Upload a new image to replace:</p>
                 {% endif %}
-                <div class="flex items-center gap-3">
-                    <input type="file"
-                           id="image"
-                           name="image"
-                           accept="image/*"
-                           class="block flex-1 text-sm text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-surface-container file:text-on-surface hover:file:bg-surface-container-high transition-colors cursor-pointer">
-                    <button type="button" onclick="openMediaLibrary('image')"
-                            class="inline-flex items-center gap-2 px-4 py-2 bg-secondary-container text-white rounded-lg hover:bg-secondary transition-colors text-sm font-medium whitespace-nowrap">
-                        <span class="material-symbols-outlined text-lg">photo_library</span>
-                        Browse Media
-                    </button>
-                </div>
-                <input type="hidden" id="existing_image_image" name="existing_image_image" value="">
-                <div id="ml_preview_image" class="mt-2 hidden"></div>
+                <input type="file"
+                       id="image"
+                       name="image"
+                       accept="image/*"
+                       class="block w-full text-sm text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-surface-container file:text-on-surface hover:file:bg-surface-container-high transition-colors cursor-pointer">
                 <p class="mt-2 text-sm text-on-surface-variant">Recommended: 1920x1080px or 16:9 aspect ratio. JPG, PNG, or WebP. Max size: 10 MB</p>
             </div>
 
@@ -150,5 +141,4 @@
     </div>
 </div>
 
-{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}

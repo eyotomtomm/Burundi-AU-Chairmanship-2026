@@ -1,0 +1,242 @@
+<!-- Media Library Modal -->
+<div id="mediaLibraryModal" class="fixed inset-0 z-50 hidden">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeMediaLibrary()"></div>
+
+    <!-- Modal Content -->
+    <div class="absolute inset-4 md:inset-8 lg:inset-12 bg-surface-container-lowest rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-2xl text-primary">perm_media</span>
+                <h2 class="font-headline text-xl font-bold text-on-surface">Browse Media Library</h2>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Search -->
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+                    <input type="text"
+                           id="mlSearchInput"
+                           placeholder="Search images..."
+                           oninput="fetchMediaLibrary()"
+                           class="pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm text-on-surface placeholder-on-surface-variant focus:ring-2 focus:ring-secondary focus:border-transparent w-64">
+                </div>
+                <button onclick="closeMediaLibrary()"
+                        class="p-2 hover:bg-surface-container-high rounded-lg transition-colors">
+                    <span class="material-symbols-outlined text-on-surface">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Folder Tabs -->
+        <div id="mlFolderTabs" class="flex gap-1 px-6 py-3 border-b border-outline-variant bg-surface-container overflow-x-auto">
+            <button onclick="filterFolder('')"
+                    class="ml-folder-tab active px-4 py-2 rounded-lg text-sm font-medium bg-primary-container text-white whitespace-nowrap transition-colors"
+                    data-folder="">
+                All Folders
+            </button>
+        </div>
+
+        <!-- Image Grid -->
+        <div id="mlImageGrid" class="flex-1 overflow-y-auto p-6">
+            <div class="flex items-center justify-center h-full text-on-surface-variant">
+                <div class="text-center">
+                    <span class="material-symbols-outlined text-5xl mb-3 block">cloud_download</span>
+                    <p class="text-lg font-medium">Loading media library...</p>
+                    <p class="text-sm mt-1">Scanning storage for images</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-outline-variant bg-surface-container flex items-center justify-between">
+            <span id="mlImageCount" class="text-sm text-on-surface-variant">0 images</span>
+            <button onclick="closeMediaLibrary()"
+                    class="px-4 py-2 bg-surface-container-high text-on-surface rounded-lg hover:bg-surface-container-highest transition-colors text-sm font-medium">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.ml-folder-tab {
+    cursor: pointer;
+}
+.ml-folder-tab:not(.active) {
+    background: transparent;
+    color: var(--md-sys-color-on-surface-variant, #666);
+}
+.ml-folder-tab:not(.active):hover {
+    background: var(--md-sys-color-surface-container-high, #e8e8e8);
+}
+.ml-image-card {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.ml-image-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+</style>
+
+<script>
+(function() {
+    let mlTargetField = '';
+    let mlData = null;
+    let mlActiveFolder = '';
+
+    window.openMediaLibrary = function(fieldName) {
+        mlTargetField = fieldName;
+        document.getElementById('mediaLibraryModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        fetchMediaLibrary();
+    };
+
+    window.closeMediaLibrary = function() {
+        document.getElementById('mediaLibraryModal').classList.add('hidden');
+        document.body.style.overflow = '';
+    };
+
+    window.fetchMediaLibrary = function() {
+        const search = document.getElementById('mlSearchInput').value;
+        const params = new URLSearchParams();
+        if (search) params.set('q', search);
+        if (mlActiveFolder) params.set('folder', mlActiveFolder);
+
+        const grid = document.getElementById('mlImageGrid');
+        grid.innerHTML = '<div class="flex items-center justify-center h-full text-on-surface-variant">' +
+            '<div class="text-center"><span class="material-symbols-outlined text-5xl mb-3 block animate-spin">progress_activity</span>' +
+            '<p class="text-lg font-medium">Scanning storage...</p></div></div>';
+
+        fetch('{% url "custom_admin:media_library_api" %}?' + params.toString())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                grid.innerHTML = '<div class="flex items-center justify-center h-full text-error">' +
+                    '<div class="text-center"><span class="material-symbols-outlined text-5xl mb-3 block">error</span>' +
+                    '<p class="text-lg font-medium">Error loading media</p>' +
+                    '<p class="text-sm mt-1">' + data.error + '</p></div></div>';
+                return;
+            }
+            mlData = data;
+            renderFolderTabs(data.folder_names || []);
+            renderGrid(data.folders || {});
+        })
+        .catch(function(err) {
+            grid.innerHTML = '<div class="flex items-center justify-center h-full text-error">' +
+                '<div class="text-center"><span class="material-symbols-outlined text-5xl mb-3 block">cloud_off</span>' +
+                '<p class="text-lg font-medium">Failed to load media</p>' +
+                '<p class="text-sm mt-1">' + err.message + '</p></div></div>';
+        });
+    };
+
+    function renderFolderTabs(folderNames) {
+        var tabs = document.getElementById('mlFolderTabs');
+        var html = '<button onclick="filterFolder(\'\')" class="ml-folder-tab ' +
+            (mlActiveFolder === '' ? 'active bg-primary-container text-white' : '') +
+            ' px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors" data-folder="">All Folders</button>';
+        folderNames.forEach(function(name) {
+            var isActive = mlActiveFolder === name;
+            html += '<button onclick="filterFolder(\'' + name.replace(/'/g, "\\'") + '\')" class="ml-folder-tab ' +
+                (isActive ? 'active bg-primary-container text-white' : '') +
+                ' px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors" data-folder="' + name + '">' +
+                name + '</button>';
+        });
+        tabs.innerHTML = html;
+    }
+
+    window.filterFolder = function(folder) {
+        mlActiveFolder = folder;
+        if (mlData) {
+            renderFolderTabs(mlData.folder_names || []);
+            renderGrid(mlData.folders || {});
+        }
+    };
+
+    function renderGrid(folders) {
+        var grid = document.getElementById('mlImageGrid');
+        var totalCount = 0;
+        var html = '';
+
+        var folderKeys = Object.keys(folders).sort();
+        folderKeys.forEach(function(folder) {
+            if (mlActiveFolder && folder !== mlActiveFolder && folder.indexOf(mlActiveFolder + '/') !== 0) {
+                return;
+            }
+            var images = folders[folder];
+            if (!images || images.length === 0) return;
+
+            totalCount += images.length;
+            html += '<div class="mb-6">' +
+                '<h3 class="text-sm font-bold text-on-surface-variant uppercase tracking-wider mb-3 flex items-center gap-2">' +
+                '<span class="material-symbols-outlined text-lg">folder</span>' + folder +
+                ' <span class="text-xs font-normal">(' + images.length + ')</span></h3>' +
+                '<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">';
+
+            images.forEach(function(img) {
+                var sizeStr = img.size ? (img.size / 1024).toFixed(1) + ' KB' : '';
+                html += '<div class="ml-image-card bg-surface-container rounded-lg overflow-hidden border border-outline-variant hover:border-primary" ' +
+                    'onclick="selectMediaImage(\'' + img.path.replace(/'/g, "\\'") + '\', \'' +
+                    img.filename.replace(/'/g, "\\'") + '\', \'' +
+                    img.url.replace(/'/g, "\\'") + '\')">' +
+                    '<div class="aspect-square bg-surface-container-high">' +
+                    '<img src="' + img.url + '" alt="' + img.filename + '" class="w-full h-full object-cover" loading="lazy" ' +
+                    'onerror="this.parentElement.innerHTML=\'<div class=\\'flex items-center justify-center h-full text-on-surface-variant\\'><span class=\\'material-symbols-outlined\\'>broken_image</span></div>\'">' +
+                    '</div>' +
+                    '<div class="p-2">' +
+                    '<p class="text-xs text-on-surface font-medium truncate">' + img.filename + '</p>' +
+                    (sizeStr ? '<p class="text-xs text-on-surface-variant">' + sizeStr + '</p>' : '') +
+                    '</div></div>';
+            });
+
+            html += '</div></div>';
+        });
+
+        if (totalCount === 0) {
+            html = '<div class="flex items-center justify-center h-full text-on-surface-variant">' +
+                '<div class="text-center"><span class="material-symbols-outlined text-5xl mb-3 block">image_not_supported</span>' +
+                '<p class="text-lg font-medium">No images found</p>' +
+                '<p class="text-sm mt-1">Try a different search or folder</p></div></div>';
+        }
+
+        grid.innerHTML = html;
+        document.getElementById('mlImageCount').textContent = totalCount + ' image' + (totalCount !== 1 ? 's' : '');
+    }
+
+    window.selectMediaImage = function(path, filename, url) {
+        // Set hidden input value
+        var hiddenInput = document.getElementById('existing_image_' + mlTargetField);
+        if (hiddenInput) hiddenInput.value = path;
+
+        // Show preview
+        var previewDiv = document.getElementById('ml_preview_' + mlTargetField);
+        var previewImg = document.getElementById('ml_preview_' + mlTargetField + '_img');
+        if (previewDiv && previewImg) {
+            previewImg.src = url;
+            previewDiv.classList.remove('hidden');
+        }
+
+        // Clear file input so the existing image takes priority
+        var fileInput = document.getElementById(mlTargetField);
+        if (fileInput) fileInput.value = '';
+
+        closeMediaLibrary();
+    };
+
+    window.clearMediaSelection = function(fieldName) {
+        var hiddenInput = document.getElementById('existing_image_' + fieldName);
+        if (hiddenInput) hiddenInput.value = '';
+
+        var previewDiv = document.getElementById('ml_preview_' + fieldName);
+        if (previewDiv) previewDiv.classList.add('hidden');
+    };
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !document.getElementById('mediaLibraryModal').classList.contains('hidden')) {
+            closeMediaLibrary();
+        }
+    });
+})();
+</script>

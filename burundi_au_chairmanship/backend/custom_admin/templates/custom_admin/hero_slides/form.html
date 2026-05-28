@@ -69,11 +69,21 @@
                 </div>
                 <p class="text-sm text-on-surface-variant mb-2">Upload a new image to replace:</p>
                 {% endif %}
-                <input type="file"
-                       id="image"
-                       name="image"
-                       accept="image/*"
-                       class="block w-full text-sm text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-surface-container file:text-on-surface hover:file:bg-surface-container-high transition-colors cursor-pointer">
+                <div class="flex items-center gap-3">
+                    <input type="file"
+                           id="image"
+                           name="image"
+                           accept="image/*"
+                           class="flex-1 text-sm text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-surface-container file:text-on-surface hover:file:bg-surface-container-high transition-colors cursor-pointer">
+                    <button type="button" onclick="openMediaLibrary('image')" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                        Browse Media
+                    </button>
+                </div>
+                <input type="hidden" id="existing_image_image" name="existing_image_image">
+                <div id="ml_preview_image" class="mt-2 hidden">
+                    <img id="ml_preview_image_img" src="" alt="Selected from library" class="max-w-xs h-32 object-cover rounded-lg shadow-sm">
+                    <button type="button" onclick="clearMediaSelection('image')" class="text-red-500 text-sm mt-1 hover:underline">Clear selection</button>
+                </div>
                 <p class="mt-2 text-sm text-on-surface-variant">Recommended: 1920x1080px or 16:9 aspect ratio. JPG, PNG, or WebP. Max size: 10 MB</p>
             </div>
 
@@ -141,4 +151,5 @@
     </div>
 </div>
 
+{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}

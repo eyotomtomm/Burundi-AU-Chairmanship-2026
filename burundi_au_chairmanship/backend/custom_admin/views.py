@@ -7688,3 +7688,73 @@ def newsletter_send_now(request):
     return redirect('custom_admin:newsletter_editions_list')
 
 
+# ─── Media Library (Browse existing Spaces images) ──────────────
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
+def media_library_api(request):
+    """Return JSON list of images in DO Spaces / local media, grouped by folder."""
+    folder_filter = request.GET.get('folder', '').strip()
+    search_query = request.GET.get('q', '').strip().lower()
+
+    image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+    results = {}
+
+    try:
+        storage = default_storage
+
+        def _scan_directory(prefix):
+            """Recursively list files using storage.listdir (works for S3 and local)."""
+            try:
+                dirs, files = storage.listdir(prefix)
+            except Exception as e:
+                logger.warning('listdir(%s) failed: %s', prefix, e)
+                return
+
+            for filename in files:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in image_extensions:
+                    continue
+                if search_query and search_query not in filename.lower():
+                    continue
+                rel_path = os.path.join(prefix, filename) if prefix else filename
+                folder = prefix if prefix else 'root'
+                if folder_filter and folder != folder_filter and not folder.startswith(folder_filter + '/'):
+                    continue
+                try:
+                    url = storage.url(rel_path)
+                except Exception:
+                    url = f'{settings.MEDIA_URL}{rel_path}'
+                try:
+                    size = storage.size(rel_path)
+                except Exception:
+                    size = 0
+                results.setdefault(folder, []).append({
+                    'path': rel_path,
+                    'filename': filename,
+                    'url': url,
+                    'size': size,
+                })
+
+            for d in dirs:
+                sub_prefix = os.path.join(prefix, d) if prefix else d
+                if folder_filter and not folder_filter.startswith(sub_prefix) and not sub_prefix.startswith(folder_filter):
+                    continue
+                _scan_directory(sub_prefix)
+
+        _scan_directory('')
+
+    except Exception as e:
+        logger.exception('Media library API error')
+        return JsonResponse({'error': str(e)}, status=500)
+
+    # Sort folders and files
+    sorted_results = {}
+    for folder in sorted(results.keys()):
+        sorted_results[folder] = sorted(results[folder], key=lambda x: x['filename'])
+
+    return JsonResponse({
+        'folders': sorted_results,
+        'folder_names': list(sorted_results.keys()),
+    })
+

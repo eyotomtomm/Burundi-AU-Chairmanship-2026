@@ -91,11 +91,21 @@
                         <img src="{{ card.image.url }}" alt="Current image" class="w-48 h-48 object-cover rounded-lg">
                     </div>
                     {% endif %}
-                    <input type="file"
-                           id="image"
-                           name="image"
-                           accept="image/*"
-                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    <div class="flex items-center gap-3">
+                        <input type="file"
+                               id="image"
+                               name="image"
+                               accept="image/*"
+                               class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        <button type="button" onclick="openMediaLibrary('image')" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                            Browse Media
+                        </button>
+                    </div>
+                    <input type="hidden" id="existing_image_image" name="existing_image_image">
+                    <div id="ml_preview_image" class="mt-2 hidden">
+                        <img id="ml_preview_image_img" src="" alt="Selected from library" class="max-w-xs h-32 object-cover rounded-lg shadow-sm">
+                        <button type="button" onclick="clearMediaSelection('image')" class="text-red-500 text-sm mt-1 hover:underline">Clear selection</button>
+                    </div>
                     <p class="text-xs text-on-surface-variant mt-2">Recommended: 800x800px. JPG, PNG, or WebP. Max size: 10 MB</p>
                 </div>
 
@@ -109,11 +119,21 @@
                         <img src="{{ card.icon_image.url }}" alt="Current icon" class="w-16 h-16 object-cover rounded-lg">
                     </div>
                     {% endif %}
-                    <input type="file"
-                           id="icon_image"
-                           name="icon_image"
-                           accept="image/*"
-                           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    <div class="flex items-center gap-3">
+                        <input type="file"
+                               id="icon_image"
+                               name="icon_image"
+                               accept="image/*"
+                               class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        <button type="button" onclick="openMediaLibrary('icon_image')" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                            Browse Media
+                        </button>
+                    </div>
+                    <input type="hidden" id="existing_image_icon_image" name="existing_image_icon_image">
+                    <div id="ml_preview_icon_image" class="mt-2 hidden">
+                        <img id="ml_preview_icon_image_img" src="" alt="Selected from library" class="max-w-xs h-16 object-cover rounded-lg shadow-sm">
+                        <button type="button" onclick="clearMediaSelection('icon_image')" class="text-red-500 text-sm mt-1 hover:underline">Clear selection</button>
+                    </div>
                     <p class="text-xs text-on-surface-variant mt-2">Recommended: 128x128px. PNG with transparency preferred. Max size: 10 MB</p>
                 </div>
 
@@ -462,6 +482,7 @@
         </form>
     </div>
 </div>
+{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}

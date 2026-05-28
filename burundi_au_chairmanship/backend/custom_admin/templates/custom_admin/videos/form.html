@@ -96,8 +96,18 @@
                     <img src="{{ video.thumbnail.url }}" alt="Current thumbnail" class="w-48 h-32 object-cover rounded-lg shadow-sm">
                 </div>
                 {% endif %}
-                <input type="file" id="thumbnail" name="thumbnail" accept="image/*"
-                       class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                <div class="flex items-center gap-3">
+                    <input type="file" id="thumbnail" name="thumbnail" accept="image/*"
+                           class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                    <button type="button" onclick="openMediaLibrary('thumbnail')" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                        Browse Media
+                    </button>
+                </div>
+                <input type="hidden" id="existing_image_thumbnail" name="existing_image_thumbnail">
+                <div id="ml_preview_thumbnail" class="mt-2 hidden">
+                    <img id="ml_preview_thumbnail_img" src="" alt="Selected from library" class="max-w-xs h-32 object-cover rounded-lg shadow-sm">
+                    <button type="button" onclick="clearMediaSelection('thumbnail')" class="text-red-500 text-sm mt-1 hover:underline">Clear selection</button>
+                </div>
                 <p class="text-xs text-on-surface-variant mt-2">Recommended: 1280x720px (16:9). JPG, PNG, or WebP. Max size: 10 MB</p>
             </div>
 
@@ -235,6 +245,7 @@
         </div>
     </form>
 </div>
+{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}
 
 {% block extra_js %}

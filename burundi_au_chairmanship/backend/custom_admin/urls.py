@@ -321,4 +321,7 @@ urlpatterns = [
     # Auto-translate (EN <-> FR)
     path('translate/', views.auto_translate, name='auto_translate'),
 
+    # Media Library (Browse existing Spaces images)
+    path('media-library/api/', views.media_library_api, name='media_library_api'),
+
 ]

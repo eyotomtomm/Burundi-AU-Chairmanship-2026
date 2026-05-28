@@ -85,13 +85,23 @@
                         <p class="text-xs text-on-surface-variant mt-2">Current cover image</p>
                     </div>
                 {% endif %}
-                <input
+                <div class="flex items-center gap-3">
+                    <input
                         type="file"
                         id="cover_image"
                         name="cover_image"
                         accept="image/*"
-                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary"
+                        class="flex-1 bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-container file:text-white file:font-medium file:cursor-pointer hover:file:bg-primary"
                     >
+                    <button type="button" onclick="openMediaLibrary('cover_image')" class="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors whitespace-nowrap">
+                        Browse Media
+                    </button>
+                </div>
+                <input type="hidden" id="existing_image_cover_image" name="existing_image_cover_image">
+                <div id="ml_preview_cover_image" class="mt-2 hidden">
+                    <img id="ml_preview_cover_image_img" src="" alt="Selected from library" class="max-w-xs h-32 object-cover rounded-lg shadow-sm">
+                    <button type="button" onclick="clearMediaSelection('cover_image')" class="text-red-500 text-sm mt-1 hover:underline">Clear selection</button>
+                </div>
                 <p class="text-xs text-on-surface-variant mt-2">Recommended: 600x800px (portrait). JPG, PNG, or WebP. Max size: 10 MB</p>
             </div>
 
@@ -204,4 +214,5 @@
     </form>
 </div>
 
+{% include 'custom_admin/includes/media_library_modal.html' %}
 {% endblock %}

@@ -317,7 +317,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Registration failed. Please try again.';
+      _errorMessage = 'Registration failed: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -370,7 +370,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Login failed. Please try again.';
+      _errorMessage = 'Login failed: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -420,7 +420,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Google Sign-In failed. Please try again.';
+      _errorMessage = 'Google Sign-In failed: $e';
       _isLoading = false;
       notifyListeners();
       return false;

@@ -87,6 +87,9 @@ services:
       - key: DO_SPACES_SECRET
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
+      - key: GEMINI_API_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
       - key: DO_SPACES_BUCKET
         value: "burundi-au-media"
       - key: DO_SPACES_ENDPOINT

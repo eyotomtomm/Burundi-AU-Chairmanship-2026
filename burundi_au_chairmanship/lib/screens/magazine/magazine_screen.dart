@@ -55,7 +55,14 @@ class _MagazineScreenState extends State<MagazineScreen> {
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('login_to_like'))),
+        SnackBar(
+          content: Text(l10n.translate('login_to_like')),
+          action: SnackBarAction(
+            label: l10n.translate('sign_in'),
+            textColor: Colors.white,
+            onPressed: () => Navigator.pushNamed(context, '/auth'),
+          ),
+        ),
       );
       return;
     }
@@ -110,6 +117,8 @@ class _MagazineScreenState extends State<MagazineScreen> {
           pdfUrl: url,
           title: magazine.getTitle(langCode),
           magazineId: magazine.id,
+          initialIsLiked: magazine.isLiked,
+          initialLikeCount: magazine.likeCount,
         ),
       ),
     );

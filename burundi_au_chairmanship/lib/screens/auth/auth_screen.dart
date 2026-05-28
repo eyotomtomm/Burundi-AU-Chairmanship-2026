@@ -78,24 +78,31 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   children: [
                     const SizedBox(height: 20),
 
-                    // Logo
-                    _buildLogo(),
+                    // Logo — switches between light/dark variants
+                    Image.asset(
+                      isDark
+                          ? 'assets/images/b4africa_logo_white.png'
+                          : 'assets/images/b4africa_logo.png',
+                      height: 80,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => _buildLogo(),
+                    ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     // App title
                     Text(
-                      'BURUNDI',
+                      '#B4Africa',
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 26,
                         fontWeight: FontWeight.w700,
                         color: AppColors.burundiGreen,
-                        letterSpacing: 6,
+                        letterSpacing: 2,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'AU CHAIRMANSHIP 2026',
+                      'BE FOR AFRICA',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,

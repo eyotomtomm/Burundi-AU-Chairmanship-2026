@@ -138,17 +138,18 @@ class _TranslateScreenState extends State<TranslateScreen> with SingleTickerProv
       appBar: AppBar(
         title: Text(
           l10n.translate('translate'),
-          style: TextStyle(fontWeight: FontWeight.w600),
+          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        iconTheme: const IconThemeData(color: Colors.white),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.auGold,
-          labelColor: isDark ? Colors.white : AppColors.burundiGreen,
-          unselectedLabelColor: isDark ? Colors.white54 : Colors.grey,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
           tabs: const [
             Tab(icon: Icon(Icons.translate, size: 18), text: 'Translate'),
             Tab(icon: Icon(Icons.menu_book, size: 18), text: 'Phrasebook'),
@@ -191,7 +192,7 @@ class _TranslateScreenState extends State<TranslateScreen> with SingleTickerProv
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.burundiGreen),
+                icon: Icon(Icons.swap_horiz_rounded, color: isDark ? AppColors.auGold : AppColors.burundiGreen),
                 onPressed: _swapLanguages,
               ),
               Expanded(
@@ -309,7 +310,7 @@ class _TranslateScreenState extends State<TranslateScreen> with SingleTickerProv
                           Icon(
                             entry.value,
                             size: 16,
-                            color: isSelected ? Colors.white : AppColors.burundiGreen,
+                            color: isSelected ? Colors.white : (isDark ? AppColors.auGold : AppColors.burundiGreen),
                           ),
                           const SizedBox(width: 6),
                           Text(labels[entry.key]!),

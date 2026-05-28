@@ -155,16 +155,30 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
           ? const ShimmerCalendarSkeleton()
           : _events == null || _events!.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_month, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        l10n.translate('no_events'),
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today_rounded, size: 56, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          langCode == 'fr' ? 'Calendrier en préparation' : 'Calendar being prepared',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          langCode == 'fr'
+                              ? 'Les événements du sommet seront affichés ici dès leur publication.'
+                              : 'Summit events will appear here once they are published.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : RefreshIndicator(

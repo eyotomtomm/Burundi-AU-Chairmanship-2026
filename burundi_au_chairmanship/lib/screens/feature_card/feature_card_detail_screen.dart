@@ -146,11 +146,17 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
       backgroundColor: gradStart,
       foregroundColor: Colors.white,
       flexibleSpace: FlexibleSpaceBar(
+        centerTitle: true,
+        titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         title: Text(
           _t(context, 'title'),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: 16,
             shadows: [Shadow(blurRadius: 8, color: Colors.black54)],
           ),
         ),

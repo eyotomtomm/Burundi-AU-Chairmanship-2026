@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
@@ -15,6 +17,7 @@ class SocialMediaScreen extends StatefulWidget {
 class _SocialMediaScreenState extends State<SocialMediaScreen> {
   List<Map<String, dynamic>> socialMedia = [];
   bool _isLoading = true;
+  Timer? _refreshTimer;
 
   // Mock fallback data
   static final List<Map<String, dynamic>> _mockSocialMedia = [
@@ -34,7 +37,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
       'url': 'https://twitter.com/BurundiAU2026',
       'follower_count': '89K',
       'description': 'Follow us for real-time updates and live coverage',
-      'icon_color': '#1DA1F2',
+      'icon_color': '#000000',
     },
     {
       'platform': 'instagram',
@@ -69,6 +72,16 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   void initState() {
     super.initState();
     _loadSocialMedia();
+    // Auto-refresh follower counts every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _refreshFollowerCounts();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSocialMedia() async {
@@ -90,22 +103,65 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     }
   }
 
+  /// Silently refresh follower counts without showing loading state
+  Future<void> _refreshFollowerCounts() async {
+    try {
+      final data = await ApiService().getSocialMediaLinks();
+      if (mounted && data.isNotEmpty) {
+        setState(() {
+          socialMedia = data;
+        });
+      }
+    } catch (_) {
+      // Silent fail — keep existing data
+    }
+  }
+
   IconData _platformIcon(String? platform) {
     switch (platform) {
       case 'facebook':
-        return Icons.facebook;
+        return FontAwesomeIcons.facebookF;
       case 'twitter':
-        return Icons.tag;
+      case 'x':
+        return FontAwesomeIcons.xTwitter;
       case 'instagram':
-        return Icons.camera_alt;
+        return FontAwesomeIcons.instagram;
       case 'youtube':
-        return Icons.play_circle_filled;
+        return FontAwesomeIcons.youtube;
       case 'linkedin':
-        return Icons.business;
+        return FontAwesomeIcons.linkedinIn;
       case 'tiktok':
-        return Icons.music_note;
+        return FontAwesomeIcons.tiktok;
+      case 'telegram':
+        return FontAwesomeIcons.telegram;
+      case 'whatsapp':
+        return FontAwesomeIcons.whatsapp;
+      case 'threads':
+        return FontAwesomeIcons.threads;
       default:
-        return Icons.link;
+        return FontAwesomeIcons.link;
+    }
+  }
+
+  String _followerLabel(String? platform) {
+    switch (platform) {
+      case 'youtube':
+        return 'subscribers';
+      case 'facebook':
+      case 'instagram':
+      case 'tiktok':
+      case 'threads':
+        return 'followers';
+      case 'twitter':
+      case 'x':
+        return 'followers';
+      case 'linkedin':
+        return 'followers';
+      case 'telegram':
+      case 'whatsapp':
+        return 'members';
+      default:
+        return 'followers';
     }
   }
 
@@ -238,6 +294,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     final titleColor = isDark ? Colors.white : Colors.black87;
     final handleColor = isDark ? Colors.white54 : Colors.grey[600]!;
     final descriptionColor = isDark ? Colors.white60 : Colors.grey[700]!;
+    final platform = social['platform'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -267,12 +324,14 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   height: 56,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: 28,
+                  child: Center(
+                    child: FaIcon(
+                      icon,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                   ),
                 ),
 
@@ -283,34 +342,13 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              social['display_name'] ?? social['name'] ?? '',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: titleColor,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              social['follower_count'] ?? '',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: color,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        social['display_name'] ?? social['name'] ?? '',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: titleColor,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -321,15 +359,45 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        social['description'] ?? '',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: descriptionColor,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      // Follower count with label
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.people_outline, size: 14, color: color),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${social['follower_count'] ?? '0'} ${_followerLabel(platform)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: color,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
+                      if (social['description'] != null && (social['description'] as String).isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          social['description'],
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: descriptionColor,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
                   ),
                 ),

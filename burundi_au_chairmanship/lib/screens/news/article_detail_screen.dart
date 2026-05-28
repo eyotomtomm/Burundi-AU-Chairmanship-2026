@@ -307,7 +307,14 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('login_to_like'))),
+        SnackBar(
+          content: Text(l10n.translate('login_to_like')),
+          action: SnackBarAction(
+            label: l10n.translate('sign_in'),
+            textColor: Colors.white,
+            onPressed: () => Navigator.pushNamed(context, '/auth'),
+          ),
+        ),
       );
       return;
     }
@@ -919,21 +926,31 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       ],
                     )
                   else
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.auGold.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.auGold.withValues(alpha: 0.2)),
-                      ),
-                      child: Text(
-                        l10n.translate('login_to_comment'),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.auGold,
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/auth'),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.auGold.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.auGold.withValues(alpha: 0.2)),
                         ),
-                        textAlign: TextAlign.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.login_rounded, size: 16, color: AppColors.auGold),
+                            const SizedBox(width: 8),
+                            Text(
+                              l10n.translate('login_to_comment'),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.auGold,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   const SizedBox(height: 16),

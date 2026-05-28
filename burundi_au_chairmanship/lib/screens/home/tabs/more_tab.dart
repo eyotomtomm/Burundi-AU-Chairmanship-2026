@@ -670,14 +670,39 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         }
                       },
                     ),
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.headset_mic_rounded,
-                      iconBgColor: const Color(0xFFEF5350),
-                      title: l10n.translate('contact_support'),
-                      subtitle: 'Get help and support',
-                      isDark: isDark,
-                      onTap: () => _showSupportOptions(context, isDark),
+                    Consumer<AuthProvider>(
+                      builder: (context, auth, _) {
+                        return _buildMenuItem(
+                          context: context,
+                          icon: Icons.headset_mic_rounded,
+                          iconBgColor: const Color(0xFFEF5350),
+                          title: l10n.translate('contact_support'),
+                          subtitle: 'Get help and support',
+                          isDark: isDark,
+                          onTap: () {
+                            if (!auth.isAuthenticated) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    Localizations.localeOf(context).languageCode == 'fr'
+                                        ? 'Veuillez vous connecter pour contacter le support'
+                                        : 'Please sign in to contact support',
+                                  ),
+                                  backgroundColor: AppColors.burundiGreen,
+                                  behavior: SnackBarBehavior.floating,
+                                  action: SnackBarAction(
+                                    label: Localizations.localeOf(context).languageCode == 'fr' ? 'Connexion' : 'Sign In',
+                                    textColor: Colors.white,
+                                    onPressed: () => Navigator.pushNamed(context, '/auth'),
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            _showSupportOptions(context, isDark);
+                          },
+                        );
+                      },
                     ),
                         // Export Data & Delete Account - Only show if logged in
                         if (isLoggedIn) ...[
@@ -966,93 +991,10 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showAboutDialog(BuildContext context, AppLocalizations l10n) async {
-    // Fetch about info from backend, fallback to hardcoded values
-    String description = 'Official application for the Burundi Chairmanship 2026.';
-    String summitTheme = AppConstants.summitTheme;
-    String developerName = 'Eyosias Tamene';
-    String developerUrl = 'https://eyosias.dev';
-
-    try {
-      final settings = await ApiService().getSettings();
-      if (settings != null) {
-        final langCode = l10n.locale.languageCode;
-        description = settings.getDescription(langCode).isNotEmpty
-            ? settings.getDescription(langCode)
-            : description;
-        summitTheme = settings.getTheme(langCode).isNotEmpty
-            ? settings.getTheme(langCode)
-            : summitTheme;
-        if (settings.developerName.isNotEmpty) {
-          developerName = settings.developerName;
-        }
-        if (settings.developerUrl.isNotEmpty) {
-          developerUrl = settings.developerUrl;
-        }
-      }
-    } catch (_) {}
-
-    if (!context.mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.burundiGreen,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Icon(Icons.stars, color: Colors.white, size: 36),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              AppConstants.appName,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            Text(
-              'v${AppConstants.appVersion}',
-              style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-            ),
-            const SizedBox(height: 16),
-            Text(summitTheme, style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 14), textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text(description, style: const TextStyle(fontSize: 14), textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () => launchUrl(Uri.parse(developerUrl), mode: LaunchMode.externalApplication),
-              child: RichText(
-                text: TextSpan(
-                  style: TextStyle(fontSize: 13, color: Theme.of(context).textTheme.bodyMedium?.color),
-                  children: [
-                    TextSpan(text: '${l10n.translate('designed_by')} '),
-                    TextSpan(
-                      text: developerName,
-                      style: const TextStyle(
-                        color: AppColors.burundiGreen,
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+  void _showAboutDialog(BuildContext context, AppLocalizations l10n) {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(builder: (_) => _AboutPage(l10n: l10n)),
     );
   }
 
@@ -1311,6 +1253,445 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Full-screen About page with parallax hero and rich content.
+class _AboutPage extends StatefulWidget {
+  final AppLocalizations l10n;
+  const _AboutPage({required this.l10n});
+
+  @override
+  State<_AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<_AboutPage> {
+  String _description = 'Official application for the Burundi Chairmanship 2026.';
+  String _summitTheme = AppConstants.summitTheme;
+  String _developerName = 'Eyosias Tamene';
+  String _developerUrl = 'https://eyosias.dev';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await ApiService().getSettings();
+      if (settings != null && mounted) {
+        final langCode = widget.l10n.locale.languageCode;
+        setState(() {
+          if (settings.getDescription(langCode).isNotEmpty) {
+            _description = settings.getDescription(langCode);
+          }
+          if (settings.getTheme(langCode).isNotEmpty) {
+            _summitTheme = settings.getTheme(langCode);
+          }
+          if (settings.developerName.isNotEmpty) {
+            _developerName = settings.developerName;
+          }
+          if (settings.developerUrl.isNotEmpty) {
+            _developerUrl = settings.developerUrl;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // Parallax hero header
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: AppColors.burundiGreen,
+            foregroundColor: Colors.white,
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(
+                widget.l10n.translate('about'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Burundi flag gradient
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.burundiGreen,
+                          Color(0xFF065A1A),
+                          AppColors.burundiRed,
+                        ],
+                        stops: [0.0, 0.6, 1.0],
+                      ),
+                    ),
+                  ),
+                  // Dark overlay for text readability
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.1),
+                          Colors.black.withValues(alpha: 0.6),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // App logo / icon
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(Icons.stars, color: Colors.white, size: 48),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'v${AppConstants.appVersion}',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // App name and version
+                  Center(
+                    child: Text(
+                      AppConstants.appName,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'HeatherGreen',
+                        color: isDark ? Colors.white : AppColors.burundiGreen,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Summit theme
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.auGold.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.auGold.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        _summitTheme,
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          fontSize: 14,
+                          color: isDark ? AppColors.auGold : const Color(0xFF8B7D3C),
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Mission statement card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.flag_rounded, size: 20, color: AppColors.burundiGreen),
+                            const SizedBox(width: 8),
+                            Text(
+                              widget.l10n.locale.languageCode == 'fr' ? 'Notre Mission' : 'Our Mission',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : AppColors.burundiGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _description,
+                          style: TextStyle(
+                            fontSize: 15,
+                            height: 1.6,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Key features grid
+                  Text(
+                    widget.l10n.locale.languageCode == 'fr' ? 'Fonctionnalites' : 'Key Features',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeaturesGrid(isDark),
+                  const SizedBox(height: 24),
+
+                  // Developer credit
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          widget.l10n.translate('designed_by'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white54 : Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () => launchUrl(
+                            Uri.parse(_developerUrl),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          child: Text(
+                            _developerName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.burundiGreen,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Website link
+                  _buildLinkTile(
+                    icon: Icons.language_rounded,
+                    title: 'burundi4africa.com',
+                    url: 'https://burundi4africa.com',
+                    color: AppColors.burundiGreen,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildLinkTile(
+                    icon: Icons.mail_outline_rounded,
+                    title: 'info@burundi4africa.com',
+                    url: 'mailto:info@burundi4africa.com',
+                    color: AppColors.auGold,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(height: 32),
+
+                  // AU branding footer
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppColors.auGold.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.public, size: 28, color: AppColors.auGold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'African Union',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white54 : Colors.black54,
+                          ),
+                        ),
+                        Text(
+                          'Chairmanship 2025-2026',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'v${AppConstants.appVersion}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white30 : Colors.black26,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturesGrid(bool isDark) {
+    final features = [
+      {'icon': Icons.article_rounded, 'title': 'News & Articles', 'color': AppColors.burundiGreen},
+      {'icon': Icons.event_rounded, 'title': 'Events Calendar', 'color': AppColors.burundiRed},
+      {'icon': Icons.auto_stories_rounded, 'title': 'Magazine', 'color': AppColors.auGold},
+      {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': const Color(0xFF5C6BC0)},
+      {'icon': Icons.wb_sunny_rounded, 'title': 'Weather', 'color': const Color(0xFFFF9800)},
+      {'icon': Icons.account_balance_rounded, 'title': 'Diplomacy', 'color': const Color(0xFF26A69A)},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.95,
+      ),
+      itemCount: features.length,
+      itemBuilder: (context, index) {
+        final f = features[index];
+        final color = f['color'] as Color;
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(f['icon'] as IconData, color: color, size: 24),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                f['title'] as String,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLinkTile({
+    required IconData icon,
+    required String title,
+    required String url,
+    required Color color,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ),
+            Icon(Icons.open_in_new_rounded, size: 16, color: isDark ? Colors.white30 : Colors.black26),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -120,7 +120,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
           '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset'
           '&timezone=auto&forecast_days=3',
         );
-        final response = await http.get(url);
+        final response = await http.get(url).timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           city.currentTemp = (data['current']['temperature_2m'] as num).toDouble();
@@ -146,7 +146,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
         } else {
           failCount++;
         }
-      } catch (_) {
+      } catch (e) {
+        if (kDebugMode) debugPrint('Weather fetch failed for ${city.name}: $e');
         failCount++;
       }
     }
@@ -168,7 +169,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
         '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset'
         '&timezone=auto&forecast_days=3',
       );
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         city.currentTemp = (data['current']['temperature_2m'] as num).toDouble();

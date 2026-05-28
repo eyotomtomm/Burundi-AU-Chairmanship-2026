@@ -156,6 +156,11 @@ class Environment {
   static String fixMediaUrl(String url) {
     if (url.isEmpty) return url;
 
+    // Handle relative URLs (e.g. /media/videos/foo.mp4)
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return '$mediaBaseUrl$url';
+    }
+
     // In development, rewrite host to match the platform
     if (isDevelopment) {
       final host = Platform.isAndroid ? '10.0.2.2' : 'localhost';

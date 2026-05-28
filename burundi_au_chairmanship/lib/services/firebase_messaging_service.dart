@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
-import '../widgets/in_app_notification_banner.dart';
 
 /// Top-level function for handling background messages
 ///
@@ -120,6 +119,13 @@ class FirebaseMessagingService {
 
     // Initialize local notifications for foreground messages
     await _initializeLocalNotifications();
+
+    // Show native notification banner on iOS even when app is in foreground
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
     // Set up message handlers
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -251,6 +257,24 @@ class FirebaseMessagingService {
       settings: settings,
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
+
+    // Create the default notification channel eagerly so FCM background
+    // messages have a valid channel to display on Android 8.0+ (API 26+).
+    // Without this, background notifications are silently dropped until
+    // the first foreground notification implicitly creates the channel.
+    final androidPlugin =
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'default_channel',
+          'Default Notifications',
+          description: 'Default notification channel for general updates',
+          importance: Importance.max,
+        ),
+      );
+    }
   }
 
   /// Handle foreground messages
@@ -294,27 +318,8 @@ class FirebaseMessagingService {
         notification.apple?.imageUrl ??
         message.data['image'] as String?;
 
-    // Prefer the in-app banner when we have a live context
-    final ctx = _navigatorKey?.currentContext;
-    if (ctx != null && title.isNotEmpty) {
-      InAppBanner.show(
-        ctx,
-        title: title,
-        body: body,
-        imageUrl: imageUrl,
-        notificationId: nid,
-        onTap: () {
-          if (nid != null) _trackEvent(nid, 'opened');
-          _navigateForMessage(message);
-        },
-      );
-      if (nid != null && nid.isNotEmpty && nid != '0') {
-        _trackEvent(nid, 'displayed');
-      }
-      return;
-    }
-
-    // Fallback: native local notification if we somehow have no context
+    // Always show a native system notification (visible in notification
+    // shade and as a heads-up banner whether the app is open or not).
     final notificationId = messageId.hashCode.abs() % 2147483647;
     _localNotifications.show(
       id: notificationId,
@@ -325,8 +330,8 @@ class FirebaseMessagingService {
           'default_channel',
           'Default Notifications',
           channelDescription: 'Default notification channel for general updates',
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: Importance.max,
+          priority: Priority.max,
           icon: '@mipmap/ic_launcher',
         ),
         iOS: const DarwinNotificationDetails(

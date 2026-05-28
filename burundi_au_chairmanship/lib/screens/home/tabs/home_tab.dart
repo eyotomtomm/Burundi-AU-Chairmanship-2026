@@ -1226,15 +1226,15 @@ class _HomeTabState extends State<HomeTab> {
                               ),
                             ),
                           ),
-                        // Dark gradient overlay for better text readability
+                        // Gradient overlay using backend colors for text readability
                         Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withValues(alpha: 0.3),
-                                Colors.black.withValues(alpha: 0.75),
+                                gradientColors[0].withValues(alpha: 0.4),
+                                gradientColors[1].withValues(alpha: 0.85),
                               ],
                             ),
                           ),

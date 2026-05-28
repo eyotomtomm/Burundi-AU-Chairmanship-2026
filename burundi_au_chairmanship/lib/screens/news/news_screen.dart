@@ -125,11 +125,34 @@ class _NewsScreenState extends State<NewsScreen> {
                 filtered.isEmpty
                     ? SliverFillRemaining(
                         child: Center(
-                          child: Text(
-                            l10n.translate('no_data'),
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.article_outlined, size: 56, color: isDark ? Colors.white24 : Colors.grey[300]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  langCode == 'fr' ? 'Les articles arrivent bientôt' : 'Articles coming soon',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  langCode == 'fr'
+                                      ? 'De nouveaux articles seront publiés ici.\nRevenez bientôt !'
+                                      : 'New articles will be published here.\nStay tuned!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark ? Colors.white38 : Colors.grey[500],
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

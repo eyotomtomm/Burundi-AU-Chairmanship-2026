@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/login_gate.dart';
@@ -37,7 +39,32 @@ class _VideosScreenState extends State<VideosScreen> {
   @override
   void initState() {
     super.initState();
+    _enableScreenProtection();
     _loadVideos();
+  }
+
+  @override
+  void dispose() {
+    _disableScreenProtection();
+    super.dispose();
+  }
+
+  Future<void> _enableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOn();
+      await ScreenProtector.preventScreenshotOn();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection error: $e');
+    }
+  }
+
+  Future<void> _disableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOff();
+      await ScreenProtector.preventScreenshotOff();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection disable error: $e');
+    }
   }
 
   Future<void> _loadVideos() async {
@@ -93,81 +120,174 @@ class _VideosScreenState extends State<VideosScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
+    final langCode = Localizations.localeOf(context).languageCode;
+
+    if (_isLoading) {
+      return const Scaffold(body: ShimmerVideoGridSkeleton());
+    }
+
+    if (_allVideos.isEmpty) {
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 120,
+              pinned: true,
+              backgroundColor: AppColors.burundiRed,
+              actions: const [TranslateButton()],
+              flexibleSpace: FlexibleSpaceBar(
+                title: const Text(
+                  'Videos',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.burundiRed,
+                        AppColors.burundiRed.withValues(alpha: 0.8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SliverFillRemaining(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.videocam_outlined, size: 56, color: Colors.grey[300]),
+                      const SizedBox(height: 16),
+                      Text(
+                        langCode == 'fr' ? 'Vidéos en préparation' : 'Videos being prepared',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        langCode == 'fr'
+                            ? 'Les vidéos du sommet seront publiées ici prochainement.'
+                            : 'Summit videos will be published here soon.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
-      body: _isLoading
-          ? const ShimmerVideoGridSkeleton()
-          : RefreshIndicator(
-              onRefresh: () async {
-                HapticFeedback.mediumImpact();
-                await _loadVideos();
-              },
-              child: CustomScrollView(
-                slivers: [
-                  // App Bar
-                  SliverAppBar(
-                    expandedHeight: 120,
-                    pinned: true,
-                    backgroundColor: AppColors.burundiRed,
-                    actions: const [TranslateButton()],
-                    flexibleSpace: FlexibleSpaceBar(
-                      title: const Text(
-                        'Videos',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async {
+              HapticFeedback.mediumImpact();
+              await _loadVideos();
+            },
+            child: CustomScrollView(
+              slivers: [
+                // App Bar
+                SliverAppBar(
+                  expandedHeight: 120,
+                  pinned: true,
+                  backgroundColor: AppColors.burundiRed,
+                  actions: const [TranslateButton()],
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: const Text(
+                      'Videos',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-                      background: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.burundiRed,
-                              AppColors.burundiRed.withValues(alpha: 0.8),
-                            ],
-                          ),
+                    ),
+                    background: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.burundiRed,
+                            AppColors.burundiRed.withValues(alpha: 0.8),
+                          ],
                         ),
                       ),
                     ),
                   ),
+                ),
 
-                  // Category Filter
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverToBoxAdapter(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: categoryLabels.entries.map((entry) {
-                            final isSelected = selectedCategory == entry.key;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(entry.value),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    selectedCategory = entry.key;
-                                  });
-                                },
-                                selectedColor: AppColors.burundiRed,
-                                labelStyle: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : (isDark ? Colors.white70 : Colors.black87),
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                ),
+                // Category Filter
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverToBoxAdapter(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: categoryLabels.entries.map((entry) {
+                          final isSelected = selectedCategory == entry.key;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(entry.value),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setState(() {
+                                  selectedCategory = entry.key;
+                                });
+                              },
+                              selectedColor: AppColors.burundiRed,
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? Colors.white70 : Colors.black87),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
-                            );
-                          }).toList(),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Empty filtered state
+                if (filteredVideos.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.videocam_off_outlined, size: 48, color: Colors.grey[300]),
+                            const SizedBox(height: 16),
+                            Text(
+                              langCode == 'fr'
+                                  ? 'Aucune vidéo dans cette catégorie'
+                                  : 'No videos in this category',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
 
-                  // Video List
+                // Video List
+                if (filteredVideos.isNotEmpty)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverList(
@@ -206,10 +326,38 @@ class _VideosScreenState extends State<VideosScreen> {
                     ),
                   ),
 
-                  const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
+                const SliverPadding(padding: EdgeInsets.only(bottom: 60)),
+              ],
+            ),
+          ),
+          // Protected content badge
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.security, size: 14, color: Colors.white.withValues(alpha: 0.8)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Protected content',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -247,7 +395,7 @@ class _VideosScreenState extends State<VideosScreen> {
                     aspectRatio: 16 / 9,
                     child: thumbnailUrl != null && thumbnailUrl.isNotEmpty
                         ? CachedNetworkImage(
-                            imageUrl: thumbnailUrl,
+                            imageUrl: Environment.fixMediaUrl(thumbnailUrl),
                             fit: BoxFit.cover,
                             placeholder: (context, url) => _videoThumbnailPlaceholder(),
                             errorWidget: (context, url, error) => _videoThumbnailPlaceholder(),

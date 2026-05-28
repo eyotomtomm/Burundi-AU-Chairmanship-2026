@@ -125,8 +125,8 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
                   controller: _tabController,
                   children: [
                     _buildEventList(_allEvents, lang, isDark, showEmpty: true),
-                    _buildEventList(_upcomingEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'Aucun \u00e9v\u00e9nement \u00e0 venir' : 'No upcoming events'),
-                    _buildEventList(_pastEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'Aucun \u00e9v\u00e9nement pass\u00e9' : 'No past events'),
+                    _buildEventList(_upcomingEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'De nouveaux événements arrivent bientôt' : 'New events coming soon'),
+                    _buildEventList(_pastEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'Les événements passés apparaîtront ici' : 'Past events will appear here'),
                   ],
                 ),
     );
@@ -601,16 +601,19 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
           Center(
             child: Column(
               children: [
-                Icon(Icons.event_busy, size: 64, color: textColor),
+                Icon(Icons.event_note_rounded, size: 56, color: isDark ? Colors.white24 : Colors.grey[300]),
                 const SizedBox(height: 16),
                 Text(
-                  message ?? (lang == 'fr' ? 'Aucun \u00e9v\u00e9nement' : 'No events'),
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: textColor),
+                  message ?? (lang == 'fr' ? 'Événements en préparation' : 'Events being prepared'),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  lang == 'fr' ? 'Revenez bient\u00f4t !' : 'Check back soon!',
-                  style: TextStyle(fontSize: 14, color: textColor),
+                  lang == 'fr'
+                      ? 'Les détails seront publiés ici dès qu\'ils seront disponibles.'
+                      : 'Details will be published here once available.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: textColor, height: 1.5),
                 ),
               ],
             ),

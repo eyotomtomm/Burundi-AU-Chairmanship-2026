@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -5,28 +6,36 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:screen_protector/screen_protector.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
-import 'painters/page_curl_painter.dart';
+import '../../models/magazine_model.dart';
+import '../../widgets/verified_badge.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfUrl;
   final String title;
   final String? magazineId;
+  final bool initialIsLiked;
+  final int initialLikeCount;
 
   const PdfViewerScreen({
     super.key,
     required this.pdfUrl,
     required this.title,
     this.magazineId,
+    this.initialIsLiked = false,
+    this.initialLikeCount = 0,
   });
 
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
-class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderStateMixin {
+class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final GlobalKey<SfPdfViewerState> _pdfViewerKey = GlobalKey();
   late PdfViewerController _pdfViewerController;
   int _currentPage = 0;
@@ -46,25 +55,20 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
   String? _cachedFilePath;
   String? _cacheError;
 
-  // Page curl animation
-  late AnimationController _curlController;
-  bool _curlForward = true;
-
-  // Shimmer animation
-  late AnimationController _shimmerController;
+  // Floating overlay
+  bool _showOverlay = false;
+  Timer? _overlayTimer;
+  bool _isLiked = false;
+  int _likeCount = 0;
+  List<ArticleComment> _comments = [];
+  bool _commentsLoading = false;
 
   @override
   void initState() {
     super.initState();
     _pdfViewerController = PdfViewerController();
-    _curlController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
+    _isLiked = widget.initialIsLiked;
+    _likeCount = widget.initialLikeCount;
     _enableScreenProtection();
     _loadPdf();
     _recordView();
@@ -352,10 +356,285 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
   @override
   void dispose() {
     _pdfViewerController.dispose();
-    _curlController.dispose();
-    _shimmerController.dispose();
+    _overlayTimer?.cancel();
     _disableScreenProtection();
     super.dispose();
+  }
+
+  void _toggleOverlay() {
+    setState(() => _showOverlay = !_showOverlay);
+    if (_showOverlay) {
+      _startAutoHideTimer();
+    } else {
+      _overlayTimer?.cancel();
+    }
+  }
+
+  void _startAutoHideTimer() {
+    _overlayTimer?.cancel();
+    _overlayTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showOverlay = false);
+    });
+  }
+
+  Future<void> _toggleLike() async {
+    if (widget.magazineId == null) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in to like this magazine')),
+      );
+      return;
+    }
+    final wasLiked = _isLiked;
+    final prevCount = _likeCount;
+    setState(() {
+      _isLiked = !wasLiked;
+      _likeCount = prevCount + (wasLiked ? -1 : 1);
+    });
+    _startAutoHideTimer();
+    try {
+      final result = await ApiService().toggleMagazineLike(widget.magazineId!);
+      if (mounted) {
+        setState(() {
+          _isLiked = result['is_liked'] == true;
+          _likeCount = result['like_count'] ?? _likeCount;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLiked = wasLiked;
+          _likeCount = prevCount;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadComments() async {
+    if (widget.magazineId == null) return;
+    setState(() => _commentsLoading = true);
+    try {
+      final comments = await ApiService().getMagazineComments(widget.magazineId!);
+      if (mounted) setState(() { _comments = comments; _commentsLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _commentsLoading = false);
+    }
+  }
+
+  Future<void> _postComment(String content, {int? parentId}) async {
+    if (widget.magazineId == null) return;
+    try {
+      await ApiService().postMagazineComment(widget.magazineId!, content, parentId: parentId);
+      await _loadComments();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to post comment: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  void _showCommentSheet() {
+    _overlayTimer?.cancel();
+    _loadComments();
+    final commentController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) {
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              return Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.comment_outlined, size: 20, color: AppColors.burundiGreen),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Comments (${_comments.length})',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  // Comments list
+                  Expanded(
+                    child: _commentsLoading
+                        ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
+                        : _comments.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
+                                    const SizedBox(height: 12),
+                                    Text('No comments yet', style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+                                    const SizedBox(height: 4),
+                                    Text('Be the first to share your thoughts!', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: scrollController,
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: _comments.length,
+                                itemBuilder: (_, i) => _buildCommentTile(_comments[i]),
+                              ),
+                  ),
+                  // Comment input
+                  if (Provider.of<AuthProvider>(context, listen: false).isAuthenticated)
+                    Container(
+                      padding: EdgeInsets.only(
+                        left: 16, right: 8, top: 8,
+                        bottom: MediaQuery.of(ctx).viewInsets.bottom + 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: commentController,
+                              decoration: InputDecoration(
+                                hintText: 'Add a comment...',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.shade100,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              ),
+                              maxLines: 3,
+                              minLines: 1,
+                              textCapitalization: TextCapitalization.sentences,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                            onPressed: () async {
+                              final text = commentController.text.trim();
+                              if (text.isEmpty) return;
+                              commentController.clear();
+                              await _postComment(text);
+                              setSheetState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    ).then((_) => _startAutoHideTimer());
+  }
+
+  Widget _buildCommentTile(ArticleComment comment) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+            backgroundImage: comment.profilePicture != null
+                ? CachedNetworkImageProvider(comment.profilePicture!)
+                : null,
+            child: comment.profilePicture == null
+                ? Text(
+                    comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : '?',
+                    style: const TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.bold, fontSize: 14),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      comment.userName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: isDark ? Colors.white : AppColors.lightText,
+                      ),
+                    ),
+                    if (comment.badgeType != null) ...[
+                      const SizedBox(width: 4),
+                      VerifiedBadge(badgeType: comment.badgeType!, size: 14),
+                    ],
+                    const SizedBox(width: 8),
+                    Text(
+                      _timeAgo(comment.createdAt),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  comment.content,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                  ),
+                ),
+                // Replies
+                if (comment.replies.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      children: comment.replies.map((r) => _buildCommentTile(r)).toList(),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _timeAgo(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${diff.inDays ~/ 7}w ago';
   }
 
   @override
@@ -447,7 +726,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
           ),
         ],
       ),
-      body: Stack(
+      body: GestureDetector(
+        onTap: _toggleOverlay,
+        child: Stack(
         children: [
           // PDF Viewer - only show when we have a cached/downloaded file
           if (_cachedFilePath != null)
@@ -478,16 +759,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
               },
               onPageChanged: (details) {
                 final newPage = details.newPageNumber - 1;
-                _curlForward = newPage > _currentPage;
                 setState(() {
                   _currentPage = newPage;
+                  _showOverlay = false;
                 });
-                // Trigger page curl animation
-                _curlController.forward(from: 0.0).then((_) {
-                  if (mounted) _curlController.reverse();
-                });
-                // Trigger shimmer on page load
-                _shimmerController.forward(from: 0.0);
+                _overlayTimer?.cancel();
               },
               onZoomLevelChanged: (details) {
                 setState(() {
@@ -496,119 +772,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
               },
             ),
 
-          // Glossy surface gradient overlay (subtle shimmer)
-          if (_cachedFilePath != null && !_isLoading)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment(-1.0, -0.5),
-                      end: Alignment(1.0, 0.5),
-                      colors: [
-                        Colors.transparent,
-                        Color(0x0DFFFFFF),
-                        Colors.transparent,
-                        Color(0x0AFFFFFF),
-                        Colors.transparent,
-                      ],
-                      stops: [0.0, 0.25, 0.5, 0.75, 1.0],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Left edge shadow (book spine effect)
-          if (_cachedFilePath != null && !_isLoading)
-            Positioned(
-              left: 0, top: 0, bottom: 0,
-              width: 12,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Color(0x26000000),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Right edge shadow
-          if (_cachedFilePath != null && !_isLoading)
-            Positioned(
-              right: 0, top: 0, bottom: 0,
-              width: 8,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerRight,
-                      end: Alignment.centerLeft,
-                      colors: [
-                        Color(0x1A000000),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Page curl animation on swipe
-          if (_cachedFilePath != null && !_isLoading)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _curlController,
-                  builder: (context, child) {
-                    return CustomPaint(
-                      painter: PageCurlPainter(
-                        progress: _curlController.value,
-                        isForward: _curlForward,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-          // Shimmer on page load
-          if (_cachedFilePath != null && !_isLoading)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _shimmerController,
-                  builder: (context, child) {
-                    final dx = _shimmerController.value * 3.0 - 1.0;
-                    return Opacity(
-                      opacity: (1.0 - _shimmerController.value).clamp(0.0, 0.4),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment(dx, -0.3),
-                            end: Alignment(dx + 1.0, 0.3),
-                            colors: const [
-                              Colors.transparent,
-                              Color(0x15FFFFFF),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-          // Caching progress indicator (replaces old generic spinner)
+          // Caching progress indicator
           if (_isCaching)
             Center(
               child: Container(
@@ -751,33 +915,88 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> with TickerProviderSt
               ),
             ),
 
-          // Screenshot protection warning
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.security, size: 14, color: Colors.white.withValues(alpha: 0.8)),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Protected content',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 11,
+          // Floating like/comment overlay
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            bottom: _showOverlay ? 24 : -80,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Like button
+                    GestureDetector(
+                      onTap: _toggleLike,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: _isLiked ? Colors.red : Colors.white,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$_likeCount',
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1, height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                    // Comment button
+                    GestureDetector(
+                      onTap: _showCommentSheet,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.comment_outlined, color: Colors.white, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            _comments.isEmpty ? 'Comment' : '${_comments.length}',
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1, height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                    // Page indicator
+                    Icon(Icons.security, size: 14, color: Colors.white.withValues(alpha: 0.7)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Protected',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ],
+      ),
       ),
     );
   }

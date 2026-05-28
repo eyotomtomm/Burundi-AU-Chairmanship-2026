@@ -185,6 +185,7 @@ class _AriseInitiativeScreenState extends State<AriseInitiativeScreen> {
         title: Text(
           _t('title').isNotEmpty ? _formatTitle(_t('title')) : (_isFr ? 'Initiative A-RISE' : 'A-RISE Initiative'),
           style: const TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.w800,
             fontSize: 20,
             letterSpacing: -0.3,

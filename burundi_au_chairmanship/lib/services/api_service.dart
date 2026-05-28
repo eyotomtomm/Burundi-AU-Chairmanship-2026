@@ -126,7 +126,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Connection failed. Check your network.', 0);
+      throw ApiException('Connection failed: $e', 0);
     }
   }
 

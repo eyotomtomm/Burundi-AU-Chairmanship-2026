@@ -92,6 +92,7 @@ class _AgendaTabState extends State<AgendaTab> {
               expandedHeight: 120,
               pinned: true,
               automaticallyImplyLeading: false,
+              backgroundColor: AppColors.burundiGreen,
               foregroundColor: Colors.white,
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(
@@ -122,10 +123,30 @@ class _AgendaTabState extends State<AgendaTab> {
             else if (_agendas == null || _agendas!.isEmpty)
               SliverFillRemaining(
                 child: Center(
-                  child: Text(
-                    l10n.translate('no_data'),
-                    style: TextStyle(
-                      color: isDark ? Colors.white60 : Colors.black54,
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.flag_rounded, size: 56, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          langCode == 'fr' ? 'Agendas en préparation' : 'Agendas being prepared',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          langCode == 'fr'
+                              ? 'Les agendas prioritaires seront publiés ici prochainement.'
+                              : 'Priority agendas will be published here soon.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                        ),
+                      ],
                     ),
                   ),
                 ),

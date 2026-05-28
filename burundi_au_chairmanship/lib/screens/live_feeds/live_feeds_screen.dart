@@ -225,6 +225,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         title: Text(
           l10n.liveFeeds,
           style: const TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.w800,
             fontSize: 20,
             shadows: [Shadow(color: Colors.black26, blurRadius: 4)],
@@ -281,46 +282,23 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                   ),
                 ),
               ),
-              // Center icon
+              // Subtitle badge
               Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.15),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.live_tv_rounded,
-                        size: 40,
-                        color: Colors.white,
-                      ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'AU Summit 2026',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'AU Summit 2026',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -1207,6 +1185,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   // ── Empty State ───────────────────────────────────────────────────────
 
   Widget _buildEmptyState(bool isDark, AppLocalizations l10n) {
+    final isError = _error != null;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -1216,18 +1195,18 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                color: (isError ? AppColors.burundiRed : AppColors.burundiGreen).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.live_tv_rounded,
+                isError ? Icons.cloud_off_rounded : Icons.live_tv_rounded,
                 size: 56,
-                color: AppColors.burundiGreen.withValues(alpha: 0.4),
+                color: (isError ? AppColors.burundiRed : AppColors.burundiGreen).withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              _error != null ? 'Could not load feeds' : 'No Streams Available',
+              isError ? 'Could not load feeds' : 'Live streams are on the way',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -1236,9 +1215,9 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              _error != null
+              isError
                   ? 'Please check your connection and try again.'
-                  : 'Check back later for live coverage\nof AU Summit events.',
+                  : 'Live coverage of AU Summit events\nwill be streamed here.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -1246,20 +1225,22 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () {
-                setState(() => _isLoading = true);
-                _loadData();
-              },
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Refresh'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.burundiGreen,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            if (isError) ...[
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () {
+                  setState(() => _isLoading = true);
+                  _loadData();
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.burundiGreen,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -1319,7 +1300,15 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   }
 
   void _openFeed(ApiLiveFeed feed) {
-    if (feed.streamUrl.isEmpty) return;
+    if (feed.streamUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No stream URL available for this feed'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
     if (feed.isYouTube) {
       // YouTube → embedded YouTube player

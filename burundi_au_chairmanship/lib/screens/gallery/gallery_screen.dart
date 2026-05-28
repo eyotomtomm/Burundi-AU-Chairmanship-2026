@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
@@ -27,7 +28,32 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   void initState() {
     super.initState();
+    _enableScreenProtection();
     _loadAlbums();
+  }
+
+  @override
+  void dispose() {
+    _disableScreenProtection();
+    super.dispose();
+  }
+
+  Future<void> _enableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOn();
+      await ScreenProtector.preventScreenshotOn();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection error: $e');
+    }
+  }
+
+  Future<void> _disableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOff();
+      await ScreenProtector.preventScreenshotOff();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection disable error: $e');
+    }
   }
 
   Future<void> _loadAlbums() async {
@@ -43,7 +69,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
       if (kDebugMode) debugPrint('Failed to load gallery albums: $e');
       if (mounted) {
         setState(() {
-          albums = []; // No fallback - show empty state
+          albums = [];
           _isLoading = false;
         });
       }
@@ -54,46 +80,56 @@ class _GalleryScreenState extends State<GalleryScreen> {
   Widget build(BuildContext context) {
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
     final featuredAlbums = albums.where((a) => a['is_featured'] == true).toList();
+
+    if (_isLoading) {
+      return const Scaffold(body: ShimmerVideoGridSkeleton());
+    }
+
+    if (albums.isEmpty) {
+      return Scaffold(body: _buildEmptyState(context));
+    }
+
     return Scaffold(
-      body: _isLoading
-          ? const ShimmerVideoGridSkeleton()
-          : RefreshIndicator(
-              onRefresh: () async {
-                HapticFeedback.mediumImpact();
-                await _loadAlbums();
-              },
-              child: CustomScrollView(
-                slivers: [
-                  // App Bar
-                  SliverAppBar(
-                    expandedHeight: 120,
-                    pinned: true,
-                    backgroundColor: AppColors.burundiGreen,
-                    actions: const [TranslateButton()],
-                    flexibleSpace: FlexibleSpaceBar(
-                      title: const Text(
-                        'Photo Gallery',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async {
+              HapticFeedback.mediumImpact();
+              await _loadAlbums();
+            },
+            child: CustomScrollView(
+              slivers: [
+                // App Bar
+                SliverAppBar(
+                  expandedHeight: 120,
+                  pinned: true,
+                  backgroundColor: AppColors.burundiGreen,
+                  actions: const [TranslateButton()],
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: const Text(
+                      'Photo Gallery',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-                      background: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.burundiGreen,
-                              AppColors.burundiGreen.withValues(alpha: 0.8),
-                            ],
-                          ),
+                    ),
+                    background: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.burundiGreen,
+                            AppColors.burundiGreen.withValues(alpha: 0.8),
+                          ],
                         ),
                       ),
                     ),
                   ),
+                ),
 
-                  // Featured Albums
+                // Featured Albums
+                if (featuredAlbums.isNotEmpty) ...[
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                     sliver: SliverToBoxAdapter(
@@ -150,44 +186,159 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       ),
                     ),
                   ),
+                ],
 
-                  // All Albums (hidden for guests — gallery grid is members-only)
-                  if (isAuth) ...[
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                      sliver: SliverToBoxAdapter(
-                        child: const Text(
-                          'All Albums',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                // All Albums
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  sliver: SliverToBoxAdapter(
+                    child: const Text(
+                      'All Albums',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SliverPadding(
-                      padding: const EdgeInsets.all(16),
-                      sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.85,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            if (index >= albums.length) return null;
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 0.85,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final slot = LoginGate.slotFor(
+                          index: index,
+                          actualCount: albums.length,
+                          isAuthenticated: isAuth,
+                        );
+                        switch (slot) {
+                          case LoginGateSlot.free:
                             return _buildAlbumGridItem(albums[index], isAuth);
-                          },
-                        ),
+                          case LoginGateSlot.banner:
+                            return const LoginGateBanner(
+                              margin: EdgeInsets.only(bottom: 12),
+                            );
+                          case LoginGateSlot.blurred:
+                            final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                            if (dataIndex == null || dataIndex >= albums.length) {
+                              return const SizedBox.shrink();
+                            }
+                            return LockedContentWrap(
+                              locked: true,
+                              borderRadius: const BorderRadius.all(Radius.circular(12)),
+                              child: _buildAlbumGridItem(albums[dataIndex], isAuth),
+                            );
+                          case LoginGateSlot.hidden:
+                            return const SizedBox.shrink();
+                        }
+                      },
+                      childCount: LoginGate.itemCountFor(
+                        actualCount: albums.length,
+                        isAuthenticated: isAuth,
                       ),
                     ),
-                  ],
+                  ),
+                ),
 
-                  const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
+                const SliverPadding(padding: EdgeInsets.only(bottom: 60)),
+              ],
+            ),
+          ),
+          // Protected content badge
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.security, size: 14, color: Colors.white.withValues(alpha: 0.8)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Protected content',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final langCode = Localizations.localeOf(context).languageCode;
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 120,
+          pinned: true,
+          backgroundColor: AppColors.burundiGreen,
+          actions: const [TranslateButton()],
+          flexibleSpace: FlexibleSpaceBar(
+            title: const Text(
+              'Photo Gallery',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            background: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.burundiGreen,
+                    AppColors.burundiGreen.withValues(alpha: 0.8),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverFillRemaining(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.photo_library_outlined, size: 56, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    langCode == 'fr' ? 'Galerie en préparation' : 'Gallery being prepared',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    langCode == 'fr'
+                        ? 'Les photos du sommet seront publiées ici prochainement.'
+                        : 'Summit photos will be published here soon.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

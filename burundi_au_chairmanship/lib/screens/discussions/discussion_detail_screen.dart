@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 
 class DiscussionDetailScreen extends StatefulWidget {
   final int discussionId;
@@ -17,11 +19,51 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
   Map<String, dynamic>? _discussion;
   List<Map<String, dynamic>> _replies = [];
   bool _loading = true;
+  bool _isLiked = false;
+  int _likeCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      await _api.recordDiscussionView(widget.discussionId);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleLike() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to like this discussion')),
+      );
+      return;
+    }
+    final wasLiked = _isLiked;
+    final prevCount = _likeCount;
+    setState(() {
+      _isLiked = !wasLiked;
+      _likeCount = prevCount + (wasLiked ? -1 : 1);
+    });
+    try {
+      final result = await _api.toggleDiscussionLike(widget.discussionId);
+      if (mounted) {
+        setState(() {
+          _isLiked = result['is_liked'] == true;
+          _likeCount = result['like_count'] ?? _likeCount;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLiked = wasLiked;
+        _likeCount = prevCount;
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -115,16 +157,42 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                     style: TextStyle(fontSize: 15, color: isDark ? Colors.grey[300] : Colors.grey[700], height: 1.5),
                                   ),
                                   const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      _discussion!['category_display'] ?? _discussion!['category'] ?? '',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.burundiGreen),
-                                    ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          _discussion!['category_display'] ?? _discussion!['category'] ?? '',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.burundiGreen),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      GestureDetector(
+                                        onTap: _toggleLike,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              _isLiked ? Icons.favorite : Icons.favorite_border,
+                                              size: 20,
+                                              color: _isLiked ? Colors.redAccent : Colors.grey,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '$_likeCount',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: _isLiked ? Colors.redAccent : Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

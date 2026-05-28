@@ -40,6 +40,12 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+    // Record view
+    if (agendaData != null && agendaData!['id'] != null) {
+      try {
+        await _apiService.recordAgendaView(agendaData!['id'] is int ? agendaData!['id'] : int.parse(agendaData!['id'].toString()));
+      } catch (_) {}
+    }
   }
 
   bool get _isFr => Localizations.localeOf(context).languageCode == 'fr';

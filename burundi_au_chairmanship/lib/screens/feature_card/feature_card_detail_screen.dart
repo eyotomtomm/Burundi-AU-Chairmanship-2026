@@ -3,11 +3,32 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
+import '../../services/api_service.dart';
 
-class FeatureCardDetailScreen extends StatelessWidget {
+class FeatureCardDetailScreen extends StatefulWidget {
   final Map<String, dynamic> cardData;
 
   const FeatureCardDetailScreen({super.key, required this.cardData});
+
+  @override
+  State<FeatureCardDetailScreen> createState() => _FeatureCardDetailScreenState();
+}
+
+class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
+  Map<String, dynamic> get cardData => widget.cardData;
+
+  @override
+  void initState() {
+    super.initState();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      final id = cardData['id'];
+      if (id != null) await ApiService().recordFeatureCardView(id is int ? id : int.parse(id.toString()));
+    } catch (_) {}
+  }
 
   /// Get localized string value, preferring French if locale is 'fr'.
   String _t(BuildContext context, String key) {
@@ -117,6 +138,7 @@ class FeatureCardDetailScreen extends StatelessWidget {
 
   Widget _buildHeroSliver(BuildContext context, Color gradStart, Color gradEnd) {
     final icon = cardData['icon'] as IconData? ?? Icons.stars;
+    final imageUrl = cardData['image_url'] as String? ?? '';
 
     return SliverAppBar(
       expandedHeight: 280,
@@ -135,24 +157,49 @@ class FeatureCardDetailScreen extends StatelessWidget {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [gradStart, gradEnd],
+            // Background image if available, otherwise gradient
+            if (imageUrl.isNotEmpty)
+              CachedNetworkImage(
+                imageUrl: Environment.fixMediaUrl(imageUrl),
+                fit: BoxFit.cover,
+                placeholder: (_, _) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [gradStart, gradEnd],
+                    ),
+                  ),
+                ),
+                errorWidget: (_, _, _) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [gradStart, gradEnd],
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [gradStart, gradEnd],
+                  ),
                 ),
               ),
-            ),
-            // Dark overlay
+            // Gradient overlay for text readability
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.1),
-                    Colors.black.withValues(alpha: 0.6),
+                    gradStart.withValues(alpha: 0.3),
+                    gradEnd.withValues(alpha: 0.8),
                   ],
                 ),
               ),

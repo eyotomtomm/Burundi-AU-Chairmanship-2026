@@ -42,6 +42,14 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   List<Map<String, dynamic>> _subtitles = [];
   bool _subtitlesEnabled = false;
 
+  // Comments
+  List<Map<String, dynamic>> _comments = [];
+  bool _loadingComments = true;
+  bool _postingComment = false;
+  final _commentController = TextEditingController();
+  int? _replyingToId;
+  String? _replyingToName;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +70,48 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       _subtitlesEnabled = _subtitles.any((s) => s['is_default'] == true);
     }
     _initPlayer();
+    _recordView();
+    _loadComments();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      await ApiService().recordVideoView(widget.video['id'].toString());
+    } catch (_) {}
+  }
+
+  Future<void> _loadComments() async {
+    try {
+      final data = await ApiService().getVideoComments(widget.video['id'].toString());
+      if (mounted) setState(() { _comments = data; _loadingComments = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingComments = false);
+    }
+  }
+
+  Future<void> _postComment() async {
+    final content = _commentController.text.trim();
+    if (content.isEmpty) return;
+    setState(() => _postingComment = true);
+    try {
+      await ApiService().postVideoComment(
+        widget.video['id'].toString(),
+        content,
+        parentId: _replyingToId,
+      );
+      _commentController.clear();
+      _replyingToId = null;
+      _replyingToName = null;
+      await _loadComments();
+    } catch (_) {}
+    if (mounted) setState(() => _postingComment = false);
+  }
+
+  Future<void> _deleteComment(int commentId) async {
+    try {
+      await ApiService().deleteVideoComment(widget.video['id'].toString(), commentId);
+      await _loadComments();
+    } catch (_) {}
   }
 
   Future<void> _toggleLike() async {
@@ -351,6 +401,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     _chewieController?.dispose();
     _videoController?.dispose();
     _youtubeController?.dispose();
+    _commentController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -549,11 +600,158 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
                     // Chapters list
                     _buildChaptersList(isDark),
+
+                    // Comments section
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Comments (${_comments.fold<int>(0, (sum, c) => sum + 1 + ((c['replies'] as List?)?.length ?? 0))})',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    // Comment input
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _commentController,
+                            decoration: InputDecoration(
+                              hintText: _replyingToName != null
+                                  ? 'Reply to $_replyingToName...'
+                                  : 'Add a comment...',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              suffixIcon: _replyingToId != null
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () => setState(() { _replyingToId = null; _replyingToName = null; }),
+                                    )
+                                  : null,
+                            ),
+                            maxLines: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: _postingComment
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                          onPressed: _postingComment ? null : _postComment,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_loadingComments)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      ..._comments.map((c) => _buildCommentTile(c, isDark)),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark) {
+    final isOwn = Provider.of<AuthProvider>(context, listen: false).userId?.toString() == comment['user_id']?.toString();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: comment['profile_picture'] != null
+                    ? NetworkImage(comment['profile_picture'])
+                    : null,
+                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+                child: comment['profile_picture'] == null
+                    ? Text((comment['user_name'] ?? 'A')[0].toUpperCase(),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(comment['user_name'] ?? 'User',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        if (comment['badge_type'] != null) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.verified, size: 14, color: AppColors.burundiGreen),
+                        ],
+                        const Spacer(),
+                        if (isOwn)
+                          GestureDetector(
+                            onTap: () => _deleteComment(comment['id']),
+                            child: Icon(Icons.delete_outline, size: 16, color: Colors.grey[400]),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(comment['content'] ?? '', style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : Colors.black87)),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _replyingToId = comment['id'];
+                        _replyingToName = comment['user_name'];
+                      }),
+                      child: Text('Reply', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // Nested replies
+          if (comment['replies'] != null && (comment['replies'] as List).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 42, top: 8),
+              child: Column(
+                children: (comment['replies'] as List).map<Widget>((r) {
+                  final reply = r as Map<String, dynamic>;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundImage: reply['profile_picture'] != null ? NetworkImage(reply['profile_picture']) : null,
+                          backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+                          child: reply['profile_picture'] == null
+                              ? Text((reply['user_name'] ?? 'A')[0].toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(reply['user_name'] ?? 'User',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              Text(reply['content'] ?? '', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
         ],
       ),
     );

@@ -65,6 +65,7 @@ urlpatterns = [
     path('auth/update-device-info/', views.update_device_info, name='update-device-info'),
     path('auth/update-language/', views.update_language_preference, name='update-language'),
     path('heartbeat/', views.heartbeat, name='heartbeat'),
+    path('app-open/', views.record_app_open, name='app-open'),
 
     # Auth - Profile management
     path('auth/profile/', views.profile, name='auth-profile'),

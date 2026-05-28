@@ -7642,7 +7642,7 @@ def newsletter_send_now(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def media_library_api(request):
-    """Return JSON list of images in DO Spaces, grouped by folder."""
+    """Return JSON list of images in DO Spaces / local media, grouped by folder."""
     folder_filter = request.GET.get('folder', '').strip()
     search_query = request.GET.get('q', '').strip().lower()
 
@@ -7651,66 +7651,48 @@ def media_library_api(request):
 
     try:
         storage = default_storage
-        # List files under the media/ prefix (AWS_LOCATION)
-        prefix = getattr(settings, 'AWS_LOCATION', 'media')
 
-        if hasattr(storage, 'bucket'):
-            # S3/Spaces storage — use boto3 to list objects
-            bucket = storage.bucket
-            s3_prefix = f'{prefix}/' if prefix else ''
-            if folder_filter:
-                s3_prefix = f'{prefix}/{folder_filter}/'
+        def _scan_directory(prefix):
+            """Recursively list files using storage.listdir (works for S3 and local)."""
+            try:
+                dirs, files = storage.listdir(prefix)
+            except Exception as e:
+                logger.warning('listdir(%s) failed: %s', prefix, e)
+                return
 
-            paginator = bucket.meta.client.get_paginator('list_objects_v2')
-            page_iterator = paginator.paginate(
-                Bucket=bucket.name,
-                Prefix=s3_prefix,
-            )
-            for page in page_iterator:
-                for obj in page.get('Contents', []):
-                    key = obj['Key']
-                    # Strip the media/ prefix for display
-                    rel_path = key[len(prefix) + 1:] if key.startswith(prefix + '/') else key
-                    ext = os.path.splitext(key)[1].lower()
-                    if ext not in image_extensions:
-                        continue
-                    filename = os.path.basename(key)
-                    if search_query and search_query not in filename.lower():
-                        continue
-                    folder = os.path.dirname(rel_path) or 'root'
+            for filename in files:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in image_extensions:
+                    continue
+                if search_query and search_query not in filename.lower():
+                    continue
+                rel_path = os.path.join(prefix, filename) if prefix else filename
+                folder = prefix if prefix else 'root'
+                if folder_filter and folder != folder_filter and not folder.startswith(folder_filter + '/'):
+                    continue
+                try:
                     url = storage.url(rel_path)
-                    results.setdefault(folder, []).append({
-                        'path': rel_path,
-                        'filename': filename,
-                        'url': url,
-                        'size': obj.get('Size', 0),
-                    })
-        else:
-            # Local filesystem storage (development)
-            import pathlib
-            media_root = pathlib.Path(settings.MEDIA_ROOT)
-            if folder_filter:
-                search_dir = media_root / folder_filter
-            else:
-                search_dir = media_root
-            if search_dir.exists():
-                for path in sorted(search_dir.rglob('*')):
-                    if not path.is_file():
-                        continue
-                    if path.suffix.lower() not in image_extensions:
-                        continue
-                    rel_path = str(path.relative_to(media_root))
-                    filename = path.name
-                    if search_query and search_query not in filename.lower():
-                        continue
-                    folder = str(path.relative_to(media_root).parent) or 'root'
+                except Exception:
                     url = f'{settings.MEDIA_URL}{rel_path}'
-                    results.setdefault(folder, []).append({
-                        'path': rel_path,
-                        'filename': filename,
-                        'url': url,
-                        'size': path.stat().st_size,
-                    })
+                try:
+                    size = storage.size(rel_path)
+                except Exception:
+                    size = 0
+                results.setdefault(folder, []).append({
+                    'path': rel_path,
+                    'filename': filename,
+                    'url': url,
+                    'size': size,
+                })
+
+            for d in dirs:
+                sub_prefix = os.path.join(prefix, d) if prefix else d
+                if folder_filter and not folder_filter.startswith(sub_prefix) and not sub_prefix.startswith(folder_filter):
+                    continue
+                _scan_directory(sub_prefix)
+
+        _scan_directory('')
+
     except Exception as e:
         logger.exception('Media library API error')
         return JsonResponse({'error': str(e)}, status=500)

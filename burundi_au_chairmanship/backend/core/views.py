@@ -23,7 +23,7 @@ from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle,
 
 logger = logging.getLogger(__name__)
 from .models import (
-    HeroSlide, MagazineEdition, MagazineLike, Article, EmbassyLocation,
+    HeroSlide, MagazineEdition, MagazineLike, MagazineComment, Article, EmbassyLocation,
     Event, LiveFeed, Resource, AppSettings,
     FeatureCard, ArticleComment, ArticleCommentMention, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryAlbumLike, GalleryPhoto, Video, VideoLike, SocialMediaLink,
@@ -44,6 +44,8 @@ from .models import (
     EventComment, CommentMention, NewsletterEdition,
     EventAgendaItem, LinkedAccount,
     DeviceToken, NotificationEvent,
+    # Engagement models
+    EventLike, DiscussionLike, VideoComment, GalleryComment, AppOpenEvent,
 )
 from .serializers import (
     get_recent_likers,
@@ -51,7 +53,7 @@ from .serializers import (
     EmbassyLocationSerializer, EventSerializer, LiveFeedSerializer,
     ResourceSerializer, AppSettingsSerializer,
     FeatureCardSerializer, RegisterSerializer, UserSerializer,
-    ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
+    MagazineCommentSerializer, ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
     GalleryAlbumSerializer, VideoSerializer, SocialMediaLinkSerializer,
     NotificationSerializer, HeroTextContentSerializer, QuickAccessMenuItemSerializer,
     VerificationRequestSerializer, VerificationStatusSerializer,
@@ -77,6 +79,7 @@ from .serializers import (
     ArticleRevisionSerializer, TranslationRequestSerializer,
     EventCommentSerializer, NewsletterEditionSerializer, EventAttendeeSerializer,
     EventAgendaItemSerializer, VideoChapterSerializer,
+    VideoCommentSerializer, GalleryCommentSerializer,
 )
 
 
@@ -1094,6 +1097,35 @@ def heartbeat(request):
     })
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def record_app_open(request):
+    """Record an app open event for analytics.
+
+    Accepts optional device metadata.  Works for both authenticated
+    and anonymous users (anonymous users are tracked by device_id).
+    """
+    data = request.data
+    AppOpenEvent.objects.create(
+        user=request.user if request.user.is_authenticated else None,
+        device_id=data.get('device_id', '')[:255],
+        device_type=data.get('device_type', '')[:50],
+        device_os=data.get('device_os', '')[:50],
+        app_version=data.get('app_version', '')[:20],
+        ip_address=_get_client_ip(request),
+        country_code=data.get('country_code', '')[:5],
+    )
+    return Response({'ok': True}, status=status.HTTP_201_CREATED)
+
+
+def _get_client_ip(request):
+    """Extract the client IP from X-Forwarded-For or REMOTE_ADDR."""
+    xff = request.META.get('HTTP_X_FORWARDED_FOR')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_user_data(request):
@@ -1206,6 +1238,59 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             'is_liked': is_liked,
             'recent_likers': get_recent_likers(MagazineLike, 'edition', edition, request),
         })
+
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    def comments(self, request, pk=None):
+        """Get or post comments on a magazine edition."""
+        from django.utils.html import escape
+        edition = self.get_object()
+        if request.method == 'GET':
+            comments = (
+                edition.comments
+                .filter(parent__isnull=True)
+                .select_related('user', 'user__profile')
+                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .order_by('-created_at')
+            )
+            serializer = MagazineCommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        content = escape(content)
+        parent_id = request.data.get('parent')
+        parent = None
+        if parent_id:
+            try:
+                parent = MagazineComment.objects.get(pk=parent_id, edition=edition)
+                if parent.parent_id is not None:
+                    parent = parent.parent
+            except MagazineComment.DoesNotExist:
+                return Response({'detail': 'Parent comment not found.'}, status=status.HTTP_400_BAD_REQUEST)
+        comment = MagazineComment.objects.create(
+            user=request.user, edition=edition, parent=parent, content=content,
+        )
+        serializer = MagazineCommentSerializer(comment, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[0-9]+)')
+    def delete_comment(self, request, pk=None, comment_id=None):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            comment = MagazineComment.objects.get(pk=comment_id, edition_id=pk)
+        except MagazineComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user and not request.user.is_staff:
+            return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1538,6 +1623,31 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         response['Content-Disposition'] = f'attachment; filename="event-{event.id}.ics"'
         return response
 
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    def record_view(self, request, pk=None):
+        """Record a view for this event. Throttled to prevent manipulation."""
+        Event.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        event = self.get_object()
+        return Response({'view_count': event.view_count})
+
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_like(self, request, pk=None):
+        """Toggle like on event. Requires authentication."""
+        event = self.get_object()
+        like, created = EventLike.objects.get_or_create(user=request.user, event=event)
+        if not created:
+            like.delete()
+            Event.objects.filter(pk=event.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            Event.objects.filter(pk=event.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        event.refresh_from_db()
+        return Response({
+            'like_count': event.like_count,
+            'is_liked': is_liked,
+        })
+
 
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view live feeds"""
@@ -1546,6 +1656,13 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LiveFeedSerializer
     filterset_fields = ['status']
 
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    def record_view(self, request, pk=None):
+        """Record a view for this live feed. Throttled to prevent manipulation."""
+        LiveFeed.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        feed = self.get_object()
+        return Response({'view_count': feed.view_count})
+
 
 class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view published resources"""
@@ -1553,6 +1670,13 @@ class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Resource.objects.filter(status='published')
     serializer_class = ResourceSerializer
     filterset_fields = ['category', 'file_type']
+
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    def record_view(self, request, pk=None):
+        """Record a view for this resource. Throttled to prevent manipulation."""
+        Resource.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        resource = self.get_object()
+        return Response({'view_count': resource.view_count})
 
 
 class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1564,6 +1688,13 @@ class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = FeatureCardSerializer
     pagination_class = None
 
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    def record_view(self, request, pk=None):
+        """Record a view for this feature card. Throttled to prevent manipulation."""
+        FeatureCard.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        card = self.get_object()
+        return Response({'view_count': card.view_count})
+
 
 class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view priority agendas"""
@@ -1571,6 +1702,13 @@ class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PriorityAgenda.objects.filter(is_active=True).order_by('display_order')
     serializer_class = PriorityAgendaSerializer
     pagination_class = None
+
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
+    def record_view(self, request, pk=None):
+        """Record a view for this priority agenda. Throttled to prevent manipulation."""
+        PriorityAgenda.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        agenda = self.get_object()
+        return Response({'view_count': agenda.view_count})
 
 
 class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1616,6 +1754,59 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             'is_liked': is_liked,
             'recent_likers': get_recent_likers(GalleryAlbumLike, 'album', album, request),
         })
+
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    def comments(self, request, pk=None):
+        """Get or post comments on a gallery album."""
+        from django.utils.html import escape
+        album = self.get_object()
+        if request.method == 'GET':
+            comments = (
+                album.comments
+                .filter(parent__isnull=True)
+                .select_related('user', 'user__profile')
+                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .order_by('-created_at')
+            )
+            serializer = GalleryCommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        content = escape(content)
+        parent_id = request.data.get('parent')
+        parent = None
+        if parent_id:
+            try:
+                parent = GalleryComment.objects.get(pk=parent_id, album=album)
+                if parent.parent_id is not None:
+                    parent = parent.parent
+            except GalleryComment.DoesNotExist:
+                return Response({'detail': 'Parent comment not found.'}, status=status.HTTP_400_BAD_REQUEST)
+        comment = GalleryComment.objects.create(
+            user=request.user, album=album, parent=parent, content=content,
+        )
+        serializer = GalleryCommentSerializer(comment, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[0-9]+)')
+    def delete_comment(self, request, pk=None, comment_id=None):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            comment = GalleryComment.objects.get(pk=comment_id, album_id=pk)
+        except GalleryComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user and not request.user.is_staff:
+            return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1671,6 +1862,59 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
         chapters = video.chapters.all()
         serializer = VideoChapterSerializer(chapters, many=True, context={'request': request})
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    def comments(self, request, pk=None):
+        """Get or post comments on a video."""
+        from django.utils.html import escape
+        video = self.get_object()
+        if request.method == 'GET':
+            comments = (
+                video.comments
+                .filter(parent__isnull=True)
+                .select_related('user', 'user__profile')
+                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .order_by('-created_at')
+            )
+            serializer = VideoCommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        content = escape(content)
+        parent_id = request.data.get('parent')
+        parent = None
+        if parent_id:
+            try:
+                parent = VideoComment.objects.get(pk=parent_id, video=video)
+                if parent.parent_id is not None:
+                    parent = parent.parent
+            except VideoComment.DoesNotExist:
+                return Response({'detail': 'Parent comment not found.'}, status=status.HTTP_400_BAD_REQUEST)
+        comment = VideoComment.objects.create(
+            user=request.user, video=video, parent=parent, content=content,
+        )
+        serializer = VideoCommentSerializer(comment, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[0-9]+)')
+    def delete_comment(self, request, pk=None, comment_id=None):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            comment = VideoComment.objects.get(pk=comment_id, video_id=pk)
+        except VideoComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user and not request.user.is_staff:
+            return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
@@ -3379,11 +3623,30 @@ class DiscussionViewSet(viewsets.ModelViewSet):
 
         return Response(DiscussionReplySerializer(reply, context={'request': request}).data, status=201)
 
-    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny])
+    @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view on a discussion."""
+        """Record a view on a discussion. Throttled to prevent manipulation."""
         Discussion.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        return Response({'message': 'View recorded'})
+        discussion = self.get_object()
+        return Response({'view_count': discussion.view_count})
+
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_like(self, request, pk=None):
+        """Toggle like on discussion. Requires authentication."""
+        discussion = self.get_object()
+        like, created = DiscussionLike.objects.get_or_create(user=request.user, discussion=discussion)
+        if not created:
+            like.delete()
+            Discussion.objects.filter(pk=discussion.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            Discussion.objects.filter(pk=discussion.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        discussion.refresh_from_db()
+        return Response({
+            'like_count': discussion.like_count,
+            'is_liked': is_liked,
+        })
 
 
 class PollViewSet(viewsets.ReadOnlyModelViewSet):

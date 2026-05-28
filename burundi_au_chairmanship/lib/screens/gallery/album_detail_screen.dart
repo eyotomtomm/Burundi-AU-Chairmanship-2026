@@ -1,11 +1,7 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_protector/screen_protector.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
@@ -28,13 +24,18 @@ class AlbumDetailScreen extends StatefulWidget {
 }
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
-  bool _isDownloaded = false;
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
-  List<String> _localPhotoPaths = [];
   bool _isLiked = false;
   int _likeCount = 0;
   List<Liker> _recentLikers = [];
+
+  // Comments
+  List<Map<String, dynamic>> _comments = [];
+  bool _loadingComments = true;
+  int _commentCount = 0;
+  final _commentController = TextEditingController();
+  bool _postingComment = false;
+  int? _replyingToId;
+  String? _replyingToName;
 
   @override
   void initState() {
@@ -47,8 +48,232 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           .toList();
     }
     _enableScreenProtection();
-    _checkIfDownloaded();
     _recordView();
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    try {
+      final data = await ApiService().getGalleryComments(widget.album['id'].toString());
+      if (mounted) {
+        setState(() {
+          _comments = data;
+          _commentCount = data.fold<int>(0, (sum, c) => sum + 1 + ((c['replies'] as List?)?.length ?? 0));
+          _loadingComments = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingComments = false);
+    }
+  }
+
+  Future<void> _postComment() async {
+    final content = _commentController.text.trim();
+    if (content.isEmpty) return;
+    setState(() => _postingComment = true);
+    try {
+      await ApiService().postGalleryComment(
+        widget.album['id'].toString(),
+        content,
+        parentId: _replyingToId,
+      );
+      _commentController.clear();
+      _replyingToId = null;
+      _replyingToName = null;
+      await _loadComments();
+    } catch (_) {}
+    if (mounted) setState(() => _postingComment = false);
+  }
+
+  Future<void> _deleteComment(int commentId) async {
+    try {
+      await ApiService().deleteGalleryComment(widget.album['id'].toString(), commentId);
+      await _loadComments();
+    } catch (_) {}
+  }
+
+  void _showCommentsSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (ctx, scrollCtrl) => StatefulBuilder(
+          builder: (ctx, setSheetState) => Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Comments ($_commentCount)',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              Expanded(
+                child: _loadingComments
+                    ? const Center(child: CircularProgressIndicator())
+                    : _comments.isEmpty
+                        ? Center(child: Text('No comments yet', style: TextStyle(color: Colors.grey[500])))
+                        : ListView.builder(
+                            controller: scrollCtrl,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _comments.length,
+                            itemBuilder: (ctx, i) => _buildCommentTile(_comments[i], isDark),
+                          ),
+              ),
+              // Input
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(ctx).viewInsets.bottom + 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentController,
+                          decoration: InputDecoration(
+                            hintText: _replyingToName != null ? 'Reply to $_replyingToName...' : 'Add a comment...',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            suffixIcon: _replyingToId != null
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 18),
+                                    onPressed: () {
+                                      setState(() { _replyingToId = null; _replyingToName = null; });
+                                      setSheetState(() {});
+                                    },
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: _postingComment
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                        onPressed: _postingComment
+                            ? null
+                            : () async {
+                                await _postComment();
+                                setSheetState(() {});
+                              },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark) {
+    final isOwn = Provider.of<AuthProvider>(context, listen: false).userId?.toString() == comment['user_id']?.toString();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: comment['profile_picture'] != null ? NetworkImage(comment['profile_picture']) : null,
+                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+                child: comment['profile_picture'] == null
+                    ? Text((comment['user_name'] ?? 'A')[0].toUpperCase(),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(comment['user_name'] ?? 'User',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        if (comment['badge_type'] != null) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified, size: 14, color: AppColors.burundiGreen),
+                        ],
+                        const Spacer(),
+                        if (isOwn)
+                          GestureDetector(
+                            onTap: () => _deleteComment(comment['id']),
+                            child: Icon(Icons.delete_outline, size: 16, color: Colors.grey[400]),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(comment['content'] ?? '', style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : Colors.black87)),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _replyingToId = comment['id'];
+                        _replyingToName = comment['user_name'];
+                      }),
+                      child: Text('Reply', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w600)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (comment['replies'] != null && (comment['replies'] as List).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 42, top: 8),
+              child: Column(
+                children: (comment['replies'] as List).map<Widget>((r) {
+                  final reply = r as Map<String, dynamic>;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundImage: reply['profile_picture'] != null ? NetworkImage(reply['profile_picture']) : null,
+                          backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
+                          child: reply['profile_picture'] == null
+                              ? Text((reply['user_name'] ?? 'A')[0].toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(reply['user_name'] ?? 'User',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                              Text(reply['content'] ?? '', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   void _recordView() {
@@ -117,164 +342,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     }
   }
 
-  /// Check if album is already downloaded
-  Future<void> _checkIfDownloaded() async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final albumDir = Directory('${directory.path}/albums/${widget.album['id']}');
-
-      if (await albumDir.exists()) {
-        final files = albumDir.listSync();
-        if (files.isNotEmpty) {
-          setState(() {
-            _isDownloaded = true;
-            _localPhotoPaths = files
-                .whereType<File>()
-                .map((f) => f.path)
-                .toList();
-          });
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('Check download error: $e');
-    }
-  }
-
-  /// Download album for offline viewing
-  Future<void> _downloadAlbum() async {
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final albumDir = Directory('${directory.path}/albums/${widget.album['id']}');
-
-      // Create album directory
-      if (!await albumDir.exists()) {
-        await albumDir.create(recursive: true);
-      }
-
-      // Get photos from album
-      final photos = widget.album['photos'] as List? ?? [];
-      final dio = Dio();
-      final downloadedPaths = <String>[];
-
-      for (int i = 0; i < photos.length; i++) {
-        final photo = photos[i];
-        final photoUrl = Environment.fixMediaUrl(photo['image'] ?? '');
-        final fileName = 'photo_${photo['id']}.jpg';
-        final filePath = '${albumDir.path}/$fileName';
-
-        try {
-          await dio.download(
-            photoUrl,
-            filePath,
-            onReceiveProgress: (received, total) {
-              if (total != -1) {
-                final photoProgress = received / total;
-                final totalProgress = (i + photoProgress) / photos.length;
-                setState(() {
-                  _downloadProgress = totalProgress;
-                });
-              }
-            },
-          );
-          downloadedPaths.add(filePath);
-        } catch (e) {
-          if (kDebugMode) debugPrint('Failed to download photo ${photo['id']}: $e');
-        }
-      }
-
-      setState(() {
-        _isDownloaded = true;
-        _isDownloading = false;
-        _localPhotoPaths = downloadedPaths;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Album downloaded! Available offline.'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isDownloading = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  /// Delete downloaded album
-  Future<void> _deleteDownload() async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final albumDir = Directory('${directory.path}/albums/${widget.album['id']}');
-
-      if (await albumDir.exists()) {
-        await albumDir.delete(recursive: true);
-      }
-
-      setState(() {
-        _isDownloaded = false;
-        _localPhotoPaths = [];
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Downloaded album deleted'),
-            backgroundColor: AppColors.info,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
   /// Open fullscreen photo viewer with swipe support
   void _openPhotoViewer(int initialIndex) {
     final photos = widget.album['photos'] as List? ?? [];
     final langCode = Localizations.localeOf(context).languageCode;
 
-    // Build image URLs: prefer local files if downloaded, otherwise network
     final imageUrls = <String>[];
     final captions = <String>[];
 
     for (final photo in photos) {
-      // Use network URL - CachedNetworkImage handles caching automatically
       imageUrls.add(Environment.fixMediaUrl(photo['image'] ?? ''));
-
-      // Get caption in current language
       final caption = langCode == 'fr'
           ? (photo['caption_fr'] ?? photo['caption'] ?? '')
           : (photo['caption'] ?? '');
@@ -292,6 +369,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   @override
   void dispose() {
+    _commentController.dispose();
     _disableScreenProtection();
     super.dispose();
   }
@@ -310,6 +388,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         actions: [
+          // Comments button
+          IconButton(
+            icon: Badge(
+              label: _commentCount > 0 ? Text('$_commentCount', style: const TextStyle(fontSize: 10)) : null,
+              isLabelVisible: _commentCount > 0,
+              child: const Icon(Icons.comment_outlined, color: Colors.white),
+            ),
+            tooltip: 'Comments',
+            onPressed: _showCommentsSheet,
+          ),
           // Like button
           IconButton(
             icon: Icon(
@@ -319,35 +407,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             tooltip: _isLiked ? 'Unlike' : 'Like',
             onPressed: _toggleLike,
           ),
-          // Download button
-          if (!_isDownloaded && !_isDownloading)
-            IconButton(
-              icon: const Icon(Icons.download_outlined),
-              tooltip: 'Download for offline',
-              onPressed: _downloadAlbum,
-            ),
-          // Downloaded indicator / delete button
-          if (_isDownloaded)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.download_done, color: AppColors.auGold),
-              tooltip: 'Downloaded',
-              onSelected: (value) {
-                if (value == 'delete') {
-                  _deleteDownload();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline, color: AppColors.error),
-                    title: Text('Delete download'),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
         ],
       ),
       body: Stack(
@@ -396,47 +455,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             ],
           ),
 
-          // Download progress overlay
-          if (_isDownloading)
-            Container(
-              color: Colors.black.withValues(alpha: 0.7),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.download, size: 48, color: AppColors.burundiGreen),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Downloading album...',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: 200,
-                        child: LinearProgressIndicator(
-                          value: _downloadProgress,
-                          backgroundColor: Colors.grey[300],
-                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.burundiGreen),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${(_downloadProgress * 100).toInt()}%',
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // Screenshot protection warning
+          // Screenshot protection badge
           Positioned(
             bottom: 16,
             left: 16,
@@ -468,278 +487,30 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   }
 
   Widget _buildPhotoTile(Map<String, dynamic> photo, int index) {
-    final photoId = photo['id'];
-    final isLocalAvailable = _localPhotoPaths.any((p) => p.contains('photo_$photoId'));
-
-    Widget imageWidget;
-    if (isLocalAvailable && _isDownloaded) {
-      final localPath = _localPhotoPaths.firstWhere((p) => p.contains('photo_$photoId'));
-      imageWidget = Image.file(
-        File(localPath),
-        fit: BoxFit.cover,
-      );
-    } else {
-      final imageUrl = Environment.fixMediaUrl(photo['image'] ?? '');
-      imageWidget = CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        memCacheWidth: 400,
-        placeholder: (context, url) => Container(
-          color: Colors.grey[300],
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey[300],
-          child: const Icon(Icons.broken_image, color: Colors.grey),
-        ),
-      );
-    }
+    final imageUrl = Environment.fixMediaUrl(photo['image'] ?? '');
 
     return GestureDetector(
-      onTap: () {
-        _openPhotoViewer(index);
-      },
+      onTap: () => _openPhotoViewer(index),
       child: Hero(
         tag: 'album_${widget.album['id']}_$index',
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              imageWidget,
-            if (isLocalAvailable)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppColors.success,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.offline_pin, size: 12, color: Colors.white),
-                ),
-              ),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-}
-
-/// Fullscreen photo viewer with swipe support (legacy, kept for reference)
-class _PhotoViewerScreen extends StatefulWidget {
-  final List photos;
-  final int initialIndex;
-  final bool isDownloaded;
-  final List<String> localPhotoPaths;
-
-  const _PhotoViewerScreen({
-    required this.photos,
-    required this.initialIndex,
-    required this.isDownloaded,
-    required this.localPhotoPaths,
-  });
-
-  @override
-  State<_PhotoViewerScreen> createState() => _PhotoViewerScreenState();
-}
-
-class _PhotoViewerScreenState extends State<_PhotoViewerScreen> {
-  late PageController _pageController;
-  late int _currentIndex;
-  bool _showUI = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-    _enableScreenProtection();
-  }
-
-  Future<void> _enableScreenProtection() async {
-    try {
-      await ScreenProtector.protectDataLeakageOn();
-      await ScreenProtector.preventScreenshotOn();
-    } catch (e) {
-      if (kDebugMode) debugPrint('Screen protection error: $e');
-    }
-  }
-
-  Future<void> _disableScreenProtection() async {
-    try {
-      await ScreenProtector.protectDataLeakageOff();
-      await ScreenProtector.preventScreenshotOff();
-    } catch (e) {
-      if (kDebugMode) debugPrint('Screen protection disable error: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _disableScreenProtection();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  void _toggleUI() {
-    setState(() {
-      _showUI = !_showUI;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Photo PageView
-          PageView.builder(
-            controller: _pageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            itemCount: widget.photos.length,
-            itemBuilder: (context, index) {
-              final photo = widget.photos[index];
-              return GestureDetector(
-                onTap: _toggleUI,
-                child: _buildPhotoView(photo),
-              );
-            },
-          ),
-
-          // Top bar
-          if (_showUI)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.7),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${_currentIndex + 1} / ${widget.photos.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Bottom caption
-          if (_showUI && widget.photos[_currentIndex]['caption'] != null)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      widget.photos[_currentIndex]['caption'] ?? '',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPhotoView(Map<String, dynamic> photo) {
-    final photoId = photo['id'];
-    final isLocalAvailable = widget.localPhotoPaths.any((p) => p.contains('photo_$photoId'));
-
-    if (isLocalAvailable && widget.isDownloaded) {
-      final localPath = widget.localPhotoPaths.firstWhere((p) => p.contains('photo_$photoId'));
-      return InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4.0,
-        child: Center(
-          child: Image.file(
-            File(localPath),
-            fit: BoxFit.contain,
-          ),
-        ),
-      );
-    } else {
-      final imageUrl = Environment.fixMediaUrl(photo['image'] ?? '');
-      return InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4.0,
-        child: Center(
           child: CachedNetworkImage(
             imageUrl: imageUrl,
-            fit: BoxFit.contain,
-            placeholder: (context, url) => const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
+            fit: BoxFit.cover,
+            memCacheWidth: 400,
+            placeholder: (context, url) => Container(
+              color: Colors.grey[300],
+              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
-            errorWidget: (context, url, error) => const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.broken_image, color: Colors.white54, size: 64),
-                  SizedBox(height: 16),
-                  Text(
-                    'Failed to load image',
-                    style: TextStyle(color: Colors.white54),
-                  ),
-                ],
-              ),
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey[300],
+              child: const Icon(Icons.broken_image, color: Colors.grey),
             ),
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 }
+

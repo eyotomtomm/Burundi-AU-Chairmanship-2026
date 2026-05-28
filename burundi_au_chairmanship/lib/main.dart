@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -18,6 +19,7 @@ import 'providers/language_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/verification_provider.dart';
 import 'services/analytics_service.dart';
+import 'services/api_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/remote_config_service.dart';
 import 'l10n/app_localizations.dart';
@@ -50,6 +52,9 @@ import 'screens/events/events_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+// Firebase Analytics — available globally for screen/event logging
+final FirebaseAnalytics firebaseAnalytics = FirebaseAnalytics.instance;
 
 Future<void> _initializeApp() async {
   // Initialize Firebase (with timeout — don't block app startup forever)
@@ -88,8 +93,16 @@ Future<void> _initializeApp() async {
   await analytics.init();
   await analytics.logAppLaunch();
 
+  // Log app open to Firebase Analytics (non-blocking)
+  try {
+    await firebaseAnalytics.logAppOpen();
+  } catch (_) {}
+
   // Initialize Firebase services in background — don't block app startup
   _initFirebaseServicesAsync();
+
+  // Record app open in backend (non-blocking, fire-and-forget)
+  _recordBackendAppOpen();
 }
 
 /// Non-blocking: init messaging + remote config after the app is running
@@ -112,6 +125,44 @@ void _initFirebaseServicesAsync() {
       if (kDebugMode) print('Remote Config init failed: $e');
     }
   });
+}
+
+/// Non-blocking: record app open event in the backend
+void _recordBackendAppOpen() {
+  Future(() async {
+    try {
+      final info = await _getDeviceInfo();
+      await ApiService().recordAppOpen(
+        deviceId: info['device_id'],
+        deviceType: info['device_type'],
+        deviceOs: info['device_os'],
+        appVersion: AppConstants.appVersion,
+      );
+    } catch (_) {
+      // Silent fail — analytics should never block the app
+    }
+  });
+}
+
+/// Gather basic device info for analytics
+Future<Map<String, String>> _getDeviceInfo() async {
+  String deviceType = 'unknown';
+  String deviceOs = 'unknown';
+  String deviceId = '';
+  try {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      deviceType = 'iOS';
+      deviceOs = 'iOS';
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      deviceType = 'Android';
+      deviceOs = 'Android';
+    }
+  } catch (_) {}
+  return {
+    'device_id': deviceId,
+    'device_type': deviceType,
+    'device_os': deviceOs,
+  };
 }
 
 void main() async {
@@ -206,6 +257,7 @@ class BurundiAUApp extends StatelessWidget {
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
             navigatorObservers: [
+              FirebaseAnalyticsObserver(analytics: firebaseAnalytics),
               if (Environment.sentryDsn.isNotEmpty)
                 SentryNavigatorObserver(),
             ],

@@ -72,18 +72,30 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               ? _buildError()
               : _grouped.isEmpty
                   ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.folder_open, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(l10n.translate('no_data'), style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey)),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () { setState(() => _isLoading = true); _loadData(); },
-                            child: Text(l10n.retry),
-                          ),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.folder_outlined, size: 56, color: Colors.grey[300]),
+                            const SizedBox(height: 16),
+                            Text(
+                              langCode == 'fr' ? 'Ressources en cours de publication' : 'Resources coming soon',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              langCode == 'fr'
+                                  ? 'Les documents et ressources du sommet seront disponibles ici.'
+                                  : 'Summit documents and resources will be available here.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : _buildResourcesList(context, langCode),
@@ -325,6 +337,8 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
               icon: const Icon(Icons.visibility_outlined),
               color: accentColor,
               onPressed: () {
+                // Record view in backend
+                ApiService().recordResourceView(item.id).catchError((_) => <String, dynamic>{});
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Opening: ${item.getTitle(langCode)}'),

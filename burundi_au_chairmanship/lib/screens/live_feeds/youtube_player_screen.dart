@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../config/app_colors.dart';
 import '../../models/api_models.dart';
+import '../../services/api_service.dart';
 import 'in_app_webview_screen.dart';
 
 class YouTubePlayerScreen extends StatefulWidget {
@@ -24,6 +25,13 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
   void initState() {
     super.initState();
     _initPlayer();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      await ApiService().recordLiveFeedView(widget.feed.id);
+    } catch (_) {}
   }
 
   void _initPlayer() {

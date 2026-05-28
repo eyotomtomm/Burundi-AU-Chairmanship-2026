@@ -1851,12 +1851,6 @@ function toggleDarkMode() {
           return;
         }
 
-        // Skip TinyMCE editors (handled separately below)
-        if (field.classList.contains('tinymce-editor') || pairField.classList.contains('tinymce-editor')) {
-          addTinyMCECopyButton(field, pairField, isEnField);
-          return;
-        }
-
         addCopyButton(field, pairField, isEnField);
         addCopyButton(pairField, field, !isEnField);
       }
@@ -1938,112 +1932,9 @@ function toggleDarkMode() {
     label.appendChild(btn);
   }
 
-  function addTinyMCECopyButton(field, pairField, isEnField) {
-    // For TinyMCE fields, add buttons to both labels
-    // But the copy must read/write via tinymce API
-    var enField = isEnField ? field : pairField;
-    var frField = isEnField ? pairField : field;
-
-    addTinyMCECopyButtonForDirection(enField, frField, true);
-    addTinyMCECopyButtonForDirection(frField, enField, false);
-  }
-
-  function addTinyMCECopyButtonForDirection(sourceField, targetField, sourceIsEn) {
-    var label = null;
-    var wrapper = sourceField.closest('div');
-    if (wrapper) {
-      label = wrapper.querySelector('label');
-    }
-    if (!label) return;
-
-    if (label.querySelector('.bilingual-copy-btn')) return;
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'bilingual-copy-btn ml-2 px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50';
-    btn.textContent = sourceIsEn ? '\u2192 Translate to FR' : '\u2192 Translate to EN';
-    btn.title = sourceIsEn ? 'Auto-translate English to French' : 'Auto-translate French to English';
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      var sourceContent = '';
-      var sourceId = sourceField.getAttribute('id');
-      var targetId = targetField.getAttribute('id');
-
-      // Try to get content from TinyMCE editor if active
-      if (typeof tinymce !== 'undefined' && sourceId && tinymce.get(sourceId)) {
-        sourceContent = tinymce.get(sourceId).getContent();
-      } else {
-        sourceContent = sourceField.value;
-      }
-
-      if (!sourceContent.trim()) {
-        sourceField.style.backgroundColor = '#fee2e2';
-        setTimeout(function() { sourceField.style.backgroundColor = ''; }, 800);
-        return;
-      }
-
-      // Show translating state
-      var origText = btn.textContent;
-      btn.textContent = 'Translating...';
-      btn.disabled = true;
-      btn.style.opacity = '0.6';
-
-      var formData = new FormData();
-      formData.append('text', sourceContent);
-      formData.append('source', sourceIsEn ? 'en' : 'fr');
-      formData.append('target', sourceIsEn ? 'fr' : 'en');
-
-      var controller = new AbortController();
-      var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
-
-      fetch('{% url "custom_admin:auto_translate" %}', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCsrfToken() },
-        body: formData,
-        signal: controller.signal
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.translated) {
-          if (typeof tinymce !== 'undefined' && targetId && tinymce.get(targetId)) {
-            tinymce.get(targetId).setContent(data.translated);
-            tinymce.get(targetId).save();
-          } else {
-            targetField.value = data.translated;
-          }
-          targetField.focus();
-          targetField.style.backgroundColor = '#d1fae5';
-          setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
-        } else {
-          btn.textContent = 'Failed!';
-          btn.style.color = '#dc2626';
-          setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
-        }
-      })
-      .catch(function(err) {
-        btn.textContent = err.name === 'AbortError' ? 'Timeout!' : 'Failed!';
-        btn.style.color = '#dc2626';
-        setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
-      })
-      .finally(function() {
-        clearTimeout(timeoutId);
-        btn.disabled = false;
-        btn.style.opacity = '';
-      });
-    });
-
-    label.style.display = 'flex';
-    label.style.alignItems = 'center';
-    label.style.flexWrap = 'wrap';
-    label.appendChild(btn);
-  }
-
   // Initialize on DOMContentLoaded
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-      // Delay slightly to allow TinyMCE and other scripts to initialize
       setTimeout(initBilingualAutofill, 500);
     });
   } else {

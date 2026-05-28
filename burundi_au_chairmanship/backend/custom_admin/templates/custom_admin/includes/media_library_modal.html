@@ -112,12 +112,18 @@
     document.getElementById('mlEmpty').classList.add('hidden');
 
     fetch("{% url 'custom_admin:media_library_api' %}")
-      .then(function(r) { return r.json(); })
+      .then(function(r) {
+        if (!r.ok) {
+          return r.text().then(function(text) {
+            throw new Error('Server error ' + r.status + ': ' + text.substring(0, 200));
+          });
+        }
+        return r.json();
+      })
       .then(function(data) {
         if (data.error) {
           console.error('Media library error:', data.error);
-          document.getElementById('mlLoading').classList.add('hidden');
-          document.getElementById('mlEmpty').classList.remove('hidden');
+          showMediaError('Server error: ' + data.error);
           return;
         }
         mlAllData = data.folders || {};
@@ -127,10 +133,31 @@
       })
       .catch(function(err) {
         console.error('Media library fetch failed:', err);
-        document.getElementById('mlLoading').classList.add('hidden');
-        document.getElementById('mlEmpty').classList.remove('hidden');
+        showMediaError('Failed to load media: ' + err.message);
       });
   }
+
+  function showMediaError(message) {
+    document.getElementById('mlLoading').classList.add('hidden');
+    document.getElementById('mlGrid').classList.add('hidden');
+    var empty = document.getElementById('mlEmpty');
+    empty.classList.remove('hidden');
+    empty.innerHTML =
+      '<div class="text-center">' +
+        '<span class="material-symbols-outlined text-5xl text-error mb-3">error</span>' +
+        '<p class="text-on-surface font-medium mb-2">Could not load media library</p>' +
+        '<p class="text-on-surface-variant text-sm max-w-md">' + message + '</p>' +
+        '<button type="button" onclick="mlRetry()" class="mt-4 px-4 py-2 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors text-sm font-medium">' +
+          '<span class="material-symbols-outlined text-base align-middle mr-1">refresh</span>Retry' +
+        '</button>' +
+      '</div>';
+  }
+
+  window.mlRetry = function() {
+    mlDataLoaded = false;
+    mlAllData = {};
+    fetchMediaLibrary();
+  };
 
   function buildFolderTabs(folderNames) {
     var container = document.getElementById('mlFolderTabs');

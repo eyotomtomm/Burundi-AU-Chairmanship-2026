@@ -63,6 +63,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   List<Map<String, dynamic>> _attendees = [];
   bool _loadingAttendees = true;
 
+  // Likes
+  bool _isLiked = false;
+  int _likeCount = 0;
+
   // Proxy form controllers
   final _proxyNameController = TextEditingController();
   final _proxyEmailController = TextEditingController();
@@ -79,6 +83,44 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (_event.showComments) _loadComments();
     if (_event.showPhotos) _loadPhotos();
     if (_event.showAttendees) _loadAttendees();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      await ApiService().recordEventView(_event.id);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleLike() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to like this event')),
+      );
+      return;
+    }
+    final wasLiked = _isLiked;
+    final prevCount = _likeCount;
+    setState(() {
+      _isLiked = !wasLiked;
+      _likeCount = prevCount + (wasLiked ? -1 : 1);
+    });
+    try {
+      final result = await ApiService().toggleEventLike(_event.id);
+      if (mounted) {
+        setState(() {
+          _isLiked = result['is_liked'] == true;
+          _likeCount = result['like_count'] ?? _likeCount;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLiked = wasLiked;
+        _likeCount = prevCount;
+      });
+    }
   }
 
   void _initFormControllers() {
@@ -205,7 +247,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             expandedHeight: 300,
             pinned: true,
             backgroundColor: AppColors.burundiGreen,
-            actions: const [TranslateButton()],
+            actions: [
+              IconButton(
+                icon: Icon(
+                  _isLiked ? Icons.favorite : Icons.favorite_border,
+                  color: _isLiked ? Colors.redAccent : Colors.white,
+                ),
+                onPressed: _toggleLike,
+              ),
+              const TranslateButton(),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,

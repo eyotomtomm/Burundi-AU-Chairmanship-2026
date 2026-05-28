@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../models/api_models.dart';
+import '../../services/api_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final ApiLiveFeed feed;
@@ -24,12 +26,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void initState() {
     super.initState();
     _initPlayer();
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      await ApiService().recordLiveFeedView(widget.feed.id);
+    } catch (_) {}
   }
 
   Future<void> _initPlayer() async {
     try {
+      final fixedUrl = Environment.fixMediaUrl(widget.feed.streamUrl);
       _videoController = VideoPlayerController.networkUrl(
-        Uri.parse(widget.feed.streamUrl),
+        Uri.parse(fixedUrl),
       );
 
       await _videoController.initialize();

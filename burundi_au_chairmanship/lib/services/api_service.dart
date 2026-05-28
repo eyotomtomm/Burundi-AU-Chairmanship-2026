@@ -469,6 +469,28 @@ class ApiService {
     return await _post('magazines/$magazineId/toggle-like/', {}, auth: true);
   }
 
+  Future<List<ArticleComment>> getMagazineComments(String magazineId) async {
+    final data = await _get('magazines/$magazineId/comments/');
+    return (data as List).map((j) => ArticleComment.fromJson(j)).toList();
+  }
+
+  Future<ArticleComment> postMagazineComment(
+    String magazineId,
+    String content, {
+    int? parentId,
+  }) async {
+    final body = <String, dynamic>{
+      'content': content,
+      'parent': ?parentId,
+    };
+    final data = await _post('magazines/$magazineId/comments/', body, auth: true);
+    return ArticleComment.fromJson(data);
+  }
+
+  Future<void> deleteMagazineComment(String magazineId, int commentId) async {
+    await _delete('magazines/$magazineId/comments/$commentId/', auth: true);
+  }
+
   // ── Events ───────────────────────────────────────────────
   Future<List<EventLocation>> getEvents() async {
     final data = await _get('events/');
@@ -478,6 +500,10 @@ class ApiService {
   }
 
   // ── Live Feeds ───────────────────────────────────────────
+  Future<Map<String, dynamic>> recordLiveFeedView(int feedId) async {
+    return await _post('live-feeds/$feedId/record-view/', {});
+  }
+
   Future<List<ApiLiveFeed>> getLiveFeeds({String? status}) async {
     String endpoint = 'live-feeds/';
     if (status != null) endpoint += '?status=$status';
@@ -488,6 +514,10 @@ class ApiService {
   }
 
   // ── Resources ────────────────────────────────────────────
+  Future<Map<String, dynamic>> recordResourceView(int resourceId) async {
+    return await _post('resources/$resourceId/record-view/', {});
+  }
+
   Future<List<ApiResource>> getResources() async {
     final data = await _get('resources/');
     return _extractResults(data)
@@ -504,7 +534,16 @@ class ApiService {
     return null;
   }
 
+  // ── Feature Cards ──────────────────────────────────────
+  Future<Map<String, dynamic>> recordFeatureCardView(int cardId) async {
+    return await _post('feature-cards/$cardId/record-view/', {});
+  }
+
   // ── Priority Agendas ─────────────────────────────────────
+  Future<Map<String, dynamic>> recordAgendaView(int agendaId) async {
+    return await _post('priority-agendas/$agendaId/record-view/', {});
+  }
+
   Future<List<Map<String, dynamic>>> getPriorityAgendas() async {
     final data = await _get('priority-agendas/');
     return _extractResults(data).cast<Map<String, dynamic>>();
@@ -512,8 +551,17 @@ class ApiService {
 
   // ── Gallery ──────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getGalleryAlbums() async {
-    final data = await _get('gallery/', auth: true);
-    return _extractResults(data).cast<Map<String, dynamic>>();
+    try {
+      final data = await _get('gallery/', auth: true);
+      return _extractResults(data).cast<Map<String, dynamic>>();
+    } on ApiException catch (e) {
+      // If auth fails (401/403), retry without auth so guests can still browse
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        final data = await _get('gallery/');
+        return _extractResults(data).cast<Map<String, dynamic>>();
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> recordGalleryAlbumView(String albumId) async {
@@ -524,12 +572,37 @@ class ApiService {
     return await _post('gallery/$albumId/toggle-like/', {}, auth: true);
   }
 
+  Future<List<Map<String, dynamic>>> getGalleryComments(String albumId) async {
+    final data = await _get('gallery/$albumId/comments/');
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> postGalleryComment(String albumId, String content, {int? parentId}) async {
+    final body = <String, dynamic>{'content': content};
+    if (parentId != null) body['parent'] = parentId;
+    return await _post('gallery/$albumId/comments/', body, auth: true);
+  }
+
+  Future<void> deleteGalleryComment(String albumId, int commentId) async {
+    await _delete('gallery/$albumId/comments/$commentId/', auth: true);
+  }
+
   // ── Videos ───────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getVideos({String? category}) async {
     String endpoint = 'videos/';
     if (category != null) endpoint += '?category=$category';
-    final data = await _get(endpoint, auth: true);
-    return _extractResults(data).cast<Map<String, dynamic>>();
+    try {
+      final data = await _get(endpoint, auth: true);
+      return _extractResults(data).cast<Map<String, dynamic>>();
+    } on ApiException catch (e) {
+      // If auth fails (401/403), retry without auth so guests can still browse
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        final data = await _get(endpoint);
+        return _extractResults(data).cast<Map<String, dynamic>>();
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> recordVideoView(String videoId) async {
@@ -538,6 +611,22 @@ class ApiService {
 
   Future<Map<String, dynamic>> toggleVideoLike(String videoId) async {
     return await _post('videos/$videoId/toggle-like/', {}, auth: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getVideoComments(String videoId) async {
+    final data = await _get('videos/$videoId/comments/');
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> postVideoComment(String videoId, String content, {int? parentId}) async {
+    final body = <String, dynamic>{'content': content};
+    if (parentId != null) body['parent'] = parentId;
+    return await _post('videos/$videoId/comments/', body, auth: true);
+  }
+
+  Future<void> deleteVideoComment(String videoId, int commentId) async {
+    await _delete('videos/$videoId/comments/$commentId/', auth: true);
   }
 
   // ── Social Media ─────────────────────────────────────────
@@ -825,6 +914,14 @@ class ApiService {
     return await _post('discussions/$discussionId/replies/', body, auth: true);
   }
 
+  Future<Map<String, dynamic>> recordDiscussionView(int discussionId) async {
+    return await _post('discussions/$discussionId/record-view/', {});
+  }
+
+  Future<Map<String, dynamic>> toggleDiscussionLike(int discussionId) async {
+    return await _post('discussions/$discussionId/toggle-like/', {}, auth: true);
+  }
+
   // ── Polls ─────────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getPolls() async {
     final data = await _get('polls/', auth: true);
@@ -1056,6 +1153,14 @@ class ApiService {
     await _delete('events/$eventId/comments/$commentId/', auth: true);
   }
 
+  Future<Map<String, dynamic>> recordEventView(int eventId) async {
+    return await _post('events/$eventId/record-view/', {});
+  }
+
+  Future<Map<String, dynamic>> toggleEventLike(int eventId) async {
+    return await _post('events/$eventId/toggle-like/', {}, auth: true);
+  }
+
   // ── Event Attendees ─────────────────────────────────────
   Future<List<Map<String, dynamic>>> getEventAttendees(int eventId) async {
     final data = await _get('events/$eventId/attendees/', auth: true);
@@ -1134,6 +1239,27 @@ class ApiService {
     return await _post('auth/merge-accounts/', {
       'source_user_id': sourceUserId,
     }, auth: true);
+  }
+
+  // ── App Open Tracking ──────────────────────────────────
+  Future<void> recordAppOpen({
+    String? deviceId,
+    String? deviceType,
+    String? deviceOs,
+    String? appVersion,
+    String? countryCode,
+  }) async {
+    try {
+      await _post('app-open/', {
+        'device_id': deviceId ?? '',
+        'device_type': deviceType ?? '',
+        'device_os': deviceOs ?? '',
+        'app_version': appVersion ?? '',
+        'country_code': countryCode ?? '',
+      });
+    } catch (_) {
+      // Silent fail — don't let analytics block app launch
+    }
   }
 }
 

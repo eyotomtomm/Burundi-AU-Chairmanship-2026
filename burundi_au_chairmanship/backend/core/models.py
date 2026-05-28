@@ -285,6 +285,28 @@ class MagazineLike(models.Model):
         return f"{self.user.username} likes {self.edition.title[:30]}"
 
 
+class MagazineComment(models.Model):
+    """User comments on magazine editions."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='magazine_comments')
+    edition = models.ForeignKey(MagazineEdition, on_delete=models.CASCADE, related_name='comments')
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies',
+        help_text='Parent comment for threaded replies (1 level deep).'
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['edition', '-created_at']),
+            models.Index(fields=['parent']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} on {self.edition.title[:30]}"
+
+
 class MagazineImage(models.Model):
     """Additional images for a magazine edition (shown in info bottom sheet)."""
     edition = models.ForeignKey(MagazineEdition, on_delete=models.CASCADE, related_name='images')
@@ -517,6 +539,10 @@ class Event(models.Model):
         help_text='When to auto-publish this event (used when status=scheduled)'
     )
 
+    # Engagement
+    view_count = models.PositiveIntegerField(default=0)
+    like_count = models.PositiveIntegerField(default=0)
+
     # Recurrence fields
     RECURRENCE_CHOICES = [
         ('none', 'None'),
@@ -584,6 +610,7 @@ class LiveFeed(models.Model):
     thumbnail = models.ImageField(upload_to='live_feeds/', blank=True, validators=[validate_image_file])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='upcoming')
     viewer_count = models.IntegerField(default=0)
+    view_count = models.PositiveIntegerField(default=0)
     duration = models.CharField(max_length=50, blank=True, help_text='e.g. 1h 30m')
     scheduled_time = models.DateTimeField(null=True, blank=True)
     content_status = models.CharField(
@@ -642,6 +669,7 @@ class Resource(models.Model):
     file = models.FileField(upload_to='resources/', validators=[validate_document_file])
     file_size = models.CharField(max_length=20, help_text='e.g. 2.4 MB')
     file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='pdf')
+    view_count = models.PositiveIntegerField(default=0)
     status = models.CharField(
         max_length=20, choices=CONTENT_STATUS_CHOICES, default='published',
         help_text='Content workflow status: draft, scheduled, published, or archived'
@@ -726,6 +754,7 @@ class FeatureCard(models.Model):
 
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    view_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1466,6 +1495,9 @@ class PriorityAgenda(models.Model):
 
     # Media
     hero_image = models.ImageField(upload_to='agendas/', blank=True, null=True, validators=[validate_image_file], help_text='Main image for this agenda')
+
+    # Engagement
+    view_count = models.PositiveIntegerField(default=0)
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
@@ -2756,6 +2788,7 @@ class Discussion(models.Model):
     is_pinned = models.BooleanField(default=False)
     is_locked = models.BooleanField(default=False, help_text='Prevent new replies')
     view_count = models.PositiveIntegerField(default=0)
+    like_count = models.PositiveIntegerField(default=0)
     reply_count = models.PositiveIntegerField(default=0)
     last_reply_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -4047,6 +4080,99 @@ class CommentMention(models.Model):
 
     def __str__(self):
         return f"@{self.mentioned_user.username} in comment #{self.comment_id}"
+
+
+class EventLike(models.Model):
+    """Tracks which users liked which events."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_likes')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'event')
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.event.name[:30]}"
+
+
+class VideoComment(models.Model):
+    """User comments on videos."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_comments')
+    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='comments')
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies',
+        help_text='Parent comment for threaded replies (1 level deep).'
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['video', '-created_at']),
+            models.Index(fields=['parent']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} on {self.video.title[:30]}"
+
+
+class GalleryComment(models.Model):
+    """User comments on gallery albums."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='gallery_comments')
+    album = models.ForeignKey(GalleryAlbum, on_delete=models.CASCADE, related_name='comments')
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies',
+        help_text='Parent comment for threaded replies (1 level deep).'
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['album', '-created_at']),
+            models.Index(fields=['parent']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} on {self.album.title[:30]}"
+
+
+class DiscussionLike(models.Model):
+    """Tracks which users liked which discussions."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussion_likes')
+    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'discussion')
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.discussion.title[:30]}"
+
+
+class AppOpenEvent(models.Model):
+    """Tracks each time the app is opened."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='app_opens')
+    device_id = models.CharField(max_length=255, blank=True, help_text='Anonymous device identifier for guest tracking')
+    device_type = models.CharField(max_length=50, blank=True)
+    device_os = models.CharField(max_length=50, blank=True)
+    app_version = models.CharField(max_length=20, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    country_code = models.CharField(max_length=5, blank=True)
+    opened_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-opened_at']
+        indexes = [
+            models.Index(fields=['-opened_at']),
+            models.Index(fields=['user', '-opened_at']),
+        ]
+
+    def __str__(self):
+        user_label = self.user.username if self.user else f'guest:{self.device_id[:8]}'
+        return f"{user_label} at {self.opened_at}"
 
 
 class NewsletterEdition(models.Model):

@@ -24,6 +24,8 @@ from .models import (
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
     EventComment, CommentMention, NewsletterEdition,
     EventAgendaItem, LinkedAccount,
+    # Engagement models
+    EventLike, DiscussionLike, VideoComment, GalleryComment, AppOpenEvent,
 )
 
 
@@ -216,6 +218,154 @@ class MagazineEditionSerializer(serializers.ModelSerializer):
     def get_recent_likers(self, obj):
         request = self.context.get('request')
         return get_recent_likers(MagazineLike, 'edition', obj, request)
+
+
+class MagazineCommentSerializer(serializers.ModelSerializer):
+    """Serializer for magazine comments with nested replies."""
+    user_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import MagazineComment
+        model = MagazineComment
+        fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
+                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+        read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
+                            'badge_type', 'created_at', 'replies', 'reply_count']
+
+    def get_user_name(self, obj):
+        from .utils import user_handle
+        return obj.user.get_full_name().strip() or user_handle(obj.user)
+
+    def get_username(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.user)
+
+    def get_profile_picture(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.user.profile.profile_picture.url)
+        return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
+            return obj.user.profile.badge_type
+        return None
+
+    def get_replies(self, obj):
+        if obj.parent_id is not None:
+            return []
+        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        return MagazineCommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_count(self, obj):
+        if obj.parent_id is not None:
+            return 0
+        return obj.replies.count()
+
+
+class VideoCommentSerializer(serializers.ModelSerializer):
+    """Serializer for video comments with nested replies."""
+    user_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VideoComment
+        fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
+                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+        read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
+                            'badge_type', 'created_at', 'replies', 'reply_count']
+
+    def get_user_name(self, obj):
+        from .utils import user_handle
+        return obj.user.get_full_name().strip() or user_handle(obj.user)
+
+    def get_username(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.user)
+
+    def get_profile_picture(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.user.profile.profile_picture.url)
+        return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
+            return obj.user.profile.badge_type
+        return None
+
+    def get_replies(self, obj):
+        if obj.parent_id is not None:
+            return []
+        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        return VideoCommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_count(self, obj):
+        if obj.parent_id is not None:
+            return 0
+        return obj.replies.count()
+
+
+class GalleryCommentSerializer(serializers.ModelSerializer):
+    """Serializer for gallery album comments with nested replies."""
+    user_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GalleryComment
+        fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
+                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+        read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
+                            'badge_type', 'created_at', 'replies', 'reply_count']
+
+    def get_user_name(self, obj):
+        from .utils import user_handle
+        return obj.user.get_full_name().strip() or user_handle(obj.user)
+
+    def get_username(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.user)
+
+    def get_profile_picture(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.user.profile.profile_picture.url)
+        return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
+            return obj.user.profile.badge_type
+        return None
+
+    def get_replies(self, obj):
+        if obj.parent_id is not None:
+            return []
+        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        return GalleryCommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_count(self, obj):
+        if obj.parent_id is not None:
+            return 0
+        return obj.replies.count()
 
 
 class ArticleCommentSerializer(serializers.ModelSerializer):

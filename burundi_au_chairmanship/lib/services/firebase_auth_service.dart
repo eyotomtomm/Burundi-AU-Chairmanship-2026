@@ -247,6 +247,10 @@ class FirebaseAuthService {
       case 'credential-already-in-use':
         return 'This account is already associated with another user.';
 
+      // Invalid credential (common with Google Sign-In SHA-1 mismatch)
+      case 'invalid-credential':
+        return 'Sign-in failed. Please try again or use a different sign-in method.';
+
       default:
         return 'Authentication error: ${e.message ?? e.code}';
     }

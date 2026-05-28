@@ -323,4 +323,7 @@ urlpatterns = [
 
     # Media Library (browse existing Spaces images)
     path('media-library/api/', views.media_library_api, name='media_library_api'),
+
+    # Temporary diagnostic endpoint (remove after debugging)
+    path('debug-create-test/', views.debug_create_test, name='debug_create_test'),
 ]

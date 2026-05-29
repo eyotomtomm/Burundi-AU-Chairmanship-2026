@@ -283,18 +283,8 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Create Firebase user (or sign in if already exists from a previous attempt)
-      UserCredential credential;
-      try {
-        credential = await _firebaseAuth.signUpWithEmail(email, password);
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'email-already-in-use') {
-          // Firebase user exists from a previous attempt — sign in to continue
-          credential = await _firebaseAuth.signInWithEmail(email, password);
-        } else {
-          rethrow;
-        }
-      }
+      // 1. Create Firebase user
+      final credential = await _firebaseAuth.signUpWithEmail(email, password);
 
       // 2. Send email verification
       await _firebaseAuth.sendEmailVerification();

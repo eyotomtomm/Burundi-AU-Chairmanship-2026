@@ -83,7 +83,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       isDark
                           ? 'assets/images/b4africa_logo_white.png'
                           : 'assets/images/b4africa_logo.png',
-                      height: 80,
+                      height: 120,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => _buildLogo(),
                     ),
@@ -223,8 +223,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   Widget _buildLogo() {
     return Container(
-      width: 80,
-      height: 80,
+      width: 120,
+      height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.2), width: 2),
@@ -872,9 +872,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } else if (context.mounted && authProvider.errorMessage != null) {
-      // Show error message
       HapticFeedback.heavyImpact();
-      _showErrorSnackBar(context, authProvider.errorMessage!);
+      // Check if the error is about an existing account
+      if (authProvider.errorMessage!.contains('already registered')) {
+        _showAccountExistsDialog(context, _signUpEmailController.text);
+      } else {
+        _showErrorSnackBar(context, authProvider.errorMessage!);
+      }
     }
   }
 
@@ -916,6 +920,58 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         content: Text(message),
         backgroundColor: AppColors.burundiRed,
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showAccountExistsDialog(BuildContext context, String email) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.patternOrange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.account_circle_outlined, color: AppColors.patternOrange, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Account Exists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: Text(
+          'An account with $email is already registered. Please sign in instead.',
+          style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.patternOrange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              // Pre-fill the sign-in email and switch to Sign In tab
+              _signInEmailController.text = email;
+              _tabController.animateTo(0);
+            },
+            child: const Text('Go to Sign In'),
+          ),
+        ],
       ),
     );
   }

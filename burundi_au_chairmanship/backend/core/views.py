@@ -825,8 +825,12 @@ def firebase_login(request):
             user.is_active = True
             user.save()
 
-        # Update email verification status from Firebase
-        profile.is_email_verified = decoded_token.get('email_verified', False)
+        # Update email verification status from Firebase — but never
+        # downgrade a locally-verified user (OTP verification sets
+        # is_email_verified=True independently of Firebase's flag).
+        firebase_email_verified = decoded_token.get('email_verified', False)
+        if firebase_email_verified and not profile.is_email_verified:
+            profile.is_email_verified = True
         profile.save()
 
         # Record login history

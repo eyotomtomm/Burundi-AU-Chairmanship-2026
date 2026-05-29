@@ -158,6 +158,12 @@ class AuthProvider extends ChangeNotifier {
         // User is signed in with Firebase — load cached profile immediately
         _isAuthenticated = true;
         await _loadLocalUserData();
+
+        // Don't set _requiresEmailVerification from cache here — the
+        // backend sync below will set the authoritative value.  Using
+        // stale cache caused users who verified their email to be
+        // re-prompted after signing back in.
+
         notifyListeners();
 
         // Sync with backend and wait for it so user data (userId, email) is populated.
@@ -244,10 +250,23 @@ class AuthProvider extends ChangeNotifier {
 
       _isAuthenticated = true;
       notifyListeners();
+    } on ApiException catch (e) {
+      if (kDebugMode) print('Backend sync rejected: ${e.statusCode} ${e.message}');
+      // If backend explicitly rejects (401/403 = account deactivated/deleted),
+      // sign out completely so the user isn't stuck as "authenticated"
+      if (e.statusCode == 401 || e.statusCode == 403) {
+        await _firebaseAuth.signOut();
+        await _clearUserData();
+        _isAuthenticated = false;
+        notifyListeners();
+      } else {
+        // Other errors (500, timeout) — keep cached data, stay authenticated
+        _isAuthenticated = true;
+        notifyListeners();
+      }
     } catch (e) {
       if (kDebugMode) print('Failed to sync with backend: $e');
-      // If sync fails, user is still authenticated with Firebase
-      // but profile data may be incomplete
+      // Network error — keep cached data, stay authenticated
       _isAuthenticated = true;
       notifyListeners();
     }
@@ -312,11 +331,14 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } on ApiException catch (e) {
+      // Firebase succeeded but backend rejected — sign out Firebase
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Registration failed: $e';
       _isLoading = false;
       notifyListeners();
@@ -365,11 +387,14 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } on ApiException catch (e) {
+      // Firebase succeeded but backend rejected — sign out Firebase
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Login failed: $e';
       _isLoading = false;
       notifyListeners();
@@ -415,11 +440,16 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } on ApiException catch (e) {
+      // Firebase succeeded but backend rejected — sign out Firebase
+      // so the user doesn't get stuck in a half-authenticated state
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
+      // Sign out Firebase if it succeeded but something else failed
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Google Sign-In failed: $e';
       _isLoading = false;
       notifyListeners();
@@ -465,12 +495,14 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } on ApiException catch (e) {
+      try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Apple Sign-In failed. Please try again.';
+      try { await _firebaseAuth.signOut(); } catch (_) {}
+      _errorMessage = 'Apple Sign-In failed: $e';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -698,6 +730,16 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       await _api.deactivateAccount();
+
+      // Deactivate FCM token so push notifications stop
+      try {
+        final messaging = FirebaseMessagingService();
+        await messaging.deactivateToken();
+      } catch (_) {}
+
+      // Sign out from Firebase so the session doesn't persist on restart
+      await _firebaseAuth.signOut();
+
       await _clearUserData();
 
       _isAuthenticated = false;
@@ -726,6 +768,12 @@ class AuthProvider extends ChangeNotifier {
     try {
       // Schedule deletion on Django backend (30-day soft delete)
       await _api.deleteAccount();
+
+      // Deactivate FCM token so push notifications stop
+      try {
+        final messaging = FirebaseMessagingService();
+        await messaging.deactivateToken();
+      } catch (_) {}
 
       // Sign out from Firebase (don't delete Firebase account yet —
       // it gets cleaned up after 30 days when Django purges)

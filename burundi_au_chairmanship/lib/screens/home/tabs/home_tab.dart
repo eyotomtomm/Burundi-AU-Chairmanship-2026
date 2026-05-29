@@ -182,13 +182,10 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   /// Cache feature toggle flags from API settings into SharedPreferences.
-  /// These flags control visibility of Bookmarks, Discussions, Polls, and Newsletter in the app.
+  /// These flags control visibility of Newsletter in the app.
   Future<void> _cacheFeatureFlags(Map<String, dynamic> settings) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('feature_bookmarks_enabled', settings['bookmarks_enabled'] ?? true);
-      await prefs.setBool('feature_discussions_enabled', settings['discussions_enabled'] ?? true);
-      await prefs.setBool('feature_polls_enabled', settings['polls_enabled'] ?? true);
       await prefs.setBool('feature_newsletter_enabled', settings['newsletter_enabled'] ?? true);
     } catch (_) {}
   }
@@ -941,50 +938,7 @@ class _HomeTabState extends State<HomeTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      PopupMenuButton<String>(
-                        icon: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.menu, color: Colors.white),
-                        ),
-                        onSelected: (value) {
-                          switch (value) {
-                            case 'news':
-                              Navigator.pushNamed(context, '/news');
-                              break;
-                            case 'magazine':
-                              Navigator.pushNamed(context, '/magazine');
-                              break;
-                            case 'calendar':
-                              Navigator.pushNamed(context, '/calendar');
-                              break;
-                            case 'live_feeds':
-                              Navigator.pushNamed(context, '/live-feeds');
-                              break;
-                            case 'resources':
-                              Navigator.pushNamed(context, '/resources');
-                              break;
-                            case 'weather':
-                              Navigator.pushNamed(context, '/weather');
-                              break;
-                            case 'translate':
-                              Navigator.pushNamed(context, '/translate');
-                              break;
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(value: 'news', child: ListTile(leading: Icon(Icons.article), title: Text('News'), dense: true, contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'magazine', child: ListTile(leading: Icon(Icons.auto_stories), title: Text('Magazine'), dense: true, contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'calendar', child: ListTile(leading: Icon(Icons.calendar_month), title: Text('Calendar'), dense: true, contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'live_feeds', child: ListTile(leading: Icon(Icons.live_tv), title: Text('Live Feeds'), dense: true, contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'resources', child: ListTile(leading: Icon(Icons.folder), title: Text('Resources'), dense: true, contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'weather', child: ListTile(leading: Icon(Icons.cloud), title: Text('Weather'), dense: true, contentPadding: EdgeInsets.zero)),
-                          const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate), title: Text('Translate'), dense: true, contentPadding: EdgeInsets.zero)),
-                        ],
-                      ),
+                      const SizedBox(width: 48),
                       Row(
                         children: [
                           // Notification bell with unread badge
@@ -1459,12 +1413,12 @@ class _HomeTabState extends State<HomeTab> {
           'hasLiveDot': false,
           'badgeText': '',
           'badgeColor': '',
-          'onTap': () => Navigator.pushNamed(context, '/news'),
+          'onTap': () => widget.onSwitchTab?.call(2),
         },
-      if (!isDuplicate('/translate', 'Translate', 'Traduire'))
+      if (!isDuplicate('/translate', 'Phrasebook', 'Guide'))
         <String, dynamic>{
-          'title': langCode == 'fr' ? 'Traduire' : 'Translate',
-          'icon': Icons.translate_rounded,
+          'title': langCode == 'fr' ? 'Guide' : 'Phrasebook',
+          'icon': Icons.menu_book_rounded,
           'hasLiveDot': false,
           'badgeText': '',
           'badgeColor': '',
@@ -2245,7 +2199,7 @@ class _HomeTabState extends State<HomeTab> {
         ),
         if (showSeeAll)
           TextButton(
-            onPressed: onSeeAll ?? () => Navigator.pushNamed(context, '/news'),
+            onPressed: onSeeAll ?? () => widget.onSwitchTab?.call(2),
             child: const Row(
               children: [
                 Text(

@@ -15,16 +15,12 @@ import '../../../l10n/app_localizations.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/verification_provider.dart';
 import '../../../services/api_service.dart';
 import '../../../widgets/verified_badge.dart';
-import '../../bookmarks/bookmarks_screen.dart';
-import '../../discussions/discussions_screen.dart';
-import '../../polls/polls_screen.dart';
 import '../../security/login_history_screen.dart';
 import '../../security/active_sessions_screen.dart';
 import '../../security/change_password_screen.dart';
-import '../../settings/notification_preferences_screen.dart';
-import '../../settings/linked_accounts_screen.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -37,9 +33,6 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   final GlobalKey _shareMenuKey = GlobalKey();
 
   // Feature toggles (loaded from SharedPreferences, set by admin via API)
-  bool _bookmarksEnabled = true;
-  bool _discussionsEnabled = true;
-  bool _pollsEnabled = true;
   bool _newsletterEnabled = true;
 
   @override
@@ -69,9 +62,6 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       if (mounted) {
         setState(() {
-          _bookmarksEnabled = prefs.getBool('feature_bookmarks_enabled') ?? true;
-          _discussionsEnabled = prefs.getBool('feature_discussions_enabled') ?? true;
-          _pollsEnabled = prefs.getBool('feature_polls_enabled') ?? true;
           _newsletterEnabled = prefs.getBool('feature_newsletter_enabled') ?? true;
         });
       }
@@ -83,14 +73,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       final settings = await ApiService().getSettings();
       if (settings != null && mounted) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('feature_bookmarks_enabled', settings.bookmarksEnabled);
-        await prefs.setBool('feature_discussions_enabled', settings.discussionsEnabled);
-        await prefs.setBool('feature_polls_enabled', settings.pollsEnabled);
         await prefs.setBool('feature_newsletter_enabled', settings.newsletterEnabled);
         setState(() {
-          _bookmarksEnabled = settings.bookmarksEnabled;
-          _discussionsEnabled = settings.discussionsEnabled;
-          _pollsEnabled = settings.pollsEnabled;
           _newsletterEnabled = settings.newsletterEnabled;
         });
       }
@@ -470,57 +454,99 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
-                child: Consumer<AuthProvider>(
-                  builder: (context, authProvider, _) {
+                child: Consumer2<AuthProvider, VerificationProvider>(
+                  builder: (context, authProvider, verificationProvider, _) {
                     final isLoggedIn = authProvider.isAuthenticated;
                     final isVerified = authProvider.isVerified;
-                    final showGetVerified = isLoggedIn && !isVerified;
+                    final showVerificationItem = isLoggedIn && !isVerified;
+                    final verificationStatus = verificationProvider.requestStatus;
 
                     return Column(
                       children: [
-                        // Engagement features (for logged in users, respects admin feature toggles)
-                        if (isLoggedIn) ...[
-                          if (_bookmarksEnabled)
-                            _buildMenuItem(
+                        // Verification status - Only show if logged in and NOT verified
+                        if (showVerificationItem)
+                          _buildVerificationMenuItem(
+                            context: context,
+                            isDark: isDark,
+                            verificationStatus: verificationStatus,
+                            l10n: l10n,
+                          ),
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.info_outline_rounded,
+                          iconBgColor: const Color(0xFF5C6BC0),
+                          title: l10n.translate('about'),
+                          subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
+                          isDark: isDark,
+                          isFirst: !showVerificationItem,
+                          onTap: () => _showAboutDialog(context, l10n),
+                        ),
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.privacy_tip_outlined,
+                          iconBgColor: const Color(0xFF8D6E63),
+                          title: l10n.translate('privacy_policy'),
+                          isDark: isDark,
+                          onTap: () => launchUrl(
+                            Uri.parse('${Environment.siteBaseUrl}/privacy-policy/'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                        ),
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.description_outlined,
+                          iconBgColor: const Color(0xFF78909C),
+                          title: l10n.translate('terms_of_service'),
+                          isDark: isDark,
+                          onTap: () => launchUrl(
+                            Uri.parse('${Environment.siteBaseUrl}/terms-of-service/'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                        ),
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            return _buildMenuItem(
                               context: context,
-                              icon: Icons.bookmark_rounded,
-                              iconBgColor: const Color(0xFFFF7043),
-                              title: l10n.translate('bookmarks'),
-                              subtitle: l10n.translate('saved_content'),
+                              icon: Icons.headset_mic_rounded,
+                              iconBgColor: const Color(0xFFEF5350),
+                              title: l10n.translate('contact_support'),
+                              subtitle: 'Get help and support',
                               isDark: isDark,
-                              isFirst: true,
-                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const BookmarksScreen())),
-                            ),
-                          if (_discussionsEnabled)
-                            _buildMenuItem(
-                              context: context,
-                              icon: Icons.forum_rounded,
-                              iconBgColor: const Color(0xFF7E57C2),
-                              title: l10n.translate('discussions'),
-                              subtitle: l10n.translate('community_forums'),
-                              isDark: isDark,
-                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const DiscussionsScreen())),
-                            ),
-                          if (_pollsEnabled)
-                            _buildMenuItem(
-                              context: context,
-                              icon: Icons.ballot_rounded,
-                              iconBgColor: const Color(0xFF5C6BC0),
-                              title: l10n.translate('polls'),
-                              subtitle: l10n.translate('vote_share_opinion'),
-                              isDark: isDark,
-                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const PollsScreen())),
-                            ),
-                        ],
-                        // Security section (for logged in users)
+                              onTap: () {
+                                if (!auth.isAuthenticated) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        Localizations.localeOf(context).languageCode == 'fr'
+                                            ? 'Veuillez vous connecter pour contacter le support'
+                                            : 'Please sign in to contact support',
+                                      ),
+                                      backgroundColor: AppColors.burundiGreen,
+                                      behavior: SnackBarBehavior.floating,
+                                      action: SnackBarAction(
+                                        label: Localizations.localeOf(context).languageCode == 'fr' ? 'Connexion' : 'Sign In',
+                                        textColor: Colors.white,
+                                        onPressed: () => Navigator.pushNamed(context, '/auth'),
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _showSupportOptions(context, isDark);
+                              },
+                            );
+                          },
+                        ),
+                        // Account management & security (for logged in users)
                         if (isLoggedIn) ...[
                           _buildMenuItem(
                             context: context,
-                            icon: Icons.notifications_rounded,
-                            iconBgColor: const Color(0xFFEC407A),
-                            title: l10n.translate('notification_preferences'),
+                            icon: Icons.manage_accounts_rounded,
+                            iconBgColor: Colors.red,
+                            title: 'Manage Account',
+                            subtitle: 'Deactivate or delete your account',
                             isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const NotificationPreferencesScreen())),
+                            onTap: () => _showAccountManageSheet(context, isDark, authProvider),
                           ),
                           if (_newsletterEnabled)
                             _buildNewsletterToggle(
@@ -528,7 +554,6 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                               isDark: isDark,
                               authProvider: authProvider,
                             ),
-                          // Only show Change Password for email/password users (not Google/Apple SSO)
                           if (authProvider.hasPasswordProvider)
                             _buildMenuItem(
                               context: context,
@@ -554,169 +579,77 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             isDark: isDark,
                             onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ActiveSessionsScreen())),
                           ),
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.link_rounded,
-                            iconBgColor: const Color(0xFF26A69A),
-                            title: 'Linked Accounts',
-                            subtitle: 'Manage sign-in methods',
-                            isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const LinkedAccountsScreen())),
-                          ),
                         ],
-                        // Get Verified - Only show if logged in and NOT verified
-                        if (showGetVerified)
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.verified_rounded,
-                            iconBgColor: const Color(0xFF42A5F5),
-                            title: l10n.translate('get_verified'),
-                            subtitle: l10n.translate('get_verified_desc'),
-                            isDark: isDark,
-                            onTap: () => Navigator.pushNamed(context, '/verification-request'),
-                          ),
                         _buildMenuItem(
                           context: context,
-                          icon: Icons.info_outline_rounded,
-                          iconBgColor: const Color(0xFF5C6BC0),
-                          title: l10n.translate('about'),
-                          subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
+                          icon: Icons.share_rounded,
+                          iconBgColor: const Color(0xFF66BB6A),
+                          title: l10n.translate('share_app'),
                           isDark: isDark,
-                          onTap: () => _showAboutDialog(context, l10n),
+                          itemKey: _shareMenuKey,
+                          onTap: () async {
+                            final appLink = Platform.isIOS
+                                ? 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
+                                : 'https://${'play.goo'}${'gle.com'}/store/apps/details?id=com.b4africa.app';
+
+                            Rect? sharePositionOrigin;
+                            final renderObject = _shareMenuKey.currentContext?.findRenderObject();
+                            if (renderObject is RenderBox) {
+                              final offset = renderObject.localToGlobal(Offset.zero);
+                              sharePositionOrigin = offset & renderObject.size;
+                            }
+
+                            await Share.share(
+                              'Check out the Burundi Chairmanship 2026 app! 🇧🇮\n\n$appLink',
+                              subject: 'Burundi Chairmanship 2026 App',
+                              sharePositionOrigin: sharePositionOrigin,
+                            );
+                          },
                         ),
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.privacy_tip_outlined,
-                      iconBgColor: const Color(0xFF8D6E63),
-                      title: l10n.translate('privacy_policy'),
-                      isDark: isDark,
-                      onTap: () => launchUrl(
-                        Uri.parse('${Environment.siteBaseUrl}/privacy-policy/'),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                    ),
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.description_outlined,
-                      iconBgColor: const Color(0xFF78909C),
-                      title: l10n.translate('terms_of_service'),
-                      isDark: isDark,
-                      onTap: () => launchUrl(
-                        Uri.parse('${Environment.siteBaseUrl}/terms-of-service/'),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                    ),
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.share_rounded,
-                      iconBgColor: const Color(0xFF66BB6A),
-                      title: l10n.translate('share_app'),
-                      isDark: isDark,
-                      itemKey: _shareMenuKey,
-                      onTap: () async {
-                        // Android store link is assembled at runtime so the
-                        // full literal never appears in the iOS binary
-                        // (App Store guideline 2.3.10).
-                        final appLink = Platform.isIOS
-                            ? 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
-                            : 'https://${'play.goo'}${'gle.com'}/store/apps/details?id=com.b4africa.app';
-
-                        Rect? sharePositionOrigin;
-                        final renderObject = _shareMenuKey.currentContext?.findRenderObject();
-                        if (renderObject is RenderBox) {
-                          final offset = renderObject.localToGlobal(Offset.zero);
-                          sharePositionOrigin = offset & renderObject.size;
-                        }
-
-                        await Share.share(
-                          'Check out the Burundi Chairmanship 2026 app! 🇧🇮\n\n$appLink',
-                          subject: 'Burundi Chairmanship 2026 App',
-                          sharePositionOrigin: sharePositionOrigin,
-                        );
-                      },
-                    ),
-                    _buildMenuItem(
-                      context: context,
-                      icon: Icons.star_rounded,
-                      iconBgColor: const Color(0xFFFFB74D),
-                      title: l10n.translate('rate_app'),
-                      isDark: isDark,
-                      onTap: () async {
-                        final InAppReview inAppReview = InAppReview.instance;
-
-                        if (await inAppReview.isAvailable()) {
-                          // Request in-app review (iOS/Android native prompt)
-                          await inAppReview.requestReview();
-                        } else {
-                          // Fallback: Open store listing
-                          final appId = Platform.isIOS
-                              ? '6740047505'
-                              : 'com.b4africa.app';
-
-                          await inAppReview.openStoreListing(
-                            appStoreId: appId,
-                          );
-                        }
-
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Thank you for your support!'),
-                              backgroundColor: const Color(0xFFFFB74D),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    Consumer<AuthProvider>(
-                      builder: (context, auth, _) {
-                        return _buildMenuItem(
+                        _buildMenuItem(
                           context: context,
-                          icon: Icons.headset_mic_rounded,
-                          iconBgColor: const Color(0xFFEF5350),
-                          title: l10n.translate('contact_support'),
-                          subtitle: 'Get help and support',
+                          icon: Icons.star_rounded,
+                          iconBgColor: const Color(0xFFFFB74D),
+                          title: l10n.translate('rate_app'),
                           isDark: isDark,
-                          onTap: () {
-                            if (!auth.isAuthenticated) {
+                          isLast: !isLoggedIn,
+                          onTap: () async {
+                            final InAppReview inAppReview = InAppReview.instance;
+
+                            if (await inAppReview.isAvailable()) {
+                              await inAppReview.requestReview();
+                            } else {
+                              final appId = Platform.isIOS
+                                  ? '6740047505'
+                                  : 'com.b4africa.app';
+
+                              await inAppReview.openStoreListing(
+                                appStoreId: appId,
+                              );
+                            }
+
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(
-                                    Localizations.localeOf(context).languageCode == 'fr'
-                                        ? 'Veuillez vous connecter pour contacter le support'
-                                        : 'Please sign in to contact support',
-                                  ),
-                                  backgroundColor: AppColors.burundiGreen,
+                                  content: const Text('Thank you for your support!'),
+                                  backgroundColor: const Color(0xFFFFB74D),
                                   behavior: SnackBarBehavior.floating,
-                                  action: SnackBarAction(
-                                    label: Localizations.localeOf(context).languageCode == 'fr' ? 'Connexion' : 'Sign In',
-                                    textColor: Colors.white,
-                                    onPressed: () => Navigator.pushNamed(context, '/auth'),
-                                  ),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                               );
-                              return;
                             }
-                            _showSupportOptions(context, isDark);
                           },
-                        );
-                      },
-                    ),
-                        // Export Data & Delete Account - Only show if logged in
-                        if (isLoggedIn) ...[
+                        ),
+                        if (isLoggedIn)
                           _buildMenuItem(
                             context: context,
-                            icon: Icons.manage_accounts_rounded,
+                            icon: Icons.logout_rounded,
                             iconBgColor: Colors.red,
-                            title: 'Manage Account',
-                            subtitle: 'Deactivate or delete your account',
+                            title: 'Sign Out',
                             isDark: isDark,
                             isLast: true,
-                            onTap: () => _showAccountManageSheet(context, isDark, authProvider),
+                            onTap: () => _showSignOutConfirmation(context, authProvider),
                           ),
-                        ],
                       ],
                     );
                   },
@@ -985,6 +918,94 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerificationMenuItem({
+    required BuildContext context,
+    required bool isDark,
+    required String? verificationStatus,
+    required AppLocalizations l10n,
+  }) {
+    if (verificationStatus == 'pending') {
+      return _buildMenuItem(
+        context: context,
+        icon: Icons.hourglass_top_rounded,
+        iconBgColor: const Color(0xFFFF9800),
+        title: 'Verification Pending',
+        subtitle: 'Your request is being processed',
+        isDark: isDark,
+        isFirst: true,
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your verification request is being processed. Please wait.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      );
+    } else if (verificationStatus == 'rejected') {
+      return _buildMenuItem(
+        context: context,
+        icon: Icons.hourglass_top_rounded,
+        iconBgColor: const Color(0xFFFF9800),
+        title: 'Verification In Review',
+        subtitle: 'Still being processed',
+        isDark: isDark,
+        isFirst: true,
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your verification request is still being processed. Please wait.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      );
+    } else {
+      // No request exists - show Get Verified
+      return _buildMenuItem(
+        context: context,
+        icon: Icons.verified_rounded,
+        iconBgColor: const Color(0xFF42A5F5),
+        title: l10n.translate('get_verified'),
+        subtitle: l10n.translate('get_verified_desc'),
+        isDark: isDark,
+        isFirst: true,
+        onTap: () => Navigator.pushNamed(context, '/verification-request'),
+      );
+    }
+  }
+
+  void _showSignOutConfirmation(BuildContext context, AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await authProvider.signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+              }
+            },
+            child: const Text('Sign Out'),
           ),
         ],
       ),

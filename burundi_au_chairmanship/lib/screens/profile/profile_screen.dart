@@ -903,7 +903,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showEditPhoneDialog(
       BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
-    final controller = TextEditingController(text: authProvider.phoneNumber ?? '');
+    // Parse existing phone number to separate dial code and number
+    final existingPhone = authProvider.phoneNumber ?? '';
+    String selectedCountryCode = 'BI'; // Default to Burundi
+
+    // Try to detect country code from nationality or existing phone
+    if (authProvider.nationality != null &&
+        AppConstants.countryDialCodes.containsKey(authProvider.nationality)) {
+      selectedCountryCode = authProvider.nationality!;
+    }
+
+    String phoneBody = existingPhone;
+    // Strip known dial code prefix from existing phone
+    for (final entry in AppConstants.countryDialCodes.entries) {
+      if (existingPhone.startsWith(entry.value)) {
+        selectedCountryCode = entry.key;
+        phoneBody = existingPhone.substring(entry.value.length).trim();
+        break;
+      }
+    }
+
+    final controller = TextEditingController(text: phoneBody);
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -913,23 +933,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Update Phone Number'),
         content: Form(
           key: formKey,
-          child: TextFormField(
-            controller: controller,
-            autofocus: true,
-            keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
-              labelText: 'Phone Number',
-              hintText: '+257 XX XXX XXXX',
-              prefixIcon: const Icon(Icons.phone_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.patternOrange, width: 2),
-              ),
-            ),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Country code picker
+                  GestureDetector(
+                    onTap: () {
+                      _showCountryCodePicker(context, selectedCountryCode, (code) {
+                        setState(() => selectedCountryCode = code);
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            AppConstants.countryFlag(selectedCountryCode),
+                            style: const TextStyle(fontSize: 20),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            AppConstants.countryDialCodes[selectedCountryCode] ?? '+257',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey.shade600),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Phone number field
+                  Expanded(
+                    child: TextFormField(
+                      controller: controller,
+                      autofocus: true,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Phone Number',
+                        hintText: 'XX XXX XXXX',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.patternOrange, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         actions: [
@@ -944,11 +1006,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () async {
+              final dialCode = AppConstants.countryDialCodes[selectedCountryCode] ?? '+257';
+              final fullPhone = '$dialCode${controller.text.trim()}';
               Navigator.pop(dialogContext);
               // Update phone via API
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Phone number updated'),
+                  content: Text('Phone number updated to $fullPhone'),
                   backgroundColor: AppColors.success,
                 ),
               );
@@ -960,9 +1024,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showCountryCodePicker(BuildContext context, String currentCode, ValueChanged<String> onSelected) {
+    String searchQuery = '';
+    final entries = AppConstants.countryDialCodes.entries
+        .where((e) => AppConstants.nationalityChoices.containsKey(e.key))
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final filtered = entries.where((e) {
+              final name = AppConstants.nationalityChoices[e.key]?.toLowerCase() ?? '';
+              final code = e.value.toLowerCase();
+              final query = searchQuery.toLowerCase();
+              return name.contains(query) || code.contains(query) || e.key.toLowerCase().contains(query);
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              maxChildSize: 0.85,
+              minChildSize: 0.4,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: TextField(
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Search country...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        onChanged: (value) => setState(() => searchQuery = value),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final entry = filtered[index];
+                          final countryName = AppConstants.nationalityChoices[entry.key] ?? entry.key;
+                          final isSelected = entry.key == currentCode;
+                          return ListTile(
+                            leading: Text(
+                              AppConstants.countryFlag(entry.key),
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            title: Text(countryName),
+                            trailing: Text(
+                              entry.value,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: isSelected ? AppColors.patternOrange : null,
+                              ),
+                            ),
+                            selected: isSelected,
+                            onTap: () {
+                              onSelected(entry.key);
+                              Navigator.pop(sheetContext);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showEditGenderDialog(
       BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
-    String selectedGender = authProvider.gender ?? 'prefer_not_to_say';
+    String selectedGender = (authProvider.gender == 'male' || authProvider.gender == 'female')
+        ? authProvider.gender!
+        : 'male';
 
     showDialog(
       context: context,
@@ -987,16 +1145,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   RadioListTile<String>(
                     title: const Text('Female'),
                     value: 'female',
-                    activeColor: AppColors.success,
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('Other'),
-                    value: 'other',
-                    activeColor: AppColors.success,
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('Prefer not to say'),
-                    value: 'prefer_not_to_say',
                     activeColor: AppColors.success,
                   ),
                 ],
@@ -1036,6 +1184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
     String? selectedCode = authProvider.nationality;
     final entries = AppConstants.nationalityChoices.entries.toList();
+    String searchQuery = '';
 
     showDialog(
       context: context,
@@ -1047,22 +1196,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
           height: 400,
           child: StatefulBuilder(
             builder: (context, setState) {
-              return RadioGroup<String>(
-                groupValue: selectedCode ?? '',
-                onChanged: (value) {
-                  setState(() => selectedCode = value);
-                },
-                child: ListView.builder(
-                  itemCount: entries.length,
-                  itemBuilder: (context, index) {
-                    final entry = entries[index];
-                    return RadioListTile<String>(
-                      title: Text(entry.value),
-                      value: entry.key,
-                      activeColor: AppColors.burundiGreen,
-                    );
-                  },
-                ),
+              final filtered = entries.where((e) {
+                final query = searchQuery.toLowerCase();
+                return query.isEmpty ||
+                    e.value.toLowerCase().contains(query) ||
+                    e.key.toLowerCase().contains(query);
+              }).toList();
+
+              return Column(
+                children: [
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search country...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    onChanged: (value) => setState(() => searchQuery = value),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: RadioGroup<String>(
+                      groupValue: selectedCode ?? '',
+                      onChanged: (value) {
+                        setState(() => selectedCode = value);
+                      },
+                      child: ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final entry = filtered[index];
+                          return RadioListTile<String>(
+                            title: Text('${AppConstants.countryFlag(entry.key)} ${entry.value}'),
+                            value: entry.key,
+                            activeColor: AppColors.burundiGreen,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),

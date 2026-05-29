@@ -46,6 +46,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   bool _showContinueReading = false;
   bool _restoredPosition = false;
   double _readingProgress = 0.0;
+  bool _isTogglingLike = false;
+  DateTime? _lastLikeTap;
 
   // Cached provider reference — safe to use in dispose() where context is invalid
   late final AuthProvider _authProvider;
@@ -303,6 +305,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Future<void> _toggleLike() async {
+    if (_isTogglingLike) return;
+    if (_lastLikeTap != null && DateTime.now().difference(_lastLikeTap!) < const Duration(seconds: 1)) return;
+    _lastLikeTap = DateTime.now();
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
@@ -320,6 +325,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     }
 
     // Optimistic UI with haptic feedback
+    _isTogglingLike = true;
     HapticService.light();
     final wasLiked = _article.isLiked;
     setState(() {
@@ -353,6 +359,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           _article = _article.copyWith(isLiked: wasLiked, likeCount: wasLiked ? _article.likeCount + 1 : _article.likeCount - 1);
         });
       }
+    } finally {
+      _isTogglingLike = false;
     }
   }
 

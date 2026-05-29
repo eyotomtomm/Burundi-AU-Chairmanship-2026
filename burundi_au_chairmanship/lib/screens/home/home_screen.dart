@@ -18,7 +18,7 @@ import '../../config/app_constants.dart';
 import '../maintenance/maintenance_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/magazine_tab.dart';
-import 'tabs/agenda_tab.dart';
+import '../news/news_screen.dart';
 import 'tabs/more_tab.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -111,41 +111,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       // Refresh auth profile to get updated badge
       await authProvider.refreshProfile();
     } else if (status == 'rejected') {
-      // Show rejection dialog with appeal option
-      await showVerificationRejectedDialog(
-        context,
-        reason: verificationProvider.rejectionReason ?? 'No reason provided',
-        onAppeal: () => _showAppealDialog(),
-      );
-
-      // Mark as shown
+      // Rejected users see "In Review" in the More tab settings.
+      // Suppress the rejection popup — just mark as shown silently.
       await verificationProvider.markStatusPopupShown();
     }
-  }
-
-  /// Show appeal submission dialog
-  void _showAppealDialog() {
-    showAppealDialog(
-      context,
-      onSubmit: (appealMessage) async {
-        final verificationProvider = context.read<VerificationProvider>();
-
-        final success = await verificationProvider.submitAppeal(appealMessage);
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              success
-                  ? 'Appeal submitted successfully. We will review your request.'
-                  : 'Failed to submit appeal. Please try again.',
-            ),
-            backgroundColor: success ? Colors.green : Colors.red,
-          ),
-        );
-      },
-    );
   }
 
   /// Check and show popup announcements
@@ -233,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 HomeTab(onSwitchTab: (index) => setState(() => _currentIndex = index)),
                 MagazineTab(),
-                AgendaTab(),
+                const NewsScreen(isTab: true),
                 MoreTab(),
               ],
             ),
@@ -275,9 +244,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               label: l10n.magazine,
             ),
             BottomNavigationBarItem(
-              icon: const Icon(Icons.flag_rounded),
-              activeIcon: const Icon(Icons.flag_rounded),
-              label: 'Agenda',
+              icon: const Icon(Icons.article_rounded),
+              activeIcon: const Icon(Icons.article_rounded),
+              label: l10n.translate('news'),
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.more_horiz_rounded),

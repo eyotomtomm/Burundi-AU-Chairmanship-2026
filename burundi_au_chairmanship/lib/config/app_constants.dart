@@ -6,7 +6,7 @@
 class AppConstants {
   // App Info (build-time constants)
   static const String appName = 'Burundi Chairmanship';
-  static const String appVersion = '1.2.0';
+  static const String appVersion = '1.2.3';
 
   // Storage Keys (build-time constants)
   static const String themeKey = 'theme_mode';

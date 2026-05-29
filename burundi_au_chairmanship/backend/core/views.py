@@ -825,12 +825,16 @@ def firebase_login(request):
             user.is_active = True
             user.save()
 
-        # Update email verification status from Firebase — but never
-        # downgrade a locally-verified user (OTP verification sets
-        # is_email_verified=True independently of Firebase's flag).
-        firebase_email_verified = decoded_token.get('email_verified', False)
-        if firebase_email_verified and not profile.is_email_verified:
-            profile.is_email_verified = True
+        # Update email verification status — never downgrade a user who
+        # previously verified via OTP (email_verified_at is set) or who
+        # is already marked verified in the DB.
+        if not profile.is_email_verified:
+            if profile.email_verified_at is not None:
+                # User verified via OTP before; old code wrongly reset the flag
+                profile.is_email_verified = True
+            elif decoded_token.get('email_verified', False):
+                # Firebase says verified — trust it
+                profile.is_email_verified = True
         profile.save()
 
         # Record login history
@@ -856,12 +860,16 @@ def firebase_login(request):
         # Create active session (use firebase_uid as session key for consistency)
         _create_active_session(user, request, session_key=firebase_uid)
 
+        # Only require email verification for new users who haven't verified.
+        # Returning users who previously verified should never be re-prompted.
+        requires_verification = is_new_user and not profile.is_email_verified
+
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
             'message': 'Login successful',
             'is_new_user': is_new_user,
             'email_verified': profile.is_email_verified,
-            'requires_email_verification': not profile.is_email_verified,
+            'requires_email_verification': requires_verification,
         })
 
     except ValueError as e:

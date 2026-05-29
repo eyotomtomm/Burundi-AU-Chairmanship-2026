@@ -364,8 +364,9 @@ class AuthProvider extends ChangeNotifier {
       // 4. Store user data locally
       await _storeUserData(data['user']);
 
-      // Capture email verification requirement
-      _requiresEmailVerification = data['requires_email_verification'] == true;
+      // Sign-in never requires email verification — that's only for sign-up.
+      // A user who can sign in already has an account.
+      _requiresEmailVerification = false;
 
       _isAuthenticated = true;
       _isLoading = false;

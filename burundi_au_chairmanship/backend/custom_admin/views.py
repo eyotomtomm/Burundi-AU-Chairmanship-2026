@@ -4468,34 +4468,68 @@ def bulk_user_action(request):
 @require_POST
 def bulk_content_action(request):
     action = request.POST.get('bulk_action')
-    article_ids = request.POST.getlist('selected_ids')
+    selected_ids = request.POST.getlist('selected_ids')
+    model_type = request.POST.get('model_type', 'article')
 
-    if not article_ids:
-        messages.warning(request, 'No articles selected.')
-        return redirect('custom_admin:articles_list')
+    # Map model_type to (Model, display name, list redirect name)
+    MODEL_MAP = {
+        'article': (Article, 'article', 'custom_admin:articles_list'),
+        'magazine': (MagazineEdition, 'magazine', 'custom_admin:magazines_list'),
+        'video': (Video, 'video', 'custom_admin:videos_list'),
+        'live_feed': (LiveFeed, 'live feed', 'custom_admin:live_feeds_list'),
+        'event': (Event, 'event', 'custom_admin:events_list'),
+        'gallery': (GalleryAlbum, 'album', 'custom_admin:gallery_list'),
+        'feature_card': (FeatureCard, 'feature card', 'custom_admin:feature_cards_list'),
+        'hero_slide': (HeroSlide, 'hero slide', 'custom_admin:hero_slides_list'),
+    }
 
-    articles = Article.objects.filter(pk__in=article_ids)
-    count = articles.count()
+    if model_type not in MODEL_MAP:
+        messages.error(request, 'Invalid content type.')
+        return redirect('custom_admin:dashboard')
 
-    if action == 'activate':
-        articles.update(is_featured=True)
-        log_admin_action(request, 'bulk_action', 'Article', object_repr=f'Bulk feature {count} article(s)',
+    Model, display_name, redirect_url = MODEL_MAP[model_type]
+
+    if not selected_ids:
+        messages.warning(request, f'No {display_name}s selected.')
+        return redirect(redirect_url)
+
+    queryset = Model.objects.filter(pk__in=selected_ids)
+    count = queryset.count()
+
+    if action == 'delete':
+        log_admin_action(request, 'bulk_action', Model.__name__,
+                         object_repr=f'Bulk delete {count} {display_name}(s)',
+                         changes={'action': {'old': '', 'new': 'delete'}, 'count': {'old': '', 'new': str(count)}})
+        queryset.delete()
+        messages.success(request, f'{count} {display_name}(s) deleted successfully.')
+    elif action == 'activate' and model_type == 'article':
+        queryset.update(is_featured=True)
+        log_admin_action(request, 'bulk_action', 'Article',
+                         object_repr=f'Bulk feature {count} article(s)',
                          changes={'action': {'old': '', 'new': 'feature'}, 'count': {'old': '', 'new': str(count)}})
         messages.success(request, f'{count} article(s) set to featured.')
-    elif action == 'deactivate':
-        articles.update(is_featured=False)
-        log_admin_action(request, 'bulk_action', 'Article', object_repr=f'Bulk unfeature {count} article(s)',
+    elif action == 'deactivate' and model_type == 'article':
+        queryset.update(is_featured=False)
+        log_admin_action(request, 'bulk_action', 'Article',
+                         object_repr=f'Bulk unfeature {count} article(s)',
                          changes={'action': {'old': '', 'new': 'unfeature'}, 'count': {'old': '', 'new': str(count)}})
         messages.success(request, f'{count} article(s) unfeatured.')
-    elif action == 'delete':
-        log_admin_action(request, 'bulk_action', 'Article', object_repr=f'Bulk delete {count} article(s)',
-                         changes={'action': {'old': '', 'new': 'delete'}, 'count': {'old': '', 'new': str(count)}})
-        articles.delete()
-        messages.success(request, f'{count} article(s) deleted successfully.')
+    elif action == 'activate' and model_type == 'event':
+        queryset.update(is_active=True)
+        log_admin_action(request, 'bulk_action', 'Event',
+                         object_repr=f'Bulk activate {count} event(s)',
+                         changes={'action': {'old': '', 'new': 'activate'}, 'count': {'old': '', 'new': str(count)}})
+        messages.success(request, f'{count} event(s) activated.')
+    elif action == 'deactivate' and model_type == 'event':
+        queryset.update(is_active=False)
+        log_admin_action(request, 'bulk_action', 'Event',
+                         object_repr=f'Bulk deactivate {count} event(s)',
+                         changes={'action': {'old': '', 'new': 'deactivate'}, 'count': {'old': '', 'new': str(count)}})
+        messages.success(request, f'{count} event(s) deactivated.')
     else:
         messages.error(request, 'Invalid action.')
 
-    return redirect('custom_admin:articles_list')
+    return redirect(redirect_url)
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -19,10 +19,48 @@
             </a>
         </div>
 
+        <form id="bulkFeatureCardForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
+            {% csrf_token %}
+            <input type="hidden" name="model_type" value="feature_card">
+            <!-- Bulk Action Bar -->
+            <div id="bulkFeatureCardBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-blue-600">checklist</span>
+                <span class="text-sm font-medium text-blue-800">
+                  <span id="featurecardSelectedCount">0</span> feature card(s) selected
+                </span>
+              </div>
+              <div class="flex items-center gap-3">
+                <select name="bulk_action" class="bg-white border border-slate-300 rounded-lg py-2 px-4 text-sm focus:ring-2 focus:ring-blue-500">
+                  <option value="">Choose action...</option>
+                  <option value="delete">Delete Selected</option>
+                </select>
+                <button type="submit" onclick="return confirmFeatureCardBulkAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2 px-5 text-sm transition-colors">
+                  Apply
+                </button>
+                <button type="button" onclick="clearFeatureCardSelection()" class="text-slate-500 hover:text-slate-700 text-sm font-medium">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+        <!-- Select All -->
+        {% if cards %}
+        <div class="flex items-center gap-3 mb-6">
+            <input type="checkbox" id="selectAllFeatureCards" onchange="toggleAllFeatureCards(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            <label for="selectAllFeatureCards" class="text-sm font-medium text-on-surface-variant cursor-pointer">Select All</label>
+        </div>
+        {% endif %}
+
         <!-- Cards Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for card in cards %}
-            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 hover:shadow-md transition-shadow">
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 hover:shadow-md transition-shadow relative">
+                <!-- Checkbox -->
+                <div class="absolute top-4 right-4 z-10">
+                    <input type="checkbox" name="selected_ids" value="{{ card.pk }}" class="featurecard-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" onchange="updateFeatureCardBulkBar()" />
+                </div>
+
                 <!-- Card Icon/Image -->
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-4">
@@ -92,6 +130,49 @@
             </div>
             {% endfor %}
         </div>
+        </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllFeatureCards(el) {
+    var checkboxes = document.querySelectorAll('.featurecard-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+    updateFeatureCardBulkBar();
+}
+
+function updateFeatureCardBulkBar() {
+    var checked = document.querySelectorAll('.featurecard-checkbox:checked');
+    var bar = document.getElementById('bulkFeatureCardBar');
+    var count = document.getElementById('featurecardSelectedCount');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearFeatureCardSelection() {
+    var checkboxes = document.querySelectorAll('.featurecard-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAllFeatureCards').checked = false;
+    updateFeatureCardBulkBar();
+}
+
+function confirmFeatureCardBulkAction() {
+    var action = document.querySelector('#bulkFeatureCardForm select[name="bulk_action"]').value;
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    var count = document.querySelectorAll('.featurecard-checkbox:checked').length;
+    if (action === 'delete') {
+        return confirm('Are you sure you want to permanently delete ' + count + ' feature card(s)? This cannot be undone.');
+    }
+    return confirm('Apply "' + action + '" to ' + count + ' feature card(s)?');
+}
+</script>
 {% endblock %}

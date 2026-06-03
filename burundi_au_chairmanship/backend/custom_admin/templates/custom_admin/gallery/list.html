@@ -15,9 +15,47 @@
         </a>
     </div>
 
+    <form id="bulkGalleryForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
+        {% csrf_token %}
+        <input type="hidden" name="model_type" value="gallery">
+        <!-- Bulk Action Bar -->
+        <div id="bulkGalleryBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-blue-600">checklist</span>
+            <span class="text-sm font-medium text-blue-800">
+              <span id="gallerySelectedCount">0</span> album(s) selected
+            </span>
+          </div>
+          <div class="flex items-center gap-3">
+            <select name="bulk_action" class="bg-white border border-slate-300 rounded-lg py-2 px-4 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="">Choose action...</option>
+              <option value="delete">Delete Selected</option>
+            </select>
+            <button type="submit" onclick="return confirmGalleryBulkAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2 px-5 text-sm transition-colors">
+              Apply
+            </button>
+            <button type="button" onclick="clearGallerySelection()" class="text-slate-500 hover:text-slate-700 text-sm font-medium">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+    <!-- Select All -->
+    {% if albums %}
+    <div class="flex items-center gap-3 mb-6">
+        <input type="checkbox" id="selectAllGallery" onchange="toggleAllGallery(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+        <label for="selectAllGallery" class="text-sm font-medium text-on-surface-variant cursor-pointer">Select All</label>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for album in albums %}
-        <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+        <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow relative">
+            <!-- Checkbox -->
+            <div class="absolute top-3 left-3 z-10">
+                <input type="checkbox" name="selected_ids" value="{{ album.pk }}" class="gallery-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-white/80 shadow-sm" onchange="updateGalleryBulkBar()" />
+            </div>
+
             <div class="aspect-video relative bg-surface-container">
                 {% if album.cover_image %}
                 <img src="{{ album.cover_image.url }}" alt="{{ album.title }}" class="w-full h-full object-cover">
@@ -59,5 +97,48 @@
         </div>
         {% endfor %}
     </div>
+    </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllGallery(el) {
+    var checkboxes = document.querySelectorAll('.gallery-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+    updateGalleryBulkBar();
+}
+
+function updateGalleryBulkBar() {
+    var checked = document.querySelectorAll('.gallery-checkbox:checked');
+    var bar = document.getElementById('bulkGalleryBar');
+    var count = document.getElementById('gallerySelectedCount');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearGallerySelection() {
+    var checkboxes = document.querySelectorAll('.gallery-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAllGallery').checked = false;
+    updateGalleryBulkBar();
+}
+
+function confirmGalleryBulkAction() {
+    var action = document.querySelector('#bulkGalleryForm select[name="bulk_action"]').value;
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    var count = document.querySelectorAll('.gallery-checkbox:checked').length;
+    if (action === 'delete') {
+        return confirm('Are you sure you want to permanently delete ' + count + ' album(s) and all their photos? This cannot be undone.');
+    }
+    return confirm('Apply "' + action + '" to ' + count + ' album(s)?');
+}
+</script>
 {% endblock %}

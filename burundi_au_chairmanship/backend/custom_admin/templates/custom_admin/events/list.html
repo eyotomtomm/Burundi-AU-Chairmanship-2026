@@ -87,12 +87,42 @@
     </div>
 
     <!-- Events Table -->
+    <form id="bulkEventForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
+        {% csrf_token %}
+        <input type="hidden" name="model_type" value="event">
+        <!-- Bulk Action Bar -->
+        <div id="bulkEventBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-blue-600">checklist</span>
+            <span class="text-sm font-medium text-blue-800">
+              <span id="eventSelectedCount">0</span> event(s) selected
+            </span>
+          </div>
+          <div class="flex items-center gap-3">
+            <select name="bulk_action" class="bg-white border border-slate-300 rounded-lg py-2 px-4 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="">Choose action...</option>
+              <option value="activate">Activate Selected</option>
+              <option value="deactivate">Deactivate Selected</option>
+              <option value="delete">Delete Selected</option>
+            </select>
+            <button type="submit" onclick="return confirmEventBulkAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2 px-5 text-sm transition-colors">
+              Apply
+            </button>
+            <button type="button" onclick="clearEventSelection()" class="text-slate-500 hover:text-slate-700 text-sm font-medium">
+              Cancel
+            </button>
+          </div>
+        </div>
+
     <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
         {% if events %}
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-surface-container">
                     <tr>
+                        <th class="px-4 py-4 text-left">
+                            <input type="checkbox" id="selectAllEvents" onchange="toggleAllEvents(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        </th>
                         <th class="px-6 py-4 text-left text-xs font-headline font-bold text-on-surface-variant uppercase tracking-wider">
                             Date
                         </th>
@@ -113,6 +143,9 @@
                 <tbody class="divide-y divide-outline-variant">
                     {% for event in events %}
                     <tr class="hover:bg-surface-container-low transition-colors">
+                        <td class="px-4 py-4">
+                            <input type="checkbox" name="selected_ids" value="{{ event.pk }}" class="event-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" onchange="updateEventBulkBar()" />
+                        </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="bg-primary-container text-white rounded-lg p-2 text-center min-w-[50px]">
                                 <p class="text-[10px] uppercase font-bold">{{ event.event_date|date:"M" }}</p>
@@ -264,5 +297,48 @@
         </div>
         {% endif %}
     </div>
+    </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllEvents(el) {
+    var checkboxes = document.querySelectorAll('.event-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+    updateEventBulkBar();
+}
+
+function updateEventBulkBar() {
+    var checked = document.querySelectorAll('.event-checkbox:checked');
+    var bar = document.getElementById('bulkEventBar');
+    var count = document.getElementById('eventSelectedCount');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearEventSelection() {
+    var checkboxes = document.querySelectorAll('.event-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAllEvents').checked = false;
+    updateEventBulkBar();
+}
+
+function confirmEventBulkAction() {
+    var action = document.querySelector('#bulkEventForm select[name="bulk_action"]').value;
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    var count = document.querySelectorAll('.event-checkbox:checked').length;
+    if (action === 'delete') {
+        return confirm('Are you sure you want to permanently delete ' + count + ' event(s)? This cannot be undone.');
+    }
+    return confirm('Apply "' + action + '" to ' + count + ' event(s)?');
+}
+</script>
 {% endblock %}

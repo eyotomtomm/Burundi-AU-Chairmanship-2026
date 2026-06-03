@@ -43,6 +43,7 @@
   <!-- Bulk Action Bar -->
   <form id="bulkArticleForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
     {% csrf_token %}
+    <input type="hidden" name="model_type" value="article">
     <div id="bulkArticleBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="material-symbols-outlined text-blue-600">checklist</span>

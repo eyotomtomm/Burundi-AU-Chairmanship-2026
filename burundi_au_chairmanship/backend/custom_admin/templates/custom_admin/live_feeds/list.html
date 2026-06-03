@@ -18,11 +18,47 @@
             </a>
         </div>
 
+        <form id="bulkLiveFeedForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
+            {% csrf_token %}
+            <input type="hidden" name="model_type" value="live_feed">
+            <!-- Bulk Action Bar -->
+            <div id="bulkLiveFeedBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-blue-600">checklist</span>
+                <span class="text-sm font-medium text-blue-800">
+                  <span id="livefeedSelectedCount">0</span> live feed(s) selected
+                </span>
+              </div>
+              <div class="flex items-center gap-3">
+                <select name="bulk_action" class="bg-white border border-slate-300 rounded-lg py-2 px-4 text-sm focus:ring-2 focus:ring-blue-500">
+                  <option value="">Choose action...</option>
+                  <option value="delete">Delete Selected</option>
+                </select>
+                <button type="submit" onclick="return confirmLiveFeedBulkAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2 px-5 text-sm transition-colors">
+                  Apply
+                </button>
+                <button type="button" onclick="clearLiveFeedSelection()" class="text-slate-500 hover:text-slate-700 text-sm font-medium">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
         <!-- Feeds Grid -->
         {% if feeds %}
+        <!-- Select All -->
+        <div class="flex items-center gap-3 mb-6">
+            <input type="checkbox" id="selectAllLiveFeeds" onchange="toggleAllLiveFeeds(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            <label for="selectAllLiveFeeds" class="text-sm font-medium text-on-surface-variant cursor-pointer">Select All</label>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for feed in feeds %}
-            <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200 relative">
+                <!-- Checkbox -->
+                <div class="absolute top-3 left-3 z-10">
+                    <input type="checkbox" name="selected_ids" value="{{ feed.pk }}" class="livefeed-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500 bg-white/80 shadow-sm" onchange="updateLiveFeedBulkBar()" />
+                </div>
+
                 <!-- Thumbnail -->
                 <div class="relative aspect-video bg-surface-container">
                     {% if feed.thumbnail %}
@@ -138,6 +174,49 @@
             </div>
         </div>
         {% endif %}
+        </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllLiveFeeds(el) {
+    var checkboxes = document.querySelectorAll('.livefeed-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+    updateLiveFeedBulkBar();
+}
+
+function updateLiveFeedBulkBar() {
+    var checked = document.querySelectorAll('.livefeed-checkbox:checked');
+    var bar = document.getElementById('bulkLiveFeedBar');
+    var count = document.getElementById('livefeedSelectedCount');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearLiveFeedSelection() {
+    var checkboxes = document.querySelectorAll('.livefeed-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAllLiveFeeds').checked = false;
+    updateLiveFeedBulkBar();
+}
+
+function confirmLiveFeedBulkAction() {
+    var action = document.querySelector('#bulkLiveFeedForm select[name="bulk_action"]').value;
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    var count = document.querySelectorAll('.livefeed-checkbox:checked').length;
+    if (action === 'delete') {
+        return confirm('Are you sure you want to permanently delete ' + count + ' live feed(s)? This cannot be undone.');
+    }
+    return confirm('Apply "' + action + '" to ' + count + ' live feed(s)?');
+}
+</script>
 {% endblock %}

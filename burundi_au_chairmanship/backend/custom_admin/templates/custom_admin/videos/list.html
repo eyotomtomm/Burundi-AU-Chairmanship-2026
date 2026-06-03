@@ -15,11 +15,39 @@
         </a>
     </div>
 
+    <form id="bulkVideoForm" method="post" action="{% url 'custom_admin:bulk_content_action' %}">
+        {% csrf_token %}
+        <input type="hidden" name="model_type" value="video">
+        <!-- Bulk Action Bar -->
+        <div id="bulkVideoBar" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-blue-600">checklist</span>
+            <span class="text-sm font-medium text-blue-800">
+              <span id="videoSelectedCount">0</span> video(s) selected
+            </span>
+          </div>
+          <div class="flex items-center gap-3">
+            <select name="bulk_action" class="bg-white border border-slate-300 rounded-lg py-2 px-4 text-sm focus:ring-2 focus:ring-blue-500">
+              <option value="">Choose action...</option>
+              <option value="delete">Delete Selected</option>
+            </select>
+            <button type="submit" onclick="return confirmVideoBulkAction()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2 px-5 text-sm transition-colors">
+              Apply
+            </button>
+            <button type="button" onclick="clearVideoSelection()" class="text-slate-500 hover:text-slate-700 text-sm font-medium">
+              Cancel
+            </button>
+          </div>
+        </div>
+
     <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-surface-container border-b border-outline-variant">
                     <tr>
+                        <th class="text-left py-4 px-4">
+                            <input type="checkbox" id="selectAllVideos" onchange="toggleAllVideos(this)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        </th>
                         <th class="text-left py-4 px-6 font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">Preview</th>
                         <th class="text-left py-4 px-6 font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">Title</th>
                         <th class="text-left py-4 px-6 font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold">Category</th>
@@ -32,6 +60,9 @@
                 <tbody class="divide-y divide-outline-variant">
                     {% for video in videos %}
                     <tr class="hover:bg-surface-container transition-colors">
+                        <td class="py-4 px-4">
+                            <input type="checkbox" name="selected_ids" value="{{ video.pk }}" class="video-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500" onchange="updateVideoBulkBar()" />
+                        </td>
                         <td class="py-4 px-6">
                             <div class="w-24 h-16 bg-surface-container rounded overflow-hidden">
                                 {% if video.thumbnail %}
@@ -78,7 +109,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="py-12 text-center">
+                        <td colspan="8" class="py-12 text-center">
                             <span class="material-symbols-outlined text-6xl text-outline-variant mb-4">videocam</span>
                             <p class="text-on-surface-variant font-body">No videos yet. Create your first video to get started.</p>
                         </td>
@@ -88,5 +119,48 @@
             </table>
         </div>
     </div>
+    </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAllVideos(el) {
+    var checkboxes = document.querySelectorAll('.video-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = el.checked; });
+    updateVideoBulkBar();
+}
+
+function updateVideoBulkBar() {
+    var checked = document.querySelectorAll('.video-checkbox:checked');
+    var bar = document.getElementById('bulkVideoBar');
+    var count = document.getElementById('videoSelectedCount');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        count.textContent = checked.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearVideoSelection() {
+    var checkboxes = document.querySelectorAll('.video-checkbox');
+    checkboxes.forEach(function(cb) { cb.checked = false; });
+    document.getElementById('selectAllVideos').checked = false;
+    updateVideoBulkBar();
+}
+
+function confirmVideoBulkAction() {
+    var action = document.querySelector('#bulkVideoForm select[name="bulk_action"]').value;
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    var count = document.querySelectorAll('.video-checkbox:checked').length;
+    if (action === 'delete') {
+        return confirm('Are you sure you want to permanently delete ' + count + ' video(s)? This cannot be undone.');
+    }
+    return confirm('Apply "' + action + '" to ' + count + ' video(s)?');
+}
+</script>
 {% endblock %}

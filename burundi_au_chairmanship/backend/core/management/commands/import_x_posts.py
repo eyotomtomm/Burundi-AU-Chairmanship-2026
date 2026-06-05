@@ -82,7 +82,7 @@ CATEGORY_COLORS = {
     'Culture': '#9B59B6',
 }
 
-AUTHOR = 'Burundi Embassy in Addis Ababa (@BurundinAddis)'
+AUTHOR = 'Burundi'
 
 
 def classify_category(text):

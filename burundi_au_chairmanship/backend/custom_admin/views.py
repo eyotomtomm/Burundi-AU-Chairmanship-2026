@@ -2792,6 +2792,10 @@ def gallery_edit(request, pk):
         album.is_featured = request.POST.get('is_featured') == 'on'
         album.status = request.POST.get('content_status', 'published')
         album.scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
+        # Delete selected photos
+        delete_ids = request.POST.getlist('delete_photos')
+        if delete_ids:
+            album.photos.filter(id__in=delete_ids).delete()
         # Handle new photo uploads
         photos = request.FILES.getlist('photos')
         existing_count = album.photos.count()

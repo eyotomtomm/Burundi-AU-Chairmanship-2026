@@ -644,6 +644,16 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
                   'created_at', 'is_featured', 'display_order', 'photos', 'is_liked',
                   'recent_likers']
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.cover_image:
+            request = self.context.get('request')
+            if request:
+                ret['cover_image'] = request.build_absolute_uri(instance.cover_image.url)
+            else:
+                ret['cover_image'] = instance.cover_image.url
+        return ret
+
     def get_recent_likers(self, obj):
         request = self.context.get('request')
         return get_recent_likers(GalleryAlbumLike, 'album', obj, request)

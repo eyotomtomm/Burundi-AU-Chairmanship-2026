@@ -1,0 +1,90 @@
+{% comment %}
+Upload Progress Overlay
+Include this in any form template that uploads files.
+
+Requires:
+  - The form must have id="upload-form"
+
+Usage:
+  {% include 'custom_admin/includes/upload_progress.html' %}
+{% endcomment %}
+
+<!-- Upload Progress Overlay -->
+<div id="upload-overlay" class="fixed inset-0 z-50 hidden items-center justify-center" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div class="bg-surface-container-lowest rounded-2xl shadow-xl p-8 w-full max-w-md mx-4 text-center">
+        <span class="material-symbols-outlined text-5xl text-primary mb-4 block" id="upload-icon">cloud_upload</span>
+        <h3 id="upload-status-text" class="font-headline text-xl font-bold text-on-surface mb-6">Uploading... 0%</h3>
+
+        <!-- Progress bar -->
+        <div class="w-full bg-surface-container-high rounded-full h-3 mb-4 overflow-hidden">
+            <div id="upload-progress-bar" class="bg-primary h-3 rounded-full transition-all duration-200" style="width: 0%;"></div>
+        </div>
+
+        <p class="text-sm text-on-surface-variant">Please do not close this page</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('upload-form');
+    if (!form) return;
+
+    var overlay = document.getElementById('upload-overlay');
+    var progressBar = document.getElementById('upload-progress-bar');
+    var statusText = document.getElementById('upload-status-text');
+    var uploadIcon = document.getElementById('upload-icon');
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Show overlay
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+
+        var formData = new FormData(form);
+        var xhr = new XMLHttpRequest();
+
+        // Track upload progress
+        xhr.upload.addEventListener('progress', function(event) {
+            if (event.lengthComputable) {
+                var percent = Math.round((event.loaded / event.total) * 100);
+                progressBar.style.width = percent + '%';
+                statusText.textContent = 'Uploading... ' + percent + '%';
+            }
+        });
+
+        // Handle completion
+        xhr.addEventListener('load', function() {
+            if (xhr.status >= 200 && xhr.status < 400) {
+                progressBar.style.width = '100%';
+                statusText.textContent = 'Processing...';
+                uploadIcon.textContent = 'check_circle';
+                uploadIcon.classList.remove('text-primary');
+                uploadIcon.classList.add('text-green-500');
+
+                // Follow redirect from server response
+                var redirectUrl = xhr.responseURL;
+                setTimeout(function() {
+                    window.location.href = redirectUrl;
+                }, 500);
+            } else {
+                // Server error
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+                alert('Upload failed (status ' + xhr.status + '). Please try again.');
+            }
+        });
+
+        // Handle network error
+        xhr.addEventListener('error', function() {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            alert('Upload failed due to a network error. Please try again.');
+        });
+
+        xhr.open(form.method, form.action || window.location.href);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.send(formData);
+    });
+});
+</script>

@@ -35,7 +35,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   int _likeCount = 0;
   List<Liker> _recentLikers = [];
   bool _isTogglingLike = false;
-  bool _ytFullScreen = false;
 
   // Chapters
   List<Map<String, dynamic>> _chapters = [];
@@ -196,8 +195,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         ),
       );
 
-      _youtubeController!.addListener(_onYtFullScreenChange);
-
       setState(() {
         _isLoading = false;
       });
@@ -207,25 +204,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         _errorMessage = 'Failed to load YouTube video: $e';
         _isLoading = false;
       });
-    }
-  }
-
-  void _onYtFullScreenChange() {
-    final isFs = _youtubeController!.value.isFullScreen;
-    if (isFs == _ytFullScreen) return;
-    setState(() => _ytFullScreen = isFs);
-    if (isFs) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]);
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
 
@@ -425,7 +403,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
   @override
   void dispose() {
-    _youtubeController?.removeListener(_onYtFullScreenChange);
     _chewieController?.dispose();
     _videoController?.dispose();
     _youtubeController?.dispose();
@@ -451,16 +428,32 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         ? (widget.video['description_fr'] ?? widget.video['description'])
         : widget.video['description'];
 
-    return PopScope(
-      canPop: !_ytFullScreen,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _ytFullScreen) {
-          _youtubeController?.toggleFullScreenMode();
-        }
-      },
-      child: Scaffold(
+    // YouTube: use YoutubePlayerBuilder which handles fullscreen natively
+    if (_isYouTube && _youtubeController != null && !_isLoading && !_hasError) {
+      return YoutubePlayerBuilder(
+        player: YoutubePlayer(
+          controller: _youtubeController!,
+          showVideoProgressIndicator: true,
+          progressIndicatorColor: AppColors.burundiGreen,
+          progressColors: ProgressBarColors(
+            playedColor: AppColors.burundiGreen,
+            handleColor: AppColors.auGold,
+          ),
+        ),
+        builder: (context, player) {
+          return _buildScaffold(title, description, isDark, theme, playerWidget: player);
+        },
+      );
+    }
+
+    // Non-YouTube / loading / error
+    return _buildScaffold(title, description, isDark, theme);
+  }
+
+  Widget _buildScaffold(String? title, String? description, bool isDark, ThemeData theme, {Widget? playerWidget}) {
+    return Scaffold(
       backgroundColor: Colors.black,
-      appBar: _ytFullScreen ? null : AppBar(
+      appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(
@@ -468,43 +461,26 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           style: const TextStyle(fontSize: 16),
         ),
       ),
-      body: _ytFullScreen
-          ? YoutubePlayer(
-              controller: _youtubeController!,
-              showVideoProgressIndicator: true,
-              progressIndicatorColor: AppColors.burundiGreen,
-              progressColors: ProgressBarColors(
-                playedColor: AppColors.burundiGreen,
-                handleColor: AppColors.auGold,
-              ),
-            )
-          : Column(
+      body: Column(
         children: [
           // Video player area
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.auGold),
-                  )
-                : _hasError
-                    ? _buildErrorWidget(_errorMessage)
-                    : _isYouTube && _youtubeController != null
-                        ? YoutubePlayer(
-                            controller: _youtubeController!,
-                            showVideoProgressIndicator: true,
-                            progressIndicatorColor: AppColors.burundiGreen,
-                            progressColors: ProgressBarColors(
-                              playedColor: AppColors.burundiGreen,
-                              handleColor: AppColors.auGold,
+          if (playerWidget != null)
+            playerWidget
+          else
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.auGold),
+                    )
+                  : _hasError
+                      ? _buildErrorWidget(_errorMessage)
+                      : _chewieController != null
+                          ? Chewie(controller: _chewieController!)
+                          : const Center(
+                              child: CircularProgressIndicator(color: AppColors.auGold),
                             ),
-                          )
-                        : _chewieController != null
-                            ? Chewie(controller: _chewieController!)
-                            : const Center(
-                                child: CircularProgressIndicator(color: AppColors.auGold),
-                              ),
-          ),
+            ),
 
           // Video info
           Expanded(
@@ -699,7 +675,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
             ),
           ),
         ],
-      ),
       ),
     );
   }

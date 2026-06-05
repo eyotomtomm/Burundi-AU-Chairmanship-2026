@@ -32,17 +32,21 @@ class ApiService {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
-    if (auth) {
-      // Try Firebase Auth first (new authentication method)
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser != null) {
-        final idToken = await firebaseUser.getIdToken(true);
+    // Always include Firebase token when user is logged in so the
+    // backend can return personalised fields (is_liked, etc.)
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      try {
+        final idToken = await firebaseUser.getIdToken();
         if (idToken != null) {
           headers['Authorization'] = 'Bearer $idToken';
           return headers;
         }
+      } catch (_) {
+        // Token fetch failed; fall through to JWT fallback if auth required
       }
-
+    }
+    if (auth) {
       // Fallback to JWT token from secure storage (for backward compatibility)
       final token = await _secureStorage.read(key: AppConstants.userTokenKey);
       if (token != null && token.isNotEmpty) {

@@ -338,6 +338,20 @@ def send_weekly_newsletter():
     return sent
 
 
+@shared_task
+def transition_live_feed_statuses():
+    """Auto-transition upcoming live feeds to recorded when scheduled_time has passed."""
+    from .models import LiveFeed
+    now = timezone.now()
+    updated = LiveFeed.objects.filter(
+        status='upcoming',
+        scheduled_time__lte=now,
+    ).update(status='recorded')
+    if updated:
+        logger.info(f"Transitioned {updated} live feed(s) from upcoming to recorded")
+    return updated
+
+
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
 def optimize_image_async(self, image_path):
     """Generate WebP thumbnails at multiple sizes."""

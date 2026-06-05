@@ -501,6 +501,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'core.tasks.send_weekly_newsletter',
         'schedule': 604800,  # Every 7 days
     },
+    'transition-live-feed-statuses': {
+        'task': 'core.tasks.transition_live_feed_statuses',
+        'schedule': 60,  # Every minute
+    },
 }
 
 # ─── GraphQL (graphene-django) ────────────────────────────────

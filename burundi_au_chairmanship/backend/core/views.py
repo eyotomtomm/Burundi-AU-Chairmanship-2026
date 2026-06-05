@@ -1664,9 +1664,17 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view live feeds"""
     permission_classes = [AllowAny]
-    queryset = LiveFeed.objects.filter(content_status='published').order_by('-created_at')
     serializer_class = LiveFeedSerializer
     filterset_fields = ['status']
+
+    def get_queryset(self):
+        # Auto-transition stale upcoming feeds to recorded
+        now = timezone.now()
+        LiveFeed.objects.filter(
+            status='upcoming',
+            scheduled_time__lte=now,
+        ).update(status='recorded')
+        return LiveFeed.objects.filter(content_status='published').order_by('-created_at')
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):

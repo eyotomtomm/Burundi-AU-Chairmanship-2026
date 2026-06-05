@@ -34,6 +34,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   bool _isLiked = false;
   int _likeCount = 0;
   List<Liker> _recentLikers = [];
+  bool _isTogglingLike = false;
+  bool _ytFullScreen = false;
 
   // Chapters
   List<Map<String, dynamic>> _chapters = [];
@@ -115,6 +117,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   }
 
   Future<void> _toggleLike() async {
+    if (_isTogglingLike) return;
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
@@ -123,6 +126,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       );
       return;
     }
+    _isTogglingLike = true;
     final wasLiked = _isLiked;
     final prevCount = _likeCount;
     setState(() {
@@ -150,6 +154,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         _isLiked = wasLiked;
         _likeCount = prevCount;
       });
+    } finally {
+      _isTogglingLike = false;
     }
   }
 
@@ -190,6 +196,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         ),
       );
 
+      _youtubeController!.addListener(_onYtFullScreenChange);
+
       setState(() {
         _isLoading = false;
       });
@@ -199,6 +207,25 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         _errorMessage = 'Failed to load YouTube video: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  void _onYtFullScreenChange() {
+    final isFs = _youtubeController!.value.isFullScreen;
+    if (isFs == _ytFullScreen) return;
+    setState(() => _ytFullScreen = isFs);
+    if (isFs) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
 
@@ -398,6 +425,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
   @override
   void dispose() {
+    _youtubeController?.removeListener(_onYtFullScreenChange);
     _chewieController?.dispose();
     _videoController?.dispose();
     _youtubeController?.dispose();
@@ -406,6 +434,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -422,9 +451,16 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         ? (widget.video['description_fr'] ?? widget.video['description'])
         : widget.video['description'];
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_ytFullScreen,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _ytFullScreen) {
+          _youtubeController?.toggleFullScreenMode();
+        }
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
+      appBar: _ytFullScreen ? null : AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(
@@ -432,7 +468,17 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           style: const TextStyle(fontSize: 16),
         ),
       ),
-      body: Column(
+      body: _ytFullScreen
+          ? YoutubePlayer(
+              controller: _youtubeController!,
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: AppColors.burundiGreen,
+              progressColors: ProgressBarColors(
+                playedColor: AppColors.burundiGreen,
+                handleColor: AppColors.auGold,
+              ),
+            )
+          : Column(
         children: [
           // Video player area
           AspectRatio(
@@ -653,6 +699,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

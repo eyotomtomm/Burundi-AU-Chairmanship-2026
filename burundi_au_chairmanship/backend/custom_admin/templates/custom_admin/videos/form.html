@@ -64,6 +64,13 @@
                 <input type="url" id="video_url" name="video_url" value="{{ video.video_url|default:'' }}"
                        class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
                 <p class="text-xs text-on-surface-variant mt-2">YouTube, Vimeo, or direct video URL</p>
+                <div id="yt-thumb-preview" class="mt-3 hidden">
+                    <p class="text-xs text-on-surface-variant mb-1 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                        YouTube thumbnail will be used automatically if no thumbnail is uploaded
+                    </p>
+                    <img id="yt-thumb-img" src="" alt="YouTube thumbnail preview" class="w-48 h-28 object-cover rounded-lg shadow-sm">
+                </div>
             </div>
 
             <div class="flex items-center gap-4 mb-6">
@@ -260,6 +267,31 @@ document.addEventListener('DOMContentLoaded', function() {
             input.value = m + ':' + (s < 10 ? '0' : '') + s;
         }
     });
+
+    // YouTube thumbnail preview
+    var urlInput = document.getElementById('video_url');
+    var preview = document.getElementById('yt-thumb-preview');
+    var previewImg = document.getElementById('yt-thumb-img');
+
+    function extractYouTubeId(url) {
+        var m = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+        return m ? m[1] : null;
+    }
+
+    function updateYtPreview() {
+        var ytId = extractYouTubeId(urlInput.value);
+        if (ytId) {
+            previewImg.src = 'https://img.youtube.com/vi/' + ytId + '/hqdefault.jpg';
+            preview.classList.remove('hidden');
+        } else {
+            preview.classList.add('hidden');
+            previewImg.src = '';
+        }
+    }
+
+    urlInput.addEventListener('input', updateYtPreview);
+    urlInput.addEventListener('change', updateYtPreview);
+    updateYtPreview();  // check on page load for edit mode
 });
 
 function addChapterRow() {

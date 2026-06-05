@@ -4,7 +4,9 @@ import io
 import json
 import logging
 import os
+import re
 import urllib.parse
+import urllib.request
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
@@ -82,6 +84,39 @@ def _get_existing_or_uploaded(request, field_name):
     existing_path = (request.POST.get(f'existing_image_{field_name}') or '').strip()
     if existing_path:
         return existing_path  # raw string path — assigned directly to the ImageField
+    return None
+
+
+def _extract_youtube_id(url):
+    """Extract the video ID from a YouTube URL, or return None."""
+    patterns = [
+        r'(?:youtube\.com/watch\?.*v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([a-zA-Z0-9_-]{11})',
+    ]
+    for pat in patterns:
+        m = re.search(pat, url or '')
+        if m:
+            return m.group(1)
+    return None
+
+
+def _fetch_youtube_thumbnail(video_url):
+    """Download YouTube thumbnail and return a ContentFile, or None on failure."""
+    yt_id = _extract_youtube_id(video_url)
+    if not yt_id:
+        return None
+    # Try high-res first, fall back to default
+    for quality in ('maxresdefault', 'hqdefault'):
+        thumb_url = f'https://img.youtube.com/vi/{yt_id}/{quality}.jpg'
+        try:
+            req = urllib.request.Request(thumb_url, headers={'User-Agent': 'Mozilla/5.0'})
+            resp = urllib.request.urlopen(req, timeout=10)
+            if resp.status == 200:
+                data = resp.read()
+                # maxresdefault returns a tiny placeholder when unavailable
+                if len(data) > 5000:
+                    return ContentFile(data, name=f'yt_{yt_id}.jpg')
+        except Exception:
+            continue
     return None
 
 
@@ -2874,13 +2909,18 @@ def video_create(request):
     if request.method == 'POST':
         content_status = request.POST.get('content_status', 'published')
         scheduled_publish_date = request.POST.get('scheduled_publish_date') or None
+        thumbnail = _get_existing_or_uploaded(request, 'thumbnail')
+        video_url = request.POST.get('video_url', '')
+        # Auto-fetch YouTube thumbnail if none provided
+        if not thumbnail and video_url:
+            thumbnail = _fetch_youtube_thumbnail(video_url)
         video = Video.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
-            video_url=request.POST.get('video_url', ''),
-            thumbnail=_get_existing_or_uploaded(request, 'thumbnail'),
+            video_url=video_url,
+            thumbnail=thumbnail,
             duration=request.POST.get('duration', ''),
             category=request.POST.get('category', 'highlight'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
@@ -2914,6 +2954,11 @@ def video_edit(request, pk):
         _th = _get_existing_or_uploaded(request, 'thumbnail')
         if _th:
             video.thumbnail = _th
+        elif not video.thumbnail and video.video_url:
+            # Auto-fetch YouTube thumbnail if video has none
+            _yt_th = _fetch_youtube_thumbnail(video.video_url)
+            if _yt_th:
+                video.thumbnail = _yt_th
         video.duration = request.POST.get('duration', '')
         video.category = request.POST.get('category', 'highlight')
         video.is_featured = request.POST.get('is_featured') == 'on'

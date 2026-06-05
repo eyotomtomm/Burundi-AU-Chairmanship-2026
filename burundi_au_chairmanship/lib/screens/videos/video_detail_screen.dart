@@ -54,6 +54,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   @override
   void initState() {
     super.initState();
+    // Allow all orientations so YoutubePlayerBuilder can go landscape for fullscreen
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _isLiked = widget.video['is_liked'] == true;
     _likeCount = widget.video['like_count'] ?? 0;
     if (widget.video['recent_likers'] is List) {

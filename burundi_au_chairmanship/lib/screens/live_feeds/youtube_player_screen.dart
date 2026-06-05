@@ -24,6 +24,8 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Allow all orientations so YoutubePlayerBuilder can go landscape for fullscreen
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     _initPlayer();
     _recordView();
   }
@@ -78,6 +80,7 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -87,6 +90,29 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Use YoutubePlayerBuilder for proper fullscreen handling
+    if (_controller != null && !_hasError) {
+      return YoutubePlayerBuilder(
+        player: YoutubePlayer(
+          controller: _controller!,
+          showVideoProgressIndicator: true,
+          progressIndicatorColor: AppColors.burundiGreen,
+          progressColors: ProgressBarColors(
+            playedColor: AppColors.burundiGreen,
+            handleColor: AppColors.auGold,
+          ),
+        ),
+        builder: (context, player) {
+          return _buildScaffold(langCode, theme, isDark, playerWidget: player);
+        },
+      );
+    }
+
+    // Loading or error state
+    return _buildScaffold(langCode, theme, isDark);
+  }
+
+  Widget _buildScaffold(String langCode, ThemeData theme, bool isDark, {Widget? playerWidget}) {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -134,25 +160,18 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
       body: Column(
         children: [
           // YouTube player area
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: _hasError
-                ? _buildErrorWidget()
-                : _controller != null
-                    ? YoutubePlayer(
-                        controller: _controller!,
-                        showVideoProgressIndicator: true,
-                        progressIndicatorColor: AppColors.burundiGreen,
-                        progressColors: ProgressBarColors(
-                          playedColor: AppColors.burundiGreen,
-                          handleColor: AppColors.auGold,
-                        ),
-                      )
-                    : const Center(
-                        child: CircularProgressIndicator(
-                            color: AppColors.auGold),
-                      ),
-          ),
+          if (playerWidget != null)
+            playerWidget
+          else
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: _hasError
+                  ? _buildErrorWidget()
+                  : const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.auGold),
+                    ),
+            ),
 
           // Feed info
           Expanded(

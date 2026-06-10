@@ -69,6 +69,36 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  /// Opens the store listing URL from backend settings, with hardcoded fallback.
+  Future<void> _openStoreListing() async {
+    try {
+      final settings = await ApiService().getSettings();
+      String url;
+      if (Platform.isIOS) {
+        url = (settings?.appStoreUrl.isNotEmpty == true)
+            ? settings!.appStoreUrl
+            : 'https://apps.apple.com/app/id6740047505';
+      } else {
+        url = (settings?.playStoreUrl.isNotEmpty == true)
+            ? settings!.playStoreUrl
+            : 'https://play.google.com/store/apps/details?id=com.b4africa.app';
+      }
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      // Hardcoded fallback if API fails
+      final fallbackUrl = Platform.isIOS
+          ? 'https://apps.apple.com/app/id6740047505'
+          : 'https://play.google.com/store/apps/details?id=com.b4africa.app';
+      final uri = Uri.parse(fallbackUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
+
   Future<void> _fetchFeatureFlagsFromApi() async {
     try {
       final settings = await ApiService().getSettings();
@@ -631,16 +661,14 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           onTap: () async {
                             final InAppReview inAppReview = InAppReview.instance;
 
-                            if (await inAppReview.isAvailable()) {
-                              await inAppReview.requestReview();
-                            } else {
-                              final appId = Platform.isIOS
-                                  ? '6740047505'
-                                  : 'com.b4africa.app';
-
-                              await inAppReview.openStoreListing(
-                                appStoreId: appId,
-                              );
+                            try {
+                              if (await inAppReview.isAvailable()) {
+                                await inAppReview.requestReview();
+                              } else {
+                                await _openStoreListing();
+                              }
+                            } catch (_) {
+                              await _openStoreListing();
                             }
 
                             if (context.mounted) {

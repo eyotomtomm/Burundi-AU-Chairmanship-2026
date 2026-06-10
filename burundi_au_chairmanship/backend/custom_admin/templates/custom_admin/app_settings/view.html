@@ -188,6 +188,70 @@
 
 
 
+                <!-- App Store URLs -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">App Store URLs</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">Configure store listing URLs used for the "Rate App" feature in the mobile app.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="app_store_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                App Store URL (iOS)
+                            </label>
+                            <input
+                                type="url"
+                                id="app_store_url"
+                                name="app_store_url"
+                                value="{{ settings.app_store_url }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="https://apps.apple.com/app/id..."
+                            />
+                        </div>
+                        <div>
+                            <label for="play_store_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Play Store URL (Android)
+                            </label>
+                            <input
+                                type="url"
+                                id="play_store_url"
+                                name="play_store_url"
+                                value="{{ settings.play_store_url }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="https://play.google.com/store/apps/details?id=..."
+                            />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="app_store_id" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                App Store ID (numeric)
+                            </label>
+                            <input
+                                type="text"
+                                id="app_store_id"
+                                name="app_store_id"
+                                value="{{ settings.app_store_id }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="6740047505"
+                            />
+                        </div>
+                        <div>
+                            <label for="play_store_id" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Play Store Package Name
+                            </label>
+                            <input
+                                type="text"
+                                id="play_store_id"
+                                name="play_store_id"
+                                value="{{ settings.play_store_id }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="com.b4africa.app"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Live Agent Support -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Live Agent Support</h3>

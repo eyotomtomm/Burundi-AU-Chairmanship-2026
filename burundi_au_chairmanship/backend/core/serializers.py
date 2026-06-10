@@ -731,6 +731,8 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'app_description', 'app_description_fr',
                   'developer_name', 'developer_url',
                   'live_agent_online',
+                  'app_store_url', 'play_store_url',
+                  'app_store_id', 'play_store_id',
                   'bookmarks_enabled', 'discussions_enabled',
                   'polls_enabled', 'newsletter_enabled']
 

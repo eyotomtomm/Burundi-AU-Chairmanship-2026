@@ -236,6 +236,10 @@ class AppSettingsModel {
   final bool discussionsEnabled;
   final bool pollsEnabled;
   final bool newsletterEnabled;
+  final String appStoreUrl;
+  final String playStoreUrl;
+  final String appStoreId;
+  final String playStoreId;
 
   AppSettingsModel({
     required this.summitYear,
@@ -254,6 +258,10 @@ class AppSettingsModel {
     this.discussionsEnabled = true,
     this.pollsEnabled = true,
     this.newsletterEnabled = true,
+    this.appStoreUrl = '',
+    this.playStoreUrl = '',
+    this.appStoreId = '6740047505',
+    this.playStoreId = 'com.b4africa.app',
   });
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -274,6 +282,10 @@ class AppSettingsModel {
       discussionsEnabled: json['discussions_enabled'] ?? true,
       pollsEnabled: json['polls_enabled'] ?? true,
       newsletterEnabled: json['newsletter_enabled'] ?? true,
+      appStoreUrl: json['app_store_url'] ?? '',
+      playStoreUrl: json['play_store_url'] ?? '',
+      appStoreId: json['app_store_id'] ?? '6740047505',
+      playStoreId: json['play_store_id'] ?? 'com.b4africa.app',
     );
   }
 

@@ -1452,6 +1452,12 @@ class AppSettings(models.Model):
     # Live agent support toggle
     live_agent_online = models.BooleanField(default=False, help_text='When ON, users see Live Agent chat option in support')
 
+    # Store URLs (for Rate App and update links)
+    app_store_url = models.URLField(blank=True, default='https://apps.apple.com/app/id6740047505', help_text='Full App Store URL for iOS')
+    play_store_url = models.URLField(blank=True, default='https://play.google.com/store/apps/details?id=com.b4africa.app', help_text='Full Play Store URL for Android')
+    app_store_id = models.CharField(max_length=20, blank=True, default='6740047505', help_text='App Store numeric ID')
+    play_store_id = models.CharField(max_length=100, blank=True, default='com.b4africa.app', help_text='Play Store package name')
+
     # Feature toggles (controlled from admin portal)
     bookmarks_enabled = models.BooleanField(default=True, help_text='Show Bookmarks feature in the app')
     discussions_enabled = models.BooleanField(default=True, help_text='Show Discussions feature in the app')

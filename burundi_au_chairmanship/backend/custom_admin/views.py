@@ -3284,6 +3284,10 @@ def app_settings(request):
         settings.discussions_enabled = request.POST.get('discussions_enabled') == 'on'
         settings.polls_enabled = request.POST.get('polls_enabled') == 'on'
         settings.newsletter_enabled = request.POST.get('newsletter_enabled') == 'on'
+        settings.app_store_url = request.POST.get('app_store_url', '')
+        settings.play_store_url = request.POST.get('play_store_url', '')
+        settings.app_store_id = request.POST.get('app_store_id', '')
+        settings.play_store_id = request.POST.get('play_store_id', '')
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')

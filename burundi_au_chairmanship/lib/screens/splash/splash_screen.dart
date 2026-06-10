@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
@@ -13,6 +14,7 @@ import '../../services/api_service.dart';
 import '../../services/heartbeat_service.dart';
 import '../../widgets/app_update_dialog.dart';
 import '../maintenance/maintenance_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -118,6 +120,20 @@ class _SplashScreenState extends State<SplashScreen>
       langCode: langCode,
     );
     if (!mounted) return;
+
+    // Show onboarding on first launch
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone = prefs.getBool(AppConstants.onboardingKey) ?? false;
+    if (!onboardingDone) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      );
+      if (result == true) {
+        await prefs.setBool(AppConstants.onboardingKey, true);
+      }
+      if (!mounted) return;
+    }
 
     // Navigate based on authentication status.
     // Only require isAuthenticated — profile data may be partially cached

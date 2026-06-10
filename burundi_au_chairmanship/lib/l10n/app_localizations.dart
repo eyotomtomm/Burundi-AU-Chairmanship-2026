@@ -214,6 +214,26 @@ class AppLocalizations {
       'no_notifications': 'No notifications yet',
       'error_loading_notifications': 'Error loading notifications',
       'notification_preferences': 'Notification Preferences',
+
+      // Onboarding / App Guide
+      'app_guide': 'App Guide',
+      'app_guide_subtitle': 'Learn how to use the app',
+      'next': 'Next',
+      'get_started': 'Get Started',
+      'onboarding_welcome': 'Welcome to Be 4 Africa',
+      'onboarding_welcome_desc': 'Your companion for the African Union Chairmanship 2026. Let\'s show you around!',
+      'onboarding_news': 'News & Articles',
+      'onboarding_news_desc': 'Stay updated with the latest articles and announcements',
+      'onboarding_events': 'Events',
+      'onboarding_events_desc': 'Browse upcoming events, register, and get tickets',
+      'onboarding_magazine': 'Digital Magazine',
+      'onboarding_magazine_desc': 'Read the digital magazine and featured articles',
+      'onboarding_live': 'Live Feeds',
+      'onboarding_live_desc': 'Watch live streams and video content',
+      'onboarding_translate': 'Translate',
+      'onboarding_translate_desc': 'Translate content between languages instantly',
+      'onboarding_gallery': 'Gallery',
+      'onboarding_gallery_desc': 'Explore photo albums from events and summits',
     },
     'fr': {
       // App
@@ -417,6 +437,26 @@ class AppLocalizations {
       'no_notifications': 'Aucune notification pour le moment',
       'error_loading_notifications': 'Erreur de chargement des notifications',
       'notification_preferences': 'Préférences de notification',
+
+      // Onboarding / App Guide
+      'app_guide': 'Guide de l\'application',
+      'app_guide_subtitle': 'Découvrez comment utiliser l\'app',
+      'next': 'Suivant',
+      'get_started': 'Commencer',
+      'onboarding_welcome': 'Bienvenue sur Be 4 Africa',
+      'onboarding_welcome_desc': 'Votre compagnon pour la Présidence de l\'Union Africaine 2026. Faisons le tour !',
+      'onboarding_news': 'Actualités & Articles',
+      'onboarding_news_desc': 'Restez informé des derniers articles et annonces',
+      'onboarding_events': 'Événements',
+      'onboarding_events_desc': 'Parcourez les événements à venir, inscrivez-vous et obtenez des billets',
+      'onboarding_magazine': 'Magazine Numérique',
+      'onboarding_magazine_desc': 'Lisez le magazine numérique et les articles en vedette',
+      'onboarding_live': 'Diffusions en Direct',
+      'onboarding_live_desc': 'Regardez les diffusions en direct et le contenu vidéo',
+      'onboarding_translate': 'Traduction',
+      'onboarding_translate_desc': 'Traduisez le contenu entre les langues instantanément',
+      'onboarding_gallery': 'Galerie',
+      'onboarding_gallery_desc': 'Explorez les albums photos des événements et sommets',
     },
   };
 
@@ -493,6 +533,12 @@ class AppLocalizations {
   String get republicOfBurundi => translate('republic_of_burundi');
   String get africanUnion => translate('african_union');
   String get chairmanship2025 => translate('chairmanship_2025');
+
+  // Onboarding / App Guide
+  String get appGuide => translate('app_guide');
+  String get appGuideSubtitle => translate('app_guide_subtitle');
+  String get next => translate('next');
+  String get getStarted => translate('get_started');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -21,6 +21,7 @@ import '../../../widgets/verified_badge.dart';
 import '../../security/login_history_screen.dart';
 import '../../security/active_sessions_screen.dart';
 import '../../security/change_password_screen.dart';
+import '../../onboarding/onboarding_screen.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -480,6 +481,20 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           isDark: isDark,
                           isFirst: !showVerificationItem,
                           onTap: () => _showAboutDialog(context, l10n),
+                        ),
+                        _buildMenuItem(
+                          context: context,
+                          icon: Icons.help_outline_rounded,
+                          iconBgColor: const Color(0xFF26A69A),
+                          title: l10n.appGuide,
+                          subtitle: l10n.appGuideSubtitle,
+                          isDark: isDark,
+                          onTap: () => Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) => const OnboardingScreen(isReplay: true),
+                            ),
+                          ),
                         ),
                         _buildMenuItem(
                           context: context,

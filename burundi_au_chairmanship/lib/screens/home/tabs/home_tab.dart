@@ -84,6 +84,9 @@ class _HomeTabState extends State<HomeTab> {
   // Youth Dialogue eligibility (for conditional Quick Access visibility)
   bool _ydEligible = false;
 
+  // Youth Dialogue settings (for Quick Access visibility + icon)
+  Map<String, dynamic>? _ydSettings;
+
   // Profile completion prompt
   bool _showProfilePrompt = false;
   bool _profilePromptDismissed = false;
@@ -280,8 +283,11 @@ class _HomeTabState extends State<HomeTab> {
 
       _applyHomeFeedData(homeFeed, priorityAgendas, heroTextData, quickAccessMenu);
 
-      // Fetch Youth Dialogue eligibility in the background (for Quick Access filtering)
+      // Fetch Youth Dialogue settings + eligibility in the background
       final isAuth = context.read<AuthProvider>().isAuthenticated;
+      api.youthDialogueSettings().then((ydSettingsData) {
+        if (mounted) setState(() => _ydSettings = ydSettingsData);
+      }).catchError((_) {});
       if (isAuth) {
         api.youthDialogueEligibility().then((ydData) {
           if (mounted) setState(() => _ydEligible = ydData['eligible'] == true);
@@ -1523,6 +1529,42 @@ class _HomeTabState extends State<HomeTab> {
     final verificationRequestStatus = verificationProvider.requestStatus;
     final showVerification = isLoggedIn && !isVerified;
     final List<Map<String, dynamic>> items = [];
+
+    // Auto-inject Youth Dialogue into Quick Access based on settings
+    if (_ydSettings != null && _ydSettings!['is_visible'] == true) {
+      final ydIsOpen = _ydSettings!['is_registration_open'] == true;
+      final ydTitle = langCode == 'fr'
+          ? (_ydSettings!['quick_access_title_fr'] as String? ?? '').isNotEmpty
+              ? _ydSettings!['quick_access_title_fr'] as String
+              : _ydSettings!['quick_access_title_en'] as String? ?? 'Youth Dialogue'
+          : _ydSettings!['quick_access_title_en'] as String? ?? 'Youth Dialogue';
+      final ydIconUrl = _ydSettings!['quick_access_icon_url'] as String? ?? '';
+      final ydClosedMsg = langCode == 'fr'
+          ? (_ydSettings!['registration_closed_message_fr'] as String? ?? '').isNotEmpty
+              ? _ydSettings!['registration_closed_message_fr'] as String
+              : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.'
+          : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.';
+
+      items.add(<String, dynamic>{
+        'title': ydTitle,
+        'icon': Icons.groups_rounded,
+        'iconImageUrl': ydIconUrl.isNotEmpty ? Environment.fixMediaUrl(ydIconUrl) : '',
+        'hasLiveDot': false,
+        'badgeText': '',
+        'badgeColor': '',
+        'locked': !ydIsOpen,
+        'onTap': ydIsOpen
+            ? () => Navigator.pushNamed(context, '/youth-dialogue')
+            : () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(ydClosedMsg),
+                    backgroundColor: AppColors.auGold,
+                  ),
+                );
+              },
+      });
+    }
 
     // Use API data if available (with visibility_rule filtering)
     if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty) {

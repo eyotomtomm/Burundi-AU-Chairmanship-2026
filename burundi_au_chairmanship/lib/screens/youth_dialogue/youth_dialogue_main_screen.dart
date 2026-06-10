@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
+import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
+import 'youth_dialogue_apply_screen.dart';
 
 class YouthDialogueMainScreen extends StatefulWidget {
   const YouthDialogueMainScreen({super.key});
@@ -18,6 +20,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   bool _hasApplication = false;
   YouthDialogueApplication? _application;
   Map<String, dynamic>? _settings;
+  List<RegistrationFormField> _formFields = [];
 
   @override
   void initState() {
@@ -35,6 +38,13 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       if (!mounted) return;
       setState(() {
         _settings = results[0];
+        // Parse form fields from settings response
+        final rawFields = _settings?['form_fields'] as List<dynamic>? ?? [];
+        _formFields = rawFields
+            .map((f) => RegistrationFormField.fromJson(f as Map<String, dynamic>))
+            .where((f) => f.isActive)
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
         final statusData = results[1];
         _hasApplication = statusData['has_application'] == true;
         if (_hasApplication) {
@@ -200,7 +210,12 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       height: 52,
       child: ElevatedButton(
         onPressed: () async {
-          await Navigator.pushNamed(context, '/youth-dialogue-apply');
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => YouthDialogueApplyScreen(formFields: _formFields),
+            ),
+          );
           _loadData();
         },
         style: ElevatedButton.styleFrom(

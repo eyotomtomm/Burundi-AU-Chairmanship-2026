@@ -1,11 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../config/app_colors.dart';
+import '../../models/event_registration_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 
 class YouthDialogueApplyScreen extends StatefulWidget {
-  const YouthDialogueApplyScreen({super.key});
+  final List<RegistrationFormField> formFields;
+
+  const YouthDialogueApplyScreen({super.key, required this.formFields});
 
   @override
   State<YouthDialogueApplyScreen> createState() => _YouthDialogueApplyScreenState();
@@ -13,34 +19,34 @@ class YouthDialogueApplyScreen extends StatefulWidget {
 
 class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _organizationController = TextEditingController();
-  final _positionController = TextEditingController();
-  final _motivationController = TextEditingController();
-
-  String? _selectedTitle;
-  String? _selectedNationality;
-  String? _selectedGender;
-  DateTime? _dateOfBirth;
   bool _isLoading = false;
   bool _submitted = false;
 
-  final List<Map<String, String>> _titles = [
-    {'value': 'mr', 'label': 'Mr.'},
-    {'value': 'mrs', 'label': 'Mrs.'},
-    {'value': 'ms', 'label': 'Ms.'},
-    {'value': 'dr', 'label': 'Dr.'},
-    {'value': 'prof', 'label': 'Prof.'},
-    {'value': 'he', 'label': 'H.E.'},
-    {'value': 'amb', 'label': 'Ambassador'},
-    {'value': 'hon', 'label': 'Honorable'},
-    {'value': 'other', 'label': 'Other'},
+  // Dynamic form state
+  final Map<String, TextEditingController> _formControllers = {};
+  final Map<String, dynamic> _formValues = {};
+  final Map<String, File> _pickedFiles = {};
+
+  // Country list for 'country' field type
+  static const List<String> _countryList = [
+    'Afghanistan', 'Albania', 'Algeria', 'Angola', 'Argentina', 'Australia',
+    'Austria', 'Bangladesh', 'Belgium', 'Benin', 'Botswana', 'Brazil',
+    'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cameroon', 'Canada',
+    'Central African Republic', 'Chad', 'China', 'Colombia', 'Comoros',
+    'Congo (Brazzaville)', 'Congo (DRC)', "Côte d'Ivoire", 'Djibouti',
+    'Egypt', 'Equatorial Guinea', 'Eritrea', 'Eswatini', 'Ethiopia',
+    'France', 'Gabon', 'Gambia', 'Germany', 'Ghana', 'Guinea',
+    'Guinea-Bissau', 'India', 'Japan', 'Kenya', 'Lesotho', 'Liberia',
+    'Libya', 'Madagascar', 'Malawi', 'Mali', 'Mauritania', 'Mauritius',
+    'Morocco', 'Mozambique', 'Namibia', 'Niger', 'Nigeria', 'Rwanda',
+    'São Tomé and Príncipe', 'Saudi Arabia', 'Senegal', 'Seychelles',
+    'Sierra Leone', 'Somalia', 'South Africa', 'South Sudan', 'Sudan',
+    'Tanzania', 'Togo', 'Tunisia', 'Turkey', 'UAE', 'Uganda',
+    'United Kingdom', 'United States', 'Zambia', 'Zimbabwe', 'Other',
   ];
 
-  final List<Map<String, String>> _nationalities = [
+  // Nationality list for 'nationality' field type
+  static const List<Map<String, String>> _nationalities = [
     {'code': 'BI', 'name': 'Burundi'}, {'code': 'DZ', 'name': 'Algeria'},
     {'code': 'AO', 'name': 'Angola'}, {'code': 'BJ', 'name': 'Benin'},
     {'code': 'BW', 'name': 'Botswana'}, {'code': 'BF', 'name': 'Burkina Faso'},
@@ -81,36 +87,55 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   @override
   void initState() {
     super.initState();
-    _prefillEmail();
+    _initFormState();
     ApiService().youthDialogueLogActivity('form_started', 'youth_dialogue_apply');
   }
 
-  void _prefillEmail() {
+  void _initFormState() {
     final authProvider = context.read<AuthProvider>();
-    if (authProvider.userEmail != null && authProvider.userEmail!.isNotEmpty) {
-      _emailController.text = authProvider.userEmail!;
+    for (final field in widget.formFields) {
+      if (!field.isActive) continue;
+      // Create controllers for text-based fields
+      switch (field.fieldType) {
+        case 'text':
+        case 'email':
+        case 'phone':
+        case 'number':
+        case 'passport':
+        case 'url':
+        case 'textarea':
+        case 'date':
+        case 'time':
+          final controller = TextEditingController();
+          // Auto-fill email from auth provider
+          if (field.fieldName == 'email' && authProvider.userEmail != null && authProvider.userEmail!.isNotEmpty) {
+            controller.text = authProvider.userEmail!;
+          }
+          _formControllers[field.fieldName] = controller;
+          break;
+        case 'multi_checkbox':
+          _formValues[field.fieldName] = <String>[];
+          break;
+        case 'checkbox':
+          _formValues[field.fieldName] = false;
+          break;
+      }
     }
   }
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _organizationController.dispose();
-    _positionController.dispose();
-    _motivationController.dispose();
+    for (final c in _formControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Check email verification
     final authProvider = context.read<AuthProvider>();
-    final isEmailVerified = authProvider.isEmailVerified;
-    if (!isEmailVerified) {
+    if (!authProvider.isEmailVerified) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -124,24 +149,19 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final formData = <String, dynamic>{
-        'title': _selectedTitle ?? '',
-        'first_name': _firstNameController.text.trim(),
-        'last_name': _lastNameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'phone_number': _phoneController.text.trim(),
-        'nationality': _selectedNationality ?? '',
-        'gender': _selectedGender ?? '',
-        'organization': _organizationController.text.trim(),
-        'position': _positionController.text.trim(),
-        'motivation': _motivationController.text.trim(),
-      };
-
-      if (_dateOfBirth != null) {
-        formData['date_of_birth'] = '${_dateOfBirth!.year}-${_dateOfBirth!.month.toString().padLeft(2, '0')}-${_dateOfBirth!.day.toString().padLeft(2, '0')}';
+      // Collect all form data
+      final formData = <String, dynamic>{};
+      for (final field in widget.formFields) {
+        if (!field.isActive) continue;
+        final name = field.fieldName;
+        if (_formControllers.containsKey(name)) {
+          formData[name] = _formControllers[name]!.text.trim();
+        } else if (_formValues.containsKey(name)) {
+          formData[name] = _formValues[name];
+        }
       }
 
-      await ApiService().youthDialogueApply(formData);
+      await ApiService().youthDialogueApply({'form_data': formData});
       if (!mounted) return;
       setState(() => _submitted = true);
     } on ApiException catch (e) {
@@ -162,6 +182,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final langCode = Localizations.localeOf(context).languageCode;
 
     if (_submitted) {
       return Scaffold(
@@ -213,6 +234,8 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       );
     }
 
+    final activeFields = widget.formFields.where((f) => f.isActive).toList();
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -226,149 +249,12 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            // Email verification gate
             _buildEmailVerificationBanner(isDark),
             const SizedBox(height: 16),
 
-            _sectionLabel('Personal Information', isDark),
-            const SizedBox(height: 12),
+            ...activeFields.map((field) => _buildFormField(field, langCode, isDark)),
 
-            // Title
-            DropdownButtonFormField<String>(
-              value: _selectedTitle,
-              decoration: _inputDecoration('Title', isDark),
-              items: _titles.map((t) => DropdownMenuItem(value: t['value'], child: Text(t['label']!))).toList(),
-              onChanged: (v) => setState(() => _selectedTitle = v),
-            ),
-            const SizedBox(height: 12),
-
-            // Name row
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _firstNameController,
-                    decoration: _inputDecoration('First Name *', isDark),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _lastNameController,
-                    decoration: _inputDecoration('Last Name *', isDark),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Date of Birth
-            GestureDetector(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _dateOfBirth ?? DateTime(2000, 1, 1),
-                  firstDate: DateTime(1950),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) setState(() => _dateOfBirth = picked);
-              },
-              child: AbsorbPointer(
-                child: TextFormField(
-                  decoration: _inputDecoration('Date of Birth', isDark).copyWith(
-                    suffixIcon: const Icon(Icons.calendar_today, size: 20),
-                  ),
-                  controller: TextEditingController(
-                    text: _dateOfBirth != null
-                      ? '${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'
-                      : '',
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Gender
-            DropdownButtonFormField<String>(
-              value: _selectedGender,
-              decoration: _inputDecoration('Gender', isDark),
-              items: const [
-                DropdownMenuItem(value: 'male', child: Text('Male')),
-                DropdownMenuItem(value: 'female', child: Text('Female')),
-              ],
-              onChanged: (v) => setState(() => _selectedGender = v),
-            ),
-            const SizedBox(height: 20),
-
-            _sectionLabel('Contact', isDark),
-            const SizedBox(height: 12),
-
-            // Email (pre-filled, read-only)
-            TextFormField(
-              controller: _emailController,
-              decoration: _inputDecoration('Email *', isDark).copyWith(
-                suffixIcon: const Icon(Icons.lock_outline, size: 18, color: Colors.grey),
-              ),
-              readOnly: true,
-              validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _phoneController,
-              decoration: _inputDecoration('Phone Number', isDark),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-
-            // Nationality
-            DropdownButtonFormField<String>(
-              value: _selectedNationality,
-              decoration: _inputDecoration('Nationality *', isDark),
-              isExpanded: true,
-              items: _nationalities.map((n) => DropdownMenuItem(value: n['code'], child: Text(n['name']!))).toList(),
-              onChanged: (v) => setState(() => _selectedNationality = v),
-              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-            ),
-            const SizedBox(height: 20),
-
-            _sectionLabel('Professional Details', isDark),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _organizationController,
-              decoration: _inputDecoration('Organization', isDark),
-              textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _positionController,
-              decoration: _inputDecoration('Position / Role', isDark),
-              textCapitalization: TextCapitalization.words,
-            ),
-            const SizedBox(height: 20),
-
-            _sectionLabel('Motivation', isDark),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _motivationController,
-              decoration: _inputDecoration('Why do you want to participate? *', isDark),
-              maxLines: 5,
-              minLines: 3,
-              textCapitalization: TextCapitalization.sentences,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Required';
-                if (v.trim().length < 50) return 'Please write at least 50 characters';
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
 
             SizedBox(
               width: double.infinity,
@@ -392,14 +278,387 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     );
   }
 
+  Widget _buildFormField(RegistrationFormField field, String langCode, bool isDark) {
+    final label = field.getLabel(langCode);
+    final placeholder = field.getPlaceholder(langCode);
+    final helpText = field.getHelpText(langCode);
+    final textColor = isDark ? Colors.white70 : Colors.black87;
+
+    switch (field.fieldType) {
+      case 'textarea':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: TextFormField(
+            controller: _formControllers[field.fieldName],
+            maxLines: 5,
+            minLines: 3,
+            maxLength: field.maxLength,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired),
+            validator: (v) {
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              if (field.minLength != null && v != null && v.isNotEmpty && v.length < field.minLength!) {
+                return 'Minimum ${field.minLength} characters required';
+              }
+              return null;
+            },
+          ),
+        );
+
+      case 'select':
+        final options = field.options.map((o) => o.toString()).toList();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: DropdownButtonFormField<String>(
+            decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
+            hint: placeholder.isNotEmpty ? Text(placeholder) : null,
+            isExpanded: true,
+            menuMaxHeight: 300,
+            items: options
+                .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
+                .toList(),
+            onChanged: (val) => _formValues[field.fieldName] = val,
+            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+          ),
+        );
+
+      case 'country':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: DropdownButtonFormField<String>(
+            decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
+            isExpanded: true,
+            menuMaxHeight: 300,
+            items: _countryList
+                .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
+                .toList(),
+            onChanged: (val) => _formValues[field.fieldName] = val,
+            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+          ),
+        );
+
+      case 'nationality':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: DropdownButtonFormField<String>(
+            decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
+            isExpanded: true,
+            menuMaxHeight: 300,
+            items: _nationalities
+                .map((n) => DropdownMenuItem(value: n['code'], child: Text(n['name']!, overflow: TextOverflow.ellipsis)))
+                .toList(),
+            onChanged: (val) => _formValues[field.fieldName] = val,
+            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+          ),
+        );
+
+      case 'radio':
+        final options = field.options.map((o) => o.toString()).toList();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: FormField<String>(
+            initialValue: _formValues[field.fieldName] as String?,
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+            builder: (state) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    field.isRequired ? '$label *' : label,
+                    style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+                  ),
+                  if (helpText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
+                    ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.map((option) {
+                      final selected = _formValues[field.fieldName] == option;
+                      return ChoiceChip(
+                        label: Text(option),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() => _formValues[field.fieldName] = option);
+                          state.didChange(option);
+                        },
+                        selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+                        labelStyle: TextStyle(
+                          color: selected ? AppColors.burundiGreen : textColor,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: selected ? AppColors.burundiGreen : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      );
+                    }).toList(),
+                  ),
+                  if (state.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 4),
+                      child: Text(state.errorText!, style: const TextStyle(color: AppColors.burundiRed, fontSize: 12)),
+                    ),
+                ],
+              );
+            },
+          ),
+        );
+
+      case 'multi_checkbox':
+        final options = field.options.map((o) => o.toString()).toList();
+        final selected = (_formValues[field.fieldName] as List<String>?) ?? [];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: FormField<List<String>>(
+            initialValue: selected,
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Select at least one' : null : null,
+            builder: (state) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    field.isRequired ? '$label *' : label,
+                    style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+                  ),
+                  if (helpText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
+                    ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: options.map((option) {
+                      final isChecked = selected.contains(option);
+                      return FilterChip(
+                        label: Text(option),
+                        selected: isChecked,
+                        onSelected: (val) {
+                          setState(() {
+                            final list = List<String>.from(selected);
+                            if (val) { list.add(option); } else { list.remove(option); }
+                            _formValues[field.fieldName] = list;
+                          });
+                          state.didChange(_formValues[field.fieldName] as List<String>);
+                        },
+                        selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+                        checkmarkColor: AppColors.burundiGreen,
+                        labelStyle: TextStyle(
+                          color: isChecked ? AppColors.burundiGreen : textColor,
+                          fontWeight: isChecked ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: isChecked ? AppColors.burundiGreen : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      );
+                    }).toList(),
+                  ),
+                  if (state.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 4),
+                      child: Text(state.errorText!, style: const TextStyle(color: AppColors.burundiRed, fontSize: 12)),
+                    ),
+                ],
+              );
+            },
+          ),
+        );
+
+      case 'checkbox':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: CheckboxListTile(
+            title: Text(label, style: TextStyle(color: textColor)),
+            value: _formValues[field.fieldName] == true,
+            onChanged: (val) => setState(() => _formValues[field.fieldName] = val ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            activeColor: AppColors.burundiGreen,
+          ),
+        );
+
+      case 'date':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: TextFormField(
+            controller: _formControllers[field.fieldName],
+            readOnly: true,
+            decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired).copyWith(
+              suffixIcon: const Icon(Icons.calendar_today, size: 18),
+            ),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: DateTime(2000, 1, 1),
+                firstDate: DateTime(1900),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                _formControllers[field.fieldName]?.text =
+                    '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+              }
+            },
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+          ),
+        );
+
+      case 'time':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: TextFormField(
+            controller: _formControllers[field.fieldName],
+            readOnly: true,
+            decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired).copyWith(
+              suffixIcon: const Icon(Icons.access_time, size: 18),
+            ),
+            onTap: () async {
+              final picked = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              if (picked != null && mounted) {
+                _formControllers[field.fieldName]?.text =
+                    '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+              }
+            },
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+          ),
+        );
+
+      case 'file':
+      case 'image':
+        final pickedFile = _pickedFiles[field.fieldName];
+        final isImage = field.fieldType == 'image';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: FormField<File>(
+            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+            initialValue: pickedFile,
+            builder: (state) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    field.isRequired ? '$label *' : label,
+                    style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+                  ),
+                  if (helpText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
+                    ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      File? file;
+                      if (isImage) {
+                        final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+                        if (picked != null) file = File(picked.path);
+                      } else {
+                        final result = await FilePicker.platform.pickFiles();
+                        if (result != null && result.files.single.path != null) {
+                          file = File(result.files.single.path!);
+                        }
+                      }
+                      if (file != null) {
+                        setState(() => _pickedFiles[field.fieldName] = file!);
+                        state.didChange(file);
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: state.hasError
+                              ? AppColors.burundiRed
+                              : (isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isImage ? Icons.image_outlined : Icons.attach_file,
+                            color: pickedFile != null ? AppColors.burundiGreen : (isDark ? Colors.white38 : Colors.black38),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              pickedFile != null
+                                  ? pickedFile.path.split('/').last
+                                  : (isImage ? 'Tap to select image' : 'Tap to select file'),
+                              style: TextStyle(
+                                color: pickedFile != null ? textColor : (isDark ? Colors.white38 : Colors.black38),
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (pickedFile != null)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() => _pickedFiles.remove(field.fieldName));
+                                state.didChange(null);
+                              },
+                              child: Icon(Icons.close, size: 18, color: isDark ? Colors.white38 : Colors.black38),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (state.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 4),
+                      child: Text(state.errorText!, style: const TextStyle(color: AppColors.burundiRed, fontSize: 12)),
+                    ),
+                ],
+              );
+            },
+          ),
+        );
+
+      default:
+        // text, email, phone, number, passport, url
+        final isEmailField = field.fieldName == 'email';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: TextFormField(
+            controller: _formControllers[field.fieldName],
+            keyboardType: _getKeyboardType(field.fieldType),
+            readOnly: isEmailField,
+            textCapitalization: field.fieldType == 'text' ? TextCapitalization.words : TextCapitalization.none,
+            decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired).copyWith(
+              suffixIcon: isEmailField ? const Icon(Icons.lock_outline, size: 18, color: Colors.grey) : null,
+            ),
+            validator: (v) {
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              if (field.validationRegex.isNotEmpty && v != null && v.isNotEmpty) {
+                final regex = RegExp(field.validationRegex);
+                if (!regex.hasMatch(v)) return 'Invalid format';
+              }
+              return null;
+            },
+          ),
+        );
+    }
+  }
+
   Widget _buildEmailVerificationBanner(bool isDark) {
     final authProvider = context.read<AuthProvider>();
-    final isEmailVerified = authProvider.isEmailVerified;
-
-    if (isEmailVerified) return const SizedBox.shrink();
+    if (authProvider.isEmailVerified) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
         color: AppColors.auGold.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -430,14 +689,11 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     );
   }
 
-  Widget _sectionLabel(String text, bool isDark) {
-    return Text(text, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-      color: isDark ? Colors.white : Colors.black87));
-  }
-
-  InputDecoration _inputDecoration(String label, bool isDark) {
+  InputDecoration _inputDecoration(String label, String? placeholder, String? helpText, bool isDark, bool required) {
     return InputDecoration(
-      labelText: label,
+      labelText: required ? '$label *' : label,
+      hintText: placeholder,
+      helperText: (helpText != null && helpText.isNotEmpty) ? helpText : null,
       filled: true,
       fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       border: OutlineInputBorder(
@@ -454,5 +710,20 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
+  }
+
+  TextInputType _getKeyboardType(String fieldType) {
+    switch (fieldType) {
+      case 'email':
+        return TextInputType.emailAddress;
+      case 'phone':
+        return TextInputType.phone;
+      case 'number':
+        return TextInputType.number;
+      case 'url':
+        return TextInputType.url;
+      default:
+        return TextInputType.text;
+    }
   }
 }

@@ -10,12 +10,90 @@
     </a>
     <div>
       <h1 class="text-3xl font-bold text-slate-900 font-headline">Youth Dialogue Settings</h1>
-      <p class="text-sm text-slate-500 mt-1">Configure branding, texts, and support contact info shown in the app</p>
+      <p class="text-sm text-slate-500 mt-1">Configure visibility, branding, form fields, and support contact info</p>
     </div>
   </div>
 
   <form method="post" enctype="multipart/form-data" class="space-y-6">
     {% csrf_token %}
+
+    <!-- Visibility & Quick Access Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sky-600">visibility</span>
+        Visibility & Quick Access
+      </h2>
+      <p class="text-sm text-slate-500 -mt-2">Controls how Youth Dialogue appears in the app's Quick Access grid</p>
+
+      <div class="space-y-4">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="is_visible" {% if settings.is_visible %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700">Visible in Quick Access</span>
+            <p class="text-xs text-slate-500">When unchecked, Youth Dialogue is completely hidden from the home screen</p>
+          </div>
+        </label>
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="is_registration_open" {% if settings.is_registration_open %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700">Registration Open</span>
+            <p class="text-xs text-slate-500">When unchecked, the icon appears greyed out and users see the closed message</p>
+          </div>
+        </label>
+      </div>
+
+      <!-- State preview -->
+      <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Current State</p>
+        {% if not settings.is_visible %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span> OFF &mdash; Hidden from Quick Access
+          </span>
+        {% elif not settings.is_registration_open %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span> CLOSED &mdash; Visible but greyed out
+          </span>
+        {% else %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span> ON &mdash; Visible and accepting applications
+          </span>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Quick Access Icon</label>
+          <input type="file" name="quick_access_icon" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if settings.quick_access_icon %}
+            <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <img src="{{ settings.quick_access_icon.url }}" alt="Quick Access icon" class="h-10 w-10 object-contain rounded-lg">
+              <span class="text-xs text-slate-500">{{ settings.quick_access_icon.name }}</span>
+            </div>
+          {% endif %}
+          <p class="text-xs text-slate-500 mt-1">Square icon for the grid (falls back to default icon)</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (EN)</label>
+          <input type="text" name="quick_access_title_en" value="{{ settings.quick_access_title_en }}" placeholder="Youth Dialogue" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (FR)</label>
+          <input type="text" name="quick_access_title_fr" value="{{ settings.quick_access_title_fr }}" placeholder="Dialogue Jeunesse" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Closed Message (EN)</label>
+          <textarea name="registration_closed_message" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ settings.registration_closed_message }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Closed Message (FR)</label>
+          <textarea name="registration_closed_message_fr" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ settings.registration_closed_message_fr }}</textarea>
+        </div>
+      </div>
+    </div>
 
     <!-- Branding Section -->
     <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
@@ -78,28 +156,22 @@
       </div>
     </div>
 
-    <!-- Registration Control -->
+    <!-- Application Form Fields -->
     <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
-      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-        <span class="material-symbols-outlined text-sky-600">toggle_on</span>
-        Registration Control
-      </h2>
-      <label class="flex items-center gap-3 cursor-pointer">
-        <input type="checkbox" name="is_registration_open" {% if settings.is_registration_open %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
-        <div>
-          <span class="text-sm font-semibold text-slate-700">Registration Open</span>
-          <p class="text-xs text-slate-500">When unchecked, the Apply button is disabled and a closed message is shown</p>
-        </div>
-      </label>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Closed Message (EN)</label>
-          <textarea name="registration_closed_message" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ settings.registration_closed_message }}</textarea>
-        </div>
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Closed Message (FR)</label>
-          <textarea name="registration_closed_message_fr" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ settings.registration_closed_message_fr }}</textarea>
-        </div>
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sky-600">dynamic_form</span>
+          Application Form Fields
+        </h2>
+        <button type="button" onclick="addFormField()" class="bg-sky-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-sky-700 transition-all shadow-sm inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sm">add</span>
+          Add Field
+        </button>
+      </div>
+      <p class="text-sm text-slate-500 -mt-2">Configure the fields shown on the application form. Drag to reorder, expand for advanced settings.</p>
+
+      <div id="formFieldsContainer" class="space-y-3">
+        <!-- Dynamic fields will be added here by JS -->
       </div>
     </div>
 
@@ -143,4 +215,235 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .collapsible-arrow.expanded {
+        transform: rotate(90deg);
+    }
+    .field-row {
+        transition: all 0.15s ease;
+    }
+    .field-row:hover {
+        border-color: #93c5fd;
+    }
+    .field-advanced {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.25s ease-out, padding 0.25s ease-out, opacity 0.2s ease;
+        opacity: 0;
+    }
+    .field-advanced.expanded {
+        max-height: 600px;
+        opacity: 1;
+        transition: max-height 0.35s ease-in, padding 0.25s ease-in, opacity 0.2s ease;
+    }
+</style>
+<script>
+let fieldCounter = 0;
+const existingFieldsJson = {{ existing_fields_json|safe|default:"[]" }};
+const fieldTypeChoices = {{ field_type_choices|safe|default:"[]" }};
+
+/* ---------------------------------------------------------- */
+/*  Slugify helper: "Full Name" -> "full_name"                 */
+/* ---------------------------------------------------------- */
+function slugify(text) {
+    return text.toLowerCase().trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+/* ---------------------------------------------------------- */
+/*  Toggle per-field Advanced section                          */
+/* ---------------------------------------------------------- */
+function toggleFieldAdvanced(index) {
+    const adv = document.getElementById('fieldAdvanced_' + index);
+    const arrow = document.getElementById('fieldAdvArrow_' + index);
+    if (adv) {
+        adv.classList.toggle('expanded');
+        if (arrow) arrow.classList.toggle('expanded');
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Add Form Field                                             */
+/* ---------------------------------------------------------- */
+function addFormField(existingData = null) {
+    const index = fieldCounter++;
+    const fieldData = existingData || {};
+
+    const optionsValue = Array.isArray(fieldData.options)
+        ? fieldData.options.join(', ')
+        : (fieldData.options || '');
+
+    const showOptions = ['select', 'radio', 'multi_checkbox'].includes(fieldData.field_type);
+
+    const fieldHtml = `
+        <div class="field-row bg-slate-50 rounded-xl border border-slate-200" data-field-index="${index}">
+            <input type="hidden" name="field_${index}_id" value="${fieldData.id || ''}">
+
+            <!-- Compact single-row: Type | Label | Required | Delete -->
+            <div class="flex items-center gap-3 p-3">
+                <span class="material-symbols-outlined text-slate-300 text-base cursor-default select-none">drag_indicator</span>
+
+                <!-- Field Type -->
+                <div class="w-44 shrink-0">
+                    <select name="field_${index}_type" class="w-full border border-slate-200 bg-white rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800" required onchange="toggleOptionsField(this)">
+                        ${fieldTypeChoices.map(choice => `<option value="${choice[0]}" ${fieldData.field_type === choice[0] ? 'selected' : ''}>${choice[1]}</option>`).join('')}
+                    </select>
+                </div>
+
+                <!-- Label EN -->
+                <div class="flex-1 min-w-0">
+                    <input type="text" name="field_${index}_label" value="${escapeAttr(fieldData.field_label || '')}" placeholder="Field Label (EN)" class="w-full border border-slate-200 bg-white rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800" required
+                        oninput="autoSlugify(this, ${index})">
+                </div>
+
+                <!-- Required checkbox -->
+                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 select-none">
+                    <input type="checkbox" name="field_${index}_required" ${fieldData.is_required ? 'checked' : ''} class="w-4 h-4 text-sky-600 bg-white border-slate-300 rounded focus:ring-sky-500 focus:ring-2">
+                    <span class="text-xs text-slate-600 font-medium">Required</span>
+                </label>
+
+                <!-- Advanced toggle -->
+                <button type="button" onclick="toggleFieldAdvanced(${index})" class="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-200 shrink-0" title="Advanced options">
+                    <span id="fieldAdvArrow_${index}" class="material-symbols-outlined text-base transition-transform duration-200 collapsible-arrow">tune</span>
+                </button>
+
+                <!-- Delete -->
+                <button type="button" onclick="removeFormField(this)" class="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 shrink-0" title="Remove field">
+                    <span class="material-symbols-outlined text-base">close</span>
+                </button>
+            </div>
+
+            <!-- Options row (only for select/radio/multi_checkbox) -->
+            <div class="options-field px-3 pb-3 ${showOptions ? '' : 'hidden'}">
+                <div class="flex items-center gap-2 ml-8">
+                    <span class="material-symbols-outlined text-slate-400 text-sm">list</span>
+                    <input type="text" name="field_${index}_options" value="${escapeAttr(optionsValue)}" placeholder="Option 1, Option 2, Option 3" class="flex-1 border border-slate-200 bg-white rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                </div>
+            </div>
+
+            <!-- Per-field Advanced (collapsed by default) -->
+            <div id="fieldAdvanced_${index}" class="field-advanced">
+                <div class="mx-3 mb-3 p-4 bg-white rounded-lg border border-slate-200">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Advanced Field Settings</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Label (FR)</label>
+                            <input type="text" name="field_${index}_label_fr" value="${escapeAttr(fieldData.field_label_fr || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Field Name</label>
+                            <input type="text" name="field_${index}_name" id="fieldName_${index}" value="${escapeAttr(fieldData.field_name || '')}" placeholder="auto_generated" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800 font-mono" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Validation Regex</label>
+                            <input type="text" name="field_${index}_validation_regex" value="${escapeAttr(fieldData.validation_regex || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Placeholder (EN)</label>
+                            <input type="text" name="field_${index}_placeholder" value="${escapeAttr(fieldData.placeholder || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Placeholder (FR)</label>
+                            <input type="text" name="field_${index}_placeholder_fr" value="${escapeAttr(fieldData.placeholder_fr || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Help Text (EN)</label>
+                            <input type="text" name="field_${index}_help_text" value="${escapeAttr(fieldData.help_text || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Help Text (FR)</label>
+                            <input type="text" name="field_${index}_help_text_fr" value="${escapeAttr(fieldData.help_text_fr || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div class="flex items-end pb-1">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="field_${index}_active" ${fieldData.is_active !== false ? 'checked' : ''} class="w-4 h-4 text-sky-600 bg-white border-slate-300 rounded focus:ring-sky-500 focus:ring-2">
+                                <span class="text-sm text-slate-700 font-medium">Active</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('formFieldsContainer').insertAdjacentHTML('beforeend', fieldHtml);
+}
+
+/* ---------------------------------------------------------- */
+/*  Escape helper for attribute values in template literals    */
+/* ---------------------------------------------------------- */
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/* ---------------------------------------------------------- */
+/*  Auto-slugify Label -> Field Name                           */
+/* ---------------------------------------------------------- */
+function autoSlugify(labelInput, index) {
+    const nameInput = document.getElementById('fieldName_' + index);
+    if (nameInput && (!nameInput.dataset.userEdited || nameInput.dataset.userEdited === 'false')) {
+        nameInput.value = slugify(labelInput.value);
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Mark field_name as user-edited (stop auto-slugify)         */
+/* ---------------------------------------------------------- */
+document.addEventListener('input', function(e) {
+    if (e.target.id && e.target.id.startsWith('fieldName_')) {
+        e.target.dataset.userEdited = 'true';
+    }
+});
+
+/* ---------------------------------------------------------- */
+/*  Remove Form Field                                          */
+/* ---------------------------------------------------------- */
+function removeFormField(button) {
+    const fieldContainer = button.closest('[data-field-index]');
+    if (fieldContainer) {
+        fieldContainer.remove();
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Toggle Options Field (select/radio/multi_checkbox)         */
+/* ---------------------------------------------------------- */
+function toggleOptionsField(selectElement) {
+    const fieldContainer = selectElement.closest('[data-field-index]');
+    const optionsField = fieldContainer.querySelector('.options-field');
+    const selectedType = selectElement.value;
+
+    if (['select', 'radio', 'multi_checkbox'].includes(selectedType)) {
+        optionsField.classList.remove('hidden');
+    } else {
+        optionsField.classList.add('hidden');
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Initialize on DOM ready                                    */
+/* ---------------------------------------------------------- */
+document.addEventListener('DOMContentLoaded', function() {
+    if (existingFieldsJson && existingFieldsJson.length > 0) {
+        existingFieldsJson.forEach(field => {
+            addFormField(field);
+        });
+        // Mark all existing field_name inputs as user-edited so auto-slugify doesn't overwrite
+        document.querySelectorAll('[id^="fieldName_"]').forEach(el => {
+            el.dataset.userEdited = 'true';
+        });
+    }
+});
+</script>
 {% endblock %}

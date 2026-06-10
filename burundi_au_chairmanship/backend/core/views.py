@@ -5333,14 +5333,42 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         settings = YouthDialogueSettings.load()
         return Response(YouthDialogueSettingsSerializer(settings, context={'request': request}).data)
 
+    # Known field names that map directly to YouthDialogueApplication model columns
+    _KNOWN_FIELD_NAMES = {
+        'title', 'first_name', 'last_name', 'email', 'phone_number',
+        'country_code', 'nationality', 'date_of_birth', 'gender',
+        'organization', 'position', 'motivation',
+    }
+
     @action(detail=False, methods=['post'], url_path='apply')
     def apply(self, request):
-        """Submit a Youth Dialogue application."""
+        """Submit a Youth Dialogue application.
+
+        Accepts either:
+          - New format: {'form_data': {field_name: value, ...}}
+          - Legacy flat format: {field_name: value, ...}
+        Known field names map to model columns; extras go to additional_data JSON.
+        """
+        # Backward compat: unwrap form_data or use flat request.data
+        raw = request.data.get('form_data', request.data)
+
+        # Separate known model fields from custom/extra fields
+        model_data = {}
+        additional_data = {}
+        for key, value in raw.items():
+            if key in self._KNOWN_FIELD_NAMES:
+                model_data[key] = value
+            else:
+                additional_data[key] = value
+
         serializer = YouthDialogueApplicationCreateSerializer(
-            data=request.data, context={'request': request}
+            data=model_data, context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
-        app = serializer.save(user=request.user, status='submitted')
+        app = serializer.save(
+            user=request.user, status='submitted',
+            additional_data=additional_data,
+        )
 
         # Log activity
         YouthDialogueActivityLog.objects.create(

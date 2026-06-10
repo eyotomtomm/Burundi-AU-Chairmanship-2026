@@ -29,7 +29,7 @@ from .models import (
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
-    YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    YouthDialogueSettings, YouthDialogueFormField, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
 )
 
 
@@ -1917,18 +1917,38 @@ class EventAgendaItemSerializer(serializers.ModelSerializer):
 #  YOUTH DIALOGUE SERIALIZERS
 # ═══════════════════════════════════════════════════════════════
 
+class YouthDialogueFormFieldSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YouthDialogueFormField
+        fields = ['id', 'field_type', 'field_label', 'field_label_fr', 'field_name',
+                  'placeholder', 'placeholder_fr', 'is_required', 'is_active',
+                  'options', 'validation_regex', 'help_text', 'help_text_fr',
+                  'max_length', 'min_length', 'order']
+
+
 class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
+    form_fields = YouthDialogueFormFieldSerializer(many=True, read_only=True)
+    quick_access_icon_url = serializers.SerializerMethodField()
+
     class Meta:
         model = YouthDialogueSettings
         fields = [
             'logo_light', 'logo_dark',
             'programme_title', 'programme_title_fr',
             'description', 'description_fr',
-            'is_registration_open',
+            'is_visible', 'is_registration_open',
             'registration_closed_message', 'registration_closed_message_fr',
+            'quick_access_icon_url', 'quick_access_title_en', 'quick_access_title_fr',
             'support_email', 'support_phone', 'live_chat_url',
             'support_note', 'support_note_fr',
+            'form_fields',
         ]
+
+    def get_quick_access_icon_url(self, obj):
+        request = self.context.get('request')
+        if obj.quick_access_icon and request:
+            return request.build_absolute_uri(obj.quick_access_icon.url)
+        return ''
 
 
 class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):

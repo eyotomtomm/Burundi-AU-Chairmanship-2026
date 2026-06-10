@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
 
 /// Grid of quick access buttons for common actions
@@ -10,7 +11,8 @@ class QuickAccessGrid extends StatelessWidget {
   ///
   /// Each item should contain:
   /// - `title`: String - Display text
-  /// - `icon`: IconData - Icon to show
+  /// - `icon`: IconData - Icon to show (fallback when iconImageUrl is absent)
+  /// - `iconImageUrl`: String (optional) - Network image URL for the icon
   /// - `onTap`: VoidCallback - Action when tapped
   /// - `hasLiveDot`: bool (optional) - Show live indicator dot
   final List<Map<String, dynamic>> items;
@@ -40,9 +42,40 @@ class QuickAccessGrid extends StatelessWidget {
         final hasLiveDot = item['hasLiveDot'] == true;
         final badgeText = item['badgeText'] as String? ?? '';
         final badgeColorHex = item['badgeColor'] as String? ?? '';
+        final iconImageUrl = item['iconImageUrl'] as String? ?? '';
 
         final isLocked = item['locked'] == true;
         final itemColor = isLocked ? Colors.grey : AppColors.burundiGreen;
+
+        // Determine icon content: network image or fallback Icon widget
+        Widget iconContent;
+        if (iconImageUrl.isNotEmpty) {
+          iconContent = ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: CachedNetworkImage(
+              imageUrl: iconImageUrl,
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+              placeholder: (_, __) => Icon(
+                item['icon'] as IconData,
+                color: itemColor,
+                size: 26,
+              ),
+              errorWidget: (_, __, ___) => Icon(
+                item['icon'] as IconData,
+                color: itemColor,
+                size: 26,
+              ),
+            ),
+          );
+        } else {
+          iconContent = Icon(
+            item['icon'] as IconData,
+            color: itemColor,
+            size: 26,
+          );
+        }
 
         return GestureDetector(
           onTap: item['onTap'] as VoidCallback,
@@ -67,11 +100,7 @@ class QuickAccessGrid extends StatelessWidget {
                           width: 1.5,
                         ),
                       ),
-                      child: Icon(
-                        item['icon'] as IconData,
-                        color: itemColor,
-                        size: 26,
-                      ),
+                      child: Center(child: iconContent),
                     ),
                     // "NEW" / "HOT" / custom text badge
                     if (badgeText.isNotEmpty)

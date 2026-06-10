@@ -52,7 +52,6 @@ import 'screens/verification/verification_request_screen.dart';
 import 'screens/trending/trending_screen.dart';
 import 'screens/events/events_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_main_screen.dart';
-import 'screens/youth_dialogue/youth_dialogue_apply_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_documents_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_credential_screen.dart';
 
@@ -333,7 +332,7 @@ class BurundiAUApp extends StatelessWidget {
                 '/trending': (context) => const TrendingScreen(),
                 '/events': (context) => const EventsScreen(),
                 '/youth-dialogue': (context) => const YouthDialogueMainScreen(),
-                '/youth-dialogue-apply': (context) => const YouthDialogueApplyScreen(),
+                '/youth-dialogue-apply': (context) => const YouthDialogueMainScreen(),
                 '/youth-dialogue-documents': (context) => const YouthDialogueDocumentsScreen(),
                 '/youth-dialogue-credential': (context) => const YouthDialogueCredentialScreen(),
               };

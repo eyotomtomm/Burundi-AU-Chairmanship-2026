@@ -49,6 +49,7 @@ from core.models import (
     ArticleLike,
     NewsletterEdition,
     YouthDialogueSettings,
+    YouthDialogueFormField,
     YouthDialogueApplication,
     YouthDialogueDocument,
     YouthDialogueActivityLog,
@@ -7889,28 +7890,112 @@ def media_library_api(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @_catch_upload_errors
 def youth_dialogue_settings(request):
-    settings = YouthDialogueSettings.load()
+    yd_settings = YouthDialogueSettings.load()
     if request.method == 'POST':
-        settings.programme_title = request.POST.get('programme_title', settings.programme_title)
-        settings.programme_title_fr = request.POST.get('programme_title_fr', '')
-        settings.description = request.POST.get('description', '')
-        settings.description_fr = request.POST.get('description_fr', '')
-        settings.is_registration_open = request.POST.get('is_registration_open') == 'on'
-        settings.registration_closed_message = request.POST.get('registration_closed_message', '')
-        settings.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
-        settings.support_email = request.POST.get('support_email', '')
-        settings.support_phone = request.POST.get('support_phone', '')
-        settings.live_chat_url = request.POST.get('live_chat_url', '')
-        settings.support_note = request.POST.get('support_note', '')
-        settings.support_note_fr = request.POST.get('support_note_fr', '')
+        yd_settings.programme_title = request.POST.get('programme_title', yd_settings.programme_title)
+        yd_settings.programme_title_fr = request.POST.get('programme_title_fr', '')
+        yd_settings.description = request.POST.get('description', '')
+        yd_settings.description_fr = request.POST.get('description_fr', '')
+        # Visibility & Quick Access
+        yd_settings.is_visible = request.POST.get('is_visible') == 'on'
+        yd_settings.is_registration_open = request.POST.get('is_registration_open') == 'on'
+        yd_settings.quick_access_title_en = request.POST.get('quick_access_title_en', 'Youth Dialogue')
+        yd_settings.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
+        yd_settings.registration_closed_message = request.POST.get('registration_closed_message', '')
+        yd_settings.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
+        yd_settings.support_email = request.POST.get('support_email', '')
+        yd_settings.support_phone = request.POST.get('support_phone', '')
+        yd_settings.live_chat_url = request.POST.get('live_chat_url', '')
+        yd_settings.support_note = request.POST.get('support_note', '')
+        yd_settings.support_note_fr = request.POST.get('support_note_fr', '')
         if request.FILES.get('logo_light'):
-            settings.logo_light = request.FILES['logo_light']
+            yd_settings.logo_light = request.FILES['logo_light']
         if request.FILES.get('logo_dark'):
-            settings.logo_dark = request.FILES['logo_dark']
-        settings.save()
+            yd_settings.logo_dark = request.FILES['logo_dark']
+        if request.FILES.get('quick_access_icon'):
+            yd_settings.quick_access_icon = request.FILES['quick_access_icon']
+        yd_settings.save()
+        _save_yd_form_fields(request, yd_settings)
         messages.success(request, 'Youth Dialogue settings updated successfully!')
         return redirect('custom_admin:youth_dialogue_settings')
-    return render(request, 'custom_admin/youth_dialogue/settings.html', {'settings': settings})
+
+    # Prepare form field data for template JS
+    existing_fields = list(yd_settings.form_fields.values(
+        'id', 'field_type', 'field_label', 'field_label_fr', 'field_name',
+        'placeholder', 'placeholder_fr', 'is_required', 'is_active',
+        'options', 'validation_regex', 'help_text', 'help_text_fr', 'order',
+    ))
+    field_type_choices = list(YouthDialogueFormField.FIELD_TYPE_CHOICES)
+
+    return render(request, 'custom_admin/youth_dialogue/settings.html', {
+        'settings': yd_settings,
+        'existing_fields_json': json.dumps(existing_fields),
+        'field_type_choices': json.dumps(field_type_choices),
+    })
+
+
+def _save_yd_form_fields(request, yd_settings):
+    """Parse and save inline form fields from the Youth Dialogue settings form."""
+    existing_ids = set(yd_settings.form_fields.values_list('id', flat=True))
+    kept_ids = set()
+    idx = 0
+    while True:
+        prefix = f'field_{idx}_'
+        field_type = request.POST.get(f'{prefix}type')
+        if field_type is None:
+            break
+        field_id = request.POST.get(f'{prefix}id')
+        field_label = request.POST.get(f'{prefix}label', '')
+        field_label_fr = request.POST.get(f'{prefix}label_fr', '')
+        field_name = request.POST.get(f'{prefix}name', '')
+        placeholder = request.POST.get(f'{prefix}placeholder', '')
+        placeholder_fr = request.POST.get(f'{prefix}placeholder_fr', '')
+        is_required = request.POST.get(f'{prefix}required') == 'on'
+        is_active = request.POST.get(f'{prefix}active') == 'on'
+        help_text_val = request.POST.get(f'{prefix}help_text', '')
+        help_text_fr = request.POST.get(f'{prefix}help_text_fr', '')
+        options_str = request.POST.get(f'{prefix}options', '')
+        validation_regex = request.POST.get(f'{prefix}validation_regex', '')
+        order = idx
+
+        options = []
+        if options_str.strip():
+            try:
+                options = json.loads(options_str)
+            except (ValueError, TypeError):
+                options = [o.strip() for o in options_str.split(',') if o.strip()]
+
+        data = {
+            'settings': yd_settings,
+            'field_type': field_type,
+            'field_label': field_label,
+            'field_label_fr': field_label_fr,
+            'field_name': field_name,
+            'placeholder': placeholder,
+            'placeholder_fr': placeholder_fr,
+            'is_required': is_required,
+            'is_active': is_active,
+            'options': options,
+            'help_text': help_text_val,
+            'help_text_fr': help_text_fr,
+            'validation_regex': validation_regex,
+            'order': order,
+        }
+
+        if field_id and field_id.isdigit():
+            fid = int(field_id)
+            YouthDialogueFormField.objects.filter(pk=fid, settings=yd_settings).update(**{
+                k: v for k, v in data.items() if k != 'settings'
+            })
+            kept_ids.add(fid)
+        else:
+            obj = YouthDialogueFormField.objects.create(**data)
+            kept_ids.add(obj.pk)
+        idx += 1
+
+    to_delete = existing_ids - kept_ids
+    if to_delete:
+        YouthDialogueFormField.objects.filter(pk__in=to_delete).delete()
 
 
 @login_required(login_url='custom_admin:login')

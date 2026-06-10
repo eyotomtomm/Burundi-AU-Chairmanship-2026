@@ -172,6 +172,20 @@
       <p class="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{{ application.motivation }}</p>
     </div>
     {% endif %}
+
+    {% if application.additional_data %}
+    <div class="mt-6 pt-6 border-t border-slate-100">
+      <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-3">Additional Fields</label>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for key, value in application.additional_data.items %}
+        <div>
+          <label class="text-xs uppercase tracking-wider text-slate-400 font-semibold block mb-1">{{ key }}</label>
+          <p class="text-slate-700 text-sm">{{ value }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- Documents Section -->

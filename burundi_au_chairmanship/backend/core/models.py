@@ -4345,6 +4345,15 @@ class YouthDialogueSettings(models.Model):
     description = models.TextField(default='Join the African Union Youth Dialogue and contribute to shaping the continent\'s future. Apply now to participate in this prestigious programme.')
     description_fr = models.TextField(blank=True, default='Rejoignez le Dialogue de la Jeunesse de l\'Union Africaine et contribuez à façonner l\'avenir du continent.')
 
+    # Visibility & Quick Access
+    is_visible = models.BooleanField(default=True, help_text='Show Youth Dialogue in Quick Access grid')
+    quick_access_icon = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
+                                          help_text='Custom icon for Quick Access grid')
+    quick_access_title_en = models.CharField(max_length=50, blank=True, default='Youth Dialogue',
+                                              help_text='Quick Access button title (EN)')
+    quick_access_title_fr = models.CharField(max_length=50, blank=True, default='Dialogue Jeunesse',
+                                              help_text='Quick Access button title (FR)')
+
     # Registration control
     is_registration_open = models.BooleanField(default=True, help_text='Whether new applications are accepted')
     registration_closed_message = models.TextField(blank=True, default='Registration is currently closed. Please check back later.')
@@ -4376,6 +4385,56 @@ class YouthDialogueSettings(models.Model):
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class YouthDialogueFormField(models.Model):
+    """Dynamic form fields for the Youth Dialogue application form."""
+    FIELD_TYPE_CHOICES = [
+        ('text', 'Text Input'),
+        ('email', 'Email'),
+        ('phone', 'Phone Number'),
+        ('textarea', 'Text Area'),
+        ('number', 'Number'),
+        ('date', 'Date'),
+        ('time', 'Time'),
+        ('file', 'File Upload'),
+        ('image', 'Image Upload'),
+        ('select', 'Dropdown Select'),
+        ('radio', 'Radio Buttons'),
+        ('checkbox', 'Single Checkbox'),
+        ('multi_checkbox', 'Multiple Checkboxes'),
+        ('country', 'Country Selector'),
+        ('nationality', 'Nationality'),
+        ('passport', 'Passport Number'),
+        ('url', 'URL / Website'),
+    ]
+
+    settings = models.ForeignKey(YouthDialogueSettings, on_delete=models.CASCADE, related_name='form_fields')
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPE_CHOICES)
+    field_label = models.CharField(max_length=200, help_text='Label shown to user')
+    field_label_fr = models.CharField(max_length=200, blank=True)
+    field_name = models.CharField(max_length=100, help_text='Internal field name (e.g., "first_name", "motivation")')
+    placeholder = models.CharField(max_length=200, blank=True)
+    placeholder_fr = models.CharField(max_length=200, blank=True)
+
+    is_required = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True, help_text='Show/hide this field')
+    options = models.JSONField(default=list, blank=True, help_text='For select/radio/multi_checkbox: ["Option 1", "Option 2"]')
+    validation_regex = models.CharField(max_length=500, blank=True, help_text='Optional regex for validation')
+    help_text = models.CharField(max_length=300, blank=True)
+    help_text_fr = models.CharField(max_length=300, blank=True)
+    max_length = models.IntegerField(null=True, blank=True)
+    min_length = models.IntegerField(null=True, blank=True)
+
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Youth Dialogue Form Field'
+        verbose_name_plural = 'Youth Dialogue Form Fields'
+
+    def __str__(self):
+        return f"{self.field_label} ({self.get_field_type_display()})"
 
 
 # ═══════════════════════════════════════════════════════════════

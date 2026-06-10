@@ -4,6 +4,10 @@ import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/like_service.dart';
+import '../../widgets/liked_by_avatars.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/comment_tile.dart';
 
 class DiscussionDetailScreen extends StatefulWidget {
   final int discussionId;
@@ -19,12 +23,15 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
   Map<String, dynamic>? _discussion;
   List<Map<String, dynamic>> _replies = [];
   bool _loading = true;
-  bool _isLiked = false;
-  int _likeCount = 0;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   @override
   void initState() {
     super.initState();
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key == 'discussion:${widget.discussionId}' && mounted) setState(() {});
+    });
     _loadData();
     _recordView();
   }
@@ -35,41 +42,34 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
     } catch (_) {}
   }
 
-  Future<void> _toggleLike() async {
+  void _toggleLike() {
     final auth = context.read<AuthProvider>();
     if (!auth.isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to like this discussion')),
+        SnackBar(content: Text(AppLocalizations.of(context).translate('login_to_like'))),
       );
       return;
     }
-    final wasLiked = _isLiked;
-    final prevCount = _likeCount;
-    setState(() {
-      _isLiked = !wasLiked;
-      _likeCount = prevCount + (wasLiked ? -1 : 1);
-    });
-    try {
-      final result = await _api.toggleDiscussionLike(widget.discussionId);
-      if (mounted) {
-        setState(() {
-          _isLiked = result['is_liked'] == true;
-          _likeCount = result['like_count'] ?? _likeCount;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isLiked = wasLiked;
-        _likeCount = prevCount;
-      });
-    }
+    _likeService.toggle(EntityType.discussion, widget.discussionId);
   }
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
       _discussion = await _api.getDiscussionDetail(widget.discussionId);
+      if (_discussion != null) {
+        final likers = _discussion!['recent_likers'] is List
+            ? (_discussion!['recent_likers'] as List)
+                .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+                .toList()
+            : <Liker>[];
+        _likeService.seed(
+          EntityType.discussion, widget.discussionId,
+          isLiked: _discussion!['is_liked'] == true,
+          likeCount: _discussion!['like_count'] ?? 0,
+          recentLikers: likers,
+        );
+      }
       _replies = await _api.getDiscussionReplies(widget.discussionId);
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
@@ -87,6 +87,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _replyCtrl.dispose();
     super.dispose();
   }
@@ -176,19 +177,27 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                         child: Row(
                                           children: [
                                             Icon(
-                                              _isLiked ? Icons.favorite : Icons.favorite_border,
+                                              _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Icons.favorite : Icons.favorite_border,
                                               size: 20,
-                                              color: _isLiked ? Colors.redAccent : Colors.grey,
+                                              color: _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Colors.redAccent : Colors.grey,
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              '$_likeCount',
+                                              '${_likeService.getState(EntityType.discussion, widget.discussionId).likeCount}',
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 fontWeight: FontWeight.w600,
-                                                color: _isLiked ? Colors.redAccent : Colors.grey,
+                                                color: _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Colors.redAccent : Colors.grey,
                                               ),
                                             ),
+                                            if (_likeService.getState(EntityType.discussion, widget.discussionId).recentLikers.isNotEmpty) ...[
+                                              const SizedBox(width: 8),
+                                              LikedByAvatars(
+                                                likers: _likeService.getState(EntityType.discussion, widget.discussionId).recentLikers,
+                                                totalLikes: _likeService.getState(EntityType.discussion, widget.discussionId).likeCount,
+                                                avatarRadius: 10,
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ),
@@ -200,7 +209,23 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                             const SizedBox(height: 20),
                             Text('Replies (${_replies.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
-                            ..._replies.map((reply) => _buildReplyCard(reply, isDark)),
+                            ..._replies.map((reply) {
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              final discussionId = widget.discussionId;
+                              return CommentTile.fromMap(
+                                reply,
+                                userNameKey: 'author_name',
+                                isAuthenticated: auth.isAuthenticated,
+                                onDelete: () async {
+                                  try {
+                                    await ApiService().deleteDiscussionReply(discussionId, reply['id']);
+                                    _loadData();
+                                  } catch (_) {}
+                                },
+                                onToggleLike: () => ApiService().toggleDiscussionReplyLike(discussionId, reply['id']),
+                                onEdit: (content) => ApiService().editDiscussionReply(discussionId, reply['id'], content),
+                              );
+                            }),
                             if (_replies.isEmpty)
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 32),
@@ -248,34 +273,4 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
     );
   }
 
-  Widget _buildReplyCard(Map<String, dynamic> reply, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: Colors.grey[300],
-                child: Text((reply['author_name'] ?? 'A')[0].toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 8),
-              Text(reply['author_name'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              const Spacer(),
-              Text(reply['created_at'] ?? '', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(reply['content'] ?? '', style: TextStyle(fontSize: 14, color: isDark ? Colors.grey[300] : Colors.grey[700])),
-        ],
-      ),
-    );
-  }
 }

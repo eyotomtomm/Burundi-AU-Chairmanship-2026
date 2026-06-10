@@ -89,7 +89,7 @@ class FirebaseAuthService {
     } catch (e) {
       throw FirebaseAuthException(
         code: 'ERROR_GOOGLE_SIGN_IN_FAILED',
-        message: 'Google Sign-In failed: $e',
+        message: '$e',
       );
     }
   }
@@ -233,7 +233,7 @@ class FirebaseAuthService {
       case 'ERROR_ABORTED_BY_USER':
         return 'Sign-in cancelled. Please try again.';
       case 'ERROR_GOOGLE_SIGN_IN_FAILED':
-        return 'Google Sign-In failed. Please check your internet connection and try again.';
+        return 'Google Sign-In failed: ${e.message ?? 'Unknown error. Check your internet connection.'}';
 
       // Apple Sign-In errors
       case 'ERROR_APPLE_SIGNIN_NOT_AVAILABLE':
@@ -247,9 +247,10 @@ class FirebaseAuthService {
       case 'credential-already-in-use':
         return 'This account is already associated with another user.';
 
-      // Invalid credential (common with Google Sign-In SHA-1 mismatch)
+      // Invalid credential — Firebase v2 merges wrong-password and user-not-found
+      // into this single code for security. Also fires on SHA-1 mismatch for Google.
       case 'invalid-credential':
-        return 'Sign-in failed. Please try again or use a different sign-in method.';
+        return 'Invalid email or password. Please check your credentials and try again.';
 
       default:
         return 'Authentication error: ${e.message ?? e.code}';

@@ -23,7 +23,7 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
   static final List<Map<String, dynamic>> _mockSocialMedia = [
     {
       'platform': 'facebook',
-      'display_name': 'Burundi Chairmanship',
+      'display_name': 'Be 4 Africa',
       'handle': '@BurundiAU2026',
       'url': 'https://facebook.com/BurundiAU2026',
       'follower_count': '125K',
@@ -41,11 +41,11 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     },
     {
       'platform': 'instagram',
-      'display_name': 'Burundi Chairmanship',
+      'display_name': 'Be 4 Africa',
       'handle': '@burundiauchair2026',
       'url': 'https://instagram.com/burundiauchair2026',
       'follower_count': '67K',
-      'description': 'Photos and stories from the Burundi Chairmanship',
+      'description': 'Photos and stories from the Be 4 Africa',
       'icon_color': '#E4405F',
     },
     {
@@ -59,12 +59,21 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
     },
     {
       'platform': 'linkedin',
-      'display_name': 'Burundi Chairmanship 2026',
-      'handle': 'Burundi Chairmanship',
+      'display_name': 'Be 4 Africa 2026',
+      'handle': 'Be 4 Africa',
       'url': 'https://linkedin.com/company/burundi-au-chairmanship',
       'follower_count': '28K',
       'description': 'Professional network and policy updates',
       'icon_color': '#0A66C2',
+    },
+    {
+      'platform': 'whatsapp',
+      'display_name': 'B4Africa Channel',
+      'handle': 'WhatsApp Channel',
+      'url': 'https://whatsapp.com/channel/b4africa',
+      'follower_count': '15K',
+      'description': 'Join our WhatsApp channel for instant updates',
+      'icon_color': '#25D366',
     },
   ];
 

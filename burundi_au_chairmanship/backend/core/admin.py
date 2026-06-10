@@ -14,13 +14,14 @@ from .models import (
     FeatureCardKeyPoint, FeatureCardImpactArea, FeatureCardMedia,
     AuditLogEntry, AdminRole, SupportTicket, TicketMessage, Popup,
     UserSession, LinkedAccount,
+    YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
 )
 
 
 # ═══════════════════════════════════════════════════════════════
 #  ADMIN SITE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
-admin.site.site_header = 'Burundi Chairmanship 2026'
+admin.site.site_header = 'Be 4 Africa 2026'
 admin.site.site_title = 'Admin Panel'
 admin.site.index_title = 'Content Management System'
 
@@ -512,6 +513,7 @@ class EventSubmissionAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'user__email', 'user__first_name', 'event_registration__event_title']
     readonly_fields = ['user', 'event_registration', 'submitted_at', 'form_data_display']
     date_hierarchy = 'submitted_at'
+    actions = ['export_csv']
 
     fieldsets = (
         ('Submission Information', {
@@ -562,7 +564,141 @@ class EventSubmissionAdmin(admin.ModelAdmin):
         if obj.status in ['approved', 'rejected'] and not obj.reviewed_at:
             obj.reviewed_at = timezone.now()
             obj.reviewed_by = request.user
+
+        # Feature 6: Detect status change and send notification email
+        if change:
+            try:
+                original = EventSubmission.objects.get(pk=obj.pk)
+                if original.status != obj.status and obj.status in ('approved', 'rejected'):
+                    super().save_model(request, obj, form, change)
+                    self._send_status_change_email(obj)
+                    return
+            except EventSubmission.DoesNotExist:
+                pass
+
         super().save_model(request, obj, form, change)
+
+    def _send_status_change_email(self, submission):
+        """Send email notification when submission status changes to approved/rejected."""
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+
+        recipient_email = submission.proxy_email if submission.is_proxy else submission.user.email
+        if not recipient_email:
+            return
+
+        recipient_name = submission.proxy_name if submission.is_proxy else (
+            submission.user.get_full_name() or submission.user.username
+        )
+        event_title = submission.event_registration.event_title
+        is_approved = submission.status == 'approved'
+        status_text = 'Approved' if is_approved else 'Rejected'
+        status_color = '#28A745' if is_approved else '#DC3545'
+        subject = f'Registration {status_text}: {event_title}'
+
+        html_message = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Update</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
+        Dear <strong>{recipient_name}</strong>,
+      </p>
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        Your registration for <strong>{event_title}</strong> has been reviewed.
+      </p>
+      <div style="text-align:center;margin:0 0 24px;">
+        <span style="display:inline-block;background:{status_color};color:white;padding:10px 28px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;">{status_text.upper()}</span>
+      </div>'''
+
+        if submission.admin_notes:
+            html_message += f'''
+      <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
+        <h3 style="color:#2d3748;font-size:14px;margin:0 0 8px;">Notes from Admin</h3>
+        <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0;">{submission.admin_notes}</p>
+      </div>'''
+
+        contact_email = submission.event_registration.contact_email or 'info@burundi4africa.com'
+        html_message += f'''
+      <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+        If you have any questions, please contact us at <a href="mailto:{contact_email}" style="color:#3182ce;">{contact_email}</a>
+      </p>
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>'''
+
+        plain_message = f"Dear {recipient_name},\n\nYour registration for {event_title} has been {status_text.lower()}.\n\n"
+        if submission.admin_notes:
+            plain_message += f"Admin notes: {submission.admin_notes}\n\n"
+        plain_message += "Best regards,\nBe 4 Africa Team"
+
+        try:
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[recipient_email],
+                html_message=html_message,
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+    def export_csv(self, request, queryset):
+        """Export selected submissions to CSV."""
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="event_submissions.csv"'
+
+        # Collect all unique form_data keys across selected submissions
+        all_keys = set()
+        for submission in queryset:
+            if submission.form_data:
+                all_keys.update(submission.form_data.keys())
+        sorted_keys = sorted(all_keys)
+
+        writer = csv.writer(response)
+        header = ['Event Title', 'User Name', 'User Email', 'Is Proxy',
+                  'Proxy Name', 'Proxy Email', 'Status', 'Submitted At'] + sorted_keys
+        writer.writerow(header)
+
+        for submission in queryset.select_related('event_registration', 'user'):
+            row = [
+                submission.event_registration.event_title,
+                submission.user.get_full_name() or submission.user.username,
+                submission.user.email,
+                'Yes' if submission.is_proxy else 'No',
+                submission.proxy_name,
+                submission.proxy_email,
+                submission.get_status_display(),
+                submission.submitted_at.strftime('%Y-%m-%d %H:%M:%S') if submission.submitted_at else '',
+            ]
+            for key in sorted_keys:
+                value = submission.form_data.get(key, '')
+                # Flatten list values (e.g. multi_checkbox) to comma-separated strings
+                if isinstance(value, list):
+                    value = ', '.join(str(v) for v in value)
+                row.append(value)
+            writer.writerow(row)
+
+        return response
+    export_csv.short_description = 'Export to CSV'
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -610,9 +746,9 @@ class ArticleAdmin(admin.ModelAdmin):
     Articles marked as "featured" appear in a special section on the home screen.
     """
     inlines = [ArticleMediaInline]
-    list_display = ['title', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
-    list_filter = ['is_featured', 'category', 'publish_date']
-    list_editable = ['is_featured']
+    list_display = ['title', 'content_type', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
+    list_filter = ['content_type', 'is_featured', 'category', 'publish_date']
+    list_editable = ['content_type', 'is_featured']
     search_fields = ['title', 'title_fr', 'content']
     date_hierarchy = 'publish_date'
 
@@ -622,6 +758,7 @@ class ArticleAdmin(admin.ModelAdmin):
                 ('title', 'title_fr'),
                 'cover_image',
                 'category',
+                'content_type',
                 'content',
                 'content_fr',
             ],
@@ -1207,7 +1344,7 @@ class PriorityAgendaAdmin(admin.ModelAdmin):
     PRIORITY AGENDAS - Key focus areas and initiatives
 
     HELP:
-    Priority agendas are the main focus areas of the Burundi Chairmanship.
+    Priority agendas are the main focus areas of the Be 4 Africa.
     Examples: Water & Sanitation, Economic Development, Peace & Security
 
     HOW TO USE:
@@ -1602,3 +1739,316 @@ class LinkedAccountAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__email', 'email', 'provider_uid', 'display_name')
     readonly_fields = ('linked_at',)
     raw_id_fields = ('user',)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YOUTH DIALOGUE
+# ═══════════════════════════════════════════════════════════════
+
+class YouthDialogueDocumentInline(admin.TabularInline):
+    model = YouthDialogueDocument
+    extra = 0
+    fields = ['document_type', 'file_link', 'original_filename', 'file_size_display',
+              'status', 'rejection_reason', 'is_resubmission', 'uploaded_at']
+    readonly_fields = ['file_link', 'original_filename', 'file_size_display',
+                       'is_resubmission', 'uploaded_at']
+
+    def file_link(self, obj):
+        if obj.file:
+            return format_html('<a href="{}" target="_blank">View File</a>', obj.file.url)
+        return '-'
+    file_link.short_description = 'File'
+
+    def file_size_display(self, obj):
+        if obj.file_size > 1048576:
+            return f'{obj.file_size / 1048576:.1f} MB'
+        return f'{obj.file_size / 1024:.0f} KB'
+    file_size_display.short_description = 'Size'
+
+
+@admin.register(YouthDialogueApplication)
+class YouthDialogueApplicationAdmin(admin.ModelAdmin):
+    """
+    YOUTH DIALOGUE APPLICATIONS
+
+    HELP:
+    Manage Youth Dialogue applications through the full pipeline:
+    submitted → under_review → accepted → documents_pending → documents_submitted
+    → documents_under_review → credential_issued
+
+    BULK ACTIONS:
+    - Accept Selected: Moves submitted/under_review apps to accepted, sends emails
+    - Reject Selected: Rejects apps with a reason
+    - Approve Documents: Approves all pending docs and issues credential
+    - Export CSV: Download all application data
+    """
+    list_display = ['full_name', 'email', 'nationality_display', 'status_badge', 'created_at']
+    list_filter = ['status', 'nationality', 'gender', 'created_at']
+    search_fields = ['first_name', 'last_name', 'email', 'participant_code']
+    date_hierarchy = 'created_at'
+    inlines = [YouthDialogueDocumentInline]
+    actions = ['accept_selected', 'reject_selected', 'approve_documents', 'issue_credentials', 'export_csv']
+    raw_id_fields = ['user', 'reviewed_by', 'documents_reviewed_by']
+
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ['user', 'title', 'first_name', 'last_name', 'date_of_birth', 'gender'],
+        }),
+        ('Contact', {
+            'fields': ['email', 'phone_number', 'country_code', 'nationality'],
+        }),
+        ('Application Details', {
+            'fields': ['organization', 'position', 'motivation', 'additional_data'],
+        }),
+        ('Admin Review', {
+            'fields': ['status', 'reviewed_by', 'reviewed_at', 'rejection_reason'],
+        }),
+        ('Document Review', {
+            'fields': ['documents_reviewed_by', 'documents_reviewed_at', 'documents_rejection_notes'],
+            'classes': ['collapse'],
+        }),
+        ('ID Photo', {
+            'fields': ['id_photo'],
+        }),
+        ('Credential', {
+            'fields': ['participant_code', 'qr_hash', 'credential_issued_at', 'id_card_pdf_link'],
+            'classes': ['collapse'],
+        }),
+        ('Timestamps', {
+            'fields': ['created_at', 'updated_at'],
+            'classes': ['collapse'],
+        }),
+    )
+    readonly_fields = ['user', 'created_at', 'updated_at', 'qr_hash', 'credential_issued_at',
+                       'id_card_pdf_link', 'participant_code']
+
+    def full_name(self, obj):
+        return f'{obj.first_name} {obj.last_name}'
+    full_name.short_description = 'Name'
+    full_name.admin_order_field = 'first_name'
+
+    def nationality_display(self, obj):
+        return obj.get_nationality_display() if obj.nationality else '-'
+    nationality_display.short_description = 'Nationality'
+
+    def status_badge(self, obj):
+        colors = {
+            'submitted': '#6C757D',
+            'under_review': '#FFA500',
+            'accepted': '#28A745',
+            'rejected': '#DC3545',
+            'documents_pending': '#17A2B8',
+            'documents_submitted': '#007BFF',
+            'documents_under_review': '#FFA500',
+            'documents_rejected': '#DC3545',
+            'credential_issued': '#6F42C1',
+        }
+        return format_html(
+            '<span style="background:{}; color:white; padding:3px 10px; border-radius:3px; '
+            'font-size:11px; font-weight:600;">{}</span>',
+            colors.get(obj.status, '#666'),
+            obj.get_status_display().upper()
+        )
+    status_badge.short_description = 'Status'
+
+    def id_card_pdf_link(self, obj):
+        if obj.status == 'credential_issued' and obj.participant_code:
+            from django.urls import reverse
+            url = reverse('yd-id-card-pdf', args=[obj.pk])
+            return format_html(
+                '<a href="{}" target="_blank" style="background:#409843;color:white;padding:6px 16px;'
+                'border-radius:4px;text-decoration:none;font-weight:600;">Download PDF ID Card</a>',
+                url
+            )
+        return 'Credential not yet issued'
+    id_card_pdf_link.short_description = 'ID Card PDF'
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            old_status = YouthDialogueApplication.objects.filter(pk=obj.pk).values_list('status', flat=True).first()
+            new_status = obj.status
+
+            if old_status != new_status:
+                from .views import _send_yd_applicant_email
+
+                if new_status == 'accepted':
+                    obj.reviewed_by = request.user
+                    obj.reviewed_at = timezone.now()
+                    # Auto-transition to documents_pending
+                    obj.status = 'documents_pending'
+                    _send_yd_applicant_email(
+                        obj,
+                        'Youth Dialogue: Application Accepted',
+                        'Application Accepted',
+                        '#28A745',
+                        '<p style="color:#4a5568;font-size:15px;line-height:1.6;">Congratulations! Your application to the Youth Dialogue programme has been accepted.</p>'
+                        '<p style="color:#4a5568;font-size:15px;line-height:1.6;">Please open the app and upload your required documents (passport, national ID, photo, and CV) to proceed.</p>'
+                    )
+
+                elif new_status == 'rejected':
+                    obj.reviewed_by = request.user
+                    obj.reviewed_at = timezone.now()
+                    reason = obj.rejection_reason or 'No specific reason provided.'
+                    _send_yd_applicant_email(
+                        obj,
+                        'Youth Dialogue: Application Update',
+                        'Application Update',
+                        '#DC3545',
+                        f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">We regret to inform you that your application could not be approved at this time.</p>'
+                        f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px;border-radius:0 8px 8px 0;margin:16px 0;">'
+                        f'<p style="color:#c53030;font-size:14px;margin:0;"><strong>Reason:</strong> {reason}</p></div>'
+                    )
+
+                elif new_status == 'documents_rejected':
+                    obj.documents_reviewed_by = request.user
+                    obj.documents_reviewed_at = timezone.now()
+                    notes = obj.documents_rejection_notes or 'Please check your documents.'
+                    # Build list of rejected docs
+                    rejected_docs = obj.documents.filter(status='rejected')
+                    doc_list = ''
+                    for doc in rejected_docs:
+                        doc_list += f'<li style="color:#c53030;">{doc.get_document_type_display()}: {doc.rejection_reason or "Rejected"}</li>'
+                    _send_yd_applicant_email(
+                        obj,
+                        'Youth Dialogue: Documents Need Attention',
+                        'Documents Need Attention',
+                        '#DC3545',
+                        f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">Some of your documents need to be re-submitted:</p>'
+                        f'<ul style="margin:16px 0;">{doc_list}</ul>'
+                        f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px;border-radius:0 8px 8px 0;margin:16px 0;">'
+                        f'<p style="color:#c53030;font-size:14px;margin:0;">{notes}</p></div>'
+                        f'<p style="color:#4a5568;font-size:15px;">Please open the app to re-upload the affected documents.</p>'
+                    )
+
+                elif new_status == 'credential_issued':
+                    if not obj.participant_code:
+                        obj.generate_participant_code()
+                    if not obj.qr_hash:
+                        obj.generate_qr_hash()
+                    obj.credential_issued_at = timezone.now()
+                    obj.documents_reviewed_by = request.user
+                    obj.documents_reviewed_at = timezone.now()
+                    _send_yd_applicant_email(
+                        obj,
+                        'Youth Dialogue: Your ID Card is Ready',
+                        'Your ID Card is Ready!',
+                        '#6F42C1',
+                        f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">Your Youth Dialogue participant credential has been issued.</p>'
+                        f'<div style="background:#f7fafc;border-radius:12px;padding:20px;margin:16px 0;text-align:center;">'
+                        f'<p style="color:#718096;font-size:12px;margin:0 0 8px;">Your Participant Code</p>'
+                        f'<p style="color:#2d3748;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{obj.participant_code}</p></div>'
+                        f'<p style="color:#4a5568;font-size:15px;">Open the app to view and share your digital ID card.</p>'
+                    )
+
+        super().save_model(request, obj, form, change)
+
+    @admin.action(description='Accept selected applications')
+    def accept_selected(self, request, queryset):
+        from .views import _send_yd_applicant_email
+        apps = queryset.filter(status__in=('submitted', 'under_review'))
+        count = 0
+        for app in apps:
+            app.status = 'documents_pending'
+            app.reviewed_by = request.user
+            app.reviewed_at = timezone.now()
+            app.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'])
+            _send_yd_applicant_email(
+                app, 'Youth Dialogue: Application Accepted', 'Application Accepted', '#28A745',
+                '<p style="color:#4a5568;font-size:15px;">Congratulations! Your application has been accepted. '
+                'Please open the app and upload your documents.</p>'
+            )
+            count += 1
+        self.message_user(request, f'{count} application(s) accepted and emails sent.')
+
+    @admin.action(description='Reject selected applications')
+    def reject_selected(self, request, queryset):
+        from .views import _send_yd_applicant_email
+        apps = queryset.exclude(status__in=('credential_issued',))
+        count = 0
+        for app in apps:
+            app.status = 'rejected'
+            app.reviewed_by = request.user
+            app.reviewed_at = timezone.now()
+            if not app.rejection_reason:
+                app.rejection_reason = 'Application not approved by review committee.'
+            app.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at'])
+            _send_yd_applicant_email(
+                app, 'Youth Dialogue: Application Update', 'Application Update', '#DC3545',
+                f'<p style="color:#4a5568;font-size:15px;">Your application could not be approved. '
+                f'Reason: {app.rejection_reason}</p>'
+            )
+            count += 1
+        self.message_user(request, f'{count} application(s) rejected.')
+
+    @admin.action(description='Approve documents & issue credentials')
+    def approve_documents(self, request, queryset):
+        from .views import _send_yd_applicant_email
+        apps = queryset.filter(status__in=('documents_submitted', 'documents_under_review'))
+        count = 0
+        for app in apps:
+            # Approve all pending docs
+            app.documents.filter(status='pending').update(
+                status='approved', reviewed_by=request.user, reviewed_at=timezone.now()
+            )
+            # Issue credential
+            app.generate_participant_code()
+            app.generate_qr_hash()
+            app.status = 'credential_issued'
+            app.credential_issued_at = timezone.now()
+            app.documents_reviewed_by = request.user
+            app.documents_reviewed_at = timezone.now()
+            app.save()
+            _send_yd_applicant_email(
+                app, 'Youth Dialogue: Your ID Card is Ready', 'Your ID Card is Ready!', '#6F42C1',
+                f'<p style="color:#4a5568;font-size:15px;">Your credential has been issued. '
+                f'Participant code: <strong>{app.participant_code}</strong>. Open the app to view your ID card.</p>'
+            )
+            count += 1
+        self.message_user(request, f'{count} credential(s) issued.')
+
+    @admin.action(description='Issue credentials for selected')
+    def issue_credentials(self, request, queryset):
+        """Same as approve_documents — alias for clarity."""
+        self.approve_documents(request, queryset)
+
+    @admin.action(description='Export selected as CSV')
+    def export_csv(self, request, queryset):
+        import csv
+        from django.http import HttpResponse as DjangoHttpResponse
+        response = DjangoHttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="youth_dialogue_applications.csv"'
+        writer = csv.writer(response)
+        writer.writerow([
+            'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Nationality',
+            'Gender', 'Organization', 'Position', 'Status', 'Participant Code',
+            'Created At', 'Documents',
+        ])
+        for app in queryset.prefetch_related('documents'):
+            doc_summary = '; '.join(
+                f'{d.get_document_type_display()}: {d.get_status_display()}'
+                for d in app.documents.all()
+            )
+            writer.writerow([
+                app.id, app.first_name, app.last_name, app.email, app.phone_number,
+                app.get_nationality_display(), app.get_gender_display(),
+                app.organization, app.position, app.get_status_display(),
+                app.participant_code or '', app.created_at.strftime('%Y-%m-%d %H:%M'),
+                doc_summary,
+            ])
+        return response
+
+
+@admin.register(YouthDialogueActivityLog)
+class YouthDialogueActivityLogAdmin(admin.ModelAdmin):
+    list_display = ['user', 'action', 'screen_name', 'timestamp']
+    list_filter = ['action', 'timestamp']
+    search_fields = ['user__username', 'user__email', 'screen_name']
+    readonly_fields = ['user', 'application', 'action', 'screen_name', 'metadata',
+                       'ip_address', 'user_agent', 'timestamp']
+    date_hierarchy = 'timestamp'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

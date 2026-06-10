@@ -1,5 +1,5 @@
 """
-Firebase Admin SDK initialization and utilities for the Burundi Chairmanship backend.
+Firebase Admin SDK initialization and utilities for the Be 4 Africa backend.
 
 This module initializes the Firebase Admin SDK and provides functions for verifying
 Firebase ID tokens sent from the Flutter mobile app.

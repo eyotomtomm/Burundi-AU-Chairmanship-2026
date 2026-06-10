@@ -1,6 +1,6 @@
 {% extends 'custom_admin/base.html' %}
 
-{% block title %}Articles - Burundi Chairmanship Admin{% endblock %}
+{% block title %}Articles - Be 4 Africa Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
@@ -29,10 +29,15 @@
           class="w-full bg-surface-container-low border-0 rounded-lg py-3 pl-12 pr-4 focus:ring-2 focus:ring-secondary"
         />
       </div>
+      <select name="content_type" class="bg-surface-container-low border-0 rounded-lg py-3 px-4 focus:ring-2 focus:ring-secondary text-sm">
+        <option value="">All Types</option>
+        <option value="article" {% if request.GET.content_type == 'article' %}selected{% endif %}>Articles</option>
+        <option value="news" {% if request.GET.content_type == 'news' %}selected{% endif %}>News</option>
+      </select>
       <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-3 px-6 font-medium transition-colors">
         Search
       </button>
-      {% if request.GET.search %}
+      {% if request.GET.search or request.GET.content_type %}
       <a href="{% url 'custom_admin:articles_list' %}" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-3 px-6 font-medium transition-colors">
         Clear
       </a>
@@ -79,6 +84,7 @@
             </th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Image</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Title</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Type</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Category</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Author</th>
             <th class="text-left py-4 px-6 font-headline font-bold text-sm text-on-surface-variant uppercase tracking-wider">Status</th>
@@ -105,6 +111,19 @@
               <div class="font-medium text-on-surface">{{ article.title }}</div>
               {% if article.title_fr %}
               <div class="text-sm text-on-surface-variant mt-1">{{ article.title_fr }}</div>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6">
+              {% if article.content_type == 'news' %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span class="material-symbols-outlined text-sm">newspaper</span>
+                News
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <span class="material-symbols-outlined text-sm">article</span>
+                Article
+              </span>
               {% endif %}
             </td>
             <td class="py-4 px-6">
@@ -186,11 +205,11 @@
   {% if articles.has_other_pages %}
   <div class="flex items-center justify-center gap-2 mt-8">
     {% if articles.has_previous %}
-    <a href="?page={{ articles.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Previous</a>
+    <a href="?page={{ articles.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.content_type %}&content_type={{ request.GET.content_type }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Previous</a>
     {% endif %}
     <span class="px-4 py-2 text-sm font-bold text-on-surface-variant">Page {{ articles.number }} of {{ articles.paginator.num_pages }}</span>
     {% if articles.has_next %}
-    <a href="?page={{ articles.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Next</a>
+    <a href="?page={{ articles.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.content_type %}&content_type={{ request.GET.content_type }}{% endif %}" class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">Next</a>
     {% endif %}
   </div>
   {% endif %}

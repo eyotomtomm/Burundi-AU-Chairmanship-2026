@@ -245,9 +245,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                         maxLines: 1,
                                       ),
                                     ),
-                                    if (isLoggedIn && authProvider.isVerified) ...[
+                                    if (isLoggedIn && isVerified) ...[
                                       const SizedBox(width: 6),
-                                      VerifiedBadge(badgeType: authProvider.badgeType, size: 18),
+                                      VerifiedBadge(badgeType: authProvider.badgeType ?? verificationProvider.badgeType, size: 18),
                                     ],
                                   ],
                                 ),
@@ -457,7 +457,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 child: Consumer2<AuthProvider, VerificationProvider>(
                   builder: (context, authProvider, verificationProvider, _) {
                     final isLoggedIn = authProvider.isAuthenticated;
-                    final isVerified = authProvider.isVerified;
+                    final isVerified = authProvider.isVerified || verificationProvider.isProfileVerified;
                     final showVerificationItem = isLoggedIn && !isVerified;
                     final verificationStatus = verificationProvider.requestStatus;
 
@@ -600,8 +600,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             }
 
                             await Share.share(
-                              'Check out the Burundi Chairmanship 2026 app! 🇧🇮\n\n$appLink',
-                              subject: 'Burundi Chairmanship 2026 App',
+                              'Check out the Be 4 Africa app! 🇧🇮\n\n$appLink',
+                              subject: 'Be 4 Africa App',
                               sharePositionOrigin: sharePositionOrigin,
                             );
                           },
@@ -1089,13 +1089,13 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: liveAgentOnline
-                        ? Colors.blue.withValues(alpha: 0.1)
+                        ? AppColors.burundiGreen.withValues(alpha: 0.1)
                         : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.support_agent_rounded,
-                    color: liveAgentOnline ? Colors.blue : Colors.grey,
+                    color: liveAgentOnline ? AppColors.burundiGreen : Colors.grey,
                     size: 28,
                   ),
                 ),
@@ -1181,44 +1181,180 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF26A69A).withValues(alpha: 0.12),
+              color: AppColors.burundiGreen.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.newspaper_rounded, color: Color(0xFF26A69A), size: 22),
+            child: Icon(Icons.newspaper_rounded, color: AppColors.burundiGreen, size: 22),
           ),
           title: Text(
-            'Weekly Newsletter',
+            'Monthly Newsletter',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 15,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+              color: isDark ? Colors.white : AppColors.burundiGreen,
             ),
           ),
           subtitle: Text(
-            'Receive weekly digest via email',
+            'Subscribe to receive our monthly digest',
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? Colors.white60 : Colors.black54,
+              color: isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.6),
             ),
           ),
-          trailing: Switch.adaptive(
-            value: authProvider.receivesNewsletter,
-            onChanged: (val) async {
-              HapticFeedback.lightImpact();
-              final success = await authProvider.toggleNewsletter(val);
-              if (!success && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to update newsletter preference'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            activeTrackColor: AppColors.burundiGreen,
+          trailing: Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 16,
+            color: isDark ? Colors.white30 : AppColors.burundiGreen.withValues(alpha: 0.4),
           ),
+          onTap: () => _showNewsletterSubscriptionDialog(context, isDark, authProvider),
         ),
       ],
+    );
+  }
+
+  void _showNewsletterSubscriptionDialog(BuildContext context, bool isDark, AuthProvider authProvider) {
+    final nameController = TextEditingController(text: authProvider.userName ?? '');
+    final emailController = TextEditingController(text: authProvider.userEmail ?? '');
+    final phoneController = TextEditingController(text: authProvider.phoneNumber ?? '');
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.newspaper_rounded, color: AppColors.burundiGreen, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Monthly Newsletter',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : AppColors.burundiGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Subscribe to receive our monthly newsletter with the latest updates and news.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Full Name',
+                      prefixIcon: const Icon(Icons.person_outline_rounded),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Email Address',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Email is required';
+                      if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'Phone Number (optional)',
+                      prefixIcon: const Icon(Icons.phone_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting ? null : () async {
+                if (!formKey.currentState!.validate()) return;
+                setDialogState(() => isSubmitting = true);
+                try {
+                  await ApiService().subscribeNewsletter(
+                    name: nameController.text.trim(),
+                    email: emailController.text.trim(),
+                    phoneNumber: phoneController.text.trim(),
+                  );
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Subscribed to Monthly Newsletter!'),
+                        backgroundColor: AppColors.burundiGreen,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  setDialogState(() => isSubmitting = false);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to subscribe: $e'),
+                        backgroundColor: AppColors.burundiRed,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: isSubmitting
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Subscribe', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1288,7 +1424,7 @@ class _AboutPage extends StatefulWidget {
 }
 
 class _AboutPageState extends State<_AboutPage> {
-  String _description = 'Official application for the Burundi Chairmanship 2026.';
+  String _description = 'Official application for the Be 4 Africa 2026.';
   String _summitTheme = AppConstants.summitTheme;
   String _developerName = 'Eyosias Tamene';
   String _developerUrl = 'https://eyosias.dev';
@@ -1338,7 +1474,7 @@ class _AboutPageState extends State<_AboutPage> {
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 widget.l10n.translate('about'),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
               ),
               background: Stack(
                 fit: StackFit.expand,
@@ -1351,7 +1487,7 @@ class _AboutPageState extends State<_AboutPage> {
                         end: Alignment.bottomRight,
                         colors: [
                           AppColors.burundiGreen,
-                          Color(0xFF065A1A),
+                          Color(0xFF2D6E31),
                           AppColors.burundiRed,
                         ],
                         stops: [0.0, 0.6, 1.0],
@@ -1484,7 +1620,7 @@ class _AboutPageState extends State<_AboutPage> {
                           style: TextStyle(
                             fontSize: 15,
                             height: 1.6,
-                            color: isDark ? Colors.white70 : Colors.black87,
+                            color: isDark ? Colors.white70 : AppColors.burundiGreen.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
@@ -1498,7 +1634,7 @@ class _AboutPageState extends State<_AboutPage> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : const Color(0xFF1A1A2E),
+                      color: isDark ? Colors.white : AppColors.burundiGreen,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1522,7 +1658,7 @@ class _AboutPageState extends State<_AboutPage> {
                           widget.l10n.translate('designed_by'),
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? Colors.white54 : Colors.black54,
+                            color: isDark ? Colors.white54 : AppColors.burundiGreen.withValues(alpha: 0.6),
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -1583,14 +1719,14 @@ class _AboutPageState extends State<_AboutPage> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isDark ? Colors.white54 : Colors.black54,
+                            color: isDark ? Colors.white54 : AppColors.burundiGreen,
                           ),
                         ),
                         Text(
                           'Chairmanship 2025-2026',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? Colors.white38 : Colors.black38,
+                            color: isDark ? Colors.white38 : AppColors.burundiGreen.withValues(alpha: 0.6),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1598,7 +1734,7 @@ class _AboutPageState extends State<_AboutPage> {
                           'v${AppConstants.appVersion}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? Colors.white30 : Colors.black26,
+                            color: isDark ? Colors.white30 : AppColors.burundiGreen.withValues(alpha: 0.4),
                           ),
                         ),
                       ],
@@ -1619,9 +1755,9 @@ class _AboutPageState extends State<_AboutPage> {
       {'icon': Icons.article_rounded, 'title': 'News & Articles', 'color': AppColors.burundiGreen},
       {'icon': Icons.event_rounded, 'title': 'Events Calendar', 'color': AppColors.burundiRed},
       {'icon': Icons.auto_stories_rounded, 'title': 'Magazine', 'color': AppColors.auGold},
-      {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': const Color(0xFF5C6BC0)},
-      {'icon': Icons.wb_sunny_rounded, 'title': 'Weather', 'color': const Color(0xFFFF9800)},
-      {'icon': Icons.account_balance_rounded, 'title': 'Diplomacy', 'color': const Color(0xFF26A69A)},
+      {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': AppColors.burundiGreen},
+      {'icon': Icons.wb_sunny_rounded, 'title': 'Weather', 'color': AppColors.auGold},
+      {'icon': Icons.account_balance_rounded, 'title': 'Diplomacy', 'color': AppColors.burundiRed},
     ];
 
     return GridView.builder(
@@ -1664,7 +1800,7 @@ class _AboutPageState extends State<_AboutPage> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white70 : Colors.black87,
+                  color: isDark ? Colors.white70 : AppColors.burundiGreen.withValues(alpha: 0.85),
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,

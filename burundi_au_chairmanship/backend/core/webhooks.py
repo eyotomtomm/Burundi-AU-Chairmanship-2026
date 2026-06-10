@@ -33,7 +33,7 @@ def _format_slack_payload(event_type, data):
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"Burundi Chairmanship: {event_display}",
+                "text": f"Be 4 Africa: {event_display}",
             }
         },
         {
@@ -66,10 +66,10 @@ def _format_teams_payload(event_type, data):
         "@type": "MessageCard",
         "@context": "http://schema.org/extensions",
         "themeColor": "0076D7",
-        "summary": f"Burundi Chairmanship: {event_display}",
+        "summary": f"Be 4 Africa: {event_display}",
         "sections": [
             {
-                "activityTitle": f"Burundi Chairmanship: {event_display}",
+                "activityTitle": f"Be 4 Africa: {event_display}",
                 "activitySubtitle": f"Event: {event_type}",
                 "facts": facts[:10],
                 "markdown": True,
@@ -91,7 +91,7 @@ def _format_discord_payload(event_type, data):
         })
 
     return {
-        "content": f"**Burundi Chairmanship: {event_display}**",
+        "content": f"**Be 4 Africa: {event_display}**",
         "embeds": [
             {
                 "title": event_display,
@@ -235,7 +235,7 @@ def send_test_webhook(webhook):
     formatter = FORMATTERS.get(webhook.service_type, _format_custom_payload)
     test_data = {
         'test': True,
-        'message': 'This is a test webhook from Burundi Chairmanship Admin Portal',
+        'message': 'This is a test webhook from Be 4 Africa Admin Portal',
         'timestamp': timezone.now().isoformat(),
     }
     payload = formatter('test.ping', test_data)

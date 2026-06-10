@@ -212,7 +212,7 @@ def generate_analytics_pdf(report_type, month_str, user):
     }
 
     # --- Title ---
-    elements.append(Paragraph('Burundi Chairmanship 2026', title_style))
+    elements.append(Paragraph('Be 4 Africa 2026', title_style))
     elements.append(Paragraph(report_names[report_type], subtitle_style))
     elements.append(Paragraph(f'Generated: {now.strftime("%B %d, %Y at %H:%M")}', styles['Normal']))
     elements.append(Spacer(1, 12))

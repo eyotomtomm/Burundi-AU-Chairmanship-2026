@@ -1,10 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../config/app_colors.dart';
 import '../../models/api_models.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/comment_tile.dart';
+import '../../widgets/liked_by_avatars.dart';
+import '../../services/like_service.dart';
 import 'in_app_webview_screen.dart';
 
 class YouTubePlayerScreen extends StatefulWidget {
@@ -21,13 +27,36 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  // Likes
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
+
+  // Comments
+  List<Map<String, dynamic>> _comments = [];
+  bool _loadingComments = true;
+  bool _postingComment = false;
+  final _commentController = TextEditingController();
+  int? _replyingToId;
+  String? _replyingToName;
+
   @override
   void initState() {
     super.initState();
-    // Allow all orientations so YoutubePlayerBuilder can go landscape for fullscreen
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    _likeService.seed(
+      EntityType.livefeed, widget.feed.id,
+      isLiked: widget.feed.isLiked,
+      likeCount: widget.feed.likeCount,
+      recentLikers: widget.feed.recentLikers
+          .map((l) => Liker.fromJson(l))
+          .toList(),
+    );
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key == 'livefeed:${widget.feed.id}' && mounted) setState(() {});
+    });
     _initPlayer();
     _recordView();
+    _loadComments();
   }
 
   Future<void> _recordView() async {
@@ -36,11 +65,56 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadComments() async {
+    try {
+      final data = await ApiService().getLiveFeedComments(widget.feed.id);
+      if (mounted) setState(() { _comments = data; _loadingComments = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingComments = false);
+    }
+  }
+
+  Future<void> _postComment() async {
+    final content = _commentController.text.trim();
+    if (content.isEmpty) return;
+    setState(() => _postingComment = true);
+    try {
+      await ApiService().postLiveFeedComment(
+        widget.feed.id,
+        content,
+        parentId: _replyingToId,
+      );
+      _commentController.clear();
+      _replyingToId = null;
+      _replyingToName = null;
+      await _loadComments();
+    } catch (_) {}
+    if (mounted) setState(() => _postingComment = false);
+  }
+
+  Future<void> _deleteComment(int commentId) async {
+    try {
+      await ApiService().deleteLiveFeedComment(widget.feed.id, commentId);
+      await _loadComments();
+    } catch (_) {}
+  }
+
+  void _toggleLike() {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+    if (!auth.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('login_to_like'))),
+      );
+      return;
+    }
+    _likeService.toggle(EntityType.livefeed, widget.feed.id);
+  }
+
   void _initPlayer() {
     final videoId = YoutubePlayer.convertUrlToId(widget.feed.streamUrl);
 
     if (videoId == null) {
-      // Fallback to WebView if we can't extract a YouTube ID
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.pushReplacement(
@@ -75,7 +149,9 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _controller?.dispose();
+    _commentController.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -90,7 +166,6 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Use YoutubePlayerBuilder for proper fullscreen handling
     if (_controller != null && !_hasError) {
       return YoutubePlayerBuilder(
         player: YoutubePlayer(
@@ -103,16 +178,24 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
           ),
         ),
         builder: (context, player) {
+          // In landscape (fullscreen), show only the player
+          final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+          if (isLandscape) {
+            return Scaffold(
+              backgroundColor: Colors.black,
+              body: Center(child: player),
+            );
+          }
           return _buildScaffold(langCode, theme, isDark, playerWidget: player);
         },
       );
     }
 
-    // Loading or error state
     return _buildScaffold(langCode, theme, isDark);
   }
 
   Widget _buildScaffold(String langCode, ThemeData theme, bool isDark, {Widget? playerWidget}) {
+    final likeState = _likeService.getState(EntityType.livefeed, widget.feed.id);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -126,8 +209,7 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
           if (widget.feed.isLive)
             Container(
               margin: const EdgeInsets.only(right: 12),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.burundiRed,
                 borderRadius: BorderRadius.circular(4),
@@ -159,7 +241,6 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
       ),
       body: Column(
         children: [
-          // YouTube player area
           if (playerWidget != null)
             playerWidget
           else
@@ -168,12 +249,11 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
               child: _hasError
                   ? _buildErrorWidget()
                   : const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.auGold),
+                      child: CircularProgressIndicator(color: AppColors.auGold),
                     ),
             ),
 
-          // Feed info
+          // Feed info + likes + comments
           Expanded(
             child: Container(
               color: isDark ? AppColors.darkBackground : Colors.white,
@@ -190,22 +270,18 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    // Stats row with like button
                     Row(
                       children: [
-                        if (widget.feed.isLive &&
-                            widget.feed.viewerCount > 0) ...[
+                        if (widget.feed.isLive && widget.feed.viewerCount > 0) ...[
                           Icon(Icons.visibility,
                               size: 16,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary),
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                           const SizedBox(width: 4),
                           Text(
                             '${_formatViewerCount(widget.feed.viewerCount)} watching',
                             style: TextStyle(
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -213,17 +289,43 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                         if (widget.feed.parsedDuration != null) ...[
                           Icon(Icons.access_time,
                               size: 16,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary),
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                           const SizedBox(width: 4),
                           Text(
                             widget.feed.duration,
                             style: TextStyle(
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                             ),
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                        // Like button
+                        GestureDetector(
+                          onTap: _toggleLike,
+                          child: Row(
+                            children: [
+                              Icon(
+                                likeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                                size: 16,
+                                color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${likeState.likeCount}',
+                                style: TextStyle(
+                                  color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (likeState.recentLikers.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          LikedByAvatars(
+                            likers: likeState.recentLikers,
+                            totalLikes: likeState.likeCount,
+                            avatarRadius: 10,
                           ),
                         ],
                       ],
@@ -231,8 +333,7 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                     const SizedBox(height: 16),
                     // Status badge
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: _statusColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
@@ -253,12 +354,79 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           height: 1.5,
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.lightText,
+                          color: isDark ? AppColors.darkText : AppColors.lightText,
                         ),
                       ),
                     ],
+
+                    // Comments section
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Comments (${_comments.fold<int>(0, (sum, c) => sum + 1 + ((c['replies'] as List?)?.length ?? 0))})',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    // Comment input
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _commentController,
+                            decoration: InputDecoration(
+                              hintText: _replyingToName != null
+                                  ? 'Reply to $_replyingToName...'
+                                  : 'Add a comment...',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              suffixIcon: _replyingToId != null
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () => setState(() { _replyingToId = null; _replyingToName = null; }),
+                                    )
+                                  : null,
+                            ),
+                            maxLines: 1,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: _postingComment
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                          onPressed: _postingComment ? null : _postComment,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_loadingComments)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      ..._comments.map((comment) {
+                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                        final feedId = widget.feed.id;
+                        return CommentTile.fromMap(
+                          comment,
+                          isAuthenticated: auth.isAuthenticated,
+                          onReply: () => setState(() {
+                            _replyingToId = comment['id'];
+                            _replyingToName = comment['user_name'];
+                          }),
+                          onDelete: () => _deleteComment(comment['id']),
+                          onToggleLike: () => ApiService().toggleLiveFeedCommentLike(feedId, comment['id']),
+                          onEdit: (content) => ApiService().editLiveFeedComment(feedId, comment['id'], content),
+                          replyBuilder: (reply) => CommentTile.fromMap(
+                            reply,
+                            isReply: true,
+                            isAuthenticated: auth.isAuthenticated,
+                            onDelete: () => _deleteComment(reply['id']),
+                            onToggleLike: () => ApiService().toggleLiveFeedCommentLike(feedId, reply['id']),
+                            onEdit: (content) => ApiService().editLiveFeedComment(feedId, reply['id'], content),
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -274,21 +442,18 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline,
-              color: AppColors.burundiRed, size: 48),
+          const Icon(Icons.error_outline, color: AppColors.burundiRed, size: 48),
           const SizedBox(height: 16),
           Text(
             'Unable to play video',
-            style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9), fontSize: 16),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16),
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
               _errorMessage,
-              style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
               textAlign: TextAlign.center,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -297,18 +462,13 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              setState(() {
-                _hasError = false;
-                _errorMessage = '';
-              });
+              setState(() { _hasError = false; _errorMessage = ''; });
               _controller?.dispose();
               _initPlayer();
             },
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.burundiGreen,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.burundiGreen),
           ),
         ],
       ),

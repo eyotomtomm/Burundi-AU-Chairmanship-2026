@@ -108,7 +108,7 @@ class _AgendaTabState extends State<AgendaTab> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                      colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                     ),
                   ),
                 ),

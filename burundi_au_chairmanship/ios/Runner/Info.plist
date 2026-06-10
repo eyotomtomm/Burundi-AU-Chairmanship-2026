@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>B4africa</string>
+	<string>B4Africa</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,6 +34,14 @@
 				<string>com.googleusercontent.apps.55634991225-q9p5oc5pqvu8q8vsnagqvleo743t9u1k</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>b4africa</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
@@ -56,7 +64,7 @@
 		<string>mailto</string>
 	</array>
 	<key>NSCalendarsUsageDescription</key>
-	<string>We need access to your calendar to add Burundi Chairmanship events and meeting reminders to your personal calendar.</string>
+	<string>We need access to your calendar to add Be 4 Africa events and meeting reminders to your personal calendar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need camera access to allow you to take photos for your profile or to scan QR codes at embassy events.</string>
 	<key>NSContactsUsageDescription</key>

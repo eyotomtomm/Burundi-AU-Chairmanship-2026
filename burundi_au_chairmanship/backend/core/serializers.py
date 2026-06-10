@@ -26,6 +26,10 @@ from .models import (
     EventAgendaItem, LinkedAccount,
     # Engagement models
     EventLike, DiscussionLike, VideoComment, GalleryComment, AppOpenEvent,
+    ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
+    GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
+    # Youth Dialogue
+    YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
 )
 
 
@@ -229,14 +233,20 @@ class MagazineCommentSerializer(serializers.ModelSerializer):
     badge_type = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
 
     class Meta:
         from .models import MagazineComment
         model = MagazineComment
         fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
-                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+                  'parent', 'content', 'like_count', 'created_at', 'updated_at',
+                  'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
         read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
-                            'badge_type', 'created_at', 'replies', 'reply_count']
+                            'badge_type', 'like_count', 'created_at', 'updated_at',
+                            'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
 
     def get_user_name(self, obj):
         from .utils import user_handle
@@ -257,6 +267,30 @@ class MagazineCommentSerializer(serializers.ModelSerializer):
         if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
             return obj.user.profile.badge_type
         return None
+
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return MagazineCommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.user_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
 
     def get_replies(self, obj):
         if obj.parent_id is not None:
@@ -279,13 +313,19 @@ class VideoCommentSerializer(serializers.ModelSerializer):
     badge_type = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
 
     class Meta:
         model = VideoComment
         fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
-                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+                  'parent', 'content', 'like_count', 'created_at', 'updated_at',
+                  'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
         read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
-                            'badge_type', 'created_at', 'replies', 'reply_count']
+                            'badge_type', 'like_count', 'created_at', 'updated_at',
+                            'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
 
     def get_user_name(self, obj):
         from .utils import user_handle
@@ -306,6 +346,30 @@ class VideoCommentSerializer(serializers.ModelSerializer):
         if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
             return obj.user.profile.badge_type
         return None
+
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return VideoCommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.user_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
 
     def get_replies(self, obj):
         if obj.parent_id is not None:
@@ -328,13 +392,19 @@ class GalleryCommentSerializer(serializers.ModelSerializer):
     badge_type = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
 
     class Meta:
         model = GalleryComment
         fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
-                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+                  'parent', 'content', 'like_count', 'created_at', 'updated_at',
+                  'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
         read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
-                            'badge_type', 'created_at', 'replies', 'reply_count']
+                            'badge_type', 'like_count', 'created_at', 'updated_at',
+                            'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
 
     def get_user_name(self, obj):
         from .utils import user_handle
@@ -355,6 +425,30 @@ class GalleryCommentSerializer(serializers.ModelSerializer):
         if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
             return obj.user.profile.badge_type
         return None
+
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return GalleryCommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.user_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
 
     def get_replies(self, obj):
         if obj.parent_id is not None:
@@ -377,16 +471,21 @@ class ArticleCommentSerializer(serializers.ModelSerializer):
     badge_type = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
 
     class Meta:
         model = ArticleComment
         fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
-                  'parent', 'content', 'created_at', 'replies', 'reply_count']
+                  'parent', 'content', 'like_count', 'created_at', 'updated_at',
+                  'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
         read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture',
-                            'badge_type', 'created_at', 'replies', 'reply_count']
+                            'badge_type', 'like_count', 'created_at', 'updated_at',
+                            'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
 
     def get_user_name(self, obj):
-        # Never fall back to the raw username (which IS the user's email in this app).
         from .utils import user_handle
         return obj.user.get_full_name().strip() or user_handle(obj.user)
 
@@ -406,8 +505,31 @@ class ArticleCommentSerializer(serializers.ModelSerializer):
             return obj.user.profile.badge_type
         return None
 
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return ArticleCommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.user_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
+
     def get_replies(self, obj):
-        # Only nest replies under top-level comments
         if obj.parent_id is not None:
             return []
         replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
@@ -445,7 +567,7 @@ class ArticleSerializer(serializers.ModelSerializer):
         model = Article
         fields = ['id', 'title', 'title_fr', 'content', 'content_fr',
                   'image', 'thumbnail_url', 'medium_url',
-                  'author', 'category', 'publish_date', 'is_featured',
+                  'author', 'category', 'publish_date', 'content_type', 'is_featured',
                   'view_count', 'comment_count', 'like_count', 'is_liked', 'media',
                   'recent_likers']
 
@@ -722,7 +844,7 @@ class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
         model = QuickAccessMenuItem
         fields = ['id', 'title_en', 'title_fr', 'icon_name', 'action_type',
                   'action_value', 'order', 'is_active', 'has_live_indicator',
-                  'badge_text', 'badge_color']
+                  'badge_text', 'badge_color', 'visibility_rule']
 
     def get_badge_text(self, obj):
         # Manual badge always takes priority
@@ -896,7 +1018,8 @@ class RegistrationFormFieldSerializer(serializers.ModelSerializer):
         model = RegistrationFormField
         fields = ['id', 'field_type', 'field_label', 'field_label_fr', 'field_name',
                   'placeholder', 'placeholder_fr', 'is_required', 'is_active',
-                  'options', 'validation_regex', 'help_text', 'help_text_fr', 'order']
+                  'options', 'validation_regex', 'help_text', 'help_text_fr',
+                  'max_length', 'min_length', 'order']
 
 
 class EventCategorySerializer(serializers.ModelSerializer):
@@ -1352,16 +1475,60 @@ class DiscussionSerializer(serializers.ModelSerializer):
 
 class DiscussionReplySerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
 
     class Meta:
         model = DiscussionReply
-        fields = ['id', 'discussion', 'author', 'author_name', 'content',
-                  'parent', 'like_count', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'author', 'like_count', 'created_at', 'updated_at']
+        fields = ['id', 'discussion', 'author', 'author_name', 'profile_picture', 'badge_type',
+                  'content', 'parent', 'like_count', 'created_at', 'updated_at',
+                  'is_liked', 'is_owner', 'can_edit', 'is_edited']
+        read_only_fields = ['id', 'author', 'like_count', 'created_at', 'updated_at',
+                            'is_liked', 'is_owner', 'can_edit', 'is_edited']
 
     def get_author_name(self, obj):
         from .utils import user_handle
         return f'{obj.author.first_name} {obj.author.last_name}'.strip() or user_handle(obj.author)
+
+    def get_profile_picture(self, obj):
+        if hasattr(obj.author, 'profile') and obj.author.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.author.profile.profile_picture.url)
+        return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.author, 'profile') and obj.author.profile.is_verified:
+            return obj.author.profile.badge_type
+        return None
+
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return DiscussionReplyLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.author_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.author_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
 
 
 class PollOptionSerializer(serializers.ModelSerializer):
@@ -1593,14 +1760,20 @@ class EventCommentSerializer(serializers.ModelSerializer):
     badge_type = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     reply_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
 
     class Meta:
         from .models import EventComment
         model = EventComment
         fields = ['id', 'event', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
-                  'parent', 'content', 'is_approved', 'created_at', 'replies', 'reply_count']
+                  'parent', 'content', 'is_approved', 'like_count', 'created_at', 'updated_at',
+                  'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
         read_only_fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
-                            'is_approved', 'created_at', 'replies', 'reply_count']
+                            'is_approved', 'like_count', 'created_at', 'updated_at',
+                            'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
 
     def get_user_name(self, obj):
         from .utils import user_handle
@@ -1622,8 +1795,31 @@ class EventCommentSerializer(serializers.ModelSerializer):
             return obj.user.profile.badge_type
         return None
 
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return EventCommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.user_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
+
     def get_replies(self, obj):
-        # Only include replies for top-level comments (parent=None)
         if obj.parent is not None:
             return []
         replies = obj.replies.filter(is_approved=True).select_related('user', 'user__profile').order_by('created_at')
@@ -1713,3 +1909,99 @@ class EventAgendaItemSerializer(serializers.ModelSerializer):
         fields = ['id', 'event', 'title', 'description', 'speaker',
                   'speaker_name', 'speaker_photo', 'start_time', 'end_time',
                   'room', 'track', 'order']
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YOUTH DIALOGUE SERIALIZERS
+# ═══════════════════════════════════════════════════════════════
+
+class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YouthDialogueApplication
+        fields = [
+            'title', 'first_name', 'last_name', 'email', 'phone_number',
+            'country_code', 'nationality', 'date_of_birth', 'gender',
+            'organization', 'position', 'motivation',
+        ]
+
+    def validate_email(self, value):
+        if YouthDialogueApplication.objects.filter(email=value).exists():
+            raise serializers.ValidationError('An application with this email address already exists.')
+        return value
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if request and request.user:
+            # Check email verification
+            profile = getattr(request.user, 'profile', None)
+            if not profile or not profile.is_email_verified:
+                raise serializers.ValidationError(
+                    {'detail': 'Please verify your email address before applying.'}
+                )
+            # Check one-per-user
+            if YouthDialogueApplication.objects.filter(user=request.user).exists():
+                raise serializers.ValidationError(
+                    {'detail': 'You have already submitted an application.'}
+                )
+        return attrs
+
+
+class YouthDialogueDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YouthDialogueDocument
+        fields = [
+            'id', 'document_type', 'file', 'original_filename', 'file_size',
+            'status', 'rejection_reason', 'is_resubmission', 'replaces',
+            'uploaded_at',
+        ]
+        read_only_fields = ['id', 'status', 'rejection_reason', 'uploaded_at']
+
+
+class YouthDialogueApplicationStatusSerializer(serializers.ModelSerializer):
+    documents = serializers.SerializerMethodField()
+    has_credential = serializers.SerializerMethodField()
+
+    class Meta:
+        model = YouthDialogueApplication
+        fields = [
+            'id', 'status', 'title', 'first_name', 'last_name', 'email',
+            'nationality', 'organization', 'position',
+            'rejection_reason', 'documents_rejection_notes',
+            'participant_code', 'has_credential', 'documents', 'created_at',
+        ]
+        read_only_fields = fields
+
+    def get_documents(self, obj):
+        # Only return docs if past the accepted stage
+        if obj.status in ('submitted', 'under_review', 'rejected'):
+            return []
+        docs = obj.documents.all()
+        return YouthDialogueDocumentSerializer(docs, many=True).data
+
+    def get_has_credential(self, obj):
+        return obj.status == 'credential_issued' and bool(obj.participant_code)
+
+
+class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
+    qr_data = serializers.SerializerMethodField()
+    id_photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = YouthDialogueApplication
+        fields = [
+            'first_name', 'last_name', 'email', 'nationality',
+            'organization', 'position', 'participant_code',
+            'qr_data', 'id_photo_url', 'credential_issued_at',
+        ]
+        read_only_fields = fields
+
+    def get_qr_data(self, obj):
+        if obj.participant_code and obj.qr_hash:
+            return f"{obj.participant_code}:{obj.qr_hash}"
+        return ''
+
+    def get_id_photo_url(self, obj):
+        request = self.context.get('request')
+        if obj.id_photo and request:
+            return request.build_absolute_uri(obj.id_photo.url)
+        return ''

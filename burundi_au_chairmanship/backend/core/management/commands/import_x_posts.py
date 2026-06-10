@@ -56,7 +56,7 @@ CATEGORY_KEYWORDS = {
         'investment', 'trade', 'economic', 'factory', 'production',
         'business', 'commerce', 'investissement',
     ],
-    'AU Chairmanship': [
+    'Be 4 Africa': [
         'chairmanship', 'a-rise', 'burundi4africa', 'présidence de l\'ua',
         'au chair',
     ],
@@ -70,7 +70,7 @@ CATEGORY_FR_MAP = {
     'Governance': 'Gouvernance',
     'Health': 'Santé',
     'Economy': 'Économie',
-    'AU Chairmanship': "Présidence de l'UA",
+    'Be 4 Africa': "Présidence de l'UA",
     'Culture': 'Culture',
 }
 CATEGORY_COLORS = {
@@ -78,7 +78,7 @@ CATEGORY_COLORS = {
     'Governance': '#CE1126',
     'Health': '#0077B6',
     'Economy': '#F4A261',
-    'AU Chairmanship': '#FFD700',
+    'Be 4 Africa': '#FFD700',
     'Culture': '#9B59B6',
 }
 
@@ -102,7 +102,7 @@ def is_event_post(text):
 
 
 def is_livefeed_post(text):
-    """Check if the post is related to AU Chairmanship / live feed."""
+    """Check if the post is related to Be 4 Africa / live feed."""
     text_lower = text.lower()
     return any(kw in text_lower for kw in LIVEFEED_KEYWORDS)
 

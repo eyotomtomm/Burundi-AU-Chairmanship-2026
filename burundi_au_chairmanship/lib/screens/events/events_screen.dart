@@ -185,7 +185,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       statusIcon = Icons.event_busy;
     } else {
       statusLabel = lang == 'fr' ? 'Information' : 'Info';
-      statusColor = Colors.blueGrey;
+      statusColor = AppColors.lightTextSecondary;
       statusIcon = Icons.info_outline;
     }
 
@@ -197,7 +197,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       case 'online':
         typeLabel = lang == 'fr' ? 'En ligne' : 'Online';
         typeIcon = Icons.videocam;
-        typeColor = Colors.blue;
+        typeColor = AppColors.burundiGreen;
         break;
       case 'hybrid':
         typeLabel = lang == 'fr' ? 'Hybride' : 'Hybrid';
@@ -207,7 +207,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       case 'info':
         typeLabel = 'Info';
         typeIcon = Icons.info_outline;
-        typeColor = Colors.blueGrey;
+        typeColor = AppColors.lightTextSecondary;
         break;
       default:
         typeLabel = lang == 'fr' ? 'En personne' : 'In Person';
@@ -464,7 +464,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
     try {
       return Color(int.parse(hex, radix: 16));
     } catch (_) {
-      return Colors.blueGrey;
+      return AppColors.lightTextSecondary;
     }
   }
 

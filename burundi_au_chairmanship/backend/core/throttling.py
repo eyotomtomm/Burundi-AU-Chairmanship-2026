@@ -1,5 +1,5 @@
 """
-Custom throttling classes for the Burundi Chairmanship API.
+Custom throttling classes for the Be 4 Africa API.
 
 Provides rate limiting to prevent abuse and manipulation of analytics.
 """

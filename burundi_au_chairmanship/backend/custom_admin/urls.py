@@ -196,6 +196,9 @@ urlpatterns = [
     path('newsletters/<int:pk>/preview/', views.newsletter_edition_preview, name='newsletter_edition_preview'),
     path('newsletters/send-now/', views.newsletter_send_now, name='newsletter_send_now'),
 
+    # Newsletter Subscribers
+    path('newsletter-subscribers/', views.newsletter_subscribers_list, name='newsletter_subscribers_list'),
+
     # Announcement Banners
     path('announcements/', views.announcements_list, name='announcements_list'),
     path('announcements/create/', views.announcement_create, name='announcement_create'),

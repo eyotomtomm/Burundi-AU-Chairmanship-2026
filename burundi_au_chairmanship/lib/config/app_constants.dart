@@ -5,7 +5,7 @@
 /// - Summit theme is loaded from /settings/ API
 class AppConstants {
   // App Info (build-time constants)
-  static const String appName = 'Burundi Chairmanship';
+  static const String appName = 'Be 4 Africa';
   static const String appVersion = '1.2.3';
 
   // Storage Keys (build-time constants)

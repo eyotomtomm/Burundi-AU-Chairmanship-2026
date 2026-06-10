@@ -248,7 +248,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         break;
       case 'system':
         icon = Icons.info;
-        iconColor = Colors.blue;
+        iconColor = AppColors.burundiGreen;
         break;
       default:
         icon = Icons.notifications;

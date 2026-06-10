@@ -252,10 +252,10 @@ def send_weekly_newsletter():
     <h2>This Week's Highlights</h2>
     {'<h3>Recent Articles</h3><ul>' + articles_html + '</ul>' if articles_html else ''}
     {'<h3>Upcoming Events</h3><ul>' + events_html + '</ul>' if events_html else ''}
-    <p>Stay connected with the Burundi Chairmanship.</p>
+    <p>Stay connected with the Be 4 Africa.</p>
     """
 
-    subject = f"Burundi Chairmanship - Weekly Digest ({now.strftime('%b %d, %Y')})"
+    subject = f"Be 4 Africa - Weekly Digest ({now.strftime('%b %d, %Y')})"
 
     # Get subscribers
     subscribers = UserProfile.objects.filter(
@@ -293,7 +293,7 @@ def send_weekly_newsletter():
     unsubscribe_footer = (
         '<hr style="margin:32px 0 16px;border:none;border-top:1px solid #e0e0e0">'
         '<p style="font-size:12px;color:#888;text-align:center">'
-        'You received this because you subscribed to the Burundi Chairmanship weekly newsletter. '
+        'You received this because you subscribed to the Be 4 Africa weekly newsletter. '
         '<a href="{unsub_url}" style="color:#1976d2">Unsubscribe</a></p>'
     )
 

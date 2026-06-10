@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Burundi Flag Colors
-  static const Color burundiGreen = Color(0xFF1EB53A);
-  static const Color burundiRed = Color(0xFFCE1126);
+  static const Color burundiGreen = Color(0xFF409843);
+  static const Color burundiRed = Color(0xFFE11C23);
   static const Color burundiWhite = Color(0xFFFFFFFF);
 
   // AU Colors
-  static const Color auGold = Color(0xFFD4AF37);
-  static const Color auGreen = Color(0xFF009739);
+  static const Color auGold = Color(0xFFFCD116);
+  static const Color auGreen = Color(0xFF409843);
 
   // African Pattern Colors
   static const Color patternOrange = Color(0xFFF4A460);
@@ -31,9 +31,9 @@ class AppColors {
   static const Color darkDivider = Color(0xFF2C2C2C);
 
   // Semantic Colors (Burundi palette only - Green, Gold, Red)
-  static const Color success = Color(0xFF1EB53A); // Burundi Green
-  static const Color warning = Color(0xFFFF9800); // Orange
-  static const Color error = Color(0xFFCE1126); // Burundi Red
-  static const Color info = Color(0xFFD4AF37); // AU Gold instead of blue
+  static const Color success = Color(0xFF409843); // Burundi Green
+  static const Color warning = Color(0xFFFCD116); // AU Gold
+  static const Color error = Color(0xFFE11C23); // Burundi Red
+  static const Color info = Color(0xFFFCD116); // AU Gold instead of blue
 
 }

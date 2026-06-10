@@ -18,6 +18,8 @@ import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/liked_by_avatars.dart';
+import '../../widgets/comment_tile.dart';
+import '../../services/like_service.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -46,8 +48,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   bool _showContinueReading = false;
   bool _restoredPosition = false;
   double _readingProgress = 0.0;
-  bool _isTogglingLike = false;
-  DateTime? _lastLikeTap;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   // Cached provider reference — safe to use in dispose() where context is invalid
   late final AuthProvider _authProvider;
@@ -60,6 +62,23 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   void initState() {
     super.initState();
     _article = widget.article;
+    _likeService.seed(
+      EntityType.article, _article.id,
+      isLiked: _article.isLiked,
+      likeCount: _article.likeCount,
+      recentLikers: _article.recentLikers,
+    );
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key == 'article:${_article.id}' && mounted) {
+        setState(() {
+          _article = _article.copyWith(
+            isLiked: state.isLiked,
+            likeCount: state.likeCount,
+            recentLikers: state.recentLikers,
+          );
+        });
+      }
+    });
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
     _recordView();
     _loadComments();
@@ -76,6 +95,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _scrollController.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
+    _removeLikeListener?.call();
     super.dispose();
   }
 
@@ -304,10 +324,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     }
   }
 
-  Future<void> _toggleLike() async {
-    if (_isTogglingLike) return;
-    if (_lastLikeTap != null && DateTime.now().difference(_lastLikeTap!) < const Duration(seconds: 1)) return;
-    _lastLikeTap = DateTime.now();
+  void _toggleLike() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
@@ -323,53 +340,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       );
       return;
     }
-
-    // Optimistic UI with haptic feedback
-    _isTogglingLike = true;
-    HapticService.light();
-    final wasLiked = _article.isLiked;
-    setState(() {
-      _article = _article.copyWith(
-        isLiked: !wasLiked,
-        likeCount: wasLiked ? _article.likeCount - 1 : _article.likeCount + 1,
-      );
-    });
-
-    try {
-      final result = await ApiService().toggleArticleLike(_article.id);
-      if (mounted) {
-        List<Liker> likers = [];
-        if (result['recent_likers'] is List) {
-          likers = (result['recent_likers'] as List)
-              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
-              .toList();
-        }
-        setState(() {
-          _article = _article.copyWith(
-            isLiked: result['is_liked'],
-            likeCount: result['like_count'],
-            recentLikers: likers,
-          );
-        });
-      }
-    } catch (_) {
-      // Revert on failure
-      if (mounted) {
-        setState(() {
-          _article = _article.copyWith(isLiked: wasLiked, likeCount: wasLiked ? _article.likeCount + 1 : _article.likeCount - 1);
-        });
-      }
-    } finally {
-      _isTogglingLike = false;
-    }
-  }
-
-  String _timeAgo(DateTime date, AppLocalizations l10n) {
-    final diff = DateTime.now().difference(date);
-    if (diff.inMinutes < 1) return l10n.translate('just_now');
-    if (diff.inHours < 1) return '${diff.inMinutes} ${l10n.translate('minutes_ago')}';
-    if (diff.inDays < 1) return '${diff.inHours} ${l10n.translate('hours_ago')}';
-    return '${diff.inDays} ${l10n.translate('days_ago')}';
+    _likeService.toggle(EntityType.article, _article.id);
   }
 
   @override
@@ -984,7 +955,31 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     )
                   else
                     ...List.generate(_comments.length, (index) {
-                      return _buildCommentTile(_comments[index], auth, l10n, isDark, isReply: false);
+                      final c = _comments[index];
+                      return CommentTile.fromMap(
+                        c.toMap(),
+                        isReply: false,
+                        isAuthenticated: auth.isAuthenticated,
+                        onReply: () => _startReply(c),
+                        onDelete: () => _deleteComment(c),
+                        onToggleLike: () => ApiService().toggleArticleCommentLike(
+                          widget.article.id, c.id),
+                        onEdit: (content) => ApiService().editArticleComment(
+                          widget.article.id, c.id, content),
+                        replyBuilder: (reply) {
+                          final rc = ArticleComment.fromJson(reply);
+                          return CommentTile.fromMap(
+                            reply,
+                            isReply: true,
+                            isAuthenticated: auth.isAuthenticated,
+                            onDelete: () => _deleteComment(rc),
+                            onToggleLike: () => ApiService().toggleArticleCommentLike(
+                              widget.article.id, rc.id),
+                            onEdit: (content) => ApiService().editArticleComment(
+                              widget.article.id, rc.id, content),
+                          );
+                        },
+                      );
                     }),
 
                   const SizedBox(height: 40),
@@ -1109,184 +1104,4 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     );
   }
 
-  Widget _buildCommentTile(
-    ArticleComment comment,
-    AuthProvider auth,
-    AppLocalizations l10n,
-    bool isDark, {
-    required bool isReply,
-  }) {
-    final isOwn = auth.isAuthenticated && auth.userId == comment.userId;
-    final avatarRadius = isReply ? 14.0 : 18.0;
-    final nameSize = isReply ? 12.5 : 13.0;
-
-    return Padding(
-      padding: EdgeInsets.only(left: isReply ? 44.0 : 0.0, bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: avatarRadius,
-                backgroundColor: AppColors.auGold.withValues(alpha: 0.15),
-                backgroundImage: comment.profilePicture != null
-                    ? CachedNetworkImageProvider(comment.profilePicture!)
-                    : null,
-                child: comment.profilePicture == null
-                    ? Text(
-                        comment.userName.isNotEmpty ? comment.userName[0].toUpperCase() : '?',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.auGold,
-                          fontSize: isReply ? 11 : 13,
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            comment.userName,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: nameSize,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? AppColors.darkText : AppColors.lightText,
-                            ),
-                          ),
-                        ),
-                        if (comment.badgeType != null && comment.badgeType!.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.verified,
-                            size: 14,
-                            color: comment.badgeType == 'GOLD'
-                                ? const Color(0xFFD4AF37)
-                                : Colors.blue,
-                          ),
-                        ],
-                        if (comment.username.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              '@${comment.username}',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: isDark
-                                    ? AppColors.darkTextSecondary
-                                    : AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(width: 6),
-                        Text(
-                          '· ${_timeAgo(comment.createdAt, l10n)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (isOwn)
-                          GestureDetector(
-                            onTap: () => _deleteComment(comment),
-                            child: Icon(
-                              Icons.delete_outline_rounded,
-                              size: 18,
-                              color: isDark
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    _buildMentionRichText(comment.content, isDark),
-                    if (!isReply && auth.isAuthenticated) ...[
-                      const SizedBox(height: 6),
-                      GestureDetector(
-                        onTap: () => _startReply(comment),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.reply_rounded, size: 14, color: AppColors.auGold),
-                            SizedBox(width: 4),
-                            Text(
-                              'Reply',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.auGold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (!isReply && comment.replies.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Column(
-                children: comment.replies
-                    .map((reply) => _buildCommentTile(reply, auth, l10n, isDark, isReply: true))
-                    .toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMentionRichText(String content, bool isDark) {
-    final mentionRegex = RegExp(r'@(\w+)');
-    final spans = <TextSpan>[];
-    int lastEnd = 0;
-
-    for (final match in mentionRegex.allMatches(content)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(text: content.substring(lastEnd, match.start)));
-      }
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: const TextStyle(
-          color: AppColors.auGold,
-          fontWeight: FontWeight.w600,
-        ),
-      ));
-      lastEnd = match.end;
-    }
-    if (lastEnd < content.length) {
-      spans.add(TextSpan(text: content.substring(lastEnd)));
-    }
-
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(
-          fontSize: 14,
-          color: isDark ? AppColors.darkText : AppColors.lightText,
-          height: 1.4,
-        ),
-        children: spans.isEmpty ? [TextSpan(text: content)] : spans,
-      ),
-    );
-  }
 }

@@ -154,6 +154,37 @@ class ApiService {
     }
   }
 
+  Future<dynamic> _patch(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool auth = false,
+  }) async {
+    try {
+      final response = await _client
+          .patch(
+            Uri.parse('$_baseUrl/$endpoint'),
+            headers: await _headers(auth: auth),
+            body: json.encode(body),
+          )
+          .timeout(const Duration(seconds: 20));
+      final data = json.decode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return data;
+      }
+      String message = 'Request failed';
+      if (data is Map) {
+        if (data.containsKey('detail')) {
+          message = data['detail'];
+        }
+      }
+      throw ApiException(message, response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Connection failed: $e', 0);
+    }
+  }
+
   /// Extract results from paginated or flat list responses
   List<dynamic> _extractResults(dynamic data) {
     if (data is List) return data;
@@ -399,12 +430,26 @@ class ApiService {
 
   // ── Articles ─────────────────────────────────────────────
   Future<List<Article>> getArticles({bool? featured}) async {
-    String endpoint = 'articles/';
-    if (featured != null) endpoint += '?is_featured=$featured';
+    String endpoint = 'articles/?content_type=article';
+    if (featured != null) endpoint += '&is_featured=$featured';
     final data = await _get(endpoint);
     return _extractResults(data)
         .map((j) => Article.fromJson(j))
         .toList();
+  }
+
+  Future<List<Article>> getNews({bool? featured}) async {
+    String endpoint = 'articles/?content_type=news';
+    if (featured != null) endpoint += '&is_featured=$featured';
+    final data = await _get(endpoint);
+    return _extractResults(data)
+        .map((j) => Article.fromJson(j))
+        .toList();
+  }
+
+  Future<Article> getArticle(String articleId) async {
+    final data = await _get('articles/$articleId/');
+    return Article.fromJson(data as Map<String, dynamic>);
   }
 
   // ── Article Engagement ──────────────────────────────────
@@ -432,6 +477,14 @@ class ApiService {
 
   Future<void> deleteArticleComment(String articleId, int commentId) async {
     await _delete('articles/$articleId/comments/$commentId/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> editArticleComment(String articleId, int commentId, String content) async {
+    return await _patch('articles/$articleId/comments/$commentId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleArticleCommentLike(String articleId, int commentId) async {
+    return await _post('articles/$articleId/comments/$commentId/toggle-like/', {}, auth: true);
   }
 
   Future<Map<String, dynamic>> toggleArticleLike(String articleId) async {
@@ -495,6 +548,14 @@ class ApiService {
     await _delete('magazines/$magazineId/comments/$commentId/', auth: true);
   }
 
+  Future<Map<String, dynamic>> editMagazineComment(String magazineId, int commentId, String content) async {
+    return await _patch('magazines/$magazineId/comments/$commentId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleMagazineCommentLike(String magazineId, int commentId) async {
+    return await _post('magazines/$magazineId/comments/$commentId/toggle-like/', {}, auth: true);
+  }
+
   // ── Events ───────────────────────────────────────────────
   Future<List<EventLocation>> getEvents() async {
     final data = await _get('events/');
@@ -515,6 +576,34 @@ class ApiService {
     return _extractResults(data)
         .map((j) => ApiLiveFeed.fromJson(j))
         .toList();
+  }
+
+  Future<Map<String, dynamic>> toggleLiveFeedLike(int feedId) async {
+    return await _post('live-feeds/$feedId/toggle-like/', {}, auth: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getLiveFeedComments(int feedId) async {
+    final data = await _get('live-feeds/$feedId/comments/');
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> postLiveFeedComment(int feedId, String content, {int? parentId}) async {
+    final body = <String, dynamic>{'content': content};
+    if (parentId != null) body['parent'] = parentId;
+    return await _post('live-feeds/$feedId/comments/', body, auth: true);
+  }
+
+  Future<void> deleteLiveFeedComment(int feedId, int commentId) async {
+    await _delete('live-feeds/$feedId/comments/$commentId/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> editLiveFeedComment(int feedId, int commentId, String content) async {
+    return await _patch('live-feeds/$feedId/comments/$commentId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleLiveFeedCommentLike(int feedId, int commentId) async {
+    return await _post('live-feeds/$feedId/comments/$commentId/toggle-like/', {}, auth: true);
   }
 
   // ── Resources ────────────────────────────────────────────
@@ -592,6 +681,14 @@ class ApiService {
     await _delete('gallery/$albumId/comments/$commentId/', auth: true);
   }
 
+  Future<Map<String, dynamic>> editGalleryComment(String albumId, int commentId, String content) async {
+    return await _patch('gallery/$albumId/comments/$commentId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleGalleryCommentLike(String albumId, int commentId) async {
+    return await _post('gallery/$albumId/comments/$commentId/toggle-like/', {}, auth: true);
+  }
+
   // ── Videos ───────────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getVideos({String? category}) async {
     String endpoint = 'videos/';
@@ -633,6 +730,14 @@ class ApiService {
     await _delete('videos/$videoId/comments/$commentId/', auth: true);
   }
 
+  Future<Map<String, dynamic>> editVideoComment(String videoId, int commentId, String content) async {
+    return await _patch('videos/$videoId/comments/$commentId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleVideoCommentLike(String videoId, int commentId) async {
+    return await _post('videos/$videoId/comments/$commentId/toggle-like/', {}, auth: true);
+  }
+
   // ── Social Media ─────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getSocialMediaLinks() async {
     final data = await _get('social-media/');
@@ -652,11 +757,43 @@ class ApiService {
     return EventRegistrationModel.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<Map<String, dynamic>> submitEventRegistration(int eventId, Map<String, dynamic> formData) async {
-    return await _post('event-submissions/', {
+  Future<Map<String, dynamic>> submitEventRegistration(int eventId, Map<String, dynamic> formData, {List<String>? uploadedFiles}) async {
+    final body = <String, dynamic>{
       'event_registration': eventId,
       'form_data': formData,
-    }, auth: true);
+    };
+    if (uploadedFiles != null && uploadedFiles.isNotEmpty) {
+      body['uploaded_files'] = uploadedFiles;
+    }
+    return await _post('event-submissions/', body, auth: true);
+  }
+
+  Future<Map<String, dynamic>> uploadRegistrationFile(File file) async {
+    try {
+      final uri = Uri.parse('${_baseUrl}event-submissions/upload-file/');
+      final request = http.MultipartRequest('POST', uri);
+
+      final headers = await _headers(auth: true);
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+
+      request.files.add(
+        await http.MultipartFile.fromPath('file', file.path),
+      );
+
+      final streamedResponse = await _client.send(request).timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return json.decode(response.body);
+      }
+      final errorBody = json.decode(response.body);
+      throw ApiException(errorBody['detail'] ?? 'Failed to upload file', response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
   }
 
   Future<Map<String, dynamic>> submitProxyRegistration({
@@ -918,6 +1055,18 @@ class ApiService {
     return await _post('discussions/$discussionId/replies/', body, auth: true);
   }
 
+  Future<void> deleteDiscussionReply(int discussionId, int replyId) async {
+    await _delete('discussions/$discussionId/replies/$replyId/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> editDiscussionReply(int discussionId, int replyId, String content) async {
+    return await _patch('discussions/$discussionId/replies/$replyId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleDiscussionReplyLike(int discussionId, int replyId) async {
+    return await _post('discussions/$discussionId/replies/$replyId/toggle-like/', {}, auth: true);
+  }
+
   Future<Map<String, dynamic>> recordDiscussionView(int discussionId) async {
     return await _post('discussions/$discussionId/record-view/', {});
   }
@@ -1157,6 +1306,14 @@ class ApiService {
     await _delete('events/$eventId/comments/$commentId/', auth: true);
   }
 
+  Future<Map<String, dynamic>> editEventComment(int eventId, int commentId, String content) async {
+    return await _patch('events/$eventId/comments/$commentId/edit/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleEventCommentLike(int eventId, int commentId) async {
+    return await _post('events/$eventId/comments/$commentId/toggle-like/', {}, auth: true);
+  }
+
   Future<Map<String, dynamic>> recordEventView(int eventId) async {
     return await _post('events/$eventId/record-view/', {});
   }
@@ -1212,6 +1369,22 @@ class ApiService {
     return await _post('newsletter/toggle/', {'receives_newsletter': receives}, auth: true);
   }
 
+  Future<Map<String, dynamic>> subscribeNewsletter({
+    required String name,
+    required String email,
+    String? phoneNumber,
+  }) async {
+    return await _post('newsletter/subscribe/', {
+      'name': name,
+      'email': email,
+      if (phoneNumber != null && phoneNumber.isNotEmpty) 'phone_number': phoneNumber,
+    }, auth: false);
+  }
+
+  Future<Map<String, dynamic>> checkNewsletterSubscription() async {
+    return await _get('newsletter/check/', auth: true);
+  }
+
   // ── Linked Accounts ────────────────────────────────────────
   Future<List<Map<String, dynamic>>> getLinkedAccounts() async {
     final data = await _get('auth/linked-accounts/', auth: true);
@@ -1263,6 +1436,83 @@ class ApiService {
       });
     } catch (_) {
       // Silent fail — don't let analytics block app launch
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  YOUTH DIALOGUE
+  // ═══════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>> youthDialogueApply(Map<String, dynamic> formData) async {
+    return await _post('youth-dialogue/apply/', formData, auth: true);
+  }
+
+  Future<Map<String, dynamic>> youthDialogueStatus() async {
+    return await _get('youth-dialogue/status/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> youthDialogueUploadDocument(
+    File file,
+    String docType, {
+    int? replacesId,
+  }) async {
+    try {
+      final uri = Uri.parse('${_baseUrl}youth-dialogue/upload-document/');
+      final request = http.MultipartRequest('POST', uri);
+
+      final headers = await _headers(auth: true);
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+
+      request.fields['document_type'] = docType;
+      if (replacesId != null) {
+        request.fields['replaces'] = replacesId.toString();
+      }
+
+      request.files.add(
+        await http.MultipartFile.fromPath('file', file.path),
+      );
+
+      final streamedResponse = await _client.send(request).timeout(const Duration(seconds: 60));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return json.decode(response.body);
+      }
+      final errorBody = json.decode(response.body);
+      throw ApiException(errorBody['detail'] ?? 'Failed to upload document', response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
+  }
+
+  Future<Map<String, dynamic>> youthDialogueSubmitDocuments() async {
+    return await _post('youth-dialogue/submit-documents/', {}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> youthDialogueCredential() async {
+    return await _get('youth-dialogue/credential/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> youthDialogueEligibility() async {
+    return await _get('youth-dialogue/eligibility/', auth: true);
+  }
+
+  Future<void> youthDialogueLogActivity(
+    String action,
+    String screenName, {
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      await _post('youth-dialogue/log-activity/', {
+        'action': action,
+        'screen_name': screenName,
+        if (metadata != null) 'metadata': metadata,
+      }, auth: true);
+    } catch (_) {
+      // Silent fail — activity logging is non-critical
     }
   }
 }

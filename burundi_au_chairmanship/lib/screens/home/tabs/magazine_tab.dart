@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,11 +14,13 @@ import '../../../services/api_service.dart';
 import '../../../widgets/login_gate.dart';
 import '../../../widgets/shimmer_loading.dart';
 import '../../../widgets/liked_by_avatars.dart';
+import '../../../services/like_service.dart';
 import '../../magazine/pdf_viewer_screen.dart';
 import '../../news/article_detail_screen.dart';
 
 class MagazineTab extends StatefulWidget {
-  const MagazineTab({super.key});
+  final VoidCallback? onBackToHome;
+  const MagazineTab({super.key, this.onBackToHome});
 
   @override
   State<MagazineTab> createState() => _MagazineTabState();
@@ -28,10 +31,17 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   List<MagazineEdition>? _editions;
   List<Article>? _articles;
   bool _isLoading = true;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   // Page flip controller for magazines
   late PageController _magazinePageController;
   int _currentMagazinePage = 0;
+
+  // Featured carousel auto-slide
+  late PageController _featuredPageController;
+  int _currentFeaturedPage = 0;
+  Timer? _featuredAutoSlideTimer;
 
   // Search & filters
   final TextEditingController _searchController = TextEditingController();
@@ -48,15 +58,36 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
       if (_tabController.indexIsChanging) setState(() {});
     });
     _magazinePageController = PageController();
+    _featuredPageController = PageController();
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key.startsWith('magazine:') && mounted) setState(() {});
+    });
     _loadData();
   }
 
   @override
   void dispose() {
+    _featuredAutoSlideTimer?.cancel();
+    _removeLikeListener?.call();
     _tabController.dispose();
     _searchController.dispose();
     _magazinePageController.dispose();
+    _featuredPageController.dispose();
     super.dispose();
+  }
+
+  void _startFeaturedAutoSlide(int itemCount) {
+    _featuredAutoSlideTimer?.cancel();
+    if (itemCount <= 1) return;
+    _featuredAutoSlideTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_featuredPageController.hasClients) return;
+      final nextPage = (_currentFeaturedPage + 1) % itemCount;
+      _featuredPageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   Future<void> _loadData() async {
@@ -78,7 +109,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     }
   }
 
-  Future<void> _toggleLike(MagazineEdition edition) async {
+  void _toggleLike(MagazineEdition edition) {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
@@ -87,39 +118,13 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
       );
       return;
     }
-
-    final index = _editions?.indexWhere((e) => e.id == edition.id) ?? -1;
-    if (index == -1) return;
-    final wasLiked = edition.isLiked;
-    setState(() {
-      _editions![index] = edition.copyWith(
-        isLiked: !wasLiked,
-        likeCount: edition.likeCount + (wasLiked ? -1 : 1),
-      );
-    });
-    try {
-      final result = await ApiService().toggleMagazineLike(edition.id);
-      if (mounted) {
-        List<Liker> likers = [];
-        if (result['recent_likers'] is List) {
-          likers = (result['recent_likers'] as List)
-              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
-              .toList();
-        }
-        setState(() {
-          _editions![index] = edition.copyWith(
-            isLiked: result['is_liked'],
-            likeCount: result['like_count'],
-            recentLikers: likers,
-          );
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _editions![index] = edition;
-      });
-    }
+    _likeService.seed(
+      EntityType.magazine, edition.id,
+      isLiked: edition.isLiked,
+      likeCount: edition.likeCount,
+      recentLikers: edition.recentLikers,
+    );
+    _likeService.toggle(EntityType.magazine, edition.id);
   }
 
   void _openPdf(BuildContext context, MagazineEdition edition) {
@@ -227,6 +232,13 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             expandedHeight: 120,
             pinned: true,
             forceElevated: innerBoxIsScrolled,
+            automaticallyImplyLeading: false,
+            leading: widget.onBackToHome != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: widget.onBackToHome,
+                  )
+                : null,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 l10n.digitalMagazine,
@@ -240,7 +252,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                    colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                   ),
                 ),
               ),
@@ -471,21 +483,28 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
       );
     }
 
-    // Separate featured from rest
+    // Separate featured from rest — featured also appear in grid below
     final featured = filtered.where((e) => e.isFeatured).toList();
-    final rest = filtered.where((e) => !e.isFeatured).toList();
+    final rest = filtered; // show all magazines including featured
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
     // Total pages for 2-per-view carousel (guests see only 1 page)
     final pageCount = isAuth
         ? (rest.length / 2).ceil()
         : (rest.isEmpty ? 0 : 1);
 
+    // Start auto-slide for featured carousel (only if not already running)
+    if (featured.length > 1 && _featuredAutoSlideTimer == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startFeaturedAutoSlide(featured.length);
+      });
+    }
+
     return ListView(
       padding: const EdgeInsets.only(bottom: 100),
       children: [
-        // Featured Hero Section
+        // Featured Hero Carousel
         if (featured.isNotEmpty)
-          _buildFeaturedHero(context, featured.first, langCode, isDark),
+          _buildFeaturedCarousel(context, featured, langCode, isDark),
 
         // 2-per-view carousel
         if (rest.isNotEmpty) ...[
@@ -548,7 +567,54 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildFeaturedCarousel(BuildContext context, List<MagazineEdition> featured, String langCode, bool isDark) {
+    if (featured.length == 1) {
+      return _buildFeaturedHero(context, featured.first, langCode, isDark);
+    }
+    return Column(
+      children: [
+        SizedBox(
+          height: 236, // 220 card + 8 top margin + 8 breathing room
+          child: PageView.builder(
+            controller: _featuredPageController,
+            onPageChanged: (index) {
+              setState(() => _currentFeaturedPage = index);
+            },
+            itemCount: featured.length,
+            itemBuilder: (context, index) {
+              return _buildFeaturedHero(context, featured[index], langCode, isDark);
+            },
+          ),
+        ),
+        // Dot indicators
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(featured.length, (index) {
+              final isActive = index == _currentFeaturedPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: isActive ? 24 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.auGold
+                      : AppColors.auGold.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFeaturedHero(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
+    _likeService.seed(EntityType.magazine, magazine.id, isLiked: magazine.isLiked, likeCount: magazine.likeCount, recentLikers: magazine.recentLikers);
+    final mLikeState = _likeService.getState(EntityType.magazine, magazine.id);
     return GestureDetector(
       onTap: () => _openPdf(context, magazine),
       child: Container(
@@ -579,7 +645,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                 errorWidget: (_, _, _) => Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                      colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                     ),
                   ),
                   child: const Center(child: Icon(Icons.auto_stories, size: 48, color: Colors.white54)),
@@ -647,15 +713,15 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                           GestureDetector(
                             onTap: () => _toggleLike(magazine),
                             child: _flipCardStat(
-                              magazine.isLiked ? Icons.favorite : Icons.favorite_border,
-                              '${magazine.likeCount}',
-                              iconColor: magazine.isLiked ? Colors.red : null,
+                              mLikeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                              '${mLikeState.likeCount}',
+                              iconColor: mLikeState.isLiked ? Colors.red : null,
                             ),
                           ),
                           const SizedBox(width: 8),
                           LikedByAvatars(
-                            likers: magazine.recentLikers,
-                            totalLikes: magazine.likeCount,
+                            likers: mLikeState.recentLikers,
+                            totalLikes: mLikeState.likeCount,
                             avatarRadius: 10,
                           ),
                           const Spacer(),
@@ -691,6 +757,8 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   }
 
   Widget _buildMagazineCard(BuildContext context, MagazineEdition magazine, String langCode, bool isDark) {
+    _likeService.seed(EntityType.magazine, magazine.id, isLiked: magazine.isLiked, likeCount: magazine.likeCount, recentLikers: magazine.recentLikers);
+    final mLikeState = _likeService.getState(EntityType.magazine, magazine.id);
     return GestureDetector(
       onTap: () => _openPdf(context, magazine),
       child: Container(
@@ -786,17 +854,17 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                         GestureDetector(
                           onTap: () => _toggleLike(magazine),
                           child: Icon(
-                            magazine.isLiked ? Icons.favorite : Icons.favorite_border,
-                            size: 14, color: magazine.isLiked ? Colors.red : Colors.grey,
+                            mLikeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                            size: 14, color: mLikeState.isLiked ? Colors.red : Colors.grey,
                           ),
                         ),
                         const SizedBox(width: 3),
-                        Text('${magazine.likeCount}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                        Text('${mLikeState.likeCount}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
                         const SizedBox(width: 6),
                         Expanded(
                           child: LikedByAvatars(
-                            likers: magazine.recentLikers,
-                            totalLikes: magazine.likeCount,
+                            likers: mLikeState.recentLikers,
+                            totalLikes: mLikeState.likeCount,
                             avatarRadius: 8,
                             overlap: 6,
                           ),
@@ -832,6 +900,8 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   }
 
   void _showMagInfo(BuildContext context, MagazineEdition magazine, String langCode) {
+    _likeService.seed(EntityType.magazine, magazine.id, isLiked: magazine.isLiked, likeCount: magazine.likeCount, recentLikers: magazine.recentLikers);
+    final mLikeState = _likeService.getState(EntityType.magazine, magazine.id);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -946,7 +1016,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                 children: [
                   _infoStat(Icons.visibility, '${magazine.viewCount}', 'Views'),
                   const SizedBox(width: 16),
-                  _infoStat(Icons.favorite, '${magazine.likeCount}', 'Likes'),
+                  _infoStat(Icons.favorite, '${mLikeState.likeCount}', 'Likes'),
                   if (magazine.pageCount > 0) ...[
                     const SizedBox(width: 16),
                     _infoStat(Icons.description, '${magazine.pageCount}', 'Pages'),

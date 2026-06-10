@@ -43,7 +43,7 @@ class Command(BaseCommand):
 
         # ── Hero Slides ──────────────────────────────────────────
         hero_slides = [
-            {'image': 'hero_slides/IMG_1647.jpeg', 'label': 'Burundi AU Chairmanship 2026', 'label_fr': 'Présidence UA du Burundi 2026', 'order': 1},
+            {'image': 'hero_slides/IMG_1647.jpeg', 'label': 'Be 4 Africa', 'label_fr': 'Présidence UA du Burundi 2026', 'order': 1},
             {'image': 'hero_slides/IMG_1648.jpeg', 'label': 'Building a Resilient Africa', 'label_fr': 'Construire une Afrique résiliente', 'order': 2},
             {'image': 'hero_slides/IMG20260326095325.jpg', 'label': 'Unity in Diversity', 'label_fr': 'Unité dans la diversité', 'order': 3},
             {'image': 'hero_slides/Final_version_1.jpg', 'label': 'A Prosperous Continent', 'label_fr': 'Un continent prospère', 'order': 4},
@@ -291,7 +291,7 @@ class Command(BaseCommand):
                 'pdf_file': 'magazines/pdfs/Ineza_Info_compressed.pdf',
                 'title': 'Ineza Info',
                 'title_fr': 'Ineza Info',
-                'description': 'Official Burundi Chairmanship magazine covering AU news and developments.',
+                'description': 'Official Be 4 Africa magazine covering AU news and developments.',
                 'description_fr': 'Magazine officiel de la présidence du Burundi couvrant les nouvelles de l\'UA.',
                 'publish_date': '2026-02-01',
                 'is_featured': True,
@@ -427,7 +427,7 @@ class Command(BaseCommand):
         videos = [
             {
                 'thumbnail': 'videos/thumbnails/IMG_1670.jpeg',
-                'title': 'Burundi Chairmanship Opening Ceremony',
+                'title': 'Be 4 Africa Opening Ceremony',
                 'title_fr': "Cérémonie d'ouverture de la présidence de l'UA",
                 'description': 'Full coverage of the historic opening ceremony.',
                 'description_fr': "Couverture complète de la cérémonie d'ouverture historique.",

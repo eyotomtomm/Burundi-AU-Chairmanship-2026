@@ -142,8 +142,15 @@ class MagazineEdition {
 
   bool get hasPdf => openablePdfUrl.isNotEmpty;
 
-  String getTitle(String languageCode) => languageCode == 'fr' ? titleFr : title;
-  String getDescription(String languageCode) => languageCode == 'fr' ? descriptionFr : description;
+  String getTitle(String languageCode) {
+    if (languageCode == 'fr') return titleFr.isNotEmpty ? titleFr : title;
+    return title.isNotEmpty ? title : titleFr;
+  }
+
+  String getDescription(String languageCode) {
+    if (languageCode == 'fr') return descriptionFr.isNotEmpty ? descriptionFr : description;
+    return description.isNotEmpty ? description : descriptionFr;
+  }
 }
 
 class Category {
@@ -157,7 +164,7 @@ class Category {
     required this.id,
     required this.name,
     this.nameFr = '',
-    this.color = '#1EB53A',
+    this.color = '#409843',
     this.order = 0,
   });
 
@@ -166,7 +173,7 @@ class Category {
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
       nameFr: json['name_fr'] ?? '',
-      color: json['color'] ?? '#1EB53A',
+      color: json['color'] ?? '#409843',
       order: json['order'] ?? 0,
     );
   }
@@ -233,6 +240,7 @@ class Article {
   final String author;
   final DateTime publishDate;
   final Category? category;
+  final String contentType;
   final bool isFeatured;
   final int viewCount;
   final int commentCount;
@@ -251,6 +259,7 @@ class Article {
     required this.author,
     required this.publishDate,
     this.category,
+    this.contentType = 'article',
     this.isFeatured = false,
     this.viewCount = 0,
     this.commentCount = 0,
@@ -291,6 +300,7 @@ class Article {
       author: json['author'] ?? '',
       publishDate: DateTime.tryParse(json['publish_date'] ?? '') ?? DateTime.now(),
       category: cat,
+      contentType: json['content_type'] ?? 'article',
       isFeatured: json['is_featured'] ?? false,
       viewCount: json['view_count'] ?? 0,
       commentCount: json['comment_count'] ?? 0,
@@ -310,6 +320,7 @@ class Article {
     int? likeCount,
     bool? isLiked,
     List<Liker>? recentLikers,
+    String? contentType,
   }) {
     return Article(
       id: id,
@@ -321,6 +332,7 @@ class Article {
       author: author,
       publishDate: publishDate,
       category: category,
+      contentType: contentType ?? this.contentType,
       isFeatured: isFeatured,
       viewCount: viewCount ?? this.viewCount,
       commentCount: commentCount ?? this.commentCount,
@@ -331,8 +343,15 @@ class Article {
     );
   }
 
-  String getTitle(String languageCode) => languageCode == 'fr' ? titleFr : title;
-  String getContent(String languageCode) => languageCode == 'fr' ? contentFr : content;
+  String getTitle(String languageCode) {
+    if (languageCode == 'fr') return titleFr.isNotEmpty ? titleFr : title;
+    return title.isNotEmpty ? title : titleFr;
+  }
+
+  String getContent(String languageCode) {
+    if (languageCode == 'fr') return contentFr.isNotEmpty ? contentFr : content;
+    return content.isNotEmpty ? content : contentFr;
+  }
 }
 
 class ArticleComment {
@@ -344,6 +363,11 @@ class ArticleComment {
   final String? badgeType;    // 'GOLD' | 'BLUE' | null
   final int? parentId;
   final String content;
+  final int likeCount;
+  final bool isLiked;
+  final bool isOwner;
+  final bool canEdit;
+  final bool isEdited;
   final DateTime createdAt;
   final List<ArticleComment> replies;
   final int replyCount;
@@ -357,10 +381,37 @@ class ArticleComment {
     this.badgeType,
     this.parentId,
     required this.content,
+    this.likeCount = 0,
+    this.isLiked = false,
+    this.isOwner = false,
+    this.canEdit = false,
+    this.isEdited = false,
     required this.createdAt,
     this.replies = const [],
     this.replyCount = 0,
   });
+
+  /// Convert to Map for use with CommentTile.fromMap
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'user_name': userName,
+      'username': username,
+      'profile_picture': profilePicture,
+      'badge_type': badgeType,
+      'parent': parentId,
+      'content': content,
+      'like_count': likeCount,
+      'is_liked': isLiked,
+      'is_owner': isOwner,
+      'can_edit': canEdit,
+      'is_edited': isEdited,
+      'created_at': createdAt.toIso8601String(),
+      'replies': replies.map((r) => r.toMap()).toList(),
+      'reply_count': replyCount,
+    };
+  }
 
   factory ArticleComment.fromJson(Map<String, dynamic> json) {
     final rawReplies = json['replies'];
@@ -379,6 +430,11 @@ class ArticleComment {
       badgeType: json['badge_type'],
       parentId: json['parent'] is int ? json['parent'] as int : null,
       content: json['content'] ?? '',
+      likeCount: json['like_count'] ?? 0,
+      isLiked: json['is_liked'] ?? false,
+      isOwner: json['is_owner'] ?? false,
+      canEdit: json['can_edit'] ?? false,
+      isEdited: json['is_edited'] ?? false,
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       replies: parsedReplies,
       replyCount: json['reply_count'] ?? parsedReplies.length,
@@ -450,7 +506,7 @@ class MagazineData {
         imageUrl: 'https://via.placeholder.com/800x400/1EB53A/FFFFFF?text=Leadership',
         author: 'Editorial Team',
         publishDate: DateTime(2025, 2, 1),
-        category: Category(id: 1, name: 'Politics', nameFr: 'Politique', color: '#CE1126'),
+        category: Category(id: 1, name: 'Politics', nameFr: 'Politique', color: '#E11C23'),
         isFeatured: true,
       ),
       Article(

@@ -46,7 +46,7 @@ class Command(BaseCommand):
 
         # Hero Slides
         hero_slides = [
-            {'label': 'Burundi Chairmanship 2026', 'label_fr': 'Présidence UA du Burundi 2026', 'order': 1},
+            {'label': 'Be 4 Africa 2026', 'label_fr': 'Présidence UA du Burundi 2026', 'order': 1},
             {'label': 'Building a Resilient Africa', 'label_fr': 'Construire une Afrique résiliente', 'order': 2},
             {'label': 'Unity in Diversity', 'label_fr': 'Unité dans la diversité', 'order': 3},
             {'label': 'A Prosperous Continent', 'label_fr': 'Un continent prospère', 'order': 4},
@@ -299,7 +299,7 @@ class Command(BaseCommand):
             {
                 'title': 'AU Summit Special Edition',
                 'title_fr': "Édition spéciale du Sommet de l'UA",
-                'description': "Complete coverage of the AU Summit and Burundi's chairmanship.",
+                'description': "Complete coverage of the AU Summit by Be 4 Africa.",
                 'description_fr': "Couverture complète du Sommet de l'UA et de la présidence du Burundi.",
                 'publish_date': '2026-02-01',
                 'is_featured': True,
@@ -589,7 +589,7 @@ class Command(BaseCommand):
                 'slug': 'water-sanitation',
                 'description': 'Clean water access and sanitation infrastructure for all African communities',
                 'description_fr': 'Accès à l\'eau potable et infrastructures d\'assainissement pour toutes les communautés africaines',
-                'overview': 'Access to clean water and proper sanitation is a fundamental human right and a cornerstone of public health and economic development. Under Burundi\'s Burundi Chairmanship, we are committed to accelerating progress towards universal water and sanitation coverage across Africa.\n\nOur vision is clear: by 2030, every African should have access to safe drinking water and adequate sanitation facilities. This ambitious goal requires coordinated action, innovative financing, and strong political will from all member states.',
+                'overview': 'Access to clean water and proper sanitation is a fundamental human right and a cornerstone of public health and economic development. Under Burundi\'s Be 4 Africa, we are committed to accelerating progress towards universal water and sanitation coverage across Africa.\n\nOur vision is clear: by 2030, every African should have access to safe drinking water and adequate sanitation facilities. This ambitious goal requires coordinated action, innovative financing, and strong political will from all member states.',
                 'overview_fr': 'L\'accès à l\'eau potable et à un assainissement adéquat est un droit humain fondamental et un pilier de la santé publique et du développement économique. Sous la présidence burundaise de l\'UA, nous nous engageons à accélérer les progrès vers une couverture universelle en eau et assainissement à travers l\'Afrique.\n\nNotre vision est claire: d\'ici 2030, chaque Africain devrait avoir accès à l\'eau potable et à des installations d\'assainissement adéquates.',
                 'objectives': [
                     'Achieve universal access to safe and affordable drinking water for all Africans by 2030',
@@ -778,9 +778,9 @@ class Command(BaseCommand):
         # Videos
         videos = [
             {
-                'title': 'Burundi Chairmanship Opening Ceremony',
+                'title': 'Be 4 Africa Opening Ceremony',
                 'title_fr': 'Cérémonie d\'ouverture de la présidence de l\'UA',
-                'description': 'Full coverage of the historic opening ceremony as Burundi assumes the Burundi Chairmanship',
+                'description': 'Full coverage of the historic opening ceremony as Burundi assumes the Be 4 Africa',
                 'description_fr': 'Couverture complète de la cérémonie d\'ouverture historique',
                 'video_url': 'https://www.youtube.com/watch?v=example1',
                 'duration': '1:45:30',
@@ -858,7 +858,7 @@ class Command(BaseCommand):
         social_media = [
             {
                 'platform': 'facebook',
-                'display_name': 'Burundi Chairmanship',
+                'display_name': 'Be 4 Africa',
                 'display_name_fr': 'Présidence UA du Burundi',
                 'url': 'https://facebook.com/BurundiAU2026',
                 'handle': '@BurundiAU2026',
@@ -884,12 +884,12 @@ class Command(BaseCommand):
             },
             {
                 'platform': 'instagram',
-                'display_name': 'Burundi Chairmanship',
+                'display_name': 'Be 4 Africa',
                 'display_name_fr': 'Présidence UA du Burundi',
                 'url': 'https://instagram.com/burundiauchair2026',
                 'handle': '@burundiauchair2026',
                 'follower_count': '67K',
-                'description': 'Photos and stories from the Burundi Chairmanship',
+                'description': 'Photos and stories from Be 4 Africa',
                 'description_fr': 'Photos et histoires de la présidence',
                 'icon_color': '#E4405F',
                 'is_active': True,
@@ -910,10 +910,10 @@ class Command(BaseCommand):
             },
             {
                 'platform': 'linkedin',
-                'display_name': 'Burundi Chairmanship 2026',
+                'display_name': 'Be 4 Africa',
                 'display_name_fr': 'Présidence UA du Burundi 2026',
                 'url': 'https://linkedin.com/company/burundi-au-chairmanship',
-                'handle': 'Burundi Chairmanship',
+                'handle': 'Be 4 Africa',
                 'follower_count': '28K',
                 'description': 'Professional network and policy updates',
                 'description_fr': 'Réseau professionnel et mises à jour politiques',
@@ -952,7 +952,7 @@ class Command(BaseCommand):
         # Notifications
         notifications = [
             {
-                'title': 'Welcome to Burundi Chairmanship 2026',
+                'title': 'Welcome to Be 4 Africa 2026',
                 'title_fr': 'Bienvenue à la Présidence de l\'UA du Burundi 2026',
                 'message': 'Stay updated with the latest news, events, and announcements from the African Union Summit.',
                 'message_fr': 'Restez informé des dernières nouvelles, événements et annonces du Sommet de l\'Union Africaine.',
@@ -1003,7 +1003,7 @@ class Command(BaseCommand):
             {
                 'event_title': 'AU Summit Gala Dinner',
                 'event_title_fr': "Dîner de gala du Sommet de l'UA",
-                'event_description': 'Join world leaders and delegates for an exclusive gala dinner celebrating African unity and the Burundi Chairmanship. Formal attire required.',
+                'event_description': 'Join world leaders and delegates for an exclusive gala dinner celebrating African unity and the Be 4 Africa. Formal attire required.',
                 'event_description_fr': "Rejoignez les dirigeants du monde et les délégués pour un dîner de gala exclusif célébrant l'unité africaine et la présidence burundaise de l'UA. Tenue formelle requise.",
                 'card_type': 'event',
                 'event_date': '2026-02-14T19:00:00Z',

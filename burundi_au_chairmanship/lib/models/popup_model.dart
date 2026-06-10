@@ -49,7 +49,18 @@ class PopupModel {
     );
   }
 
-  String getTitle(String langCode) => langCode == 'fr' ? titleFr : title;
-  String getMessage(String langCode) => langCode == 'fr' ? messageFr : message;
-  String getActionText(String langCode) => langCode == 'fr' ? actionTextFr : actionText;
+  String getTitle(String langCode) {
+    if (langCode == 'fr') return titleFr.isNotEmpty ? titleFr : title;
+    return title.isNotEmpty ? title : titleFr;
+  }
+
+  String getMessage(String langCode) {
+    if (langCode == 'fr') return messageFr.isNotEmpty ? messageFr : message;
+    return message.isNotEmpty ? message : messageFr;
+  }
+
+  String getActionText(String langCode) {
+    if (langCode == 'fr') return actionTextFr.isNotEmpty ? actionTextFr : actionText;
+    return actionText.isNotEmpty ? actionText : actionTextFr;
+  }
 }

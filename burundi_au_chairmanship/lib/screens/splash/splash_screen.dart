@@ -124,7 +124,12 @@ class _SplashScreenState extends State<SplashScreen>
     // and that's OK; it will be refreshed in the background once the user
     // reaches the home screen.
     if (authProvider.isAuthenticated) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Block unverified users — they must complete email verification first
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
     } else {
       Navigator.of(context).pushReplacementNamed('/auth');
     }
@@ -151,9 +156,9 @@ class _SplashScreenState extends State<SplashScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF1EB53A),
-              Color(0xFF0D8C2D),
-              Color(0xFF065A1A),
+              Color(0xFF409843),
+              Color(0xFF357E39),
+              Color(0xFF2D6E31),
             ],
             stops: [0.0, 0.5, 1.0],
           ),

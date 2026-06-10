@@ -13,10 +13,13 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
+import '../../widgets/liked_by_avatars.dart';
 import 'article_detail_screen.dart';
 
 class NewsScreen extends StatefulWidget {
-  const NewsScreen({super.key});
+  final bool isTab;
+  final VoidCallback? onBackToHome;
+  const NewsScreen({super.key, this.isTab = false, this.onBackToHome});
 
   @override
   State<NewsScreen> createState() => _NewsScreenState();
@@ -61,7 +64,7 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Future<List<Article>> _loadArticles() async {
     try {
-      return await ApiService().getArticles();
+      return await ApiService().getNews();
     } catch (_) {
       return MagazineData.getMockArticles();
     }
@@ -207,10 +210,18 @@ class _NewsScreenState extends State<NewsScreen> {
       expandedHeight: 120,
       floating: false,
       pinned: true,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
+      automaticallyImplyLeading: false,
+      leading: widget.isTab
+          ? (widget.onBackToHome != null
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  onPressed: widget.onBackToHome,
+                )
+              : null)
+          : IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
       actions: const [TranslateButton()],
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
@@ -359,10 +370,23 @@ class _NewsScreenState extends State<NewsScreen> {
                       _buildStatChip(Icons.chat_bubble_outline_rounded, '${article.commentCount}', Colors.white70),
                       const SizedBox(width: 12),
                       _buildStatChip(Icons.favorite_rounded, '${article.likeCount}', Colors.white70),
+                      if (article.recentLikers.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        LikedByAvatars(
+                          likers: article.recentLikers,
+                          totalLikes: article.likeCount,
+                          avatarRadius: 10,
+                          overlap: 7,
+                        ),
+                      ],
                       const Spacer(),
-                      Text(
-                        article.author,
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      Flexible(
+                        child: Text(
+                          article.author,
+                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -453,9 +477,8 @@ class _NewsScreenState extends State<NewsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image with category badge
-            SizedBox(
-              height: 160,
-              width: double.infinity,
+            AspectRatio(
+              aspectRatio: 16 / 10,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -493,6 +516,30 @@ class _NewsScreenState extends State<NewsScreen> {
                         ),
                       ),
                     ),
+                  // Multiple images indicator
+                  if (article.media.where((m) => m.isImage).isNotEmpty)
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.photo_library_rounded, size: 14, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(
+                              '+${article.media.where((m) => m.isImage).length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -521,11 +568,15 @@ class _NewsScreenState extends State<NewsScreen> {
                       Icon(Icons.person_rounded, size: 14,
                           color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                       const SizedBox(width: 4),
-                      Text(
-                        article.author,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      Flexible(
+                        child: Text(
+                          article.author,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -563,6 +614,17 @@ class _NewsScreenState extends State<NewsScreen> {
                         '${article.likeCount}',
                         article.isLiked ? AppColors.burundiRed : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                       ),
+                      if (article.recentLikers.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: LikedByAvatars(
+                            likers: article.recentLikers,
+                            totalLikes: article.likeCount,
+                            avatarRadius: 10,
+                            overlap: 7,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],

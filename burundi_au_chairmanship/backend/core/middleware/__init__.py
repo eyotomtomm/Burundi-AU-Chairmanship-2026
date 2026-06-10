@@ -1,1 +1,1 @@
-# Middleware package for Burundi Chairmanship backend
+# Middleware package for Be 4 Africa backend

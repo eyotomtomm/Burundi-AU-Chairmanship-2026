@@ -23,7 +23,10 @@ class HeroSlide {
     );
   }
 
-  String getLabel(String langCode) => langCode == 'fr' ? labelFr : label;
+  String getLabel(String langCode) {
+    if (langCode == 'fr') return labelFr.isNotEmpty ? labelFr : label;
+    return label.isNotEmpty ? label : labelFr;
+  }
 }
 
 class ApiLiveFeed {
@@ -45,6 +48,9 @@ class ApiLiveFeed {
   final String? eventName;
   final DateTime? eventDate;
   final List<Map<String, dynamic>> speakers;
+  final bool isLiked;
+  final int likeCount;
+  final List<Map<String, dynamic>> recentLikers;
 
   ApiLiveFeed({
     required this.id,
@@ -65,6 +71,9 @@ class ApiLiveFeed {
     this.eventName,
     this.eventDate,
     this.speakers = const [],
+    this.isLiked = false,
+    this.likeCount = 0,
+    this.recentLikers = const [],
   });
 
   factory ApiLiveFeed.fromJson(Map<String, dynamic> json) {
@@ -94,11 +103,24 @@ class ApiLiveFeed {
               ?.whereType<Map<String, dynamic>>()
               .toList() ??
           const [],
+      isLiked: json['is_liked'] == true,
+      likeCount: json['like_count'] ?? 0,
+      recentLikers: (json['recent_likers'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
     );
   }
 
-  String getTitle(String langCode) => langCode == 'fr' ? titleFr : title;
-  String getDescription(String langCode) => langCode == 'fr' ? descriptionFr : description;
+  String getTitle(String langCode) {
+    if (langCode == 'fr') return titleFr.isNotEmpty ? titleFr : title;
+    return title.isNotEmpty ? title : titleFr;
+  }
+
+  String getDescription(String langCode) {
+    if (langCode == 'fr') return descriptionFr.isNotEmpty ? descriptionFr : description;
+    return description.isNotEmpty ? description : descriptionFr;
+  }
 
   bool get isLive => status == 'live';
   bool get isUpcoming => status == 'upcoming';
@@ -168,7 +190,10 @@ class ApiResource {
     );
   }
 
-  String getTitle(String langCode) => langCode == 'fr' ? titleFr : title;
+  String getTitle(String langCode) {
+    if (langCode == 'fr') return titleFr.isNotEmpty ? titleFr : title;
+    return title.isNotEmpty ? title : titleFr;
+  }
 
   String get categoryDisplayName {
     switch (category) {
@@ -240,7 +265,7 @@ class AppSettingsModel {
       facebookUrl: json['facebook_url'] ?? '',
       twitterUrl: json['twitter_url'] ?? '',
       instagramUrl: json['instagram_url'] ?? '',
-      appDescription: json['app_description'] ?? 'Official application for the Burundi Chairmanship 2026.',
+      appDescription: json['app_description'] ?? 'Official application for Be 4 Africa.',
       appDescriptionFr: json['app_description_fr'] ?? 'Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.',
       developerName: json['developer_name'] ?? 'Eyosias Tamene',
       developerUrl: json['developer_url'] ?? 'https://eyosias.dev',
@@ -253,8 +278,15 @@ class AppSettingsModel {
   }
 
 
-  String getTheme(String langCode) => langCode == 'fr' ? summitThemeFr : summitTheme;
-  String getDescription(String langCode) => langCode == 'fr' ? appDescriptionFr : appDescription;
+  String getTheme(String langCode) {
+    if (langCode == 'fr') return summitThemeFr.isNotEmpty ? summitThemeFr : summitTheme;
+    return summitTheme.isNotEmpty ? summitTheme : summitThemeFr;
+  }
+
+  String getDescription(String langCode) {
+    if (langCode == 'fr') return appDescriptionFr.isNotEmpty ? appDescriptionFr : appDescription;
+    return appDescription.isNotEmpty ? appDescription : appDescriptionFr;
+  }
 }
 
 class WeatherCity {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/popup_model.dart';
 import '../config/app_colors.dart';
+import '../services/deep_link_router.dart';
 
 class PopupDialog extends StatelessWidget {
   final PopupModel popup;
@@ -16,28 +16,11 @@ class PopupDialog extends StatelessWidget {
     required this.onClose,
   });
 
-  Future<void> _handleAction(BuildContext context) async {
+  void _handleAction(BuildContext context) {
+    onClose();
     final url = popup.actionUrl.trim();
-    if (url.isEmpty) {
-      onClose();
-      return;
-    }
-
-    // Check if it's an internal route (starts with /)
-    if (url.startsWith('/')) {
-      onClose();
-      // Navigate to internal route
-      Navigator.of(context).pushNamed(url);
-    } else {
-      // External URL
-      final uri = Uri.tryParse(url);
-      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      }
-      onClose();
-    }
+    if (url.isEmpty) return;
+    DeepLinkRouter().navigate(url);
   }
 
   @override

@@ -1,7 +1,7 @@
 name: burundi_au_chairmanship
-description: Burundi Chairmanship Official App - Digital Magazine, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
+description: Be 4 Africa Official App - Digital Magazine, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
 publish_to: 'none'
-version: 1.2.3+30
+version: 1.2.4+31
 
 environment:
   sdk: ^3.10.8
@@ -36,6 +36,7 @@ dependencies:
 
   # Image Picker
   image_picker: ^1.0.7
+  file_picker: ^8.0.0
 
   # Screenshot & Screen Recording Prevention
   screen_protector: ^1.4.2
@@ -74,6 +75,10 @@ dependencies:
   firebase_analytics: ^11.3.0
   firebase_crashlytics: ^4.1.0
   firebase_remote_config: ^5.1.0
+  firebase_in_app_messaging: ^0.8.0+10
+
+  # Deep Linking
+  app_links: ^6.3.3
 
   # Social Authentication
   google_sign_in: ^6.2.1
@@ -90,6 +95,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  background_color_ios: "#ffffff"
 
 flutter:
   uses-material-design: true

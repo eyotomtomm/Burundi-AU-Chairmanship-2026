@@ -1,4 +1,4 @@
-# CI/CD Pipeline — Burundi Chairmanship
+# CI/CD Pipeline — Be 4 Africa
 # Runs on every push & PR to main
 # - Backend: Django checks, migrations, tests
 # - Frontend: Flutter analyze, build APK & IPA

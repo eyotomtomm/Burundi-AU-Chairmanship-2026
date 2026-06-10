@@ -51,7 +51,7 @@ services:
       - key: EMAIL_HOST_USER
         value: "info@burundi4africa.com"
       - key: DEFAULT_FROM_EMAIL
-        value: "Burundi Chairmanship <info@burundi4africa.com>"
+        value: "Be 4 Africa <info@burundi4africa.com>"
       - key: SENTRY_ENVIRONMENT
         value: "production"
       - key: SENTRY_RELEASE

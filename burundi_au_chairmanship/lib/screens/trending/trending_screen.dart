@@ -165,7 +165,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
         break;
       case 'video':
         typeIcon = Icons.play_circle_rounded;
-        typeColor = Colors.blue;
+        typeColor = AppColors.burundiGreen;
         break;
       default:
         typeIcon = Icons.article_rounded;

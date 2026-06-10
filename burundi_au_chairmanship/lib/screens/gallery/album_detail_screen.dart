@@ -10,6 +10,8 @@ import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../../widgets/liked_by_avatars.dart';
+import '../../widgets/comment_tile.dart';
+import '../../services/like_service.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -24,9 +26,8 @@ class AlbumDetailScreen extends StatefulWidget {
 }
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
-  bool _isLiked = false;
-  int _likeCount = 0;
-  List<Liker> _recentLikers = [];
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   // Comments
   List<Map<String, dynamic>> _comments = [];
@@ -40,13 +41,20 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _isLiked = widget.album['is_liked'] == true;
-    _likeCount = widget.album['like_count'] ?? 0;
-    if (widget.album['recent_likers'] is List) {
-      _recentLikers = (widget.album['recent_likers'] as List)
-          .map((l) => Liker.fromJson(l as Map<String, dynamic>))
-          .toList();
-    }
+    final likers = widget.album['recent_likers'] is List
+        ? (widget.album['recent_likers'] as List)
+            .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+            .toList()
+        : <Liker>[];
+    _likeService.seed(
+      EntityType.gallery, widget.album['id'],
+      isLiked: widget.album['is_liked'] == true,
+      likeCount: widget.album['like_count'] ?? 0,
+      recentLikers: likers,
+    );
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key == 'gallery:${widget.album['id']}' && mounted) setState(() {});
+    });
     _enableScreenProtection();
     _recordView();
     _loadComments();
@@ -128,7 +136,30 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             controller: scrollCtrl,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: _comments.length,
-                            itemBuilder: (ctx, i) => _buildCommentTile(_comments[i], isDark),
+                            itemBuilder: (ctx, i) {
+                              final comment = _comments[i];
+                              final albumId = widget.album['id']?.toString() ?? '';
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              return CommentTile.fromMap(
+                                comment,
+                                isAuthenticated: auth.isAuthenticated,
+                                onReply: () => setState(() {
+                                  _replyingToId = comment['id'];
+                                  _replyingToName = comment['user_name'];
+                                }),
+                                onDelete: () => _deleteComment(comment['id']),
+                                onToggleLike: () => ApiService().toggleGalleryCommentLike(albumId, comment['id']),
+                                onEdit: (content) => ApiService().editGalleryComment(albumId, comment['id'], content),
+                                replyBuilder: (reply) => CommentTile.fromMap(
+                                  reply,
+                                  isReply: true,
+                                  isAuthenticated: auth.isAuthenticated,
+                                  onDelete: () => _deleteComment(reply['id']),
+                                  onToggleLike: () => ApiService().toggleGalleryCommentLike(albumId, reply['id']),
+                                  onEdit: (content) => ApiService().editGalleryComment(albumId, reply['id'], content),
+                                ),
+                              );
+                            },
                           ),
               ),
               // Input
@@ -179,102 +210,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     );
   }
 
-  Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark) {
-    final isOwn = Provider.of<AuthProvider>(context, listen: false).userId?.toString() == comment['user_id']?.toString();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: comment['profile_picture'] != null ? NetworkImage(comment['profile_picture']) : null,
-                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
-                child: comment['profile_picture'] == null
-                    ? Text((comment['user_name'] ?? 'A')[0].toUpperCase(),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(comment['user_name'] ?? 'User',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        if (comment['badge_type'] != null) ...[
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified, size: 14, color: AppColors.burundiGreen),
-                        ],
-                        const Spacer(),
-                        if (isOwn)
-                          GestureDetector(
-                            onTap: () => _deleteComment(comment['id']),
-                            child: Icon(Icons.delete_outline, size: 16, color: Colors.grey[400]),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(comment['content'] ?? '', style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : Colors.black87)),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _replyingToId = comment['id'];
-                        _replyingToName = comment['user_name'];
-                      }),
-                      child: Text('Reply', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (comment['replies'] != null && (comment['replies'] as List).isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 42, top: 8),
-              child: Column(
-                children: (comment['replies'] as List).map<Widget>((r) {
-                  final reply = r as Map<String, dynamic>;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundImage: reply['profile_picture'] != null ? NetworkImage(reply['profile_picture']) : null,
-                          backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
-                          child: reply['profile_picture'] == null
-                              ? Text((reply['user_name'] ?? 'A')[0].toUpperCase(),
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
-                              : null,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(reply['user_name'] ?? 'User',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                              Text(reply['content'] ?? '', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
   void _recordView() {
     final id = widget.album['id'];
@@ -283,7 +218,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     }
   }
 
-  Future<void> _toggleLike() async {
+  void _toggleLike() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
@@ -292,34 +227,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       );
       return;
     }
-    final wasLiked = _isLiked;
-    final prevCount = _likeCount;
-    setState(() {
-      _isLiked = !wasLiked;
-      _likeCount = prevCount + (wasLiked ? -1 : 1);
-    });
-    try {
-      final result = await ApiService().toggleGalleryAlbumLike(widget.album['id'].toString());
-      if (mounted) {
-        List<Liker> likers = [];
-        if (result['recent_likers'] is List) {
-          likers = (result['recent_likers'] as List)
-              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
-              .toList();
-        }
-        setState(() {
-          _isLiked = result['is_liked'] == true;
-          _likeCount = result['like_count'] ?? _likeCount;
-          _recentLikers = likers;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isLiked = wasLiked;
-        _likeCount = prevCount;
-      });
-    }
+    _likeService.toggle(EntityType.gallery, widget.album['id']);
   }
 
   /// Enable screenshot and screen recording prevention
@@ -369,6 +277,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _commentController.dispose();
     _disableScreenProtection();
     super.dispose();
@@ -376,6 +285,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final likeState = _likeService.getState(EntityType.gallery, widget.album['id']);
     final photos = widget.album['photos'] as List? ?? [];
     final langCode = Localizations.localeOf(context).languageCode;
     final title = langCode == 'fr'
@@ -401,10 +311,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           // Like button
           IconButton(
             icon: Icon(
-              _isLiked ? Icons.favorite : Icons.favorite_border,
-              color: _isLiked ? Colors.red : Colors.white,
+              likeState.isLiked ? Icons.favorite : Icons.favorite_border,
+              color: likeState.isLiked ? Colors.red : Colors.white,
             ),
-            tooltip: _isLiked ? 'Unlike' : 'Like',
+            tooltip: likeState.isLiked ? 'Unlike' : 'Like',
             onPressed: _toggleLike,
           ),
         ],
@@ -414,18 +324,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           // Photo Grid with liked-by header
           Column(
             children: [
-              if (_recentLikers.isNotEmpty || _likeCount > 0)
+              if (likeState.recentLikers.isNotEmpty || likeState.likeCount > 0)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                   child: Row(
                     children: [
                       LikedByAvatars(
-                        likers: _recentLikers,
-                        totalLikes: _likeCount,
+                        likers: likeState.recentLikers,
+                        totalLikes: likeState.likeCount,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _likeCount == 1 ? '1 like' : '$_likeCount likes',
+                        likeState.likeCount == 1 ? '1 like' : '${likeState.likeCount} likes',
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                       const Spacer(),

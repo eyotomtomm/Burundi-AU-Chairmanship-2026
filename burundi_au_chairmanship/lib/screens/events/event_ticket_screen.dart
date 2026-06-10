@@ -155,7 +155,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                    colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                   ),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(20),
@@ -317,7 +317,7 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
                   ),
                 ),
                 child: Text(
-                  'Burundi Chairmanship 2025',
+                  'Be 4 Africa 2025',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

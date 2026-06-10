@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Production Deployment Script — Burundi Chairmanship Backend
+# Production Deployment Script — Be 4 Africa Backend
 # =============================================================================
 # Run this script on the production server or as part of CI/CD.
 # Usage: bash deploy.sh
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 echo "========================================="
-echo "  Burundi Chairmanship — Deploying..."
+echo "  Be 4 Africa — Deploying..."
 echo "========================================="
 
 # Ensure we're in the backend directory

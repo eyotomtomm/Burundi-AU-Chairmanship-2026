@@ -270,7 +270,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                     icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  backgroundColor: const Color(0xFF065A1A),
+                  backgroundColor: const Color(0xFF2D6E31),
                   flexibleSpace: FlexibleSpaceBar(
                     title: Text(
                       l10n.translate('weather'),
@@ -285,7 +285,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                          colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                         ),
                       ),
                     ),
@@ -318,7 +318,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                         icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                         onPressed: () => Navigator.pop(context),
                       ),
-                      backgroundColor: const Color(0xFF065A1A),
+                      backgroundColor: const Color(0xFF2D6E31),
                       flexibleSpace: FlexibleSpaceBar(
                         title: Text(
                           l10n.translate('weather'),
@@ -333,7 +333,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                              colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                             ),
                           ),
                         ),
@@ -402,7 +402,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    backgroundColor: const Color(0xFF065A1A),
+                    backgroundColor: const Color(0xFF2D6E31),
                     flexibleSpace: FlexibleSpaceBar(
                       title: Text(
                         l10n.translate('weather'),
@@ -426,7 +426,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                   gradient: LinearGradient(
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
-                                    colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                                    colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                                   ),
                                 ),
                               ),
@@ -437,7 +437,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 gradient: LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
-                                  colors: [AppColors.burundiGreen, Color(0xFF065A1A)],
+                                  colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
                                 ),
                               ),
                             ),
@@ -458,7 +458,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 end: Alignment.bottomRight,
                                 colors: [
                                   AppColors.burundiGreen.withValues(alpha: 0.7),
-                                  const Color(0xFF065A1A).withValues(alpha: 0.8),
+                                  const Color(0xFF2D6E31).withValues(alpha: 0.8),
                                 ],
                               ),
                             ),

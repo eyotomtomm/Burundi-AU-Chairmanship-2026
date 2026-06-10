@@ -305,8 +305,8 @@ REST_FRAMEWORK = {
 
 # ─── drf-spectacular (OpenAPI / Swagger) ──────────────────────
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Burundi Chairmanship API',
-    'DESCRIPTION': 'REST API for the Burundi Chairmanship 2026 mobile application',
+    'TITLE': 'Be 4 Africa API',
+    'DESCRIPTION': 'REST API for the Be 4 Africa 2026 mobile application',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
@@ -336,7 +336,7 @@ SESSION_SAVE_EVERY_REQUEST = True  # Refresh cookie Max-Age on every request
 # Setting it to True caused "Remember me" to be ignored in some edge cases.
 
 # ─── Custom Admin Settings ────────────────────────────────────
-CUSTOM_ADMIN_SITE_TITLE = 'Burundi Chairmanship 2026'
+CUSTOM_ADMIN_SITE_TITLE = 'Be 4 Africa 2026'
 CUSTOM_ADMIN_SITE_HEADER = 'Content Management System'
 
 # ─── Security Headers (always active) ────────────────────────
@@ -386,7 +386,7 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
-    'Burundi Chairmanship <info@burundi4africa.com>'
+    'Be 4 Africa <info@burundi4africa.com>'
 )
 
 # ─── IMAP Inbox (admin "Email Inbox" viewer) ─────────────────

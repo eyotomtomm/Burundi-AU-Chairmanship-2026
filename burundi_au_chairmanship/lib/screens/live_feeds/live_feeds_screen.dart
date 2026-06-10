@@ -67,10 +67,23 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         api.getLiveFeeds(status: 'recorded'),
       ]);
       if (!mounted) return;
+
+      // Move upcoming feeds whose scheduled time has passed to recorded
+      final now = DateTime.now();
+      final upcoming = <ApiLiveFeed>[];
+      final pastUpcoming = <ApiLiveFeed>[];
+      for (final feed in results[1]) {
+        if (feed.scheduledTime != null && feed.scheduledTime!.isBefore(now)) {
+          pastUpcoming.add(feed);
+        } else {
+          upcoming.add(feed);
+        }
+      }
+
       setState(() {
         _liveFeeds = results[0];
-        _upcomingFeeds = results[1];
-        _recordedFeeds = results[2];
+        _upcomingFeeds = upcoming;
+        _recordedFeeds = [...pastUpcoming, ...results[2]];
         _isLoading = false;
       });
     } catch (e) {
@@ -435,7 +448,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF8B1A1A), Color(0xFFCE1126)],
+                              colors: [Color(0xFF8B1A1A), Color(0xFFE11C23)],
                             ),
                           ),
                         ),
@@ -444,7 +457,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [Color(0xFF8B1A1A), Color(0xFFCE1126)],
+                              colors: [Color(0xFF8B1A1A), Color(0xFFE11C23)],
                             ),
                           ),
                           child: const Center(
@@ -457,7 +470,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF8B1A1A), Color(0xFFCE1126)],
+                            colors: [Color(0xFF8B1A1A), Color(0xFFE11C23)],
                           ),
                         ),
                         child: const Center(
@@ -1707,8 +1720,8 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
         title: feed.getTitle(langCode),
         description: feed.getDescription(langCode).isNotEmpty
             ? feed.getDescription(langCode)
-            : 'Burundi Chairmanship Live Event',
-        location: 'Burundi Chairmanship App - Live Feeds',
+            : 'Be 4 Africa Live Event',
+        location: 'Be 4 Africa App - Live Feeds',
         startDate: startTime,
         endDate: endTime,
         allDay: false,

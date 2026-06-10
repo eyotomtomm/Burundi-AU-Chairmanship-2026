@@ -48,6 +48,10 @@ class VerificationProvider extends ChangeNotifier {
             await _markStatusAsNew(requestId, status ?? '');
           }
         }
+      } else if (response['is_verified'] == true) {
+        // Admin verified user directly from backend without a verification request.
+        // Store the response so isProfileVerified returns true.
+        _verificationStatus = response;
       } else {
         _verificationStatus = null;
       }

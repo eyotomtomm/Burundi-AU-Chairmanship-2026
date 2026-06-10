@@ -40,6 +40,7 @@ router.register('contact-directory', views.ContactDirectoryViewSet, basename='co
 router.register('live-qa', views.LiveQAViewSet, basename='live-qa')
 router.register('onboarding-steps', views.OnboardingStepViewSet, basename='onboarding-step')
 router.register('event-agenda-items', views.EventAgendaItemViewSet, basename='event-agenda-item')
+router.register('youth-dialogue', views.YouthDialogueViewSet, basename='youth-dialogue')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -158,11 +159,18 @@ urlpatterns = [
     path('whats-new/', views.whats_new, name='whats-new'),
     path('events/<int:event_id>/comments/', views.event_comments, name='event-comments'),
     path('events/<int:event_id>/comments/<int:comment_id>/', views.event_comment_delete, name='event-comment-delete'),
+    path('events/<int:event_id>/comments/<int:comment_id>/edit/', views.event_comment_edit, name='event-comment-edit'),
+    path('events/<int:event_id>/comments/<int:comment_id>/toggle-like/', views.event_comment_toggle_like, name='event-comment-toggle-like'),
     path('events/<int:event_id>/attendees/', views.event_attendees, name='event-attendees'),
 
     # Newsletter
     path('newsletter/toggle/', views.toggle_newsletter, name='toggle-newsletter'),
+    path('newsletter/subscribe/', views.subscribe_newsletter, name='newsletter-subscribe'),
+    path('newsletter/check/', views.check_newsletter_subscription, name='newsletter-check'),
     path('newsletter/unsubscribe/<str:token>/', views.newsletter_unsubscribe, name='newsletter-unsubscribe'),
+
+    # Youth Dialogue Admin
+    path('youth-dialogue/admin/<int:app_id>/id-card-pdf/', views.yd_id_card_pdf, name='yd-id-card-pdf'),
 
     # Analytics API (admin only)
     path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),

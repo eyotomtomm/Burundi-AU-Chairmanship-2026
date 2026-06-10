@@ -35,6 +35,9 @@ class EventRegistrationModel {
   final int currentRegistrationCount;
   final int? spotsRemaining;
   final int? userSubmissionId;
+  final bool isLiked;
+  final int likeCount;
+  final List<Map<String, dynamic>> recentLikers;
 
   EventRegistrationModel({
     required this.id,
@@ -73,6 +76,9 @@ class EventRegistrationModel {
     this.isRegistrationOpen = true,
     this.currentRegistrationCount = 0,
     this.spotsRemaining,
+    this.isLiked = false,
+    this.likeCount = 0,
+    this.recentLikers = const [],
   });
 
   factory EventRegistrationModel.fromJson(Map<String, dynamic> json) {
@@ -116,6 +122,12 @@ class EventRegistrationModel {
       isRegistrationOpen: json['is_registration_open'] as bool? ?? true,
       currentRegistrationCount: json['current_registration_count'] as int? ?? 0,
       spotsRemaining: json['spots_remaining'] as int?,
+      isLiked: json['is_liked'] == true,
+      likeCount: json['like_count'] as int? ?? 0,
+      recentLikers: (json['recent_likers'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -180,6 +192,8 @@ class RegistrationFormField {
   final String validationRegex;
   final String helpText;
   final String helpTextFr;
+  final int? maxLength;
+  final int? minLength;
   final int order;
 
   RegistrationFormField({
@@ -196,6 +210,8 @@ class RegistrationFormField {
     this.validationRegex = '',
     this.helpText = '',
     this.helpTextFr = '',
+    this.maxLength,
+    this.minLength,
     this.order = 0,
   });
 
@@ -214,6 +230,8 @@ class RegistrationFormField {
       validationRegex: json['validation_regex'] as String? ?? '',
       helpText: json['help_text'] as String? ?? '',
       helpTextFr: json['help_text_fr'] as String? ?? '',
+      maxLength: json['max_length'] as int?,
+      minLength: json['min_length'] as int?,
       order: json['order'] as int? ?? 0,
     );
   }

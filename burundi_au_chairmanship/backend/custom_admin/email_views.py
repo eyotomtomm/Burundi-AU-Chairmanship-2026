@@ -51,7 +51,7 @@ def email_template_edit(request, pk):
             sample_data = {
                 'user_name': request.user.get_full_name() or request.user.username,
                 'user_email': request.user.email,
-                'app_name': 'Burundi Chairmanship',
+                'app_name': 'Be 4 Africa',
                 'action_url': 'https://burundi4africa.com',
                 'otp_code': '123456',
                 'event_name': 'Sample Event',
@@ -105,7 +105,7 @@ def email_template_preview(request, pk):
         'user_email': 'john@example.com',
         'otp_code': '123456',
         'expiry_minutes': '10',
-        'app_name': 'Burundi Chairmanship',
+        'app_name': 'Be 4 Africa',
         'badge_type': 'Gold',
         'event_name': 'Sample Event',
         'event_date': 'April 15, 2026',
@@ -143,7 +143,7 @@ def email_template_send_test(request, pk):
         'user_email': request.user.email,
         'otp_code': '123456',
         'expiry_minutes': '10',
-        'app_name': 'Burundi Chairmanship',
+        'app_name': 'Be 4 Africa',
         'badge_type': 'Gold',
         'event_name': 'AU Summit 2026',
         'event_date': 'April 15, 2026',
@@ -307,7 +307,7 @@ def email_campaign_send(request, pk):
         ctx = {
             'user_name': name or email.split('@')[0],
             'user_email': email,
-            'app_name': 'Burundi Chairmanship',
+            'app_name': 'Be 4 Africa',
         }
         subject = _render(campaign.subject, ctx)
         body = _render(campaign.body_html, ctx)

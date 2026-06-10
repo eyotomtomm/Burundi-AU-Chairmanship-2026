@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:add_2_calendar/add_2_calendar.dart' as cal;
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../config/app_colors.dart';
@@ -18,6 +19,9 @@ import '../../widgets/events/event_info_card.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/confetti_overlay.dart';
 import 'event_ticket_screen.dart';
+import '../../services/like_service.dart';
+import '../../widgets/liked_by_avatars.dart';
+import '../../widgets/comment_tile.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -38,6 +42,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final _proxyFormKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _formControllers = {};
   final Map<String, dynamic> _formValues = {};
+  final Map<String, File> _pickedFiles = {};
+  bool _isUploadingFiles = false;
 
   // Speakers
   List<Map<String, dynamic>> _speakers = [];
@@ -64,8 +70,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   bool _loadingAttendees = true;
 
   // Likes
-  bool _isLiked = false;
-  int _likeCount = 0;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   // Proxy form controllers
   final _proxyNameController = TextEditingController();
@@ -76,6 +82,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   void initState() {
     super.initState();
     _event = widget.event;
+    _likeService.seed(
+      EntityType.event, _event.id,
+      isLiked: _event.isLiked,
+      likeCount: _event.likeCount,
+      recentLikers: _event.recentLikers
+          .map((m) => Liker.fromJson(m))
+          .toList(),
+    );
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key == 'event:${_event.id}' && mounted) setState(() {});
+    });
     _initFormControllers();
     _startCountdown();
     _loadSpeakers();
@@ -92,7 +109,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     } catch (_) {}
   }
 
-  Future<void> _toggleLike() async {
+  void _toggleLike() {
     final auth = context.read<AuthProvider>();
     if (!auth.isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -100,31 +117,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       );
       return;
     }
-    final wasLiked = _isLiked;
-    final prevCount = _likeCount;
-    setState(() {
-      _isLiked = !wasLiked;
-      _likeCount = prevCount + (wasLiked ? -1 : 1);
-    });
-    try {
-      final result = await ApiService().toggleEventLike(_event.id);
-      if (mounted) {
-        setState(() {
-          _isLiked = result['is_liked'] == true;
-          _likeCount = result['like_count'] ?? _likeCount;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isLiked = wasLiked;
-        _likeCount = prevCount;
-      });
-    }
+    _likeService.toggle(EntityType.event, _event.id);
   }
 
   void _initFormControllers() {
-    const valueOnlyTypes = {'checkbox', 'select', 'radio', 'multi_checkbox', 'country'};
+    const valueOnlyTypes = {'checkbox', 'select', 'radio', 'multi_checkbox', 'country', 'file', 'image'};
     for (final field in _event.formFields) {
       if (!valueOnlyTypes.contains(field.fieldType)) {
         _formControllers[field.fieldName] = TextEditingController();
@@ -217,10 +214,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _countdownTimer?.cancel();
     for (final c in _formControllers.values) {
       c.dispose();
     }
+    _pickedFiles.clear();
     _commentController.dispose();
     _proxyNameController.dispose();
     _proxyEmailController.dispose();
@@ -250,8 +249,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             actions: [
               IconButton(
                 icon: Icon(
-                  _isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: _isLiked ? Colors.redAccent : Colors.white,
+                  _likeService.getState(EntityType.event, _event.id).isLiked ? Icons.favorite : Icons.favorite_border,
+                  color: _likeService.getState(EntityType.event, _event.id).isLiked ? Colors.redAccent : Colors.white,
                 ),
                 onPressed: _toggleLike,
               ),
@@ -339,6 +338,41 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     langCode: langCode,
                     isDark: isDark,
                   ),
+                  const SizedBox(height: 12),
+
+                  // Like row
+                  Builder(builder: (_) {
+                    final likeState = _likeService.getState(EntityType.event, _event.id);
+                    return GestureDetector(
+                      onTap: _toggleLike,
+                      child: Row(
+                        children: [
+                          Icon(
+                            likeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                            size: 22,
+                            color: likeState.isLiked ? Colors.redAccent : (isDark ? Colors.grey[400] : Colors.grey),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${likeState.likeCount}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: likeState.isLiked ? Colors.redAccent : (isDark ? Colors.grey[400] : Colors.grey),
+                            ),
+                          ),
+                          if (likeState.recentLikers.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            LikedByAvatars(
+                              likers: likeState.recentLikers,
+                              totalLikes: likeState.likeCount,
+                              avatarRadius: 10,
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 12),
 
                   // Multi-day event indicator
@@ -596,7 +630,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Burundi Chairmanship 2025',
+                              'Be 4 Africa 2025',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.7),
@@ -759,7 +793,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
+          colors: [Color(0xFF409843), Color(0xFF2D6E31)],
         ),
       ),
       child: const Center(
@@ -1330,13 +1364,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   disabledBackgroundColor: AppColors.burundiGreen.withValues(alpha: 0.5),
                 ),
                 child: _isSubmitting
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          ),
+                          if (_isUploadingFiles) ...[
+                            const SizedBox(width: 10),
+                            const Text('Uploading files...', style: TextStyle(fontSize: 14, color: Colors.white)),
+                          ],
+                        ],
                       )
                     : const Text(
                         'Register',
@@ -1362,9 +1405,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: TextFormField(
             controller: _formControllers[field.fieldName],
-            maxLines: 4,
+            maxLines: 6,
+            maxLength: field.maxLength,
             decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired),
-            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+            validator: (v) {
+              if (field.isRequired && (v == null || v.isEmpty)) return 'Required';
+              if (field.minLength != null && v != null && v.isNotEmpty && v.length < field.minLength!) {
+                return 'Minimum ${field.minLength} characters required';
+              }
+              return null;
+            },
           ),
         );
 
@@ -1568,6 +1618,101 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               }
             },
             validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+          ),
+        );
+
+      case 'file':
+      case 'image':
+        final pickedFile = _pickedFiles[field.fieldName];
+        final isImage = field.fieldType == 'image';
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: FormField<File>(
+            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+            initialValue: pickedFile,
+            builder: (state) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    field.isRequired ? '$label *' : label,
+                    style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+                  ),
+                  if (helpText.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
+                    ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      File? file;
+                      if (isImage) {
+                        final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+                        if (picked != null) file = File(picked.path);
+                      } else {
+                        final result = await FilePicker.platform.pickFiles();
+                        if (result != null && result.files.single.path != null) {
+                          file = File(result.files.single.path!);
+                        }
+                      }
+                      if (file != null) {
+                        setState(() => _pickedFiles[field.fieldName] = file!);
+                        state.didChange(file);
+                      }
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: state.hasError
+                              ? AppColors.burundiRed
+                              : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isImage ? Icons.image_outlined : Icons.attach_file,
+                            color: pickedFile != null ? AppColors.burundiGreen : (isDark ? Colors.white38 : Colors.black38),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              pickedFile != null
+                                  ? pickedFile.path.split('/').last
+                                  : (isImage ? 'Tap to select image' : 'Tap to select file'),
+                              style: TextStyle(
+                                color: pickedFile != null ? textColor : (isDark ? Colors.white38 : Colors.black38),
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (pickedFile != null)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() => _pickedFiles.remove(field.fieldName));
+                                state.didChange(null);
+                              },
+                              child: Icon(Icons.close, size: 18, color: isDark ? Colors.white38 : Colors.black38),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (state.hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 4),
+                      child: Text(state.errorText!, style: const TextStyle(color: AppColors.burundiRed, fontSize: 12)),
+                    ),
+                ],
+              );
+            },
           ),
         );
 
@@ -2041,7 +2186,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
 
     try {
-      await ApiService().submitEventRegistration(_event.id, formData);
+      // Upload picked files first
+      final uploadedFileUrls = <String>[];
+      if (_pickedFiles.isNotEmpty) {
+        setState(() => _isUploadingFiles = true);
+        for (final entry in _pickedFiles.entries) {
+          final result = await ApiService().uploadRegistrationFile(entry.value);
+          final url = result['url'] as String;
+          formData[entry.key] = url;
+          uploadedFileUrls.add(url);
+        }
+        if (!mounted) return;
+        setState(() => _isUploadingFiles = false);
+      }
+
+      await ApiService().submitEventRegistration(
+        _event.id,
+        formData,
+        uploadedFiles: uploadedFileUrls.isNotEmpty ? uploadedFileUrls : null,
+      );
       if (!mounted) return;
 
       // Refresh event data
@@ -2063,14 +2226,14 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         ),
       );
     } on ApiException catch (e) {
-      setState(() => _isSubmitting = false);
+      setState(() { _isSubmitting = false; _isUploadingFiles = false; });
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
       );
     } catch (e) {
-      setState(() => _isSubmitting = false);
+      setState(() { _isSubmitting = false; _isUploadingFiles = false; });
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2293,7 +2456,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             ),
           )
         else
-          ...topLevelComments.map((comment) => _buildCommentTile(comment, isDark, auth, isReply: false)),
+          ...topLevelComments.map((comment) {
+            final eventId = _event.id;
+            return CommentTile.fromMap(
+              comment,
+              isAuthenticated: auth.isAuthenticated,
+              onReply: () => setState(() {
+                _replyingToId = comment['id'];
+                _replyingToName = comment['user_name'];
+              }),
+              onDelete: () => _deleteComment(comment['id']),
+              onToggleLike: () => ApiService().toggleEventCommentLike(eventId, comment['id']),
+              onEdit: (content) => ApiService().editEventComment(eventId, comment['id'], content),
+              replyBuilder: (reply) => CommentTile.fromMap(
+                reply,
+                isReply: true,
+                isAuthenticated: auth.isAuthenticated,
+                onDelete: () => _deleteComment(reply['id']),
+                onToggleLike: () => ApiService().toggleEventCommentLike(eventId, reply['id']),
+                onEdit: (content) => ApiService().editEventComment(eventId, reply['id'], content),
+              ),
+            );
+          }),
 
         const SizedBox(height: 16),
       ],
@@ -2437,213 +2621,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     } finally {
       if (mounted) setState(() => _postingComment = false);
     }
-  }
-
-  Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark, AuthProvider auth, {required bool isReply}) {
-    final userName = comment['user_name'] ?? 'User';
-    final username = (comment['username'] as String?) ?? '';
-    final userId = comment['user_id'] as int?;
-    final content = comment['content'] ?? '';
-    final createdAt = comment['created_at'] as String?;
-    final profilePicture = comment['profile_picture'] as String?;
-    final badgeType = comment['badge_type'] as String?;
-    final replies = (comment['replies'] as List<dynamic>?) ?? [];
-    final replyCount = comment['reply_count'] ?? replies.length;
-    final commentId = comment['id'] as int?;
-    final isOwner = auth.isAuthenticated && userId == auth.userId;
-
-    String timeAgo = '';
-    if (createdAt != null) {
-      final dt = DateTime.tryParse(createdAt);
-      if (dt != null) {
-        final diff = DateTime.now().difference(dt);
-        if (diff.inDays > 0) {
-          timeAgo = '${diff.inDays}d ago';
-        } else if (diff.inHours > 0) {
-          timeAgo = '${diff.inHours}h ago';
-        } else if (diff.inMinutes > 0) {
-          timeAgo = '${diff.inMinutes}m ago';
-        } else {
-          timeAgo = 'Just now';
-        }
-      }
-    }
-
-    return Padding(
-      padding: EdgeInsets.only(left: isReply ? 40.0 : 0.0, bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: isReply ? 14 : 18,
-                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
-                backgroundImage: profilePicture != null && profilePicture.isNotEmpty
-                    ? CachedNetworkImageProvider(Environment.fixMediaUrl(profilePicture))
-                    : null,
-                child: profilePicture == null || profilePicture.isEmpty
-                    ? Text(
-                        userName[0].toUpperCase(),
-                        style: TextStyle(
-                          fontSize: isReply ? 11 : 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.burundiGreen,
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            userName,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: isReply ? 13 : 14,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ),
-                        if (badgeType != null && badgeType.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.verified,
-                            size: 14,
-                            color: badgeType == 'GOLD' ? const Color(0xFFD4AF37) : Colors.blue,
-                          ),
-                        ],
-                        if (username.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              '@$username',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? Colors.white54 : Colors.black54,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(width: 6),
-                        Text(
-                          '· $timeAgo',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? Colors.white30 : Colors.black38,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (isOwner && commentId != null)
-                          GestureDetector(
-                            onTap: () => _deleteComment(commentId),
-                            child: Icon(
-                              Icons.delete_outline,
-                              size: 16,
-                              color: isDark ? Colors.white24 : Colors.black26,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    _buildMentionRichText(content, isDark),
-                    const SizedBox(height: 6),
-                    if (!isReply && auth.isAuthenticated)
-                      GestureDetector(
-                        onTap: () => setState(() {
-                          _replyingToId = commentId;
-                          _replyingToName = userName;
-                        }),
-                        child: Text(
-                          'Reply',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.burundiGreen,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // Nested replies
-          if (!isReply && replies.isNotEmpty)
-            ...replies.map((reply) => _buildCommentTile(
-              reply as Map<String, dynamic>,
-              isDark,
-              auth,
-              isReply: true,
-            )),
-          // Show reply count if there are more
-          if (!isReply && replyCount > replies.length)
-            Padding(
-              padding: const EdgeInsets.only(left: 48, top: 4),
-              child: Text(
-                '${replyCount - replies.length} more replies...',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.burundiGreen,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// Build rich text with @mentions highlighted in blue
-  Widget _buildMentionRichText(String content, bool isDark) {
-    final mentionRegex = RegExp(r'@(\w+)');
-    final spans = <TextSpan>[];
-    int lastEnd = 0;
-
-    for (final match in mentionRegex.allMatches(content)) {
-      // Add text before the mention
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(
-          text: content.substring(lastEnd, match.start),
-        ));
-      }
-      // Add the mention in blue
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: const TextStyle(
-          color: Colors.blue,
-          fontWeight: FontWeight.w600,
-        ),
-      ));
-      lastEnd = match.end;
-    }
-
-    // Add remaining text after the last mention
-    if (lastEnd < content.length) {
-      spans.add(TextSpan(
-        text: content.substring(lastEnd),
-      ));
-    }
-
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(
-          fontSize: 14,
-          color: isDark ? Colors.white70 : Colors.black87,
-          height: 1.4,
-        ),
-        children: spans.isEmpty ? [TextSpan(text: content)] : spans,
-      ),
-    );
   }
 
   Future<void> _deleteComment(int commentId) async {
@@ -3097,7 +3074,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               child: Icon(
                                 Icons.verified,
                                 size: 14,
-                                color: badgeType == 'GOLD' ? const Color(0xFFD4AF37) : Colors.blue,
+                                color: badgeType == 'GOLD' ? const Color(0xFFD4AF37) : AppColors.burundiGreen,
                               ),
                             ),
                         ],

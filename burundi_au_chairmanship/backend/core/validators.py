@@ -1,5 +1,5 @@
 """
-File upload validators for the Burundi Chairmanship backend.
+File upload validators for the Be 4 Africa backend.
 """
 import re
 from django.core.exceptions import ValidationError

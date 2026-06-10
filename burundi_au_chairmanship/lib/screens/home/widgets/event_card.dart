@@ -195,6 +195,18 @@ class EventCard extends StatelessWidget {
     final venue = event.getVenue(langCode);
     final countdown = event.timeUntilEvent;
     final isPast = event.isEventPast;
+    final isFull = event.maxRegistrations > 0 &&
+        event.spotsRemaining != null &&
+        event.spotsRemaining! <= 0;
+    final isInactive = isPast || isFull;
+
+    // Greyscale colour matrix
+    const greyscaleMatrix = ColorFilter.matrix(<double>[
+      0.2126, 0.7152, 0.0722, 0, 0,
+      0.2126, 0.7152, 0.0722, 0, 0,
+      0.2126, 0.7152, 0.0722, 0, 0,
+      0,      0,      0,      1, 0,
+    ]);
 
     return GestureDetector(
       onTap: onTap,
@@ -216,34 +228,50 @@ class EventCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background image or gradient
-              if (event.eventPoster != null && event.eventPoster!.isNotEmpty)
-                CachedNetworkImage(
-                  imageUrl: Environment.fixMediaUrl(event.eventPoster!),
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => _gradientFallback(),
-                  errorWidget: (context, url, error) => _gradientFallback(),
-                )
-              else
-                _gradientFallback(),
+              // Background image + gradient — greyscale when past/full
+              ColorFiltered(
+                colorFilter: isInactive
+                    ? greyscaleMatrix
+                    : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (event.eventPoster != null && event.eventPoster!.isNotEmpty)
+                      CachedNetworkImage(
+                        imageUrl: Environment.fixMediaUrl(event.eventPoster!),
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => _gradientFallback(),
+                        errorWidget: (context, url, error) => _gradientFallback(),
+                      )
+                    else
+                      _gradientFallback(),
 
-              // Dark gradient overlay
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.1),
-                      Colors.black.withValues(alpha: 0.75),
-                    ],
-                    stops: const [0.3, 1.0],
-                  ),
+                    // Dark gradient overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.1),
+                            Colors.black.withValues(alpha: 0.75),
+                          ],
+                          stops: const [0.3, 1.0],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              // Countdown badge (top-right)
-              if (countdown != null || isPast)
+              // Extra dark overlay for past/full cards
+              if (isInactive)
+                Container(
+                  color: Colors.black.withValues(alpha: 0.35),
+                ),
+
+              // Countdown / status badge (top-right)
+              if (countdown != null || isPast || isFull)
                 Positioned(
                   top: 10,
                   right: 10,
@@ -252,16 +280,35 @@ class EventCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isPast
                           ? Colors.grey.shade700
-                          : AppColors.burundiRed,
+                          : isFull
+                              ? Colors.orange.shade700
+                              : AppColors.burundiRed,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      isPast ? 'Ended' : _formatCountdown(countdown!),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isPast || isFull) ...[
+                          Icon(
+                            isPast ? Icons.event_busy : Icons.block,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          isPast
+                              ? (langCode == 'fr' ? 'Terminé' : 'Ended')
+                              : isFull
+                                  ? (langCode == 'fr' ? 'Complet' : 'Full')
+                                  : _formatCountdown(countdown!),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -294,7 +341,7 @@ class EventCard extends StatelessWidget {
                     ),
                   ),
                 )
-              else if (event.isRegistrationEnabled && event.isRegistrationOpen && !isPast)
+              else if (event.isRegistrationEnabled && event.isRegistrationOpen && !isPast && !isFull)
                 Positioned(
                   top: 10,
                   left: 10,
@@ -302,12 +349,12 @@ class EventCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFCE1126), Color(0xFFE8334A)],
+                        colors: [Color(0xFFE11C23), Color(0xFFE8404A)],
                       ),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFCE1126).withValues(alpha: 0.4),
+                          color: const Color(0xFFE11C23).withValues(alpha: 0.4),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -392,7 +439,7 @@ class EventCard extends StatelessWidget {
                           ],
                         ),
                       ],
-                      if (event.isRegistrationEnabled && event.isRegistrationOpen && !isPast && event.registrationDeadline != null) ...[
+                      if (event.isRegistrationEnabled && event.isRegistrationOpen && !isPast && !isFull && event.registrationDeadline != null) ...[
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -430,7 +477,7 @@ class EventCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
+          colors: [Color(0xFF409843), Color(0xFF2D6E31)],
         ),
       ),
       child: const Center(

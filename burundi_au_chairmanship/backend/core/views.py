@@ -16,6 +16,7 @@ from rest_framework.decorators import api_view, permission_classes, action, thro
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
@@ -46,6 +47,10 @@ from .models import (
     DeviceToken, NotificationEvent,
     # Engagement models
     EventLike, DiscussionLike, VideoComment, GalleryComment, AppOpenEvent,
+    ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
+    GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
+    # Youth Dialogue
+    YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
 )
 from .serializers import (
     get_recent_likers,
@@ -80,6 +85,9 @@ from .serializers import (
     EventCommentSerializer, NewsletterEditionSerializer, EventAttendeeSerializer,
     EventAgendaItemSerializer, VideoChapterSerializer,
     VideoCommentSerializer, GalleryCommentSerializer,
+    # Youth Dialogue
+    YouthDialogueApplicationCreateSerializer, YouthDialogueApplicationStatusSerializer,
+    YouthDialogueDocumentSerializer, YouthDialogueCredentialSerializer,
 )
 
 
@@ -474,14 +482,14 @@ def deactivate_account(request):
     # Send confirmation email
     try:
         send_mail(
-            subject='Burundi4Africa - Account Deactivated',
+            subject='B4Africa - Account Deactivated',
             message=(
                 f'Hello {user.first_name or user.username},\n\n'
-                'Your Burundi Chairmanship 2026 account has been deactivated.\n\n'
+                'Your Be 4 Africa account has been deactivated.\n\n'
                 'Your data is safe and your account is just paused. '
                 'You can reactivate it anytime by simply logging back in.\n\n'
                 'If you did not request this, please contact us immediately.\n\n'
-                'Best regards,\nBurundi4Africa Team'
+                'Best regards,\nB4Africa Team'
             ),
             from_email=django_settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
@@ -523,15 +531,15 @@ def delete_account(request):
     deletion_date = profile.deletion_scheduled_for.strftime('%B %d, %Y')
     try:
         send_mail(
-            subject='Burundi4Africa - Account Deletion Scheduled',
+            subject='B4Africa - Account Deletion Scheduled',
             message=(
                 f'Hello {user.first_name or user.username},\n\n'
-                'Your Burundi Chairmanship 2026 account has been scheduled for permanent deletion.\n\n'
+                'Your Be 4 Africa account has been scheduled for permanent deletion.\n\n'
                 f'Your data will be permanently removed on {deletion_date}.\n\n'
                 'Changed your mind? Simply log back in before that date to cancel '
                 'the deletion and reactivate your account.\n\n'
                 'If you did not request this, please contact us immediately.\n\n'
-                'Best regards,\nBurundi4Africa Team'
+                'Best regards,\nB4Africa Team'
             ),
             from_email=django_settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
@@ -1304,6 +1312,46 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
+            permission_classes=[IsAuthenticated])
+    def edit_comment(self, request, pk=None, comment_id=None):
+        from django.utils.html import escape
+        try:
+            comment = MagazineComment.objects.get(pk=comment_id, edition_id=pk)
+        except MagazineComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user:
+            return Response({'detail': 'You can only edit your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if (timezone.now() - comment.created_at).total_seconds() > 120:
+            return Response({'detail': 'Edit window has expired (2 minutes).'}, status=status.HTTP_403_FORBIDDEN)
+        content = request.data.get('content', '').strip()
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        comment.content = escape(content)
+        comment.updated_at = timezone.now()
+        comment.save(update_fields=['content', 'updated_at'])
+        return Response(MagazineCommentSerializer(comment, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
+            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_comment_like(self, request, pk=None, comment_id=None):
+        try:
+            comment = MagazineComment.objects.get(pk=comment_id, edition_id=pk)
+        except MagazineComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        like, created = MagazineCommentLike.objects.get_or_create(user=request.user, comment=comment)
+        if not created:
+            like.delete()
+            MagazineComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            MagazineComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        comment.refresh_from_db()
+        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view categories"""
@@ -1317,7 +1365,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can read articles, but authentication required to like/comment"""
     permission_classes = [AllowAny]
     serializer_class = ArticleSerializer
-    filterset_fields = ['category', 'is_featured']
+    filterset_fields = ['category', 'is_featured', 'content_type']
 
     def get_queryset(self):
         now = timezone.now()
@@ -1353,12 +1401,13 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='related', permission_classes=[AllowAny])
     def related(self, request, pk=None):
-        """Get related articles in the same category, excluding the current article."""
+        """Get related articles in the same category and content_type, excluding the current article."""
         article = self.get_object()
         now = timezone.now()
         related_qs = Article.objects.select_related('category').prefetch_related('media').filter(
             is_draft=False,
             status='published',
+            content_type=article.content_type,
         ).exclude(
             scheduled_publish_at__gt=now,
         ).exclude(
@@ -1506,8 +1555,48 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
         if comment.user != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
-        comment.delete()  # CASCADE deletes any replies too
+        comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
+            permission_classes=[IsAuthenticated])
+    def edit_comment(self, request, pk=None, comment_id=None):
+        from django.utils.html import escape
+        try:
+            comment = ArticleComment.objects.get(pk=comment_id, article_id=pk)
+        except ArticleComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user:
+            return Response({'detail': 'You can only edit your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if (timezone.now() - comment.created_at).total_seconds() > 120:
+            return Response({'detail': 'Edit window has expired (2 minutes).'}, status=status.HTTP_403_FORBIDDEN)
+        content = request.data.get('content', '').strip()
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        comment.content = escape(content)
+        comment.updated_at = timezone.now()
+        comment.save(update_fields=['content', 'updated_at'])
+        return Response(ArticleCommentSerializer(comment, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
+            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_comment_like(self, request, pk=None, comment_id=None):
+        try:
+            comment = ArticleComment.objects.get(pk=comment_id, article_id=pk)
+        except ArticleComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        like, created = ArticleCommentLike.objects.get_or_create(user=request.user, comment=comment)
+        if not created:
+            like.delete()
+            ArticleComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            ArticleComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        comment.refresh_from_db()
+        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
@@ -1615,7 +1704,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         ics_content = (
             "BEGIN:VCALENDAR\r\n"
             "VERSION:2.0\r\n"
-            "PRODID:-//Burundi Chairmanship//Events//EN\r\n"
+            "PRODID:-//Be 4 Africa//Events//EN\r\n"
             "CALSCALE:GREGORIAN\r\n"
             "METHOD:PUBLISH\r\n"
             "BEGIN:VEVENT\r\n"
@@ -1828,6 +1917,46 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
+            permission_classes=[IsAuthenticated])
+    def edit_comment(self, request, pk=None, comment_id=None):
+        from django.utils.html import escape
+        try:
+            comment = GalleryComment.objects.get(pk=comment_id, album_id=pk)
+        except GalleryComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user:
+            return Response({'detail': 'You can only edit your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if (timezone.now() - comment.created_at).total_seconds() > 120:
+            return Response({'detail': 'Edit window has expired (2 minutes).'}, status=status.HTTP_403_FORBIDDEN)
+        content = request.data.get('content', '').strip()
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        comment.content = escape(content)
+        comment.updated_at = timezone.now()
+        comment.save(update_fields=['content', 'updated_at'])
+        return Response(GalleryCommentSerializer(comment, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
+            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_comment_like(self, request, pk=None, comment_id=None):
+        try:
+            comment = GalleryComment.objects.get(pk=comment_id, album_id=pk)
+        except GalleryComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        like, created = GalleryCommentLike.objects.get_or_create(user=request.user, comment=comment)
+        if not created:
+            like.delete()
+            GalleryComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            GalleryComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        comment.refresh_from_db()
+        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+
 
 class VideoViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view videos, authentication required to like"""
@@ -1935,6 +2064,46 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
+            permission_classes=[IsAuthenticated])
+    def edit_comment(self, request, pk=None, comment_id=None):
+        from django.utils.html import escape
+        try:
+            comment = VideoComment.objects.get(pk=comment_id, video_id=pk)
+        except VideoComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user:
+            return Response({'detail': 'You can only edit your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if (timezone.now() - comment.created_at).total_seconds() > 120:
+            return Response({'detail': 'Edit window has expired (2 minutes).'}, status=status.HTTP_403_FORBIDDEN)
+        content = request.data.get('content', '').strip()
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        comment.content = escape(content)
+        comment.updated_at = timezone.now()
+        comment.save(update_fields=['content', 'updated_at'])
+        return Response(VideoCommentSerializer(comment, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
+            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_comment_like(self, request, pk=None, comment_id=None):
+        try:
+            comment = VideoComment.objects.get(pk=comment_id, video_id=pk)
+        except VideoComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        like, created = VideoCommentLike.objects.get_or_create(user=request.user, comment=comment)
+        if not created:
+            like.delete()
+            VideoComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            VideoComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        comment.refresh_from_db()
+        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
 
 
 class SocialMediaLinkViewSet(viewsets.ReadOnlyModelViewSet):
@@ -2246,8 +2415,10 @@ def home_feed(request):
         from django.db.models import Value, BooleanField
         base_articles = base_articles.annotate(is_liked=Value(False, output_field=BooleanField()))
 
-    featured_articles = base_articles.filter(is_featured=True)[:5]
-    articles = base_articles[:10]  # Already ordered by -publish_date
+    featured_articles = base_articles.filter(is_featured=True, content_type='article')[:5]
+    featured_news = base_articles.filter(is_featured=True, content_type='news')[:5]
+    articles = base_articles.filter(content_type='article')[:10]
+    news_items = base_articles.filter(content_type='news')[:10]
     feature_cards = FeatureCard.objects.filter(is_active=True).prefetch_related(
         'key_point_items', 'impact_area_items', 'media',
     )
@@ -2323,7 +2494,9 @@ def home_feed(request):
     data = {
         'hero_slides': HeroSlideSerializer(hero_slides, many=True, context={'request': request}).data,
         'featured_articles': ArticleSerializer(featured_articles, many=True, context={'request': request}).data,
+        'featured_news': ArticleSerializer(featured_news, many=True, context={'request': request}).data,
         'articles': ArticleSerializer(articles, many=True, context={'request': request}).data,
+        'news_items': ArticleSerializer(news_items, many=True, context={'request': request}).data,
         'feature_cards': FeatureCardSerializer(feature_cards, many=True, context={'request': request}).data,
         'event_cards': all_event_cards,
         'magazines': MagazineEditionSerializer(magazines, many=True, context={'request': request}).data,
@@ -2347,6 +2520,7 @@ def search_articles(request):
     """
     query = request.GET.get('q', '').strip()
     lang = request.GET.get('lang', 'en')
+    content_type_filter = request.GET.get('content_type', '').strip()
 
     if not query or len(query) < 2:
         return Response({'results': [], 'count': 0})
@@ -2358,6 +2532,9 @@ def search_articles(request):
     ).select_related('category').prefetch_related('media').annotate(
         comment_count=Count('comments', distinct=True),
     )
+
+    if content_type_filter in ('article', 'news'):
+        articles = articles.filter(content_type=content_type_filter)
 
     # Add is_liked annotation if authenticated
     if request.user.is_authenticated:
@@ -2619,7 +2796,7 @@ class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
         ics_content = (
             "BEGIN:VCALENDAR\r\n"
             "VERSION:2.0\r\n"
-            "PRODID:-//Burundi Chairmanship//Events//EN\r\n"
+            "PRODID:-//Be 4 Africa//Events//EN\r\n"
             "CALSCALE:GREGORIAN\r\n"
             "METHOD:PUBLISH\r\n"
             "BEGIN:VEVENT\r\n"
@@ -2703,7 +2880,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Burundi Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -2746,7 +2923,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Burundi Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
     </div>
   </div>
 </div>
@@ -2756,7 +2933,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                 plain_message = f"Dear {user.get_full_name() or user.username},\n\nThank you for registering for {event_reg.event_title}.\n\n"
                 if event_reg.confirmation_message:
                     plain_message += f"{event_reg.confirmation_message}\n\n"
-                plain_message += "Best regards,\nBurundi Chairmanship Team"
+                plain_message += "Best regards,\nBe 4 Africa Team"
 
                 send_mail(
                     subject=subject,
@@ -2869,6 +3046,17 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         if not event_reg.allow_proxy_registration:
             return Response({'detail': 'Proxy registration is not allowed for this event.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Feature 2: Proxy duplicate detection
+        if EventSubmission.objects.filter(
+            event_registration=event_reg,
+            proxy_email__iexact=data['proxy_email'],
+            is_proxy=True,
+        ).exists():
+            return Response(
+                {'detail': 'This person has already been registered for this event.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         submission = EventSubmission.objects.create(
             event_registration=event_reg,
             user=request.user,
@@ -2878,7 +3066,126 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             proxy_phone=data.get('proxy_phone', ''),
             form_data=data.get('form_data', {}),
         )
+
+        # Feature 3: Send confirmation email to proxy recipient
+        if event_reg.send_confirmation_email and data['proxy_email']:
+            try:
+                registrant_name = request.user.get_full_name() or request.user.username
+                proxy_name = data['proxy_name']
+                subject = f'Registration Confirmation: {event_reg.event_title}'
+
+                html_message = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 12px;">
+        Dear <strong>{proxy_name}</strong>,
+      </p>
+      <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+        This registration was submitted on your behalf by <strong>{registrant_name}</strong> for <strong>{event_reg.event_title}</strong>. Your registration has been received and is being processed.
+      </p>
+      <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
+        <h3 style="color:#2d3748;font-size:14px;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px;">Event Details</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Event</td><td style="padding:6px 0;color:#2d3748;font-size:14px;font-weight:600;">{event_reg.event_title}</td></tr>'''
+
+                if event_reg.event_date:
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Date</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{event_reg.event_date.strftime("%B %d, %Y at %H:%M")}</td></tr>'''
+                if event_reg.venue:
+                    html_message += f'''
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Venue</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{event_reg.venue}</td></tr>'''
+
+                html_message += '''
+        </table>
+      </div>'''
+
+                if event_reg.confirmation_message:
+                    html_message += f'''
+      <div style="background:#fffff0;border-left:4px solid #ecc94b;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+        <p style="color:#744210;font-size:14px;line-height:1.6;margin:0;">{event_reg.confirmation_message}</p>
+      </div>'''
+
+                html_message += f'''
+      <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+      </p>
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>'''
+
+                plain_message = f"Dear {proxy_name},\n\nThis registration was submitted on your behalf by {registrant_name} for {event_reg.event_title}.\n\n"
+                if event_reg.confirmation_message:
+                    plain_message += f"{event_reg.confirmation_message}\n\n"
+                plain_message += "Best regards,\nBe 4 Africa Team"
+
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=django_settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[data['proxy_email']],
+                    html_message=html_message,
+                    fail_silently=True,
+                )
+            except Exception:
+                pass  # Don't fail registration if email fails
+
         return Response(EventSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='upload-file', parser_classes=[MultiPartParser, FormParser])
+    def upload_file(self, request):
+        """Upload a file for event registration form fields."""
+        import uuid
+        from django.core.files.storage import default_storage
+
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'detail': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate extension
+        ext = file_obj.name.rsplit('.', 1)[-1].lower() if '.' in file_obj.name else ''
+        allowed_extensions = django_settings.ALLOWED_IMAGE_EXTENSIONS + django_settings.ALLOWED_DOCUMENT_EXTENSIONS
+        if ext not in allowed_extensions:
+            return Response(
+                {'detail': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate size
+        is_image = ext in django_settings.ALLOWED_IMAGE_EXTENSIONS
+        max_size = django_settings.MAX_IMAGE_SIZE if is_image else django_settings.MAX_DOCUMENT_SIZE
+        if file_obj.size > max_size:
+            max_mb = max_size / (1024 * 1024)
+            return Response(
+                {'detail': f'File too large. Maximum size is {max_mb:.0f}MB.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save file
+        filename = f"registration_files/{uuid.uuid4().hex}_{file_obj.name}"
+        saved_path = default_storage.save(filename, file_obj)
+        file_url = default_storage.url(saved_path)
+
+        return Response({
+            'url': file_url,
+            'filename': file_obj.name,
+            'size': file_obj.size,
+        }, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET'])
@@ -3667,6 +3974,59 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             'like_count': discussion.like_count,
             'is_liked': is_liked,
         })
+
+    @action(detail=True, methods=['delete'], url_path='replies/(?P<reply_id>[0-9]+)')
+    def delete_reply(self, request, pk=None, reply_id=None):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            reply = DiscussionReply.objects.get(pk=reply_id, discussion_id=pk)
+        except DiscussionReply.DoesNotExist:
+            return Response({'detail': 'Reply not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if reply.author != request.user and not request.user.is_staff:
+            return Response({'detail': 'You can only delete your own replies.'}, status=status.HTTP_403_FORBIDDEN)
+        reply.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['patch'], url_path='replies/(?P<reply_id>[0-9]+)/edit',
+            permission_classes=[IsAuthenticated])
+    def edit_reply(self, request, pk=None, reply_id=None):
+        from django.utils.html import escape
+        try:
+            reply = DiscussionReply.objects.get(pk=reply_id, discussion_id=pk)
+        except DiscussionReply.DoesNotExist:
+            return Response({'detail': 'Reply not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if reply.author != request.user:
+            return Response({'detail': 'You can only edit your own replies.'}, status=status.HTTP_403_FORBIDDEN)
+        if (timezone.now() - reply.created_at).total_seconds() > 120:
+            return Response({'detail': 'Edit window has expired (2 minutes).'}, status=status.HTTP_403_FORBIDDEN)
+        content = request.data.get('content', '').strip()
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        reply.content = escape(content)
+        reply.updated_at = timezone.now()
+        reply.save(update_fields=['content', 'updated_at'])
+        return Response(DiscussionReplySerializer(reply, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='replies/(?P<reply_id>[0-9]+)/toggle-like',
+            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_reply_like(self, request, pk=None, reply_id=None):
+        try:
+            reply = DiscussionReply.objects.get(pk=reply_id, discussion_id=pk)
+        except DiscussionReply.DoesNotExist:
+            return Response({'detail': 'Reply not found.'}, status=status.HTTP_404_NOT_FOUND)
+        like, created = DiscussionReplyLike.objects.get_or_create(user=request.user, comment=reply)
+        if not created:
+            like.delete()
+            DiscussionReply.objects.filter(pk=reply.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            DiscussionReply.objects.filter(pk=reply.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        reply.refresh_from_db()
+        return Response({'is_liked': is_liked, 'like_count': reply.like_count})
 
 
 class PollViewSet(viewsets.ReadOnlyModelViewSet):
@@ -4468,6 +4828,45 @@ def event_comment_delete(request, event_id, comment_id):
     return Response({'message': 'Comment deleted'}, status=204)
 
 
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def event_comment_edit(request, event_id, comment_id):
+    """Edit own comment on an event within 2-minute window."""
+    from django.utils.html import escape
+    comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
+    if comment.user != request.user:
+        return Response({'detail': 'You can only edit your own comments.'}, status=403)
+    if (timezone.now() - comment.created_at).total_seconds() > 120:
+        return Response({'detail': 'Edit window has expired (2 minutes).'}, status=403)
+    content = request.data.get('content', '').strip()
+    if len(content) < 2:
+        return Response({'detail': 'Comment too short (min 2 characters).'}, status=400)
+    if len(content) > 5000:
+        return Response({'detail': 'Comment too long (max 5000 characters).'}, status=400)
+    comment.content = escape(content)
+    comment.updated_at = timezone.now()
+    comment.save(update_fields=['content', 'updated_at'])
+    return Response(EventCommentSerializer(comment, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@throttle_classes([LikeToggleThrottle])
+def event_comment_toggle_like(request, event_id, comment_id):
+    """Toggle like on an event comment."""
+    comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
+    like, created = EventCommentLike.objects.get_or_create(user=request.user, comment=comment)
+    if not created:
+        like.delete()
+        EventComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
+        is_liked = False
+    else:
+        EventComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
+        is_liked = True
+    comment.refresh_from_db()
+    return Response({'is_liked': is_liked, 'like_count': comment.like_count})
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def event_attendees(request, event_id):
@@ -4494,6 +4893,68 @@ def toggle_newsletter(request):
         profile.receives_newsletter = bool(receives)
         profile.save(update_fields=['receives_newsletter'])
     return Response({'receives_newsletter': profile.receives_newsletter})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def subscribe_newsletter(request):
+    """Subscribe to the monthly newsletter with contact details."""
+    from core.models import NewsletterSubscriber
+
+    name = (request.data.get('name') or '').strip()
+    email = (request.data.get('email') or '').strip()
+    phone_number = (request.data.get('phone_number') or '').strip()
+
+    if not name or not email:
+        return Response(
+            {'detail': 'Name and email are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Link to authenticated user if available
+    user = request.user if request.user.is_authenticated else None
+
+    # Check if already subscribed
+    existing = NewsletterSubscriber.objects.filter(email__iexact=email).first()
+    if existing:
+        # Re-activate if previously unsubscribed, update details
+        existing.name = name
+        existing.phone_number = phone_number
+        existing.is_active = True
+        if user and not existing.user:
+            existing.user = user
+        existing.save()
+        return Response({'detail': 'Subscription updated successfully.', 'subscribed': True})
+
+    NewsletterSubscriber.objects.create(
+        user=user,
+        name=name,
+        email=email,
+        phone_number=phone_number,
+    )
+
+    # Also update profile newsletter flag if authenticated
+    if user and hasattr(user, 'profile'):
+        user.profile.receives_newsletter = True
+        user.profile.save(update_fields=['receives_newsletter'])
+
+    return Response({'detail': 'Subscribed successfully!', 'subscribed': True}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def check_newsletter_subscription(request):
+    """Check if the current user is already subscribed to the newsletter."""
+    from core.models import NewsletterSubscriber
+
+    if not request.user.is_authenticated:
+        return Response({'subscribed': False})
+
+    email = request.user.email
+    subscribed = NewsletterSubscriber.objects.filter(
+        email__iexact=email, is_active=True
+    ).exists()
+    return Response({'subscribed': subscribed})
 
 
 @api_view(['GET'])
@@ -4630,7 +5091,7 @@ def article_share_card(request, pk):
     <meta property="og:image" content="{safe_image}" />
     <meta property="og:url" content="{safe_share}" />
     <meta property="og:type" content="article" />
-    <meta property="og:site_name" content="Burundi Chairmanship" />
+    <meta property="og:site_name" content="Be 4 Africa" />
 
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -4764,3 +5225,396 @@ def translation_queue_detail(request, pk):
             serializer.save()
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YOUTH DIALOGUE
+# ═══════════════════════════════════════════════════════════════
+
+def _send_yd_admin_notification(application):
+    """Send admin notification email when a new Youth Dialogue application is submitted."""
+    try:
+        admin_emails = getattr(django_settings, 'YD_ADMIN_EMAILS', [])
+        if not admin_emails:
+            admin_emails = list(
+                User.objects.filter(is_staff=True, is_active=True)
+                .exclude(email='')
+                .values_list('email', flat=True)[:5]
+            )
+        if not admin_emails:
+            return
+
+        subject = f'New Youth Dialogue Application: {application.first_name} {application.last_name}'
+        html_message = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;">New Youth Dialogue Application</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+    </div>
+    <div style="padding:32px;">
+      <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Name</td><td style="padding:6px 0;color:#2d3748;font-size:14px;font-weight:600;">{application.first_name} {application.last_name}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Email</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.email}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Nationality</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.get_nationality_display()}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Organization</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.organization}</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;font-size:14px;">Position</td><td style="padding:6px 0;color:#2d3748;font-size:14px;">{application.position}</td></tr>
+        </table>
+      </div>
+      <p style="color:#4a5568;font-size:14px;">Review this application in the admin panel.</p>
+    </div>
+  </div>
+</div>
+</body></html>'''
+
+        def _send():
+            send_mail(
+                subject, '', django_settings.DEFAULT_FROM_EMAIL,
+                admin_emails, html_message=html_message, fail_silently=True,
+            )
+        threading.Thread(target=_send, daemon=True).start()
+    except Exception:
+        pass
+
+
+def _send_yd_applicant_email(application, subject, heading, badge_color, body_html):
+    """Send branded email to Youth Dialogue applicant."""
+    try:
+        if not application.email:
+            return
+        html_message = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;">{heading}</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Youth Dialogue Programme</p>
+    </div>
+    <div style="padding:32px;">
+      <div style="display:inline-block;background:{badge_color};color:white;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;margin:0 0 20px;">{application.get_status_display().upper()}</div>
+      <p style="color:#2d3748;font-size:16px;margin:0 0 20px;">Dear <strong>{application.first_name}</strong>,</p>
+      {body_html}
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Be 4 Africa 2026</p>
+    </div>
+  </div>
+</div>
+</body></html>'''
+
+        def _send():
+            send_mail(
+                subject, '', django_settings.DEFAULT_FROM_EMAIL,
+                [application.email], html_message=html_message, fail_silently=True,
+            )
+        threading.Thread(target=_send, daemon=True).start()
+    except Exception:
+        pass
+
+
+class YouthDialogueViewSet(viewsets.GenericViewSet):
+    """Youth Dialogue application pipeline endpoints."""
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['post'], url_path='apply')
+    def apply(self, request):
+        """Submit a Youth Dialogue application."""
+        serializer = YouthDialogueApplicationCreateSerializer(
+            data=request.data, context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        app = serializer.save(user=request.user, status='submitted')
+
+        # Log activity
+        YouthDialogueActivityLog.objects.create(
+            user=request.user, application=app, action='form_submitted',
+            screen_name='youth_dialogue_apply',
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+        )
+
+        # Notify admins
+        _send_yd_admin_notification(app)
+
+        return Response(
+            {'detail': 'Application submitted successfully.', 'id': app.id},
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=['get'], url_path='status')
+    def get_status(self, request):
+        """Return the user's application status, documents, and credential availability."""
+        try:
+            app = YouthDialogueApplication.objects.prefetch_related('documents').get(user=request.user)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'has_application': False})
+
+        data = YouthDialogueApplicationStatusSerializer(app, context={'request': request}).data
+        data['has_application'] = True
+        return Response(data)
+
+    @action(detail=False, methods=['post'], url_path='upload-document',
+            parser_classes=[MultiPartParser, FormParser])
+    def upload_document(self, request):
+        """Upload a document for the user's Youth Dialogue application."""
+        try:
+            app = YouthDialogueApplication.objects.get(user=request.user)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        allowed_statuses = ('accepted', 'documents_pending', 'documents_rejected')
+        if app.status not in allowed_statuses:
+            return Response(
+                {'detail': 'Document upload not allowed at this stage.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        uploaded_file = request.FILES.get('file')
+        doc_type = request.data.get('document_type', 'other')
+        replaces_id = request.data.get('replaces')
+
+        if not uploaded_file:
+            return Response({'detail': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate file size (10MB max)
+        if uploaded_file.size > 10 * 1024 * 1024:
+            return Response({'detail': 'File too large. Maximum 10MB.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        doc = YouthDialogueDocument(
+            application=app,
+            document_type=doc_type,
+            file=uploaded_file,
+            original_filename=uploaded_file.name,
+            file_size=uploaded_file.size,
+        )
+
+        if replaces_id:
+            try:
+                old_doc = YouthDialogueDocument.objects.get(id=replaces_id, application=app)
+                doc.is_resubmission = True
+                doc.replaces = old_doc
+            except YouthDialogueDocument.DoesNotExist:
+                pass
+
+        doc.save()
+
+        # Auto-transition to documents_pending
+        if app.status in ('accepted', 'documents_rejected'):
+            app.status = 'documents_pending'
+            app.save(update_fields=['status', 'updated_at'])
+
+        # Log activity
+        YouthDialogueActivityLog.objects.create(
+            user=request.user, application=app, action='document_uploaded',
+            screen_name='youth_dialogue_documents',
+            metadata={'document_type': doc_type, 'filename': uploaded_file.name},
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+        )
+
+        return Response(
+            YouthDialogueDocumentSerializer(doc).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=['post'], url_path='submit-documents')
+    def submit_documents(self, request):
+        """Mark documents as submitted for review."""
+        try:
+            app = YouthDialogueApplication.objects.get(user=request.user)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if app.status not in ('documents_pending', 'documents_rejected'):
+            return Response(
+                {'detail': 'Cannot submit documents at this stage.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check that required document types exist
+        existing_types = set(
+            app.documents.filter(status__in=('pending', 'approved'))
+            .values_list('document_type', flat=True)
+        )
+        required = {'passport', 'national_id', 'photo', 'cv'}
+        missing = required - existing_types
+        if missing:
+            labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
+            missing_names = [labels.get(m, m) for m in missing]
+            return Response(
+                {'detail': f'Missing required documents: {", ".join(missing_names)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        app.status = 'documents_submitted'
+        app.save(update_fields=['status', 'updated_at'])
+
+        return Response({'detail': 'Documents submitted for review.'})
+
+    @action(detail=False, methods=['get'], url_path='credential')
+    def credential(self, request):
+        """Return credential data for the user's issued ID card."""
+        try:
+            app = YouthDialogueApplication.objects.get(user=request.user)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if app.status != 'credential_issued' or not app.participant_code:
+            return Response(
+                {'detail': 'Credential not yet issued.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            YouthDialogueCredentialSerializer(app, context={'request': request}).data
+        )
+
+    @action(detail=False, methods=['get'], url_path='eligibility')
+    def eligibility(self, request):
+        """Check if the user is eligible for Youth Dialogue features (Quick Access filtering)."""
+        try:
+            app = YouthDialogueApplication.objects.get(user=request.user)
+            eligible_statuses = (
+                'accepted', 'documents_pending', 'documents_submitted',
+                'documents_under_review', 'documents_rejected', 'credential_issued',
+            )
+            return Response({
+                'eligible': app.status in eligible_statuses,
+                'status': app.status,
+                'has_credential': app.status == 'credential_issued' and bool(app.participant_code),
+            })
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({
+                'eligible': False,
+                'status': None,
+                'has_credential': False,
+            })
+
+    @action(detail=False, methods=['post'], url_path='log-activity')
+    def log_activity(self, request):
+        """Log a Youth Dialogue activity entry."""
+        action_name = request.data.get('action', '')
+        screen_name = request.data.get('screen_name', '')
+        metadata = request.data.get('metadata', {})
+
+        valid_actions = dict(YouthDialogueActivityLog.ACTION_CHOICES).keys()
+        if action_name not in valid_actions:
+            return Response({'detail': 'Invalid action.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        app = YouthDialogueApplication.objects.filter(user=request.user).first()
+
+        YouthDialogueActivityLog.objects.create(
+            user=request.user,
+            application=app,
+            action=action_name,
+            screen_name=screen_name,
+            metadata=metadata if isinstance(metadata, dict) else {},
+            ip_address=request.META.get('REMOTE_ADDR', ''),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+        )
+
+        return Response({'detail': 'Activity logged.'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def yd_id_card_pdf(request, app_id):
+    """Generate a printable PDF ID card for a Youth Dialogue participant."""
+    from django.http import HttpResponse as DjangoHttpResponse
+
+    app = get_object_or_404(YouthDialogueApplication, pk=app_id)
+    if app.status != 'credential_issued' or not app.participant_code:
+        return DjangoHttpResponse('Credential not issued yet.', status=400)
+
+    try:
+        from reportlab.lib.pagesizes import inch
+        from reportlab.lib import colors as rl_colors
+        from reportlab.pdfgen import canvas as rl_canvas
+        from reportlab.lib.utils import ImageReader
+    except ImportError:
+        return DjangoHttpResponse('reportlab is not installed.', status=500)
+
+    import io as _io
+
+    # Credit-card size: 3.375 x 2.125 inches
+    card_w = 3.375 * inch
+    card_h = 2.125 * inch
+
+    buf = _io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=(card_w, card_h))
+
+    # Background gradient (green header)
+    header_h = 0.65 * inch
+    c.setFillColor(rl_colors.HexColor('#409843'))
+    c.rect(0, card_h - header_h, card_w, header_h, fill=1, stroke=0)
+
+    # Header text
+    c.setFillColor(rl_colors.white)
+    c.setFont('Helvetica-Bold', 8)
+    c.drawCentredString(card_w / 2, card_h - 0.25 * inch, 'YOUTH DIALOGUE PARTICIPANT')
+    c.setFont('Helvetica', 6)
+    c.drawCentredString(card_w / 2, card_h - 0.40 * inch, 'Be 4 Africa 2026')
+
+    # Participant photo (if available)
+    photo_x = 0.15 * inch
+    photo_y = card_h - header_h - 0.85 * inch
+    photo_size = 0.7 * inch
+    if app.id_photo:
+        try:
+            img = ImageReader(app.id_photo.path)
+            c.drawImage(img, photo_x, photo_y, photo_size, photo_size, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            c.setFillColor(rl_colors.HexColor('#e0e0e0'))
+            c.rect(photo_x, photo_y, photo_size, photo_size, fill=1, stroke=0)
+    else:
+        c.setFillColor(rl_colors.HexColor('#e0e0e0'))
+        c.rect(photo_x, photo_y, photo_size, photo_size, fill=1, stroke=0)
+
+    # Name & details
+    text_x = photo_x + photo_size + 0.15 * inch
+    text_y = card_h - header_h - 0.2 * inch
+    c.setFillColor(rl_colors.black)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(text_x, text_y, f'{app.first_name} {app.last_name}')
+    c.setFont('Helvetica', 7)
+    text_y -= 0.15 * inch
+    if app.organization:
+        c.drawString(text_x, text_y, app.organization)
+        text_y -= 0.13 * inch
+    if app.nationality:
+        c.drawString(text_x, text_y, f'Nationality: {app.get_nationality_display()}')
+        text_y -= 0.13 * inch
+
+    # Participant code
+    c.setFont('Courier-Bold', 10)
+    c.setFillColor(rl_colors.HexColor('#409843'))
+    c.drawString(text_x, text_y - 0.05 * inch, app.participant_code)
+
+    # QR data as text (bottom)
+    c.setFillColor(rl_colors.HexColor('#888888'))
+    c.setFont('Helvetica', 5)
+    qr_data = f'{app.participant_code}:{app.qr_hash}'
+    c.drawCentredString(card_w / 2, 0.1 * inch, qr_data)
+
+    # Footer line
+    c.setStrokeColor(rl_colors.HexColor('#409843'))
+    c.setLineWidth(1)
+    c.line(0, 0.25 * inch, card_w, 0.25 * inch)
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+
+    response = DjangoHttpResponse(buf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="YD-IDCard-{app.participant_code}.pdf"'
+    return response

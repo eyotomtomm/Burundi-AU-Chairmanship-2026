@@ -14,13 +14,17 @@ import '../../../l10n/app_localizations.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/verification_provider.dart';
 import '../../../widgets/verified_badge.dart';
 import '../../../models/api_models.dart';
 import '../../../models/magazine_model.dart';
 import '../../magazine/pdf_viewer_screen.dart';
 import '../../../models/event_registration_model.dart';
 import '../../../services/api_service.dart';
+import '../../../services/deep_link_router.dart';
 import '../../../services/firebase_messaging_service.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import '../../articles/articles_screen.dart';
 import '../../news/article_detail_screen.dart';
 import '../../feature_card/feature_card_detail_screen.dart';
 import '../../events/event_detail_screen.dart';
@@ -58,6 +62,7 @@ class _HomeTabState extends State<HomeTab> {
   // API data
   List<HeroSlide>? _apiHeroSlides;
   List<Article>? _apiArticles;
+  List<Article>? _apiNewsItems;
   List<Map<String, dynamic>>? _apiFeatureCards;
   List<Map<String, dynamic>>? _apiPriorityAgendas;
   List<EventRegistrationModel>? _apiEventCards;
@@ -75,6 +80,13 @@ class _HomeTabState extends State<HomeTab> {
   // Announcement banner
   Map<String, dynamic>? _announcementBanner;
   bool _announcementDismissed = false;
+
+  // Youth Dialogue eligibility (for conditional Quick Access visibility)
+  bool _ydEligible = false;
+
+  // Profile completion prompt
+  bool _showProfilePrompt = false;
+  bool _profilePromptDismissed = false;
 
   // Computed getters
   List<Map<String, dynamic>> get _heroSlides {
@@ -102,6 +114,11 @@ class _HomeTabState extends State<HomeTab> {
     return [];
   }
 
+  List<Article> get _newsItems {
+    if (_apiNewsItems != null && _apiNewsItems!.isNotEmpty) return _apiNewsItems!;
+    return [];
+  }
+
   String _getHeroText(String key) {
     if (_heroTextContent != null && _heroTextContent!.containsKey(key)) {
       return _heroTextContent![key]!;
@@ -110,13 +127,13 @@ class _HomeTabState extends State<HomeTab> {
     return '';
   }
 
-  /// Parse hex color string like "#1EB53A" into a Color
+  /// Parse hex color string like "#409843" into a Color
   static Color _hexToColor(String hex) {
     hex = hex.replaceFirst('#', '');
-    if (hex.isEmpty) return const Color(0xFF1EB53A);
+    if (hex.isEmpty) return const Color(0xFF409843);
     if (hex.length == 6) hex = 'FF$hex';
     final parsed = int.tryParse(hex, radix: 16);
-    if (parsed == null) return const Color(0xFF1EB53A);
+    if (parsed == null) return const Color(0xFF409843);
     return Color(parsed);
   }
 
@@ -133,6 +150,8 @@ class _HomeTabState extends State<HomeTab> {
     _badgeTimer = Timer.periodic(const Duration(seconds: 60), (_) => _loadUnreadCount());
     // Check notification permission after a brief delay (non-blocking)
     _checkNotificationPermission();
+    // Check if profile is incomplete for contextual prompt + FIAM trigger
+    _checkProfileCompletion();
   }
 
   /// Show a permission dialog if push notifications are not enabled.
@@ -144,6 +163,33 @@ class _HomeTabState extends State<HomeTab> {
     final langCode = context.read<LanguageProvider>().languageCode;
     final messagingService = FirebaseMessagingService();
     await messagingService.showPermissionDialog(context, langCode);
+  }
+
+  /// Check if the user's profile is incomplete and show a prompt + log an
+  /// analytics event that FIAM campaigns can trigger on.
+  Future<void> _checkProfileCompletion() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) return;
+
+    // Check if user previously dismissed the prompt this session
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('profile_prompt_dismissed') == true) return;
+
+    // Consider profile incomplete if key fields are missing
+    final isIncomplete = (auth.userName == null || auth.userName!.isEmpty) ||
+        (auth.nationality == null || auth.nationality!.isEmpty) ||
+        (auth.gender == null || auth.gender!.isEmpty);
+
+    if (isIncomplete && mounted) {
+      setState(() => _showProfilePrompt = true);
+      // Log analytics event — FIAM campaigns can trigger on this
+      try {
+        FirebaseAnalytics.instance.logEvent(name: 'profile_incomplete');
+      } catch (_) {}
+    }
   }
 
   Future<void> _loadUnreadCount() async {
@@ -233,6 +279,14 @@ class _HomeTabState extends State<HomeTab> {
       _cacheHomeFeed(homeFeed);
 
       _applyHomeFeedData(homeFeed, priorityAgendas, heroTextData, quickAccessMenu);
+
+      // Fetch Youth Dialogue eligibility in the background (for Quick Access filtering)
+      final isAuth = context.read<AuthProvider>().isAuthenticated;
+      if (isAuth) {
+        api.youthDialogueEligibility().then((ydData) {
+          if (mounted) setState(() => _ydEligible = ydData['eligible'] == true);
+        }).catchError((_) {});
+      }
     } catch (e, stack) {
       debugPrint('Failed to load home feed data: $e');
       Sentry.captureException(e, stackTrace: stack);
@@ -274,8 +328,11 @@ class _HomeTabState extends State<HomeTab> {
         ?.map((j) => HeroSlide.fromJson(j as Map<String, dynamic>))
         .toList();
 
-    // Parse articles
+    // Parse articles and news items
     final articles = (homeFeed['articles'] as List<dynamic>?)
+        ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
+        .toList();
+    final newsItems = (homeFeed['news_items'] as List<dynamic>?)
         ?.map((j) => Article.fromJson(j as Map<String, dynamic>))
         .toList();
 
@@ -285,7 +342,7 @@ class _HomeTabState extends State<HomeTab> {
     final rawCards = homeFeed['feature_cards'] as List<dynamic>? ?? [];
     final featureCards = rawCards.asMap().entries.map((entry) {
       final j = entry.value as Map<String, dynamic>;
-      final gradStart = _hexToColor(j['gradient_start'] ?? '#1EB53A');
+      final gradStart = _hexToColor(j['gradient_start'] ?? '#409843');
       final gradEnd = _hexToColor(j['gradient_end'] ?? '#4CAF50');
 
       IconData icon = featureCardIcons[entry.key % featureCardIcons.length];
@@ -303,7 +360,7 @@ class _HomeTabState extends State<HomeTab> {
         'imageUrl': j['image'] ?? '',
         'actionType': j['action_type'] ?? 'none',
         'actionValue': j['action_value'] ?? '',
-        'gradient_start': j['gradient_start'] ?? '#1EB53A',
+        'gradient_start': j['gradient_start'] ?? '#409843',
         'gradient_end': j['gradient_end'] ?? '#4CAF50',
         'overview': j['overview'] ?? '',
         'overview_fr': j['overview_fr'] ?? '',
@@ -349,6 +406,7 @@ class _HomeTabState extends State<HomeTab> {
     setState(() {
       _apiHeroSlides = heroSlides;
       _apiArticles = articles;
+      _apiNewsItems = newsItems;
       _apiFeatureCards = featureCards;
       _apiPriorityAgendas = priorityAgendas;
       _apiEventCards = eventCards;
@@ -504,6 +562,12 @@ class _HomeTabState extends State<HomeTab> {
             child: _buildAnnouncementBanner(context, langCode),
           ),
 
+        // Profile Completion Prompt
+        if (_showProfilePrompt && !_profilePromptDismissed && isAuth)
+          SliverToBoxAdapter(
+            child: _buildProfilePromptCard(context, langCode),
+          ),
+
         // Welcome Banner
         SliverToBoxAdapter(
           child: _buildWelcomeBanner(context),
@@ -649,11 +713,68 @@ class _HomeTabState extends State<HomeTab> {
         ],
 
         // Latest News Section
-        if (_articles.isNotEmpty) ...[
+        if (_newsItems.isNotEmpty) ...[
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
               child: _buildSectionTitle(context, l10n.translate('latest_news'), showSeeAll: true),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: Builder(
+                builder: (context) {
+                  final total = _newsItems.length;
+                  final freeShown = isAuth ? total : (total < 2 ? total : 2);
+                  final itemCount = isAuth ? total : freeShown + 1;
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      if (!isAuth && index == freeShown) {
+                        return const LoginGateCarouselCard(width: 280, height: 260);
+                      }
+                      final article = _newsItems[index];
+                      return NewsCard(
+                        article: article,
+                        langCode: langCode,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) => ArticleDetailScreen(article: article),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+
+        // Articles Section
+        if (_articles.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+              child: _buildSectionTitle(
+                context,
+                langCode == 'fr' ? 'Articles' : 'Articles',
+                showSeeAll: true,
+                onSeeAll: () {
+                  Navigator.push(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (_) => const ArticlesScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           SliverToBoxAdapter(
@@ -722,7 +843,7 @@ class _HomeTabState extends State<HomeTab> {
     final text = langCode == 'fr'
         ? (banner['text_fr'] ?? banner['text'] ?? '')
         : (banner['text'] ?? '');
-    final bgColorHex = banner['background_color'] as String? ?? '#1EB53A';
+    final bgColorHex = banner['background_color'] as String? ?? '#409843';
     final bgColor = _hexToColor(bgColorHex);
 
     return Padding(
@@ -760,6 +881,101 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
+  Widget _buildProfilePromptCard(BuildContext context, String langCode) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEn = langCode != 'fr';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? [const Color(0xFF1B3A1C), const Color(0xFF2D4A2E)]
+                : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.burundiGreen.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.burundiGreen.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_outline,
+                color: AppColors.burundiGreen,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isEn ? 'Complete Your Profile' : 'Compl\u00e9tez votre profil',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: isDark ? Colors.white : AppColors.lightText,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isEn
+                        ? 'Add your details for a personalised experience'
+                        : 'Ajoutez vos informations pour une exp\u00e9rience personnalis\u00e9e',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white70 : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 32,
+              child: FilledButton(
+                onPressed: () => DeepLinkRouter().navigate('/profile-completion'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.burundiGreen,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(isEn ? 'Go' : 'Aller'),
+              ),
+            ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () async {
+                setState(() => _profilePromptDismissed = true);
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('profile_prompt_dismissed', true);
+              },
+              child: Icon(
+                Icons.close,
+                size: 18,
+                color: isDark ? Colors.white54 : Colors.black38,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildWelcomeBanner(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final theme = Theme.of(context);
@@ -789,39 +1005,46 @@ class _HomeTabState extends State<HomeTab> {
     final isVerified = authProvider.isVerified;
     final badgeType = authProvider.badgeType;
 
+    final greetingColor = isDark ? const Color(0xFF8FB7A3) : const Color(0xFF4A7C5D);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Flexible(
-            child: RichText(
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              text: TextSpan(
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'HeatherGreen',
-                  color: isDark ? const Color(0xFF8FB7A3) : const Color(0xFF4A7C5D), // Heather green (more visible)
-                ),
-                children: [
-                  TextSpan(text: '$greeting, '),
-                  TextSpan(
-                    text: userName,
-                    style: TextStyle(
-                      color: isDark ? const Color(0xFF8FB7A3) : const Color(0xFF4A7C5D), // Heather green (more visible)
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'HeatherGreen',
-                    ),
-                  ),
-                ],
-              ),
+          Text(
+            '$greeting,',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'HeatherGreen',
+              color: greetingColor,
             ),
           ),
-          if (isVerified) ...[
-            const SizedBox(width: 6),
-            VerifiedBadge(badgeType: badgeType, size: 20),
-          ],
+          Row(
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    userName,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'HeatherGreen',
+                      color: greetingColor,
+                    ),
+                  ),
+                ),
+              ),
+              if (isVerified) ...[
+                const SizedBox(width: 6),
+                VerifiedBadge(badgeType: badgeType, size: 20),
+              ],
+            ],
+          ),
         ],
       ),
     );
@@ -861,7 +1084,7 @@ class _HomeTabState extends State<HomeTab> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
+                            colors: [Color(0xFF409843), Color(0xFF2D6E31)],
                           ),
                         ),
                       ),
@@ -870,7 +1093,7 @@ class _HomeTabState extends State<HomeTab> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
+                            colors: [Color(0xFF409843), Color(0xFF2D6E31)],
                           ),
                         ),
                         child: const Center(child: Icon(Icons.image, size: 64, color: Colors.white54)),
@@ -888,7 +1111,7 @@ class _HomeTabState extends State<HomeTab> {
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
+                              colors: [Color(0xFF409843), Color(0xFF2D6E31)],
                             ),
                           ),
                           child: Center(
@@ -1293,12 +1516,23 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildQuickAccessGrid(BuildContext context, AppLocalizations l10n) {
     final langCode = Localizations.localeOf(context).languageCode;
-    final isLoggedIn = context.read<AuthProvider>().isAuthenticated;
+    final authProvider = context.read<AuthProvider>();
+    final isLoggedIn = authProvider.isAuthenticated;
+    final verificationProvider = context.read<VerificationProvider>();
+    final isVerified = authProvider.isVerified || verificationProvider.isProfileVerified;
+    final verificationRequestStatus = verificationProvider.requestStatus;
+    final showVerification = isLoggedIn && !isVerified;
     final List<Map<String, dynamic>> items = [];
 
-    // Use API data if available
+    // Use API data if available (with visibility_rule filtering)
     if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty) {
-      items.addAll(_quickAccessItems!.map((menuItem) {
+      final filteredApiItems = _quickAccessItems!.where((menuItem) {
+        final rule = menuItem['visibility_rule'] as String? ?? '';
+        if (rule.isEmpty) return true; // everyone
+        if (rule == 'youth_dialogue_accepted') return _ydEligible;
+        return true;
+      }).toList();
+      items.addAll(filteredApiItems.map((menuItem) {
         final title = langCode == 'fr' && menuItem['title_fr'] != null && (menuItem['title_fr'] as String).isNotEmpty
             ? menuItem['title_fr'] as String
             : menuItem['title_en'] as String;
@@ -1393,6 +1627,17 @@ class _HomeTabState extends State<HomeTab> {
           'badgeText': '',
           'badgeColor': '',
           'onTap': () => Navigator.pushNamed(context, '/resources'),
+        },
+      if (showVerification && !isDuplicate('/verification-request', 'Get Verified', 'Vérification'))
+        <String, dynamic>{
+          'title': langCode == 'fr' ? 'Vérification' : 'Get Verified',
+          'icon': Icons.verified_rounded,
+          'hasLiveDot': false,
+          'badgeText': verificationRequestStatus == 'pending'
+              ? (langCode == 'fr' ? 'En cours' : 'Pending')
+              : '',
+          'badgeColor': verificationRequestStatus == 'pending' ? '#FF9800' : '',
+          'onTap': () => Navigator.pushNamed(context, '/verification-request'),
         },
       if (!isDuplicate('/support', 'Support', 'Assistance'))
         <String, dynamic>{
@@ -2290,13 +2535,13 @@ class _HomeTabState extends State<HomeTab> {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: liveAgentOnline
-                        ? Colors.blue.withValues(alpha: 0.1)
+                        ? AppColors.burundiGreen.withValues(alpha: 0.1)
                         : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.support_agent_rounded,
-                    color: liveAgentOnline ? Colors.blue : Colors.grey,
+                    color: liveAgentOnline ? AppColors.burundiGreen : Colors.grey,
                     size: 28,
                   ),
                 ),

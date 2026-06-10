@@ -38,6 +38,13 @@ class EventLocation {
     );
   }
 
-  String getName(String languageCode) => languageCode == 'fr' ? nameFr : name;
-  String getDescription(String languageCode) => languageCode == 'fr' ? descriptionFr : description;
+  String getName(String languageCode) {
+    if (languageCode == 'fr') return nameFr.isNotEmpty ? nameFr : name;
+    return name.isNotEmpty ? name : nameFr;
+  }
+
+  String getDescription(String languageCode) {
+    if (languageCode == 'fr') return descriptionFr.isNotEmpty ? descriptionFr : description;
+    return description.isNotEmpty ? description : descriptionFr;
+  }
 }

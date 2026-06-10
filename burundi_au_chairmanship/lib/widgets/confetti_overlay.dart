@@ -161,13 +161,13 @@ class _Particle {
   // AU: gold, green
   // Plus blue for accent
   static const _colors = [
-    Color(0xFF1EB53A), // Burundi Green
-    Color(0xFFCE1126), // Burundi Red
+    Color(0xFF409843), // Burundi Green
+    Color(0xFFE11C23), // Burundi Red
     Color(0xFFFFFFFF), // White
     Color(0xFFD4AF37), // AU Gold
     Color(0xFFD4AF37), // AU Gold (double-weighted for prominence)
-    Color(0xFF1EB53A), // Green (double-weighted)
-    Color(0xFF2196F3), // Blue accent
+    Color(0xFF409843), // Green (double-weighted)
+    Color(0xFFE11C23), // Red accent
   ];
 
   static Color _pickColor(Random r) => _colors[r.nextInt(_colors.length)];

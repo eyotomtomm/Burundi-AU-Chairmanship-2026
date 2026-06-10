@@ -57,15 +57,15 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
 
   Color _hexToColor(String hex) {
     hex = hex.replaceFirst('#', '');
-    if (hex.isEmpty) return const Color(0xFF1EB53A);
+    if (hex.isEmpty) return const Color(0xFF409843);
     if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.tryParse(hex, radix: 16) ?? 0xFF1EB53A);
+    return Color(int.tryParse(hex, radix: 16) ?? 0xFF409843);
   }
 
   @override
   Widget build(BuildContext context) {
     final gradStart = _hexToColor(
-        cardData['gradient_start'] as String? ?? '#1EB53A');
+        cardData['gradient_start'] as String? ?? '#409843');
     final gradEnd = _hexToColor(
         cardData['gradient_end'] as String? ?? '#4CAF50');
     final isDark = Theme.of(context).brightness == Brightness.dark;

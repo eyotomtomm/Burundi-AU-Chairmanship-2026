@@ -51,9 +51,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Check maintenance when app comes back to foreground
     if (state == AppLifecycleState.resumed) {
       _checkMaintenance();
+      // Re-check verification status when app resumes in case admin verified
+      _checkVerificationStatus();
     }
   }
 
@@ -85,9 +86,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final status = verificationProvider.requestStatus;
 
-    // If verification was approved, always refresh auth profile to sync badge state
-    // This ensures isVerified + badgeType are up to date even if popup was already shown
-    if (status == 'approved' && !authProvider.isVerified) {
+    // If verification was approved or admin verified directly, refresh auth profile
+    // to sync badge state. This ensures isVerified + badgeType are up to date.
+    if ((status == 'approved' || verificationProvider.isProfileVerified) && !authProvider.isVerified) {
       await authProvider.refreshProfile();
     }
 
@@ -201,8 +202,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               index: _currentIndex,
               children: [
                 HomeTab(onSwitchTab: (index) => setState(() => _currentIndex = index)),
-                MagazineTab(),
-                const NewsScreen(isTab: true),
+                MagazineTab(onBackToHome: () => setState(() => _currentIndex = 0)),
+                NewsScreen(isTab: true, onBackToHome: () => setState(() => _currentIndex = 0)),
                 MoreTab(),
               ],
             ),
@@ -244,8 +245,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               label: l10n.magazine,
             ),
             BottomNavigationBarItem(
-              icon: const Icon(Icons.article_rounded),
-              activeIcon: const Icon(Icons.article_rounded),
+              icon: const Icon(Icons.newspaper_rounded),
+              activeIcon: const Icon(Icons.newspaper_rounded),
               label: l10n.translate('news'),
             ),
             BottomNavigationBarItem(

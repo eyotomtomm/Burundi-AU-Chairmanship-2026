@@ -14,7 +14,7 @@ class AppLocalizations {
   static final Map<String, Map<String, String>> _localizedValues = {
     'en': {
       // App
-      'app_name': 'Burundi Chairmanship',
+      'app_name': 'Be 4 Africa',
       'welcome': 'Welcome',
       'continue': 'Continue',
       'skip': 'Skip',
@@ -53,8 +53,8 @@ class AppLocalizations {
       'create_account_text': 'Create your account to get started',
 
       // Home
-      'au_chairmanship': 'Burundi Chairmanship 2025',
-      'burundi_chairmanship': 'Burundi Chairmanship',
+      'au_chairmanship': 'Be 4 Africa 2025',
+      'burundi_chairmanship': 'Be 4 Africa',
       'explore_features': 'Explore Features',
       'latest_news': 'Latest News',
       'upcoming_events': 'Upcoming Events',
@@ -126,6 +126,7 @@ class AppLocalizations {
 
       // Quick Access extras
       'translate': 'Translate',
+      'phrasebook': 'Phrasebook',
       'weather': 'Weather',
       'calendar': 'Calendar',
       'no_events': 'No events available',
@@ -328,6 +329,7 @@ class AppLocalizations {
 
       // Quick Access extras
       'translate': 'Traduire',
+      'phrasebook': 'Guide de conversation',
       'weather': 'Météo',
       'calendar': 'Calendrier',
       'no_events': 'Aucun événement disponible',

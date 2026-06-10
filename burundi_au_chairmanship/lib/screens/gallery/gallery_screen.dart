@@ -420,7 +420,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   left: 0,
                   right: 0,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -428,9 +428,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           album['title'] ?? '',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
+                            height: 1.2,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Row(

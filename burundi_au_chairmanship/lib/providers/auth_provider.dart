@@ -9,6 +9,7 @@ import '../config/app_constants.dart';
 import '../services/api_service.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_messaging_service.dart';
+import '../services/like_service.dart';
 
 /// Authentication provider using Firebase Auth + Django backend
 ///
@@ -53,6 +54,7 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   bool _requiresEmailVerification = false;
   bool _hasInitialized = false; // Guard against premature sign-out during startup
+  bool _isSigningIn = false; // Guard against auth listener racing with active sign-in
   bool _receivesNewsletter = false;
 
   bool get isAuthenticated => _isAuthenticated;
@@ -102,6 +104,12 @@ class AuthProvider extends ChangeNotifier {
       if (!_hasInitialized) return;
 
       if (firebaseUser != null) {
+        // Skip if a sign-in method is already handling the backend call.
+        // Without this guard, both the listener and signInWithGoogle/Apple
+        // hit firebase_login simultaneously for new users, causing a
+        // database race condition (duplicate User.objects.create).
+        if (_isSigningIn) return;
+
         // User signed in (or token refreshed) — sync with Django backend
         await _syncWithBackend();
       } else {
@@ -397,6 +405,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _errorMessage = null;
+    _isSigningIn = true; // Prevent auth listener from racing with this method
     notifyListeners();
 
     try {
@@ -423,11 +432,13 @@ class AuthProvider extends ChangeNotifier {
 
       _isAuthenticated = true;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _firebaseAuth.getErrorMessage(e);
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } on ApiException catch (e) {
@@ -436,6 +447,7 @@ class AuthProvider extends ChangeNotifier {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } catch (e) {
@@ -443,6 +455,7 @@ class AuthProvider extends ChangeNotifier {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Google Sign-In failed: $e';
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     }
@@ -452,6 +465,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signInWithApple() async {
     _isLoading = true;
     _errorMessage = null;
+    _isSigningIn = true; // Prevent auth listener from racing with this method
     notifyListeners();
 
     try {
@@ -478,23 +492,27 @@ class AuthProvider extends ChangeNotifier {
 
       _isAuthenticated = true;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _firebaseAuth.getErrorMessage(e);
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } on ApiException catch (e) {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } catch (e) {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Apple Sign-In failed: $e';
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     }
@@ -585,6 +603,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     await _firebaseAuth.signOut();
+    LikeService().clearAll();
     await _clearUserData();
     _isAuthenticated = false;
     _errorMessage = null;

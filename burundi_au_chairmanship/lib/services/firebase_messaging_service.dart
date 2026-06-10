@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
+import '../services/deep_link_router.dart';
 
 /// Top-level function for handling background messages
 ///
@@ -49,8 +50,6 @@ class FirebaseMessagingService {
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
-  GlobalKey<NavigatorState>? _navigatorKey;
-
   /// Static handle to the navigator key so standalone helpers (e.g. banner
   /// tap handlers) can navigate without a BuildContext.
   static GlobalKey<NavigatorState>? navigatorKey;
@@ -74,7 +73,6 @@ class FirebaseMessagingService {
   ///
   /// Should be called during app startup
   Future<void> initialize(GlobalKey<NavigatorState> navigatorKey) async {
-    _navigatorKey = navigatorKey;
     FirebaseMessagingService.navigatorKey = navigatorKey;
     // Request notification permissions
     NotificationSettings settings = await _messaging.requestPermission(
@@ -182,7 +180,7 @@ class FirebaseMessagingService {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.notifications_active, color: Color(0xFF1EB53A), size: 28),
+            const Icon(Icons.notifications_active, color: Color(0xFF409843), size: 28),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -194,7 +192,7 @@ class FirebaseMessagingService {
         ),
         content: Text(
           isEnglish
-              ? 'Enable notifications to receive important updates about events, news, and announcements from the Burundi Chairmanship.'
+              ? 'Enable notifications to receive important updates about events, news, and announcements from Be 4 Africa.'
               : 'Activez les notifications pour recevoir les mises \u00e0 jour importantes sur les \u00e9v\u00e9nements, les actualit\u00e9s et les annonces de la Pr\u00e9sidence de l\'UA.',
           style: const TextStyle(fontSize: 14, height: 1.4),
         ),
@@ -223,7 +221,7 @@ class FirebaseMessagingService {
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1EB53A),
+              backgroundColor: const Color(0xFF409843),
             ),
             child: Text(isEnglish ? 'Enable' : 'Activer'),
           ),
@@ -349,25 +347,16 @@ class FirebaseMessagingService {
 
   /// Shared navigation for a RemoteMessage — used by both tap and banner tap.
   void _navigateForMessage(RemoteMessage message) {
-    if (_navigatorKey?.currentState == null) return;
     final data = message.data;
     final actionType = data['action_type'];
     final actionValue = data['action_value'];
     if (actionType == 'route' &&
         actionValue != null &&
         actionValue.toString().isNotEmpty) {
-      _navigatorKey?.currentState?.pushNamed(actionValue.toString());
+      DeepLinkRouter().navigate(actionValue.toString());
       return;
     }
-    final type = data['type'];
-    final routes = {
-      'article': '/news',
-      'magazine': '/magazine',
-      'event': '/calendar',
-      'gallery': '/gallery',
-      'video': '/videos',
-    };
-    _navigatorKey?.currentState?.pushNamed(routes[type] ?? '/notifications');
+    DeepLinkRouter().navigateForNotificationType(data['type']);
   }
 
   /// Build notification payload including notification_id for open tracking
@@ -398,35 +387,14 @@ class FirebaseMessagingService {
       _trackNotificationOpened(notificationId);
     }
 
-    if (_navigatorKey?.currentState == null) return;
-
-    final data = message.data;
-
-    // Prefer action_type/action_value for precise deep linking
-    final actionType = data['action_type'];
-    final actionValue = data['action_value'];
-    if (actionType == 'route' && actionValue != null && actionValue.isNotEmpty) {
-      _navigatorKey?.currentState?.pushNamed(actionValue);
-      return;
-    }
-
-    // Fallback: navigate by notification type
-    final type = data['type'];
-    final routes = {
-      'article': '/news',
-      'magazine': '/magazine',
-      'event': '/calendar',
-      'gallery': '/gallery',
-      'video': '/videos',
-    };
-    _navigatorKey?.currentState?.pushNamed(routes[type] ?? '/notifications');
+    _navigateForMessage(message);
   }
 
   /// Handle local notification tap
   void _onLocalNotificationTap(NotificationResponse response) {
     if (kDebugMode) print('Local notification tapped: ${response.payload}');
 
-    if (response.payload != null && _navigatorKey?.currentState != null) {
+    if (response.payload != null) {
       try {
         final payload = response.payload!;
 
@@ -442,8 +410,8 @@ class FirebaseMessagingService {
         // Support action_type:route:/path format
         if (cleanPayload.startsWith('route:')) {
           final route = cleanPayload.substring(6);
-          if (route.startsWith('/')) {
-            _navigatorKey?.currentState?.pushNamed(route);
+          if (route.isNotEmpty) {
+            DeepLinkRouter().navigate(route);
             return;
           }
         }
@@ -451,17 +419,11 @@ class FirebaseMessagingService {
         // Legacy format: type:id
         final data = cleanPayload.split(':');
         if (data.length >= 2) {
-          final routes = {
-            'article': '/news',
-            'magazine': '/magazine',
-            'event': '/calendar',
-            'gallery': '/gallery',
-            'video': '/videos',
-          };
-          final route = routes[data[0]];
-          if (route != null) {
-            _navigatorKey?.currentState?.pushNamed(route);
-          }
+          final id = data.length >= 2 ? data[1] : null;
+          DeepLinkRouter().navigateForNotificationType(
+            data[0],
+            id: (id != null && id != '0') ? id : null,
+          );
         }
       } catch (e) {
         if (kDebugMode) print('Error parsing notification payload: $e');

@@ -20,7 +20,7 @@ class VerifiedBadge extends StatelessWidget {
     if (badgeType == 'GOLD') {
       badgeColor = const Color(0xFFFFD700); // Gold
     } else {
-      badgeColor = const Color(0xFF2196F3); // Blue (default)
+      badgeColor = const Color(0xFF409843); // Green (default)
     }
 
     return Icon(
@@ -44,7 +44,7 @@ class SimpleVerifiedBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Icon(
       Icons.verified,
-      color: const Color(0xFF2196F3), // Blue
+      color: const Color(0xFF409843), // Green
       size: size,
     );
   }

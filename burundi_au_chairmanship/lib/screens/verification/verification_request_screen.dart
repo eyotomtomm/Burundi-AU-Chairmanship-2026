@@ -464,7 +464,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            const Icon(Icons.verified, color: Color(0xFF2196F3), size: 20),
+            const Icon(Icons.verified, color: Color(0xFF409843), size: 20),
             const SizedBox(width: 8),
             Expanded(child: Text('Blue Badge - Verified professionals and notable individuals', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87))),
           ]),

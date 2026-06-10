@@ -26,7 +26,7 @@ CATEGORY_FR_MAP = {
     'Governance': 'Gouvernance',
     'Health': 'Santé',
     'Economy': 'Économie',
-    'AU Chairmanship': "Présidence de l'UA",
+    'Be 4 Africa': "Présidence de l'UA",
     'Culture': 'Culture',
 }
 CATEGORY_COLORS = {
@@ -34,7 +34,7 @@ CATEGORY_COLORS = {
     'Governance': '#CE1126',
     'Health': '#0077B6',
     'Economy': '#F4A261',
-    'AU Chairmanship': '#FFD700',
+    'Be 4 Africa': '#FFD700',
     'Culture': '#9B59B6',
 }
 

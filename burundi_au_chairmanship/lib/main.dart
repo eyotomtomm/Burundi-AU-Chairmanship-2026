@@ -20,8 +20,10 @@ import 'providers/auth_provider.dart';
 import 'providers/verification_provider.dart';
 import 'services/analytics_service.dart';
 import 'services/api_service.dart';
+import 'services/app_link_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/remote_config_service.dart';
+import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/auth_screen.dart';
@@ -49,6 +51,10 @@ import 'screens/support/contact_support_screen.dart';
 import 'screens/verification/verification_request_screen.dart';
 import 'screens/trending/trending_screen.dart';
 import 'screens/events/events_screen.dart';
+import 'screens/youth_dialogue/youth_dialogue_main_screen.dart';
+import 'screens/youth_dialogue/youth_dialogue_apply_screen.dart';
+import 'screens/youth_dialogue/youth_dialogue_documents_screen.dart';
+import 'screens/youth_dialogue/youth_dialogue_credential_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -123,6 +129,22 @@ void _initFirebaseServicesAsync() {
       await remoteConfig.initialize().timeout(const Duration(seconds: 8));
     } catch (e) {
       if (kDebugMode) print('Remote Config init failed: $e');
+    }
+  });
+
+  Future(() async {
+    try {
+      FirebaseInAppMessaging.instance.setMessagesSuppressed(false);
+    } catch (e) {
+      if (kDebugMode) print('FIAM init failed: $e');
+    }
+  });
+
+  Future(() async {
+    try {
+      await AppLinkService().initialize();
+    } catch (e) {
+      if (kDebugMode) print('AppLinkService init failed: $e');
     }
   });
 }
@@ -310,6 +332,10 @@ class BurundiAUApp extends StatelessWidget {
                 '/verification-request': (context) => const VerificationRequestScreen(),
                 '/trending': (context) => const TrendingScreen(),
                 '/events': (context) => const EventsScreen(),
+                '/youth-dialogue': (context) => const YouthDialogueMainScreen(),
+                '/youth-dialogue-apply': (context) => const YouthDialogueApplyScreen(),
+                '/youth-dialogue-documents': (context) => const YouthDialogueDocumentsScreen(),
+                '/youth-dialogue-credential': (context) => const YouthDialogueCredentialScreen(),
               };
 
               final builder = routes[settings.name];

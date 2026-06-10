@@ -435,8 +435,8 @@ class _KaryendaDrumAnimatedState extends State<KaryendaDrumAnimated>
 
 
 class _KaryendaDrumPainter extends CustomPainter {
-  static const Color _red = Color(0xFFCE1126);
-  static const Color _green = Color(0xFF1EB53A);
+  static const Color _red = Color(0xFFE11C23);
+  static const Color _green = Color(0xFF409843);
   static const Color _white = Color(0xFFFFFFFF);
   static const Color _darkBrown = Color(0xFF3D2314);
 

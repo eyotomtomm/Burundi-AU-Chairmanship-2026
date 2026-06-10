@@ -174,7 +174,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
       case 'open':
         return Colors.orange;
       case 'in_progress':
-        return Colors.blue;
+        return AppColors.burundiGreen;
       case 'resolved':
         return AppColors.burundiGreen;
       case 'closed':

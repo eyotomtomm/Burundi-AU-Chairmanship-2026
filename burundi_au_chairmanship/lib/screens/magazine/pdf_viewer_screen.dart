@@ -13,6 +13,7 @@ import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/magazine_model.dart';
+import '../../services/like_service.dart';
 import '../../widgets/verified_badge.dart';
 
 class PdfViewerScreen extends StatefulWidget {
@@ -58,8 +59,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // Floating overlay
   bool _showOverlay = false;
   Timer? _overlayTimer;
-  bool _isLiked = false;
-  int _likeCount = 0;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
   List<ArticleComment> _comments = [];
   bool _commentsLoading = false;
 
@@ -67,8 +68,16 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   void initState() {
     super.initState();
     _pdfViewerController = PdfViewerController();
-    _isLiked = widget.initialIsLiked;
-    _likeCount = widget.initialLikeCount;
+    if (widget.magazineId != null) {
+      _likeService.seed(
+        EntityType.magazine, widget.magazineId!,
+        isLiked: widget.initialIsLiked,
+        likeCount: widget.initialLikeCount,
+      );
+      _removeLikeListener = _likeService.addListener((key, state) {
+        if (key == 'magazine:${widget.magazineId}' && mounted) setState(() {});
+      });
+    }
     _enableScreenProtection();
     _loadPdf();
     _recordView();
@@ -355,6 +364,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _pdfViewerController.dispose();
     _overlayTimer?.cancel();
     _disableScreenProtection();
@@ -377,7 +387,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     });
   }
 
-  Future<void> _toggleLike() async {
+  void _toggleLike() {
     if (widget.magazineId == null) return;
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isAuthenticated) {
@@ -386,29 +396,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       );
       return;
     }
-    final wasLiked = _isLiked;
-    final prevCount = _likeCount;
-    setState(() {
-      _isLiked = !wasLiked;
-      _likeCount = prevCount + (wasLiked ? -1 : 1);
-    });
+    _likeService.toggle(EntityType.magazine, widget.magazineId!);
     _startAutoHideTimer();
-    try {
-      final result = await ApiService().toggleMagazineLike(widget.magazineId!);
-      if (mounted) {
-        setState(() {
-          _isLiked = result['is_liked'] == true;
-          _likeCount = result['like_count'] ?? _likeCount;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLiked = wasLiked;
-          _likeCount = prevCount;
-        });
-      }
-    }
   }
 
   Future<void> _loadComments() async {
@@ -639,6 +628,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final likeState = widget.magazineId != null
+        ? _likeService.getState(EntityType.magazine, widget.magazineId!)
+        : const LikeState();
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -946,13 +938,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: _isLiked ? Colors.red : Colors.white,
+                            likeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: likeState.isLiked ? Colors.red : Colors.white,
                             size: 22,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '$_likeCount',
+                            '${likeState.likeCount}',
                             style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                         ],

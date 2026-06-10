@@ -574,6 +574,9 @@ def articles_list(request):
         articles = articles.filter(
             Q(title__icontains=search) | Q(title_fr__icontains=search) | Q(content__icontains=search)
         )
+    content_type_filter = request.GET.get('content_type')
+    if content_type_filter in ('article', 'news'):
+        articles = articles.filter(content_type=content_type_filter)
     paginator = Paginator(articles, 20)
     page = request.GET.get('page')
     articles = paginator.get_page(page)
@@ -603,6 +606,7 @@ def article_create(request):
             image=_get_existing_or_uploaded(request, 'image'),
             author=request.POST.get('author', 'Admin'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
+            content_type=request.POST.get('content_type', 'article'),
             is_featured=request.POST.get('is_featured') == 'on',
             is_draft=is_draft,
             status=content_status,
@@ -668,6 +672,7 @@ def article_edit(request, pk):
         if _img:
             article.image = _img
             changes['image'] = {'old': '', 'new': 'new image uploaded'}
+        article.content_type = request.POST.get('content_type', article.content_type)
         article.is_featured = new_values['is_featured']
         article.is_draft = new_values['is_draft']
         content_status = request.POST.get('content_status', 'published')
@@ -1755,11 +1760,11 @@ def admin_invite(request):
         try:
             from django.core.mail import send_mail
             from django.conf import settings as conf_settings
-            subject = 'Admin Portal Access — Burundi Chairmanship 2026'
+            subject = 'Admin Portal Access — Be 4 Africa 2026'
             message = (
                 f'Dear {first_name or username},\n\n'
                 f'You have been granted {"Super Admin" if role == "superuser" else "Staff"} access '
-                f'to the Burundi Chairmanship Admin Portal.\n\n'
+                f'to the Be 4 Africa Admin Portal.\n\n'
                 f'Your login credentials:\n'
                 f'  Portal URL: https://burundi4africa.com/admin/\n'
                 f'  Username: {username}\n'
@@ -1767,7 +1772,7 @@ def admin_invite(request):
                 f'Please change your password after your first login.\n\n'
                 f'For questions, contact info@burundi4africa.com\n\n'
                 f'Best regards,\n'
-                f'Burundi Chairmanship Team\n'
+                f'Be 4 Africa Team\n'
                 f'Ministère des Affaires Étrangères'
             )
             send_mail(
@@ -1881,7 +1886,7 @@ def verification_request_review(request, pk):
                 user = ver_request.user
                 send_mail(
                     subject='Congratulations! Your Account is Verified',
-                    message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Burundi Chairmanship community.\n\nBest regards,\nB4Africa Team',
+                    message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Be 4 Africa community.\n\nBest regards,\nB4Africa Team',
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
                     fail_silently=True,
@@ -2470,7 +2475,7 @@ def event_submission_review(request, pk):
         <span style="font-size:28px;font-weight:900;color:#276749;">&#10003;</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Approved</h1>
-      <p style="color:#9ae6b4;font-size:14px;margin:0;">Burundi Chairmanship 2026-2027</p>
+      <p style="color:#9ae6b4;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -2505,14 +2510,14 @@ def event_submission_review(request, pk):
 
                     html_message += f'''
       <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
-        You can view your ticket and event details in the Burundi Chairmanship app.
+        You can view your ticket and event details in the Be 4 Africa app.
       </p>
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
         If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Burundi Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
     </div>
   </div>
 </div>
@@ -2522,7 +2527,7 @@ def event_submission_review(request, pk):
                     plain_message = f"Dear {user.get_full_name() or user.username},\n\nYour registration for {event_reg.event_title} has been approved.\n\n"
                     if submission.admin_notes:
                         plain_message += f"Note from organizer: {submission.admin_notes}\n\n"
-                    plain_message += "You can view your ticket and event details in the Burundi Chairmanship app.\n\nBest regards,\nBurundi Chairmanship Team"
+                    plain_message += "You can view your ticket and event details in the Be 4 Africa app.\n\nBest regards,\nBe 4 Africa Team"
 
                     send_mail(
                         subject=subject,
@@ -2562,7 +2567,7 @@ def event_submission_review(request, pk):
         <span style="font-size:28px;font-weight:900;color:#9b2c2c;">!</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Not Approved</h1>
-      <p style="color:#feb2b2;font-size:14px;margin:0;">Burundi Chairmanship 2026-2027</p>
+      <p style="color:#feb2b2;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -2588,7 +2593,7 @@ def event_submission_review(request, pk):
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Burundi Chairmanship 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
     </div>
   </div>
 </div>
@@ -2598,7 +2603,7 @@ def event_submission_review(request, pk):
                     plain_message = f"Dear {user.get_full_name() or user.username},\n\nWe regret to inform you that your registration for {event_reg.event_title} could not be approved at this time.\n\n"
                     if submission.admin_notes:
                         plain_message += f"Reason: {submission.admin_notes}\n\n"
-                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundi4africa.com'}.\n\nBest regards,\nBurundi Chairmanship Team"
+                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundi4africa.com'}.\n\nBest regards,\nBe 4 Africa Team"
 
                     send_mail(
                         subject=subject,
@@ -3430,7 +3435,7 @@ def support_ticket_update_status(request, pk):
             'Your support ticket has been resolved. '
             'We hope we were able to help!\n\n'
             'Please rate your experience to help us improve our service. '
-            'Thank you for using Burundi Chairmanship support.'
+            'Thank you for using Be 4 Africa support.'
         )
         TicketMessage.objects.create(
             ticket=ticket,
@@ -7769,6 +7774,29 @@ def newsletter_send_now(request):
     except Exception as e:
         messages.error(request, f'Newsletter send failed: {e}')
     return redirect('custom_admin:newsletter_editions_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def newsletter_subscribers_list(request):
+    """Browse monthly newsletter subscribers."""
+    from core.models import NewsletterSubscriber
+    q = request.GET.get('q', '').strip()
+    qs = NewsletterSubscriber.objects.all()
+    if q:
+        qs = qs.filter(
+            models.Q(name__icontains=q) |
+            models.Q(email__icontains=q) |
+            models.Q(phone_number__icontains=q)
+        )
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'custom_admin/newsletters/subscribers.html', {
+        'subscribers': page,
+        'search_query': q,
+        'total_active': NewsletterSubscriber.objects.filter(is_active=True).count(),
+        'total_all': NewsletterSubscriber.objects.count(),
+    })
 
 
 # ─── Media Library (Browse existing Spaces images) ──────────────

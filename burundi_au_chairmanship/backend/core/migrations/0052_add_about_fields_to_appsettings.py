@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='appsettings',
             name='app_description',
-            field=models.TextField(blank=True, default='Official application for the Burundi Chairmanship 2026.', help_text='Description shown in the About dialog (English)'),
+            field=models.TextField(blank=True, default='Official application for the Be 4 Africa 2026.', help_text='Description shown in the About dialog (English)'),
         ),
         migrations.AddField(
             model_name='appsettings',

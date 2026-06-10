@@ -122,7 +122,7 @@ class UserProfile(models.Model):
     )
 
     # Newsletter preference
-    receives_newsletter = models.BooleanField(default=True, help_text='User opted in for weekly newsletter')
+    receives_newsletter = models.BooleanField(default=True, help_text='User opted in for monthly newsletter')
 
     # Admin section permissions (staff users only; superusers have implicit full access)
     admin_sections = models.JSONField(
@@ -294,7 +294,9 @@ class MagazineComment(models.Model):
         help_text='Parent comment for threaded replies (1 level deep).'
     )
     content = models.TextField()
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -341,6 +343,8 @@ class Category(models.Model):
 
 
 class Article(models.Model):
+    CONTENT_TYPE_CHOICES = [('article', 'Article'), ('news', 'News')]
+
     title = models.CharField(max_length=300)
     title_fr = models.CharField(max_length=300, blank=True)
     content = models.TextField()
@@ -349,6 +353,10 @@ class Article(models.Model):
     author = models.CharField(max_length=100)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, null=True, blank=True, related_name='articles')
     publish_date = models.DateTimeField()
+    content_type = models.CharField(
+        max_length=10, choices=CONTENT_TYPE_CHOICES, default='article',
+        help_text='Type of content: "article" for long-form articles, "news" for news items'
+    )
     is_featured = models.BooleanField(default=False)
     view_count = models.PositiveIntegerField(default=0)
     like_count = models.PositiveIntegerField(default=0)
@@ -372,6 +380,7 @@ class Article(models.Model):
             models.Index(fields=['is_featured', '-publish_date']),
             models.Index(fields=['is_draft', '-publish_date']),
             models.Index(fields=['status', '-publish_date']),
+            models.Index(fields=['content_type', '-publish_date']),
         ]
 
     def __str__(self):
@@ -425,7 +434,9 @@ class ArticleComment(models.Model):
         help_text='Parent comment for threaded replies (1 level deep).'
     )
     content = models.TextField()
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -985,6 +996,8 @@ class RegistrationFormField(models.Model):
     validation_regex = models.CharField(max_length=500, blank=True, help_text='Optional regex for validation')
     help_text = models.CharField(max_length=300, blank=True)
     help_text_fr = models.CharField(max_length=300, blank=True)
+    max_length = models.IntegerField(null=True, blank=True, help_text='Maximum character length (for textarea)')
+    min_length = models.IntegerField(null=True, blank=True, help_text='Minimum character length (for textarea)')
 
     order = models.IntegerField(default=0)
 
@@ -1430,7 +1443,7 @@ class AppSettings(models.Model):
     instagram_url = models.URLField(blank=True)
 
     # About page fields (editable from admin)
-    app_description = models.TextField(blank=True, default='Official application for the Burundi Chairmanship 2026.', help_text='Description shown in the About dialog (English)')
+    app_description = models.TextField(blank=True, default='Official application for the Be 4 Africa 2026.', help_text='Description shown in the About dialog (English)')
     app_description_fr = models.TextField(blank=True, default='Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.', help_text='Description shown in the About dialog (French)')
     developer_name = models.CharField(max_length=100, blank=True, default='Eyosias Tamene', help_text='Developer/company name shown in About dialog')
     developer_url = models.URLField(blank=True, default='https://eyosias.dev', help_text='Developer website URL')
@@ -1471,7 +1484,7 @@ class AppSettings(models.Model):
 
 
 class PriorityAgenda(models.Model):
-    """Priority agendas for the Burundi Chairmanship"""
+    """Priority agendas for the Be 4 Africa"""
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
     slug = models.SlugField(unique=True)
@@ -1810,6 +1823,11 @@ class QuickAccessMenuItem(models.Model):
     badge_color = models.CharField(max_length=10, blank=True, default='#E53935', help_text='Badge background color (hex). Default: red')
     auto_badge = models.BooleanField(default=True, help_text='Automatically show "NEW" badge when fresh content exists for this route')
     auto_badge_days = models.IntegerField(default=3, help_text='Number of days content is considered "new"')
+    visibility_rule = models.CharField(
+        max_length=50, blank=True, default='',
+        choices=[('', 'Everyone'), ('youth_dialogue_accepted', 'Youth Dialogue Accepted Only')],
+        help_text='Who can see this menu item. Empty = everyone.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -2815,7 +2833,7 @@ class DiscussionReply(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
     like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['created_at']
@@ -4053,7 +4071,9 @@ class EventComment(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
     content = models.TextField()
     is_approved = models.BooleanField(default=True)
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -4104,7 +4124,9 @@ class VideoComment(models.Model):
         help_text='Parent comment for threaded replies (1 level deep).'
     )
     content = models.TextField()
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -4126,7 +4148,9 @@ class GalleryComment(models.Model):
         help_text='Parent comment for threaded replies (1 level deep).'
     )
     content = models.TextField()
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -4150,6 +4174,84 @@ class DiscussionLike(models.Model):
 
     def __str__(self):
         return f"{self.user.username} likes {self.discussion.title[:30]}"
+
+
+class ArticleCommentLike(models.Model):
+    """Tracks which users liked which article comments."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='article_comment_likes')
+    comment = models.ForeignKey(ArticleComment, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes article comment #{self.comment_id}"
+
+
+class MagazineCommentLike(models.Model):
+    """Tracks which users liked which magazine comments."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='magazine_comment_likes')
+    comment = models.ForeignKey(MagazineComment, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes magazine comment #{self.comment_id}"
+
+
+class VideoCommentLike(models.Model):
+    """Tracks which users liked which video comments."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_comment_likes')
+    comment = models.ForeignKey(VideoComment, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes video comment #{self.comment_id}"
+
+
+class GalleryCommentLike(models.Model):
+    """Tracks which users liked which gallery comments."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='gallery_comment_likes')
+    comment = models.ForeignKey(GalleryComment, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes gallery comment #{self.comment_id}"
+
+
+class EventCommentLike(models.Model):
+    """Tracks which users liked which event comments."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='event_comment_likes')
+    comment = models.ForeignKey(EventComment, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes event comment #{self.comment_id}"
+
+
+class DiscussionReplyLike(models.Model):
+    """Tracks which users liked which discussion replies."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussion_reply_likes')
+    comment = models.ForeignKey(DiscussionReply, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes discussion reply #{self.comment_id}"
 
 
 class AppOpenEvent(models.Model):
@@ -4176,7 +4278,7 @@ class AppOpenEvent(models.Model):
 
 
 class NewsletterEdition(models.Model):
-    """Weekly newsletter editions sent to subscribers."""
+    """Monthly newsletter editions sent to subscribers."""
     subject = models.CharField(max_length=300)
     body_html = models.TextField()
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -4191,6 +4293,213 @@ class NewsletterEdition(models.Model):
     def __str__(self):
         status = f"Sent to {self.recipient_count}" if self.sent_at else "Draft"
         return f"{self.subject} ({status})"
+
+
+class NewsletterSubscriber(models.Model):
+    """Monthly newsletter subscribers with contact details."""
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='newsletter_subscriptions',
+        help_text='Linked app user (if subscribed while logged in)'
+    )
+    name = models.CharField(max_length=200)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=30, blank=True, default='')
+    subscribed_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True, help_text='Uncheck to unsubscribe')
+
+    class Meta:
+        ordering = ['-subscribed_at']
+        verbose_name = 'Newsletter Subscriber'
+        verbose_name_plural = 'Newsletter Subscribers'
+        constraints = [
+            models.UniqueConstraint(fields=['email'], name='unique_subscriber_email'),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.email})"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YOUTH DIALOGUE APPLICATION SYSTEM
+# ═══════════════════════════════════════════════════════════════
+
+class YouthDialogueApplication(models.Model):
+    """Youth Dialogue application — one per user, with multi-step status pipeline."""
+
+    STATUS_CHOICES = [
+        ('submitted', 'Submitted'),
+        ('under_review', 'Under Review'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('documents_pending', 'Documents Pending'),
+        ('documents_submitted', 'Documents Submitted'),
+        ('documents_under_review', 'Documents Under Review'),
+        ('documents_rejected', 'Documents Rejected'),
+        ('credential_issued', 'Credential Issued'),
+    ]
+
+    TITLE_CHOICES = [
+        ('mr', 'Mr.'), ('mrs', 'Mrs.'), ('ms', 'Ms.'), ('dr', 'Dr.'),
+        ('prof', 'Prof.'), ('he', 'H.E. (His/Her Excellency)'),
+        ('amb', 'Ambassador'), ('hon', 'Honorable'), ('other', 'Other'),
+    ]
+
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='youth_dialogue_application')
+
+    # Step 1 form fields
+    title = models.CharField(max_length=10, choices=TITLE_CHOICES, blank=True)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField(db_index=True, help_text='Contact email for this application')
+    phone_number = models.CharField(max_length=30, blank=True)
+    country_code = models.CharField(max_length=5, blank=True)
+    nationality = models.CharField(max_length=5, choices=NATIONALITY_CHOICES, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
+    organization = models.CharField(max_length=200, blank=True)
+    position = models.CharField(max_length=200, blank=True)
+    motivation = models.TextField(blank=True, help_text='Why the applicant wants to participate')
+    additional_data = models.JSONField(default=dict, blank=True, help_text='Flexible extra fields')
+
+    # Status pipeline
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='submitted')
+
+    # Application review
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='yd_reviewed_apps')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+
+    # Document review
+    documents_reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='yd_doc_reviewed_apps')
+    documents_reviewed_at = models.DateTimeField(null=True, blank=True)
+    documents_rejection_notes = models.TextField(blank=True)
+
+    # Credential
+    participant_code = models.CharField(max_length=20, unique=True, blank=True, null=True, help_text='Format: YD-2026-0001')
+    qr_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    credential_issued_at = models.DateTimeField(null=True, blank=True)
+    id_photo = models.ImageField(upload_to='youth_dialogue/id_photos/', blank=True, null=True, help_text='Passport photo for ID card')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Youth Dialogue Application'
+        verbose_name_plural = 'Youth Dialogue Applications'
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['email']),
+        ]
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.get_status_display()})"
+
+    def generate_participant_code(self):
+        """Generate sequential participant code: YD-YYYY-NNNN"""
+        from django.utils import timezone as tz
+        year = tz.now().year
+        prefix = f'YD-{year}-'
+        existing = YouthDialogueApplication.objects.filter(
+            participant_code__startswith=prefix
+        ).count()
+        self.participant_code = f'{prefix}{existing + 1:04d}'
+        return self.participant_code
+
+    def generate_qr_hash(self):
+        """Generate a unique hash for QR code validation."""
+        import hashlib
+        raw = f"{self.id}:{self.user_id}:{self.participant_code}:{self.created_at}"
+        self.qr_hash = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        return self.qr_hash
+
+
+class YouthDialogueDocument(models.Model):
+    """Documents uploaded for a Youth Dialogue application."""
+
+    DOCUMENT_TYPE_CHOICES = [
+        ('passport', 'Passport Copy'),
+        ('national_id', 'National ID'),
+        ('photo', 'Passport Photo'),
+        ('cv', 'CV / Resume'),
+        ('recommendation', 'Recommendation Letter'),
+        ('other', 'Other'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    application = models.ForeignKey(YouthDialogueApplication, on_delete=models.CASCADE, related_name='documents')
+    document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
+    file = models.FileField(upload_to='youth_dialogue/documents/')
+    original_filename = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveIntegerField(default=0, help_text='File size in bytes')
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(blank=True)
+
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='yd_doc_reviews')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    # Resubmission tracking
+    is_resubmission = models.BooleanField(default=False)
+    replaces = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replacements')
+
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+        verbose_name = 'Youth Dialogue Document'
+        verbose_name_plural = 'Youth Dialogue Documents'
+
+    def __str__(self):
+        return f"{self.get_document_type_display()} - {self.application}"
+
+
+class YouthDialogueActivityLog(models.Model):
+    """Activity tracking for the Youth Dialogue feature."""
+
+    ACTION_CHOICES = [
+        ('screen_visit', 'Screen Visit'),
+        ('form_started', 'Form Started'),
+        ('form_submitted', 'Form Submitted'),
+        ('document_uploaded', 'Document Uploaded'),
+        ('document_deleted', 'Document Deleted'),
+        ('status_viewed', 'Status Viewed'),
+        ('credential_viewed', 'Credential Viewed'),
+        ('credential_shared', 'Credential Shared'),
+        ('qr_scanned', 'QR Scanned'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='yd_activity_logs')
+    application = models.ForeignKey(YouthDialogueApplication, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs')
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    screen_name = models.CharField(max_length=100, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Youth Dialogue Activity Log'
+        verbose_name_plural = 'Youth Dialogue Activity Logs'
+        indexes = [
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['action', '-timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_action_display()} at {self.timestamp}"
 
 
 # Connect to all core models with image fields

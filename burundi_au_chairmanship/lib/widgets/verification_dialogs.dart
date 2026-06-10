@@ -69,7 +69,7 @@ Future<void> showVerificationApprovedDialog(
               decoration: BoxDecoration(
                 color: badgeType == 'GOLD'
                     ? const Color(0xFFFFD700).withValues(alpha: 0.1)
-                    : const Color(0xFF2196F3).withValues(alpha: 0.1),
+                    : const Color(0xFF409843).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -86,7 +86,7 @@ Future<void> showVerificationApprovedDialog(
                       fontWeight: FontWeight.w600,
                       color: badgeType == 'GOLD'
                           ? const Color(0xFFFFD700)
-                          : const Color(0xFF2196F3),
+                          : const Color(0xFF409843),
                     ),
                   ),
                 ],

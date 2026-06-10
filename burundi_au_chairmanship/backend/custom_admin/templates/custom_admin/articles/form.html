@@ -1,6 +1,6 @@
 {% extends 'custom_admin/base.html' %}
 
-{% block title %}{% if article %}Edit Article{% else %}New Article{% endif %} - Burundi Chairmanship Admin{% endblock %}
+{% block title %}{% if article %}Edit Article{% else %}New Article{% endif %} - Be 4 Africa Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -88,6 +88,26 @@
           placeholder="Entrez le contenu de l'article en français (HTML supporté)"
         >{% if article %}{{ article.content_fr }}{% endif %}</textarea>
         <p class="text-xs text-on-surface-variant mt-2">Vous pouvez utiliser des balises HTML pour le formatage (ex: &lt;b&gt;, &lt;i&gt;, &lt;h2&gt;, &lt;ul&gt;, &lt;a&gt;)</p>
+      </div>
+
+      <!-- Content Type -->
+      <div class="mb-6">
+        <label for="content_type" class="block font-headline font-bold text-on-surface mb-2">
+          Content Type <span class="text-error">*</span>
+        </label>
+        <select
+          id="content_type"
+          name="content_type"
+          required
+          class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
+        >
+          <option value="article" {% if article and article.content_type == 'article' %}selected{% endif %}>Article</option>
+          <option value="news" {% if article and article.content_type == 'news' %}selected{% endif %}>News</option>
+        </select>
+        <p class="text-xs text-on-surface-variant mt-2">
+          <strong>Article:</strong> Long-form content shown in the Articles section.
+          <strong>News:</strong> News items shown in the News tab and Latest News on the home screen.
+        </p>
       </div>
 
       <!-- Two Column Layout -->

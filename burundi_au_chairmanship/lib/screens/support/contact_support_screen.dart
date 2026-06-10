@@ -187,7 +187,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                   scheme: 'mailto',
                   path: 'support@burundi4africa.com',
                   queryParameters: {
-                    'subject': 'Support Request - Burundi Chairmanship App',
+                    'subject': 'Support Request - Be 4 Africa App',
                     'body': 'Hello Support Team,\n\n'
                         'I need help with:\n\n'
                         'Email: ${_emailController.text}\n',

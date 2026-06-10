@@ -8,6 +8,7 @@ import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -28,6 +29,7 @@ class _VideosScreenState extends State<VideosScreen> {
 
   final Map<String, String> categoryLabels = {
     'all': 'All Videos',
+    'live_recorded': 'Live Recorded',
     'highlight': 'Highlights',
     'speech': 'Speeches',
     'documentary': 'Documentaries',
@@ -69,10 +71,35 @@ class _VideosScreenState extends State<VideosScreen> {
 
   Future<void> _loadVideos() async {
     try {
-      final data = await ApiService().getVideos();
+      final api = ApiService();
+      final results = await Future.wait([
+        api.getVideos(),
+        api.getLiveFeeds(status: 'recorded'),
+      ]);
+
+      final videos = results[0] as List<Map<String, dynamic>>;
+      final recordedFeeds = results[1] as List<ApiLiveFeed>;
+
+      // Convert recorded live feeds to video format
+      final liveRecordedVideos = recordedFeeds.map((feed) => <String, dynamic>{
+        'id': feed.id,
+        'title': feed.title,
+        'title_fr': feed.titleFr,
+        'description': feed.description,
+        'description_fr': feed.descriptionFr,
+        'video_url': feed.streamUrl,
+        'thumbnail': feed.thumbnail,
+        'category': 'live_recorded',
+        'duration': feed.duration,
+        'view_count': feed.viewerCount,
+        'like_count': 0,
+        'is_featured': false,
+        '_is_live_recorded': true,
+      }).toList();
+
       if (mounted) {
         setState(() {
-          _allVideos = data;
+          _allVideos = [...videos, ...liveRecordedVideos];
           _isLoading = false;
         });
       }
@@ -80,7 +107,7 @@ class _VideosScreenState extends State<VideosScreen> {
       if (kDebugMode) debugPrint('Failed to load videos: $e');
       if (mounted) {
         setState(() {
-          _allVideos = []; // No fallback - show empty state
+          _allVideos = [];
           _isLoading = false;
         });
       }
@@ -442,8 +469,37 @@ class _VideosScreenState extends State<VideosScreen> {
                   ),
                 ),
 
+                // Live Recorded Badge
+                if (video['_is_live_recorded'] == true)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE53935),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.sensors, color: Colors.white, size: 12),
+                          SizedBox(width: 4),
+                          Text(
+                            'Live Recorded',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Featured Badge
-                if (video['is_featured'] == true)
+                if (video['is_featured'] == true && video['_is_live_recorded'] != true)
                   Positioned(
                     top: 8,
                     left: 8,
@@ -552,6 +608,8 @@ class _VideosScreenState extends State<VideosScreen> {
 
   Color _getCategoryColor(String category) {
     switch (category) {
+      case 'live_recorded':
+        return const Color(0xFFE53935);
       case 'highlight':
         return AppColors.burundiGreen;
       case 'speech':

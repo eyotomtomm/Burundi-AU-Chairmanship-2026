@@ -1,5 +1,5 @@
 """
-Utility functions for the Burundi Chairmanship app.
+Utility functions for the Be 4 Africa app.
 """
 
 import logging

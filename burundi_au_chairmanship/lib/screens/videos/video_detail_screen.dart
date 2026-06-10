@@ -10,6 +10,8 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/liked_by_avatars.dart';
+import '../../services/like_service.dart';
+import '../../widgets/comment_tile.dart';
 
 class VideoDetailScreen extends StatefulWidget {
   final Map<String, dynamic> video;
@@ -31,10 +33,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   bool _hasError = false;
   String _errorMessage = '';
   bool _isLoading = true;
-  bool _isLiked = false;
-  int _likeCount = 0;
-  List<Liker> _recentLikers = [];
-  bool _isTogglingLike = false;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   // Chapters
   List<Map<String, dynamic>> _chapters = [];
@@ -56,13 +56,20 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     super.initState();
     // Allow all orientations so YoutubePlayerBuilder can go landscape for fullscreen
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-    _isLiked = widget.video['is_liked'] == true;
-    _likeCount = widget.video['like_count'] ?? 0;
-    if (widget.video['recent_likers'] is List) {
-      _recentLikers = (widget.video['recent_likers'] as List)
-          .map((l) => Liker.fromJson(l as Map<String, dynamic>))
-          .toList();
-    }
+    final likers = widget.video['recent_likers'] is List
+        ? (widget.video['recent_likers'] as List)
+            .map((l) => Liker.fromJson(l as Map<String, dynamic>))
+            .toList()
+        : <Liker>[];
+    _likeService.seed(
+      EntityType.video, widget.video['id'],
+      isLiked: widget.video['is_liked'] == true,
+      likeCount: widget.video['like_count'] ?? 0,
+      recentLikers: likers,
+    );
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key == 'video:${widget.video['id']}' && mounted) setState(() {});
+    });
     // Parse chapters and subtitles from video data
     if (widget.video['chapters'] != null) {
       _chapters = List<Map<String, dynamic>>.from(widget.video['chapters']);
@@ -117,8 +124,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     } catch (_) {}
   }
 
-  Future<void> _toggleLike() async {
-    if (_isTogglingLike) return;
+  void _toggleLike() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final l10n = AppLocalizations.of(context);
     if (!auth.isAuthenticated) {
@@ -127,37 +133,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       );
       return;
     }
-    _isTogglingLike = true;
-    final wasLiked = _isLiked;
-    final prevCount = _likeCount;
-    setState(() {
-      _isLiked = !wasLiked;
-      _likeCount = prevCount + (wasLiked ? -1 : 1);
-    });
-    try {
-      final result = await ApiService().toggleVideoLike(widget.video['id'].toString());
-      if (mounted) {
-        List<Liker> likers = [];
-        if (result['recent_likers'] is List) {
-          likers = (result['recent_likers'] as List)
-              .map((l) => Liker.fromJson(l as Map<String, dynamic>))
-              .toList();
-        }
-        setState(() {
-          _isLiked = result['is_liked'] == true;
-          _likeCount = result['like_count'] ?? _likeCount;
-          _recentLikers = likers;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _isLiked = wasLiked;
-        _likeCount = prevCount;
-      });
-    } finally {
-      _isTogglingLike = false;
-    }
+    _likeService.toggle(EntityType.video, widget.video['id']);
   }
 
   Future<void> _initPlayer() async {
@@ -235,6 +211,11 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         allowFullScreen: true,
         allowMuting: true,
         showControls: true,
+        deviceOrientationsOnEnterFullScreen: DeviceOrientation.values,
+        deviceOrientationsAfterFullScreen: [
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ],
         materialProgressColors: ChewieProgressColors(
           playedColor: AppColors.burundiGreen,
           handleColor: AppColors.auGold,
@@ -405,6 +386,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _chewieController?.dispose();
     _videoController?.dispose();
     _youtubeController?.dispose();
@@ -443,6 +425,14 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           ),
         ),
         builder: (context, player) {
+          // In landscape (fullscreen), show only the player without AppBar
+          final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+          if (isLandscape) {
+            return Scaffold(
+              backgroundColor: Colors.black,
+              body: Center(child: player),
+            );
+          }
           return _buildScaffold(title, description, isDark, theme, playerWidget: player);
         },
       );
@@ -453,6 +443,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   }
 
   Widget _buildScaffold(String? title, String? description, bool isDark, ThemeData theme, {Widget? playerWidget}) {
+    final likeState = _likeService.getState(EntityType.video, widget.video['id']);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -523,26 +514,26 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                           child: Row(
                             children: [
                               Icon(
-                                _isLiked ? Icons.favorite : Icons.favorite_border,
+                                likeState.isLiked ? Icons.favorite : Icons.favorite_border,
                                 size: 16,
-                                color: _isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '$_likeCount',
+                                '${likeState.likeCount}',
                                 style: TextStyle(
-                                  color: _isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                                   fontSize: 14,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        if (_recentLikers.isNotEmpty) ...[
+                        if (likeState.recentLikers.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           LikedByAvatars(
-                            likers: _recentLikers,
-                            totalLikes: _likeCount,
+                            likers: likeState.recentLikers,
+                            totalLikes: likeState.likeCount,
                             avatarRadius: 10,
                           ),
                         ],
@@ -669,113 +660,35 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                     if (_loadingComments)
                       const Center(child: CircularProgressIndicator())
                     else
-                      ..._comments.map((c) => _buildCommentTile(c, isDark)),
+                      ..._comments.map((comment) {
+                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                        final videoId = widget.video['id'].toString();
+                        return CommentTile.fromMap(
+                          comment,
+                          isAuthenticated: auth.isAuthenticated,
+                          onReply: () => setState(() {
+                            _replyingToId = comment['id'];
+                            _replyingToName = comment['user_name'];
+                          }),
+                          onDelete: () => _deleteComment(comment['id']),
+                          onToggleLike: () => ApiService().toggleVideoCommentLike(videoId, comment['id']),
+                          onEdit: (content) => ApiService().editVideoComment(videoId, comment['id'], content),
+                          replyBuilder: (reply) => CommentTile.fromMap(
+                            reply,
+                            isReply: true,
+                            isAuthenticated: auth.isAuthenticated,
+                            onDelete: () => _deleteComment(reply['id']),
+                            onToggleLike: () => ApiService().toggleVideoCommentLike(videoId, reply['id']),
+                            onEdit: (content) => ApiService().editVideoComment(videoId, reply['id'], content),
+                          ),
+                        );
+                      }),
                     const SizedBox(height: 32),
                   ],
                 ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommentTile(Map<String, dynamic> comment, bool isDark) {
-    final isOwn = Provider.of<AuthProvider>(context, listen: false).userId?.toString() == comment['user_id']?.toString();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: comment['profile_picture'] != null
-                    ? NetworkImage(comment['profile_picture'])
-                    : null,
-                backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
-                child: comment['profile_picture'] == null
-                    ? Text((comment['user_name'] ?? 'A')[0].toUpperCase(),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(comment['user_name'] ?? 'User',
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        if (comment['badge_type'] != null) ...[
-                          const SizedBox(width: 4),
-                          Icon(Icons.verified, size: 14, color: AppColors.burundiGreen),
-                        ],
-                        const Spacer(),
-                        if (isOwn)
-                          GestureDetector(
-                            onTap: () => _deleteComment(comment['id']),
-                            child: Icon(Icons.delete_outline, size: 16, color: Colors.grey[400]),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(comment['content'] ?? '', style: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : Colors.black87)),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _replyingToId = comment['id'];
-                        _replyingToName = comment['user_name'];
-                      }),
-                      child: Text('Reply', style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // Nested replies
-          if (comment['replies'] != null && (comment['replies'] as List).isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 42, top: 8),
-              child: Column(
-                children: (comment['replies'] as List).map<Widget>((r) {
-                  final reply = r as Map<String, dynamic>;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundImage: reply['profile_picture'] != null ? NetworkImage(reply['profile_picture']) : null,
-                          backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
-                          child: reply['profile_picture'] == null
-                              ? Text((reply['user_name'] ?? 'A')[0].toUpperCase(),
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.burundiGreen))
-                              : null,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(reply['user_name'] ?? 'User',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                              Text(reply['content'] ?? '', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
         ],
       ),
     );

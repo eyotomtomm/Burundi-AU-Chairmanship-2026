@@ -57,7 +57,7 @@ class EventCountdown extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1EB53A), Color(0xFF065A1A)],
+          colors: [Color(0xFF409843), Color(0xFF2D6E31)],
         ),
         borderRadius: BorderRadius.circular(12),
       ),

@@ -757,14 +757,14 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ],
 
-        // Articles Section
+        // News Section
         if (_articles.isNotEmpty) ...[
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
               child: _buildSectionTitle(
                 context,
-                langCode == 'fr' ? 'Articles' : 'Articles',
+                langCode == 'fr' ? 'Actualités' : 'News',
                 showSeeAll: true,
                 onSeeAll: () {
                   Navigator.push(

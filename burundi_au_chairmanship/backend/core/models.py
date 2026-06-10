@@ -3080,7 +3080,8 @@ class OnboardingStep(models.Model):
     description = models.TextField()
     description_fr = models.TextField(blank=True)
     image = models.ImageField(upload_to='onboarding/', blank=True, validators=[validate_image_file])
-    icon_name = models.CharField(max_length=50, blank=True, help_text='Material icon name')
+    image_dark = models.ImageField(upload_to='onboarding/', blank=True, validators=[validate_image_file], help_text='Icon/logo for dark mode')
+    icon_name = models.CharField(max_length=50, blank=True, help_text='Material icon name (fallback if no image)')
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -4318,6 +4319,56 @@ class NewsletterSubscriber(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.email})"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YOUTH DIALOGUE SETTINGS (Singleton)
+# ═══════════════════════════════════════════════════════════════
+
+class YouthDialogueSettings(models.Model):
+    """Admin-configurable branding and support info for the Youth Dialogue section."""
+
+    # Branding
+    logo_light = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
+                                   help_text='Horizontal logo for light mode')
+    logo_dark = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
+                                  help_text='Horizontal logo for dark mode')
+    programme_title = models.CharField(max_length=200, default='Youth Dialogue Programme')
+    programme_title_fr = models.CharField(max_length=200, blank=True, default='Programme du Dialogue de la Jeunesse')
+    description = models.TextField(default='Join the African Union Youth Dialogue and contribute to shaping the continent\'s future. Apply now to participate in this prestigious programme.')
+    description_fr = models.TextField(blank=True, default='Rejoignez le Dialogue de la Jeunesse de l\'Union Africaine et contribuez à façonner l\'avenir du continent.')
+
+    # Registration control
+    is_registration_open = models.BooleanField(default=True, help_text='Whether new applications are accepted')
+    registration_closed_message = models.TextField(blank=True, default='Registration is currently closed. Please check back later.')
+    registration_closed_message_fr = models.TextField(blank=True, default='Les inscriptions sont actuellement fermées. Veuillez réessayer plus tard.')
+
+    # Support & Contact
+    support_email = models.EmailField(blank=True, default='', help_text='Contact email for Youth Dialogue support')
+    support_phone = models.CharField(max_length=30, blank=True, default='', help_text='Contact phone number')
+    live_chat_url = models.URLField(blank=True, default='', help_text='URL for live chat support (e.g. WhatsApp, Tawk.to)')
+    support_note = models.TextField(blank=True, default='Need help? Reach out to our support team for assistance with your application.',
+                                    help_text='Text shown above contact options')
+    support_note_fr = models.TextField(blank=True, default='Besoin d\'aide ? Contactez notre équipe de support pour obtenir de l\'aide avec votre candidature.')
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Youth Dialogue Settings'
+        verbose_name_plural = 'Youth Dialogue Settings'
+
+    def __str__(self):
+        return 'Youth Dialogue Settings'
+
+    def save(self, *args, **kwargs):
+        # Singleton: ensure only one instance
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
 
 # ═══════════════════════════════════════════════════════════════

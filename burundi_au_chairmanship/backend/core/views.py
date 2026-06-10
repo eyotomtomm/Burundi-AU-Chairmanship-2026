@@ -50,7 +50,7 @@ from .models import (
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
-    YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
 )
 from .serializers import (
     get_recent_likers,
@@ -5325,6 +5325,13 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
 class YouthDialogueViewSet(viewsets.GenericViewSet):
     """Youth Dialogue application pipeline endpoints."""
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='settings', permission_classes=[AllowAny])
+    def settings(self, request):
+        """Return Youth Dialogue branding, texts, and support contact info."""
+        from core.serializers import YouthDialogueSettingsSerializer
+        settings = YouthDialogueSettings.load()
+        return Response(YouthDialogueSettingsSerializer(settings, context={'request': request}).data)
 
     @action(detail=False, methods=['post'], url_path='apply')
     def apply(self, request):

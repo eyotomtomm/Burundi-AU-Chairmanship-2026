@@ -21,13 +21,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _loading = true;
   int _currentPage = 0;
 
+  /// Map icon_name strings from the API to Material icons.
+  static const Map<String, IconData> _iconMap = {
+    'celebration': Icons.celebration_rounded,
+    'article': Icons.article_rounded,
+    'event': Icons.event_rounded,
+    'auto_stories': Icons.auto_stories_rounded,
+    'live_tv': Icons.live_tv_rounded,
+    'translate': Icons.translate_rounded,
+    'photo_library': Icons.photo_library_rounded,
+    'groups': Icons.groups_rounded,
+    'campaign': Icons.campaign_rounded,
+    'podcasts': Icons.podcasts_rounded,
+    'video_library': Icons.video_library_rounded,
+    'school': Icons.school_rounded,
+    'forum': Icons.forum_rounded,
+    'star': Icons.star_rounded,
+    'explore': Icons.explore_rounded,
+    'bookmark': Icons.bookmark_rounded,
+    'favorite': Icons.favorite_rounded,
+    'notifications': Icons.notifications_rounded,
+    'public': Icons.public_rounded,
+    'verified': Icons.verified_rounded,
+  };
+
   /// Hardcoded bilingual fallback steps — used when the API returns nothing.
   static List<Map<String, dynamic>> _fallbackSteps(String lang) {
     final isFr = lang == 'fr';
     return [
       {
         'icon': Icons.celebration_rounded,
-        'title': isFr ? 'Bienvenue sur Be 4 Africa' : 'Welcome to Be 4 Africa',
+        'title': isFr ? 'Bienvenue sur B4Africa' : 'Welcome to B4Africa',
         'description': isFr
             ? 'Votre compagnon pour la Présidence de l\'Union Africaine 2026. Faisons le tour !'
             : 'Your companion for the African Union Chairmanship 2026. Let\'s show you around!',
@@ -111,6 +135,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (mounted) Navigator.pop(context, true);
   }
 
+  /// Resolve the correct image URL based on dark/light mode.
+  String? _resolveImage(Map<String, dynamic> step, bool isDark) {
+    if (isDark) {
+      final dark = step['image_dark']?.toString() ?? '';
+      if (dark.isNotEmpty) return dark;
+    }
+    final light = step['image']?.toString() ?? '';
+    return light.isNotEmpty ? light : null;
+  }
+
+  /// Resolve an IconData from the step — either from fallback 'icon' key
+  /// or from the API 'icon_name' string.
+  IconData _resolveIcon(Map<String, dynamic> step) {
+    if (step['icon'] is IconData) return step['icon'];
+    final name = step['icon_name']?.toString() ?? '';
+    return _iconMap[name] ?? Icons.star_rounded;
+  }
+
   @override
   void dispose() {
     _pageCtrl.dispose();
@@ -120,6 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_loading) {
       return Scaffold(
@@ -163,16 +206,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 itemBuilder: (context, index) {
                   final step = _steps[index];
+                  final imageUrl = _resolveImage(step, isDark);
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 40),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (step['image'] != null && step['image'].toString().isNotEmpty)
+                        if (imageUrl != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: Image.network(
-                              step['image'],
+                              imageUrl,
                               height: 260,
                               fit: BoxFit.contain,
                               errorBuilder: (_, _, _) => _buildIconPlaceholder(step),
@@ -250,8 +294,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildIconPlaceholder(Map<String, dynamic> step) {
-    // Use the step's icon if available (from fallback steps), otherwise default
-    final IconData icon = step['icon'] is IconData ? step['icon'] : Icons.star;
+    final icon = _resolveIcon(step);
 
     return Container(
       width: 200,

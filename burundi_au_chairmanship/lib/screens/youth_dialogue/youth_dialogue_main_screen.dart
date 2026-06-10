@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
 
@@ -15,37 +17,51 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   String? _error;
   bool _hasApplication = false;
   YouthDialogueApplication? _application;
+  Map<String, dynamic>? _settings;
 
   @override
   void initState() {
     super.initState();
-    _loadStatus();
+    _loadData();
     ApiService().youthDialogueLogActivity('screen_visit', 'youth_dialogue_main');
   }
 
-  Future<void> _loadStatus() async {
+  Future<void> _loadData() async {
     try {
-      final data = await ApiService().youthDialogueStatus();
+      final results = await Future.wait([
+        ApiService().youthDialogueSettings(),
+        ApiService().youthDialogueStatus().catchError((_) => <String, dynamic>{}),
+      ]);
       if (!mounted) return;
       setState(() {
-        _hasApplication = data['has_application'] == true;
+        _settings = results[0];
+        final statusData = results[1];
+        _hasApplication = statusData['has_application'] == true;
         if (_hasApplication) {
-          _application = YouthDialogueApplication.fromJson(data);
+          _application = YouthDialogueApplication.fromJson(statusData);
         }
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load status. Please try again.';
+        _error = 'Failed to load. Please try again.';
         _isLoading = false;
       });
     }
   }
 
+  String _t(String enKey, String frKey, bool isFr) {
+    if (_settings == null) return '';
+    final val = isFr ? _settings![frKey] : null;
+    if (val != null && val.toString().isNotEmpty) return val.toString();
+    return _settings![enKey]?.toString() ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isFr = Localizations.localeOf(context).languageCode == 'fr';
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
@@ -60,14 +76,67 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
           : _error != null
               ? _buildError(isDark)
               : RefreshIndicator(
-                  onRefresh: _loadStatus,
+                  onRefresh: _loadData,
                   color: AppColors.burundiGreen,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(20),
-                    child: _hasApplication ? _buildStatusView(isDark) : _buildWelcome(isDark),
+                    child: Column(
+                      children: [
+                        _buildHeader(isDark, isFr),
+                        const SizedBox(height: 24),
+                        if (_hasApplication)
+                          _buildStatusView(isDark)
+                        else
+                          _buildWelcome(isDark, isFr),
+                        const SizedBox(height: 24),
+                        _buildSupportSection(isDark, isFr),
+                      ],
+                    ),
                   ),
                 ),
+    );
+  }
+
+  Widget _buildHeader(bool isDark, bool isFr) {
+    final logoUrl = isDark
+        ? (_settings?['logo_dark']?.toString() ?? '')
+        : (_settings?['logo_light']?.toString() ?? '');
+    // Fallback: if dark logo is empty, try light
+    final effectiveUrl = logoUrl.isNotEmpty
+        ? logoUrl
+        : (_settings?['logo_light']?.toString() ?? '');
+
+    if (effectiveUrl.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Image.network(
+          Environment.fixMediaUrl(effectiveUrl),
+          height: 80,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          _t('programme_title', 'programme_title_fr', isFr),
+          style: TextStyle(
+            fontSize: 22, fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _t('description', 'description_fr', isFr),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14, height: 1.5,
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
+      ],
     );
   }
 
@@ -84,7 +153,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () { setState(() { _isLoading = true; _error = null; }); _loadStatus(); },
+              onPressed: () { setState(() { _isLoading = true; _error = null; }); _loadData(); },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.burundiGreen),
               child: const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
@@ -94,51 +163,162 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     );
   }
 
-  Widget _buildWelcome(bool isDark) {
-    return Column(
-      children: [
-        const SizedBox(height: 40),
-        Container(
-          width: 100, height: 100,
-          decoration: BoxDecoration(
-            color: AppColors.burundiGreen.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.forum_rounded, size: 48, color: AppColors.burundiGreen),
+  Widget _buildWelcome(bool isDark, bool isFr) {
+    final isOpen = _settings?['is_registration_open'] ?? true;
+
+    if (!isOpen) {
+      final closedMsg = _t('registration_closed_message', 'registration_closed_message_fr', isFr);
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
         ),
-        const SizedBox(height: 24),
-        Text('Youth Dialogue Programme',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black87),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Join the African Union Youth Dialogue and contribute to shaping the continent\'s future. Apply now to participate in this prestigious programme.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, height: 1.5,
-              color: isDark ? Colors.white60 : Colors.black54),
-          ),
-        ),
-        const SizedBox(height: 32),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: () async {
-              await Navigator.pushNamed(context, '/youth-dialogue-apply');
-              _loadStatus();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.burundiGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          children: [
+            Container(
+              width: 72, height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.auGold.withValues(alpha: 0.1), shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_clock_rounded, size: 36, color: AppColors.auGold),
             ),
-            child: const Text('Apply Now', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            Text(closedMsg,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, height: 1.5,
+                color: isDark ? Colors.white60 : Colors.black54)),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: () async {
+          await Navigator.pushNamed(context, '/youth-dialogue-apply');
+          _loadData();
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.burundiGreen,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Text(isFr ? 'Postuler Maintenant' : 'Apply Now',
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  Widget _buildSupportSection(bool isDark, bool isFr) {
+    final supportNote = _t('support_note', 'support_note_fr', isFr);
+    final email = _settings?['support_email']?.toString() ?? '';
+    final phone = _settings?['support_phone']?.toString() ?? '';
+    final chatUrl = _settings?['live_chat_url']?.toString() ?? '';
+
+    if (email.isEmpty && phone.isEmpty && chatUrl.isEmpty && supportNote.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.support_agent_rounded, size: 22,
+                color: isDark ? Colors.white70 : Colors.black54),
+              const SizedBox(width: 8),
+              Text(isFr ? 'Support' : 'Support',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87)),
+            ],
+          ),
+          if (supportNote.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(supportNote,
+              style: TextStyle(fontSize: 13, height: 1.5,
+                color: isDark ? Colors.white60 : Colors.black54)),
+          ],
+          const SizedBox(height: 16),
+          if (email.isNotEmpty)
+            _buildContactTile(
+              isDark,
+              icon: Icons.email_outlined,
+              label: isFr ? 'Email' : 'Email',
+              value: email,
+              onTap: () => launchUrl(Uri.parse('mailto:$email')),
+            ),
+          if (phone.isNotEmpty)
+            _buildContactTile(
+              isDark,
+              icon: Icons.phone_outlined,
+              label: isFr ? 'Téléphone' : 'Phone',
+              value: phone,
+              onTap: () => launchUrl(Uri.parse('tel:$phone')),
+            ),
+          if (chatUrl.isNotEmpty)
+            _buildContactTile(
+              isDark,
+              icon: Icons.chat_bubble_outline_rounded,
+              label: isFr ? 'Chat en direct' : 'Live Chat',
+              value: isFr ? 'Ouvrir le chat' : 'Open chat',
+              onTap: () => launchUrl(Uri.parse(chatUrl), mode: LaunchMode.externalApplication),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactTile(bool isDark, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.burundiGreen),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white38 : Colors.black38)),
+                    Text(value, style: TextStyle(fontSize: 14,
+                      color: isDark ? Colors.white : Colors.black87)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, size: 20,
+                color: isDark ? Colors.white30 : Colors.black26),
+            ],
           ),
         ),
-        const SizedBox(height: 40),
-      ],
+      ),
     );
   }
 
@@ -344,7 +524,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     await Navigator.pushNamed(context, '/youth-dialogue-documents');
-                    _loadStatus();
+                    _loadData();
                   },
                   icon: const Icon(Icons.upload_rounded, color: Colors.white),
                   label: const Text('Upload Documents', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
@@ -399,7 +579,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 ),
               ],
               const SizedBox(height: 16),
-              // Show doc list with statuses
               ...app.documents.map((doc) => _buildDocRow(doc, isDark)),
               const SizedBox(height: 16),
               SizedBox(
@@ -408,7 +587,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     await Navigator.pushNamed(context, '/youth-dialogue-documents');
-                    _loadStatus();
+                    _loadData();
                   },
                   icon: const Icon(Icons.edit_document, color: Colors.white),
                   label: const Text('Fix Documents', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),

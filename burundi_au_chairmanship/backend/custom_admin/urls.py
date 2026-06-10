@@ -329,6 +329,7 @@ urlpatterns = [
 
     # Youth Dialogue
     path('youth-dialogue/', views.youth_dialogue_list, name='youth_dialogue_list'),
+    path('youth-dialogue/settings/', views.youth_dialogue_settings, name='youth_dialogue_settings'),
     path('youth-dialogue/<int:pk>/review/', views.youth_dialogue_review, name='youth_dialogue_review'),
     path('youth-dialogue/export-csv/', views.youth_dialogue_export_csv, name='youth_dialogue_export_csv'),
     path('youth-dialogue/<int:pk>/id-card-pdf/', views.youth_dialogue_id_card_pdf, name='youth_dialogue_id_card_pdf'),

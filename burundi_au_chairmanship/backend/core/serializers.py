@@ -29,7 +29,7 @@ from .models import (
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
-    YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
 )
 
 
@@ -1639,7 +1639,7 @@ class OnboardingStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = OnboardingStep
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'image', 'icon_name', 'order']
+                  'image', 'image_dark', 'icon_name', 'order']
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1914,6 +1914,20 @@ class EventAgendaItemSerializer(serializers.ModelSerializer):
 # ═══════════════════════════════════════════════════════════════
 #  YOUTH DIALOGUE SERIALIZERS
 # ═══════════════════════════════════════════════════════════════
+
+class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YouthDialogueSettings
+        fields = [
+            'logo_light', 'logo_dark',
+            'programme_title', 'programme_title_fr',
+            'description', 'description_fr',
+            'is_registration_open',
+            'registration_closed_message', 'registration_closed_message_fr',
+            'support_email', 'support_phone', 'live_chat_url',
+            'support_note', 'support_note_fr',
+        ]
+
 
 class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
     class Meta:

@@ -48,6 +48,7 @@ from core.models import (
     AppRelease, AppReleaseHighlight,
     ArticleLike,
     NewsletterEdition,
+    YouthDialogueSettings,
     YouthDialogueApplication,
     YouthDialogueDocument,
     YouthDialogueActivityLog,
@@ -4282,7 +4283,8 @@ def onboarding_step_create(request):
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
             image=request.FILES.get('image'),
-            icon=request.POST.get('icon', ''),
+            image_dark=request.FILES.get('image_dark'),
+            icon_name=request.POST.get('icon_name', ''),
             order=request.POST.get('order', 0) or 0,
             is_active=request.POST.get('is_active') == 'on',
         )
@@ -4303,7 +4305,9 @@ def onboarding_step_edit(request, pk):
         step.description_fr = request.POST.get('description_fr', '')
         if request.FILES.get('image'):
             step.image = request.FILES.get('image')
-        step.icon = request.POST.get('icon', '')
+        if request.FILES.get('image_dark'):
+            step.image_dark = request.FILES.get('image_dark')
+        step.icon_name = request.POST.get('icon_name', '')
         step.order = request.POST.get('order', 0) or 0
         step.is_active = request.POST.get('is_active') == 'on'
         step.save()
@@ -7876,6 +7880,34 @@ def media_library_api(request):
 # ═══════════════════════════════════════════════════════════════
 #  YOUTH DIALOGUE
 # ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@_catch_upload_errors
+def youth_dialogue_settings(request):
+    settings = YouthDialogueSettings.load()
+    if request.method == 'POST':
+        settings.programme_title = request.POST.get('programme_title', settings.programme_title)
+        settings.programme_title_fr = request.POST.get('programme_title_fr', '')
+        settings.description = request.POST.get('description', '')
+        settings.description_fr = request.POST.get('description_fr', '')
+        settings.is_registration_open = request.POST.get('is_registration_open') == 'on'
+        settings.registration_closed_message = request.POST.get('registration_closed_message', '')
+        settings.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
+        settings.support_email = request.POST.get('support_email', '')
+        settings.support_phone = request.POST.get('support_phone', '')
+        settings.live_chat_url = request.POST.get('live_chat_url', '')
+        settings.support_note = request.POST.get('support_note', '')
+        settings.support_note_fr = request.POST.get('support_note_fr', '')
+        if request.FILES.get('logo_light'):
+            settings.logo_light = request.FILES['logo_light']
+        if request.FILES.get('logo_dark'):
+            settings.logo_dark = request.FILES['logo_dark']
+        settings.save()
+        messages.success(request, 'Youth Dialogue settings updated successfully!')
+        return redirect('custom_admin:youth_dialogue_settings')
+    return render(request, 'custom_admin/youth_dialogue/settings.html', {'settings': settings})
+
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')

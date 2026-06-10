@@ -227,13 +227,16 @@ class NewsCard extends StatelessWidget {
                           ),
                         ],
                         const Spacer(),
-                        Text(
-                          article.author,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 10,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        Flexible(
+                          child: Text(
+                            article.author,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 10,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

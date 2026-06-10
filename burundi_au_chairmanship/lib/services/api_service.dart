@@ -1443,6 +1443,10 @@ class ApiService {
   //  YOUTH DIALOGUE
   // ═══════════════════════════════════════════════════════════
 
+  Future<Map<String, dynamic>> youthDialogueSettings() async {
+    return await _get('youth-dialogue/settings/');
+  }
+
   Future<Map<String, dynamic>> youthDialogueApply(Map<String, dynamic> formData) async {
     return await _post('youth-dialogue/apply/', formData, auth: true);
   }

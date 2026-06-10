@@ -62,6 +62,9 @@ ADMIN_MENU_GROUPS = [
         ('users_list',                'User Management',        'group'),
         ('verification_requests_list','Verification Requests',  'verified'),
     ]),
+    ('Youth Dialogue', [
+        ('youth_dialogue_list',       'Youth Dialogue',         'forum'),
+    ]),
     ('Support & Engagement', [
         ('support_tickets_list',      'Support Tickets',        'support_agent'),
         ('polls_list',                'Polls',                  'poll'),
@@ -213,6 +216,10 @@ def get_required_section(url_name):
     # Verifications
     if 'verification' in url_name:
         return 'verification_requests_list'
+
+    # Youth Dialogue
+    if 'youth_dialogue' in url_name:
+        return 'youth_dialogue_list'
 
     # Support
     if 'support_ticket' in url_name:

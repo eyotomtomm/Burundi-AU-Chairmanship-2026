@@ -48,6 +48,9 @@ from core.models import (
     AppRelease, AppReleaseHighlight,
     ArticleLike,
     NewsletterEdition,
+    YouthDialogueApplication,
+    YouthDialogueDocument,
+    YouthDialogueActivityLog,
 )
 
 # Email-related views live in custom_admin/email_views.py. Re-exported here so
@@ -7868,4 +7871,420 @@ def media_library_api(request):
         'folders': sorted_results,
         'folder_names': list(sorted_results.keys()),
     })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  YOUTH DIALOGUE
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_list(request):
+    qs = YouthDialogueApplication.objects.select_related('user').order_by('-created_at')
+
+    status_filter = request.GET.get('status')
+    if status_filter == 'pending_review':
+        qs = qs.filter(status__in=['submitted', 'under_review'])
+    elif status_filter == 'accepted':
+        qs = qs.filter(status__in=['accepted', 'documents_pending', 'documents_submitted', 'documents_under_review'])
+    elif status_filter == 'documents':
+        qs = qs.filter(status__in=['documents_pending', 'documents_submitted', 'documents_under_review'])
+    elif status_filter == 'credentials':
+        qs = qs.filter(status='credential_issued')
+    elif status_filter == 'rejected':
+        qs = qs.filter(status__in=['rejected', 'documents_rejected'])
+    elif status_filter:
+        qs = qs.filter(status=status_filter)
+
+    search_q = request.GET.get('q', '').strip()
+    if search_q:
+        qs = qs.filter(
+            Q(first_name__icontains=search_q) |
+            Q(last_name__icontains=search_q) |
+            Q(email__icontains=search_q) |
+            Q(participant_code__icontains=search_q)
+        )
+
+    total_count = YouthDialogueApplication.objects.count()
+    pending_review_count = YouthDialogueApplication.objects.filter(status__in=['submitted', 'under_review']).count()
+    accepted_count = YouthDialogueApplication.objects.filter(
+        status__in=['accepted', 'documents_pending', 'documents_submitted', 'documents_under_review']
+    ).count()
+    credential_count = YouthDialogueApplication.objects.filter(status='credential_issued').count()
+    rejected_count = YouthDialogueApplication.objects.filter(status__in=['rejected', 'documents_rejected']).count()
+
+    paginator = Paginator(qs, 20)
+    page = request.GET.get('page')
+    applications = paginator.get_page(page)
+
+    return render(request, 'custom_admin/youth_dialogue/list.html', {
+        'applications': applications,
+        'total_count': total_count,
+        'pending_review_count': pending_review_count,
+        'accepted_count': accepted_count,
+        'credential_count': credential_count,
+        'rejected_count': rejected_count,
+        'current_filter': status_filter or '',
+        'search_query': search_q,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_review(request, pk):
+    application = get_object_or_404(
+        YouthDialogueApplication.objects.select_related('user', 'reviewed_by', 'documents_reviewed_by'),
+        pk=pk,
+    )
+    documents = application.documents.select_related('reviewed_by').order_by('uploaded_at')
+    activity_logs = application.activity_logs.order_by('-timestamp')[:20]
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        old_status = application.status
+
+        if action == 'accept' and application.status in ('submitted', 'under_review'):
+            application.status = 'accepted'
+            application.reviewed_by = request.user
+            application.reviewed_at = timezone.now()
+            application.save()
+            log_admin_action(
+                request, 'approve', 'YouthDialogueApplication', object_id=pk,
+                object_repr=f'{application.first_name} {application.last_name}',
+                changes={'status': {'old': old_status, 'new': 'accepted'}},
+            )
+            # Send acceptance email
+            try:
+                from django.core.mail import send_mail
+                import threading
+                subject = 'Youth Dialogue Application Accepted'
+                html_message = _yd_email_html(
+                    application,
+                    'Application Accepted',
+                    '#38a169',
+                    '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                      We are pleased to inform you that your application for the <strong>Youth Dialogue Programme</strong>
+                      has been accepted.
+                    </p>
+                    <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                      The next step is to upload your required documents through the Be 4 Africa app.
+                      Please submit your documents at your earliest convenience.
+                    </p>''',
+                )
+                threading.Thread(
+                    target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
+                    daemon=True,
+                ).start()
+            except Exception:
+                pass
+            messages.success(request, f'Application from {application.first_name} {application.last_name} accepted.')
+
+        elif action == 'reject' and application.status in ('submitted', 'under_review'):
+            reason = request.POST.get('rejection_reason', '')
+            application.status = 'rejected'
+            application.rejection_reason = reason
+            application.reviewed_by = request.user
+            application.reviewed_at = timezone.now()
+            application.save()
+            log_admin_action(
+                request, 'reject', 'YouthDialogueApplication', object_id=pk,
+                object_repr=f'{application.first_name} {application.last_name}',
+                changes={'status': {'old': old_status, 'new': 'rejected'}, 'reason': reason},
+            )
+            try:
+                from django.core.mail import send_mail
+                import threading
+                subject = 'Youth Dialogue Application Update'
+                reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
+                html_message = _yd_email_html(
+                    application,
+                    'Application Not Accepted',
+                    '#e53e3e',
+                    f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                      We regret to inform you that your application for the Youth Dialogue Programme
+                      has not been accepted at this time.
+                    </p>{reason_html}
+                    <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+                      If you have questions, please contact us at info@burundi4africa.com
+                    </p>''',
+                )
+                threading.Thread(
+                    target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
+                    daemon=True,
+                ).start()
+            except Exception:
+                pass
+            messages.success(request, f'Application from {application.first_name} {application.last_name} rejected.')
+
+        elif action == 'approve_document':
+            doc_id = request.POST.get('document_id')
+            try:
+                doc = YouthDialogueDocument.objects.get(pk=doc_id, application=application)
+                if doc.status == 'pending':
+                    doc.status = 'approved'
+                    doc.reviewed_by = request.user
+                    doc.reviewed_at = timezone.now()
+                    doc.save()
+                    messages.success(request, f'Document "{doc.get_document_type_display()}" approved.')
+            except YouthDialogueDocument.DoesNotExist:
+                messages.error(request, 'Document not found.')
+
+        elif action == 'reject_document':
+            doc_id = request.POST.get('document_id')
+            doc_reason = request.POST.get('doc_rejection_reason', '')
+            try:
+                doc = YouthDialogueDocument.objects.get(pk=doc_id, application=application)
+                if doc.status == 'pending':
+                    doc.status = 'rejected'
+                    doc.rejection_reason = doc_reason
+                    doc.reviewed_by = request.user
+                    doc.reviewed_at = timezone.now()
+                    doc.save()
+                    messages.success(request, f'Document "{doc.get_document_type_display()}" rejected.')
+            except YouthDialogueDocument.DoesNotExist:
+                messages.error(request, 'Document not found.')
+
+        elif action == 'approve_all_documents':
+            pending_docs = application.documents.filter(status='pending')
+            count = pending_docs.update(
+                status='approved',
+                reviewed_by=request.user,
+                reviewed_at=timezone.now(),
+            )
+            if application.status in ('documents_submitted', 'documents_under_review'):
+                application.status = 'documents_under_review'
+                application.documents_reviewed_by = request.user
+                application.documents_reviewed_at = timezone.now()
+                application.save()
+            messages.success(request, f'{count} document(s) approved.')
+
+        elif action == 'reject_documents':
+            notes = request.POST.get('documents_rejection_notes', '')
+            application.status = 'documents_rejected'
+            application.documents_rejection_notes = notes
+            application.documents_reviewed_by = request.user
+            application.documents_reviewed_at = timezone.now()
+            application.save()
+            log_admin_action(
+                request, 'reject', 'YouthDialogueApplication', object_id=pk,
+                object_repr=f'{application.first_name} {application.last_name}',
+                changes={'status': {'old': old_status, 'new': 'documents_rejected'}},
+            )
+            try:
+                from django.core.mail import send_mail
+                import threading
+                subject = 'Youth Dialogue — Documents Need Attention'
+                notes_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Notes from reviewer:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{notes}</p></div>' if notes else ''
+                html_message = _yd_email_html(
+                    application,
+                    'Documents Need Attention',
+                    '#e53e3e',
+                    f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                      Some of your uploaded documents require attention. Please review the notes
+                      below and re-upload the necessary documents through the Be 4 Africa app.
+                    </p>{notes_html}''',
+                )
+                threading.Thread(
+                    target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
+                    daemon=True,
+                ).start()
+            except Exception:
+                pass
+            messages.success(request, 'Documents rejected. Applicant notified.')
+
+        elif action == 'issue_credential':
+            all_docs_approved = not application.documents.filter(status='pending').exists()
+            has_rejected = application.documents.filter(status='rejected').exists()
+            if application.status in ('accepted', 'documents_submitted', 'documents_under_review') and all_docs_approved and not has_rejected:
+                application.generate_participant_code()
+                application.generate_qr_hash()
+                application.status = 'credential_issued'
+                application.credential_issued_at = timezone.now()
+                application.save()
+                log_admin_action(
+                    request, 'approve', 'YouthDialogueApplication', object_id=pk,
+                    object_repr=f'{application.first_name} {application.last_name}',
+                    changes={'status': {'old': old_status, 'new': 'credential_issued'}, 'participant_code': application.participant_code},
+                )
+                try:
+                    from django.core.mail import send_mail
+                    import threading
+                    subject = 'Youth Dialogue — Your Credential Has Been Issued'
+                    html_message = _yd_email_html(
+                        application,
+                        'Credential Issued',
+                        '#5a67d8',
+                        f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                          Congratulations! Your participant credential for the Youth Dialogue Programme has been issued.
+                        </p>
+                        <div style="background:#ebf4ff;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
+                          <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">Participant Code</p>
+                          <p style="color:#2b6cb0;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{application.participant_code}</p>
+                        </div>
+                        <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+                          You can view your digital ID card and QR code in the Be 4 Africa app.
+                        </p>''',
+                    )
+                    threading.Thread(
+                        target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
+                        daemon=True,
+                    ).start()
+                except Exception:
+                    pass
+                messages.success(request, f'Credential issued: {application.participant_code}')
+            else:
+                messages.error(request, 'Cannot issue credential. Ensure all documents are approved and none are rejected.')
+
+        return redirect('custom_admin:youth_dialogue_review', pk=pk)
+
+    return render(request, 'custom_admin/youth_dialogue/review.html', {
+        'application': application,
+        'documents': documents,
+        'activity_logs': activity_logs,
+    })
+
+
+def _yd_email_html(application, heading, badge_color, body_html):
+    """Build branded HTML email for Youth Dialogue notifications."""
+    return f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
+      </div>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;">{heading}</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Youth Dialogue Programme</p>
+    </div>
+    <div style="padding:32px;">
+      <div style="display:inline-block;background:{badge_color};color:white;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;margin:0 0 20px;">{application.get_status_display().upper()}</div>
+      <p style="color:#2d3748;font-size:16px;margin:0 0 20px;">Dear <strong>{application.first_name}</strong>,</p>
+      {body_html}
+    </div>
+    <div style="background:#f7fafc;padding:20px 32px;text-align:center;">
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Be 4 Africa 2026</p>
+    </div>
+  </div>
+</div>
+</body></html>'''
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_export_csv(request):
+    qs = YouthDialogueApplication.objects.select_related('user').order_by('-created_at')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="youth_dialogue_applications.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Name', 'Email', 'Nationality', 'Organization', 'Position',
+        'Status', 'Participant Code', 'Created At', 'Documents Status',
+    ])
+
+    for app in qs:
+        total_docs = app.documents.count()
+        approved_docs = app.documents.filter(status='approved').count()
+        docs_status = f'{approved_docs}/{total_docs} approved' if total_docs else 'No documents'
+        writer.writerow([
+            f'{app.first_name} {app.last_name}',
+            app.email,
+            app.get_nationality_display() if app.nationality else '',
+            app.organization,
+            app.position,
+            app.get_status_display(),
+            app.participant_code or '',
+            app.created_at.strftime('%Y-%m-%d %H:%M:%S') if app.created_at else '',
+            docs_status,
+        ])
+
+    log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'CSV export of {qs.count()} applications')
+
+    return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_id_card_pdf(request, pk):
+    """Generate a printable PDF ID card for a Youth Dialogue participant."""
+    app = get_object_or_404(YouthDialogueApplication, pk=pk)
+    if app.status != 'credential_issued' or not app.participant_code:
+        return HttpResponse('Credential not issued yet.', status=400)
+
+    try:
+        from reportlab.lib.pagesizes import inch
+        from reportlab.lib import colors as rl_colors
+        from reportlab.pdfgen import canvas as rl_canvas
+        from reportlab.lib.utils import ImageReader
+    except ImportError:
+        return HttpResponse('reportlab is not installed.', status=500)
+
+    buf = io.BytesIO()
+    card_w = 3.375 * inch
+    card_h = 2.125 * inch
+    c = rl_canvas.Canvas(buf, pagesize=(card_w, card_h))
+
+    # Green header
+    header_h = 0.65 * inch
+    c.setFillColor(rl_colors.HexColor('#409843'))
+    c.rect(0, card_h - header_h, card_w, header_h, fill=1, stroke=0)
+    c.setFillColor(rl_colors.white)
+    c.setFont('Helvetica-Bold', 8)
+    c.drawCentredString(card_w / 2, card_h - 0.25 * inch, 'YOUTH DIALOGUE PARTICIPANT')
+    c.setFont('Helvetica', 6)
+    c.drawCentredString(card_w / 2, card_h - 0.40 * inch, 'Be 4 Africa 2026')
+
+    # Photo
+    photo_x = 0.15 * inch
+    photo_y = card_h - header_h - 0.85 * inch
+    photo_size = 0.7 * inch
+    if app.id_photo:
+        try:
+            img = ImageReader(app.id_photo.path)
+            c.drawImage(img, photo_x, photo_y, photo_size, photo_size, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            c.setFillColor(rl_colors.HexColor('#e0e0e0'))
+            c.rect(photo_x, photo_y, photo_size, photo_size, fill=1, stroke=0)
+    else:
+        c.setFillColor(rl_colors.HexColor('#e0e0e0'))
+        c.rect(photo_x, photo_y, photo_size, photo_size, fill=1, stroke=0)
+
+    # Name & details
+    text_x = photo_x + photo_size + 0.15 * inch
+    text_y = card_h - header_h - 0.2 * inch
+    c.setFillColor(rl_colors.black)
+    c.setFont('Helvetica-Bold', 9)
+    c.drawString(text_x, text_y, f'{app.first_name} {app.last_name}')
+    c.setFont('Helvetica', 7)
+    text_y -= 0.15 * inch
+    if app.organization:
+        c.drawString(text_x, text_y, app.organization)
+        text_y -= 0.13 * inch
+    if app.nationality:
+        c.drawString(text_x, text_y, f'Nationality: {app.get_nationality_display()}')
+        text_y -= 0.13 * inch
+
+    # Participant code
+    c.setFont('Courier-Bold', 10)
+    c.setFillColor(rl_colors.HexColor('#409843'))
+    c.drawString(text_x, text_y - 0.05 * inch, app.participant_code)
+
+    # QR data footer
+    c.setFillColor(rl_colors.HexColor('#888888'))
+    c.setFont('Helvetica', 5)
+    c.drawCentredString(card_w / 2, 0.1 * inch, f'{app.participant_code}:{app.qr_hash}')
+    c.setStrokeColor(rl_colors.HexColor('#409843'))
+    c.setLineWidth(1)
+    c.line(0, 0.25 * inch, card_w, 0.25 * inch)
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+
+    response = HttpResponse(buf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="YD-IDCard-{app.participant_code}.pdf"'
+    return response
 

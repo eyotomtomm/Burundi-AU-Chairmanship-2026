@@ -912,6 +912,13 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     </a>
     {% endif %}
 
+    {% if 'youth_dialogue_list' in allowed_sections %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'youth_dialogue' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:youth_dialogue_list' %}">
+      <span class="material-symbols-outlined">forum</span>
+      <span class="text-sm tracking-wide font-headline">Youth Dialogue</span>
+    </a>
+    {% endif %}
+
     {% if 'event_registrations_list' in allowed_sections %}
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'event_registration' in url_name or 'event_submission' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:event_registrations_list' %}">
       <span class="material-symbols-outlined">how_to_reg</span>

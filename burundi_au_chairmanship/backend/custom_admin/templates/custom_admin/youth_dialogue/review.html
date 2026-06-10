@@ -1,0 +1,553 @@
+{% extends 'custom_admin/base.html' %}
+{% block title %}Review Application — Youth Dialogue — Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+  <!-- Messages -->
+  {% if messages %}
+  <div class="mb-6 space-y-3">
+    {% for message in messages %}
+    <div class="rounded-xl p-4 flex items-center gap-3 {% if message.tags == 'success' %}bg-emerald-50 border border-emerald-200 text-emerald-800{% elif message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
+      <span class="material-symbols-outlined text-xl">
+        {% if message.tags == 'success' %}check_circle{% elif message.tags == 'error' %}error{% else %}info{% endif %}
+      </span>
+      <p class="text-sm font-medium">{{ message }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Header -->
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:youth_dialogue_list' %}"
+       class="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900 font-headline">Review Application</h1>
+      <p class="text-sm text-slate-500 mt-0.5">{{ application.first_name }} {{ application.last_name }}</p>
+    </div>
+  </div>
+
+  <!-- Status Banner -->
+  <div class="mb-6 rounded-xl p-4 flex items-center gap-3
+    {% if application.status == 'submitted' %}bg-amber-50 border border-amber-200
+    {% elif application.status == 'under_review' %}bg-blue-50 border border-blue-200
+    {% elif application.status == 'accepted' %}bg-emerald-50 border border-emerald-200
+    {% elif application.status == 'rejected' %}bg-red-50 border border-red-200
+    {% elif application.status == 'documents_pending' %}bg-orange-50 border border-orange-200
+    {% elif application.status == 'documents_submitted' %}bg-cyan-50 border border-cyan-200
+    {% elif application.status == 'documents_under_review' %}bg-blue-50 border border-blue-200
+    {% elif application.status == 'documents_rejected' %}bg-red-50 border border-red-200
+    {% elif application.status == 'credential_issued' %}bg-indigo-50 border border-indigo-200
+    {% endif %}">
+    <span class="material-symbols-outlined text-2xl
+      {% if application.status == 'submitted' %}text-amber-600
+      {% elif application.status == 'under_review' %}text-blue-600
+      {% elif application.status == 'accepted' %}text-emerald-600
+      {% elif application.status == 'rejected' %}text-red-600
+      {% elif application.status == 'documents_pending' %}text-orange-600
+      {% elif application.status == 'documents_submitted' %}text-cyan-600
+      {% elif application.status == 'documents_under_review' %}text-blue-600
+      {% elif application.status == 'documents_rejected' %}text-red-600
+      {% elif application.status == 'credential_issued' %}text-indigo-600
+      {% endif %}">
+      {% if application.status == 'submitted' %}schedule
+      {% elif application.status == 'under_review' %}pending
+      {% elif application.status == 'accepted' %}check_circle
+      {% elif application.status == 'rejected' %}cancel
+      {% elif application.status == 'documents_pending' %}upload_file
+      {% elif application.status == 'documents_submitted' %}description
+      {% elif application.status == 'documents_under_review' %}fact_check
+      {% elif application.status == 'documents_rejected' %}error
+      {% elif application.status == 'credential_issued' %}badge
+      {% endif %}
+    </span>
+    <div>
+      <p class="font-semibold text-sm
+        {% if application.status == 'submitted' %}text-amber-800
+        {% elif application.status == 'under_review' %}text-blue-800
+        {% elif application.status == 'accepted' %}text-emerald-800
+        {% elif application.status == 'rejected' %}text-red-800
+        {% elif application.status == 'documents_pending' %}text-orange-800
+        {% elif application.status == 'documents_submitted' %}text-cyan-800
+        {% elif application.status == 'documents_under_review' %}text-blue-800
+        {% elif application.status == 'documents_rejected' %}text-red-800
+        {% elif application.status == 'credential_issued' %}text-indigo-800
+        {% endif %}">
+        Status: {{ application.get_status_display }}
+      </p>
+      <p class="text-xs
+        {% if application.status == 'submitted' %}text-amber-600
+        {% elif application.status == 'under_review' %}text-blue-600
+        {% elif application.status == 'accepted' %}text-emerald-600
+        {% elif application.status == 'rejected' %}text-red-600
+        {% elif application.status == 'documents_pending' %}text-orange-600
+        {% elif application.status == 'documents_submitted' %}text-cyan-600
+        {% elif application.status == 'documents_under_review' %}text-blue-600
+        {% elif application.status == 'documents_rejected' %}text-red-600
+        {% elif application.status == 'credential_issued' %}text-indigo-600
+        {% endif %}">
+        Submitted {{ application.created_at|date:"M d, Y" }}{% if application.reviewed_by %} &middot; Reviewed by {{ application.reviewed_by.get_full_name|default:application.reviewed_by.username }}{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Personal Information Card -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-indigo-600">person</span>
+      Personal Information
+    </h2>
+
+    <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+      <div class="h-16 w-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+        {{ application.first_name|first|upper }}
+      </div>
+      <div>
+        <p class="text-lg font-bold text-slate-900">
+          {% if application.title %}{{ application.get_title_display }} {% endif %}{{ application.first_name }} {{ application.last_name }}
+        </p>
+        <p class="text-sm text-slate-500">{{ application.email }}</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {% if application.title %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Title</label>
+        <p class="text-slate-800 font-medium">{{ application.get_title_display }}</p>
+      </div>
+      {% endif %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Full Name</label>
+        <p class="text-slate-800 font-medium">{{ application.first_name }} {{ application.last_name }}</p>
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Email</label>
+        <p class="text-slate-800 font-medium">{{ application.email }}</p>
+      </div>
+      {% if application.phone_number %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Phone</label>
+        <p class="text-slate-800 font-medium">{% if application.country_code %}+{{ application.country_code }} {% endif %}{{ application.phone_number }}</p>
+      </div>
+      {% endif %}
+      {% if application.nationality %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Nationality</label>
+        <p class="text-slate-800 font-medium">{{ application.get_nationality_display }}</p>
+      </div>
+      {% endif %}
+      {% if application.date_of_birth %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Date of Birth</label>
+        <p class="text-slate-800 font-medium">{{ application.date_of_birth|date:"M d, Y" }}</p>
+      </div>
+      {% endif %}
+      {% if application.gender %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Gender</label>
+        <p class="text-slate-800 font-medium">{{ application.get_gender_display }}</p>
+      </div>
+      {% endif %}
+      {% if application.organization %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Organization</label>
+        <p class="text-slate-800 font-medium">{{ application.organization }}</p>
+      </div>
+      {% endif %}
+      {% if application.position %}
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Position</label>
+        <p class="text-slate-800 font-medium">{{ application.position }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if application.motivation %}
+    <div class="mt-6 pt-6 border-t border-slate-100">
+      <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">Motivation</label>
+      <p class="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{{ application.motivation }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Documents Section -->
+  {% if documents %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-cyan-600">folder</span>
+        Documents
+        <span class="text-sm font-normal text-slate-500 ml-2">({{ documents|length }})</span>
+      </h2>
+      {% if application.status == 'documents_submitted' or application.status == 'documents_under_review' %}
+      <form method="post" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="approve_all_documents">
+        <button type="submit"
+                class="inline-flex items-center gap-1.5 bg-emerald-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-emerald-700 transition-all shadow-sm"
+                onclick="return confirm('Approve all pending documents?')">
+          <span class="material-symbols-outlined text-sm">done_all</span>
+          Approve All Pending
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="space-y-4">
+      {% for doc in documents %}
+      <div class="border border-slate-200 rounded-xl p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+              <span class="material-symbols-outlined text-slate-500">
+                {% if doc.document_type == 'passport' %}badge
+                {% elif doc.document_type == 'national_id' %}id_card
+                {% elif doc.document_type == 'photo' %}photo_camera
+                {% elif doc.document_type == 'cv' %}description
+                {% elif doc.document_type == 'recommendation' %}recommend
+                {% else %}attach_file{% endif %}
+              </span>
+            </div>
+            <div class="min-w-0">
+              <p class="font-semibold text-slate-900 text-sm">{{ doc.get_document_type_display }}</p>
+              <p class="text-xs text-slate-500 truncate">{{ doc.original_filename|default:"Unnamed file" }}</p>
+              <p class="text-xs text-slate-400 mt-0.5">
+                {% if doc.file_size %}{{ doc.file_size|filesizeformat }} &middot; {% endif %}Uploaded {{ doc.uploaded_at|date:"M d, Y g:i A" }}
+                {% if doc.is_resubmission %}<span class="text-amber-600 font-semibold">&middot; Resubmission</span>{% endif %}
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 flex-shrink-0">
+            <!-- Status Badge -->
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+              {% if doc.status == 'pending' %}bg-amber-50 text-amber-700 border border-amber-200
+              {% elif doc.status == 'approved' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+              {% elif doc.status == 'rejected' %}bg-red-50 text-red-700 border border-red-200
+              {% endif %}">
+              <span class="material-symbols-outlined" style="font-size:12px;">
+                {% if doc.status == 'pending' %}schedule{% elif doc.status == 'approved' %}check_circle{% else %}cancel{% endif %}
+              </span>
+              {{ doc.get_status_display }}
+            </span>
+            <!-- Download -->
+            {% if doc.file %}
+            <a href="{{ doc.file.url }}" target="_blank" title="Download / Preview"
+               class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-all">
+              <span class="material-symbols-outlined text-sm text-slate-600">open_in_new</span>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if doc.rejection_reason %}
+        <div class="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+          <p class="text-xs text-red-700"><strong>Rejection reason:</strong> {{ doc.rejection_reason }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Per-Document Actions -->
+        {% if doc.status == 'pending' %}
+        <div class="mt-4 pt-4 border-t border-slate-100 flex items-end gap-3">
+          <form method="post" class="inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="approve_document">
+            <input type="hidden" name="document_id" value="{{ doc.pk }}">
+            <button type="submit"
+                    class="inline-flex items-center gap-1.5 bg-emerald-600 text-white font-semibold rounded-lg py-1.5 px-3 text-xs hover:bg-emerald-700 transition-all">
+              <span class="material-symbols-outlined" style="font-size:14px;">check</span>
+              Approve
+            </button>
+          </form>
+          <form method="post" class="flex items-end gap-2 flex-1" id="reject-doc-form-{{ doc.pk }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject_document">
+            <input type="hidden" name="document_id" value="{{ doc.pk }}">
+            <div class="flex-1">
+              <input type="text" name="doc_rejection_reason" placeholder="Rejection reason (optional)"
+                     class="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-3 text-xs focus:ring-2 focus:ring-red-500 focus:border-transparent">
+            </div>
+            <button type="submit"
+                    class="inline-flex items-center gap-1.5 bg-red-600 text-white font-semibold rounded-lg py-1.5 px-3 text-xs hover:bg-red-700 transition-all"
+                    onclick="return confirm('Reject this document?')">
+              <span class="material-symbols-outlined" style="font-size:14px;">close</span>
+              Reject
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Credential Section -->
+  {% if application.status == 'credential_issued' %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-indigo-600" style="font-variation-settings: 'FILL' 1">badge</span>
+      Credential
+    </h2>
+    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label class="text-xs uppercase tracking-wider text-indigo-500 font-semibold block mb-1.5">Participant Code</label>
+          <p class="text-indigo-900 font-bold text-lg font-mono">{{ application.participant_code }}</p>
+        </div>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-indigo-500 font-semibold block mb-1.5">QR Hash</label>
+          <p class="text-indigo-700 font-mono text-xs break-all">{{ application.qr_hash }}</p>
+        </div>
+        <div>
+          <label class="text-xs uppercase tracking-wider text-indigo-500 font-semibold block mb-1.5">Issued At</label>
+          <p class="text-indigo-900 font-medium">{{ application.credential_issued_at|date:"M d, Y g:i A" }}</p>
+        </div>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:youth_dialogue_id_card_pdf' application.pk %}"
+       class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+      Download PDF ID Card
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Review Action Form -->
+  {% if application.status == 'submitted' or application.status == 'under_review' %}
+  <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    {% csrf_token %}
+
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-amber-600">gavel</span>
+      Review Decision
+    </h2>
+
+    <div class="mb-6">
+      <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">Action *</label>
+      <select name="action" id="action-select" required
+              class="w-full bg-slate-50 border border-slate-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-800">
+        <option value="">Select an action...</option>
+        <option value="accept">Accept Application</option>
+        <option value="reject">Reject Application</option>
+      </select>
+    </div>
+
+    <!-- Accept Section -->
+    <div id="accept-section" class="hidden mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-6">
+      <h3 class="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">check_circle</span>
+        Accept Application
+      </h3>
+      <p class="text-sm text-emerald-700">
+        The applicant will be notified that their application has been accepted and
+        they will be asked to upload required documents.
+      </p>
+    </div>
+
+    <!-- Reject Section -->
+    <div id="reject-section" class="hidden mb-6 bg-red-50 border border-red-200 rounded-xl p-6">
+      <h3 class="text-sm font-bold text-red-800 mb-3 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">cancel</span>
+        Rejection Details
+      </h3>
+      <label class="text-xs uppercase tracking-wider text-red-700 font-semibold block mb-2">Rejection Reason *</label>
+      <textarea name="rejection_reason" rows="4" id="rejection-reason"
+                class="w-full bg-white border border-red-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-800"
+                placeholder="Provide a clear reason for rejecting this application..."></textarea>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex gap-3 pt-6 border-t border-slate-100">
+      <button type="submit" id="accept-btn" class="hidden bg-emerald-600 text-white font-semibold rounded-lg py-3 px-8 hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">check_circle</span>
+        Accept Application
+      </button>
+      <button type="submit" id="reject-btn" class="hidden bg-red-600 text-white font-semibold rounded-lg py-3 px-8 hover:bg-red-700 transition-all shadow-sm flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">cancel</span>
+        Reject Application
+      </button>
+      <a href="{% url 'custom_admin:youth_dialogue_list' %}"
+         class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-8 hover:bg-slate-50 transition-all">
+        Cancel
+      </a>
+    </div>
+  </form>
+  {% endif %}
+
+  <!-- Document Review Actions (for accepted / documents phase) -->
+  {% if application.status == 'accepted' or application.status == 'documents_pending' or application.status == 'documents_submitted' or application.status == 'documents_under_review' %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-amber-600">gavel</span>
+      Document Review Actions
+    </h2>
+
+    {% with pending_docs=application.documents.all %}
+    {% with all_approved=True %}
+
+    <div class="flex flex-wrap gap-3">
+      <!-- Issue Credential -->
+      <form method="post" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="issue_credential">
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                onclick="return confirm('Issue credential to this applicant? This will generate a participant code and QR hash.')"
+                title="All documents must be approved first">
+          <span class="material-symbols-outlined text-sm">badge</span>
+          Issue Credential
+        </button>
+      </form>
+
+      <!-- Reject Documents -->
+      <button type="button" onclick="document.getElementById('reject-docs-form').classList.toggle('hidden')"
+              class="inline-flex items-center gap-2 bg-red-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-red-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">cancel</span>
+        Reject Documents
+      </button>
+    </div>
+
+    <!-- Reject Documents Form (hidden by default) -->
+    <form method="post" id="reject-docs-form" class="hidden mt-6 bg-red-50 border border-red-200 rounded-xl p-6">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reject_documents">
+      <h3 class="text-sm font-bold text-red-800 mb-3 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">cancel</span>
+        Reject Documents
+      </h3>
+      <label class="text-xs uppercase tracking-wider text-red-700 font-semibold block mb-2">Rejection Notes</label>
+      <textarea name="documents_rejection_notes" rows="3"
+                class="w-full bg-white border border-red-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-800 mb-4"
+                placeholder="Explain what documents are missing or need correction..."></textarea>
+      <button type="submit"
+              class="bg-red-600 text-white font-semibold rounded-lg py-2.5 px-6 text-sm hover:bg-red-700 transition-all"
+              onclick="return confirm('Reject documents? The applicant will be notified.')">
+        Confirm Rejection
+      </button>
+    </form>
+
+    {% endwith %}
+    {% endwith %}
+  </div>
+  {% endif %}
+
+  <!-- Rejection Info (if rejected) -->
+  {% if application.status == 'rejected' and application.rejection_reason %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-red-600">cancel</span>
+      Rejection Details
+    </h2>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <p class="text-sm text-red-800 whitespace-pre-wrap">{{ application.rejection_reason }}</p>
+    </div>
+    {% if application.reviewed_by %}
+    <p class="text-xs text-slate-500 mt-3">
+      Rejected by {{ application.reviewed_by.get_full_name|default:application.reviewed_by.username }}
+      on {{ application.reviewed_at|date:"M d, Y g:i A" }}
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Documents Rejection Info -->
+  {% if application.status == 'documents_rejected' and application.documents_rejection_notes %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-red-600">error</span>
+      Documents Rejection Notes
+    </h2>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <p class="text-sm text-red-800 whitespace-pre-wrap">{{ application.documents_rejection_notes }}</p>
+    </div>
+    {% if application.documents_reviewed_by %}
+    <p class="text-xs text-slate-500 mt-3">
+      Documents rejected by {{ application.documents_reviewed_by.get_full_name|default:application.documents_reviewed_by.username }}
+      on {{ application.documents_reviewed_at|date:"M d, Y g:i A" }}
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Activity Log -->
+  {% if activity_logs %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 mb-6">
+    <button type="button" onclick="document.getElementById('activity-log-body').classList.toggle('hidden'); this.querySelector('.expand-icon').classList.toggle('rotate-180')"
+            class="w-full p-6 flex items-center justify-between text-left">
+      <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-slate-500">history</span>
+        Activity Log
+        <span class="text-sm font-normal text-slate-500">({{ activity_logs|length }})</span>
+      </h2>
+      <span class="material-symbols-outlined text-slate-400 expand-icon transition-transform">expand_more</span>
+    </button>
+    <div id="activity-log-body" class="hidden border-t border-slate-100">
+      <div class="divide-y divide-slate-50">
+        {% for log in activity_logs %}
+        <div class="px-6 py-3 flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-sm text-slate-500">
+              {% if log.action == 'form_submitted' %}send
+              {% elif log.action == 'document_uploaded' %}upload_file
+              {% elif log.action == 'document_deleted' %}delete
+              {% elif log.action == 'status_viewed' %}visibility
+              {% elif log.action == 'credential_viewed' %}badge
+              {% elif log.action == 'credential_shared' %}share
+              {% elif log.action == 'qr_scanned' %}qr_code_scanner
+              {% elif log.action == 'screen_visit' %}monitor
+              {% else %}radio_button_checked{% endif %}
+            </span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-slate-800 font-medium">{{ log.get_action_display }}</p>
+            <p class="text-xs text-slate-400">{{ log.timestamp|date:"M d, Y g:i A" }}{% if log.screen_name %} &middot; {{ log.screen_name }}{% endif %}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- JavaScript for action toggle -->
+<script>
+(function() {
+  var actionSelect = document.getElementById('action-select');
+  if (!actionSelect) return;
+
+  var acceptSection = document.getElementById('accept-section');
+  var rejectSection = document.getElementById('reject-section');
+  var acceptBtn = document.getElementById('accept-btn');
+  var rejectBtn = document.getElementById('reject-btn');
+  var rejectionReason = document.getElementById('rejection-reason');
+
+  actionSelect.addEventListener('change', function() {
+    var action = this.value;
+    if (action === 'accept') {
+      acceptSection.classList.remove('hidden');
+      rejectSection.classList.add('hidden');
+      acceptBtn.classList.remove('hidden');
+      rejectBtn.classList.add('hidden');
+      if (rejectionReason) rejectionReason.removeAttribute('required');
+    } else if (action === 'reject') {
+      acceptSection.classList.add('hidden');
+      rejectSection.classList.remove('hidden');
+      acceptBtn.classList.add('hidden');
+      rejectBtn.classList.remove('hidden');
+      if (rejectionReason) rejectionReason.setAttribute('required', 'required');
+    } else {
+      acceptSection.classList.add('hidden');
+      rejectSection.classList.add('hidden');
+      acceptBtn.classList.add('hidden');
+      rejectBtn.classList.add('hidden');
+    }
+  });
+})();
+</script>
+{% endblock %}

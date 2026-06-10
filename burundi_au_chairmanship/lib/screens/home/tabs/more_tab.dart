@@ -245,9 +245,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                         maxLines: 1,
                                       ),
                                     ),
-                                    if (isLoggedIn && isVerified) ...[
+                                    if (isLoggedIn && authProvider.isVerified) ...[
                                       const SizedBox(width: 6),
-                                      VerifiedBadge(badgeType: authProvider.badgeType ?? verificationProvider.badgeType, size: 18),
+                                      VerifiedBadge(badgeType: authProvider.badgeType ?? Provider.of<VerificationProvider>(context, listen: false).badgeType, size: 18),
                                     ],
                                   ],
                                 ),

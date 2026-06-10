@@ -78,7 +78,7 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                 ], isDark),
                 const SizedBox(height: 16),
                 _buildSection('Content', [
-                  _buildToggle('articles_enabled', 'Articles', 'New articles published', Icons.article),
+                  _buildToggle('articles_enabled', 'News', 'New news published', Icons.article),
                   _buildToggle('magazines_enabled', 'Magazines', 'New magazine editions', Icons.menu_book),
                   _buildToggle('events_enabled', 'Events', 'Upcoming events', Icons.event),
                   _buildToggle('live_feeds_enabled', 'Live Feeds', 'Live stream notifications', Icons.live_tv),

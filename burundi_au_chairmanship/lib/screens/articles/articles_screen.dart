@@ -210,7 +210,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       actions: const [TranslateButton()],
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          langCode == 'fr' ? 'Articles' : 'Articles',
+          langCode == 'fr' ? 'Actualités' : 'News',
           style: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 22,

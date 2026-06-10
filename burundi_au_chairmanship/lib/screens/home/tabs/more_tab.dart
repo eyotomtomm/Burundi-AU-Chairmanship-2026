@@ -1767,7 +1767,7 @@ class _AboutPageState extends State<_AboutPage> {
 
   Widget _buildFeaturesGrid(bool isDark) {
     final features = [
-      {'icon': Icons.article_rounded, 'title': 'News & Articles', 'color': AppColors.burundiGreen},
+      {'icon': Icons.article_rounded, 'title': 'News', 'color': AppColors.burundiGreen},
       {'icon': Icons.event_rounded, 'title': 'Events Calendar', 'color': AppColors.burundiRed},
       {'icon': Icons.auto_stories_rounded, 'title': 'Magazine', 'color': AppColors.auGold},
       {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': AppColors.burundiGreen},

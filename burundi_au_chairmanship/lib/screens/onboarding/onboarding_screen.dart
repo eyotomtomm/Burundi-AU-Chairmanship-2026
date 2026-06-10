@@ -58,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       },
       {
         'icon': Icons.article_rounded,
-        'title': isFr ? 'Actualités & Articles' : 'News & Articles',
+        'title': isFr ? 'Actualités' : 'News',
         'description': isFr
             ? 'Restez informé des derniers articles et annonces'
             : 'Stay updated with the latest articles and announcements',

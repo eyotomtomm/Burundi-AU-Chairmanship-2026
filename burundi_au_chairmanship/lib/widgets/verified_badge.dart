@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Verified badge widget that displays Gold or Blue badges
+/// Verified badge widget — supports GOLD, BLUE, GREEN, or NONE.
 class VerifiedBadge extends StatelessWidget {
-  final String? badgeType; // 'GOLD' or 'BLUE' or null
+  final String? badgeType; // 'GOLD', 'BLUE', 'GREEN', 'NONE', or null
   final double size;
 
   const VerifiedBadge({
@@ -13,14 +13,20 @@ class VerifiedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (badgeType == null) return const SizedBox.shrink();
+    if (badgeType == null || badgeType == 'NONE') return const SizedBox.shrink();
 
-    Color badgeColor;
-
-    if (badgeType == 'GOLD') {
-      badgeColor = const Color(0xFFFFD700); // Gold
-    } else {
-      badgeColor = const Color(0xFF409843); // Green (default)
+    final Color badgeColor;
+    switch (badgeType) {
+      case 'GOLD':
+        badgeColor = const Color(0xFFFFD700); // Gold
+        break;
+      case 'BLUE':
+        badgeColor = const Color(0xFF1DA1F2); // Blue
+        break;
+      case 'GREEN':
+      default:
+        badgeColor = const Color(0xFF409843); // Green
+        break;
     }
 
     return Icon(
@@ -31,7 +37,7 @@ class VerifiedBadge extends StatelessWidget {
   }
 }
 
-/// Legacy verified badge (simple blue checkmark) - kept for backward compatibility
+/// Legacy verified badge (simple green checkmark) - kept for backward compatibility
 class SimpleVerifiedBadge extends StatelessWidget {
   final double size;
 
@@ -42,10 +48,10 @@ class SimpleVerifiedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Icon(
+    return const Icon(
       Icons.verified,
-      color: const Color(0xFF409843), // Green
-      size: size,
+      color: Color(0xFF409843),
+      size: 18,
     );
   }
 }

@@ -89,10 +89,10 @@ class UserProfile(models.Model):
     is_verified = models.BooleanField(default=False, help_text='User has verified badge (approved by admin)')
     badge_type = models.CharField(
         max_length=10,
-        choices=[('GOLD', 'Gold Badge'), ('BLUE', 'Blue Badge')],
+        choices=[('GOLD', 'Gold Badge'), ('BLUE', 'Blue Badge'), ('GREEN', 'Green Badge')],
         blank=True,
         null=True,
-        help_text='Type of verification badge (Gold for VIPs, Blue for regular verified users)'
+        help_text='Type of verification badge (Gold for VIPs, Blue for officials, Green for verified users)'
     )
     verification_requested_at = models.DateTimeField(null=True, blank=True, help_text='When user requested verification')
     email_verified_at = models.DateTimeField(null=True, blank=True)
@@ -1895,6 +1895,7 @@ class VerificationRequest(models.Model):
     BADGE_TYPE_CHOICES = [
         ('GOLD', 'Gold Badge'),
         ('BLUE', 'Blue Badge'),
+        ('GREEN', 'Green Badge'),
     ]
 
     # User requesting verification

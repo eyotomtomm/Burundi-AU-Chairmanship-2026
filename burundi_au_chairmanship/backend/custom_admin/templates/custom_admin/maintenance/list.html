@@ -40,7 +40,7 @@
               {% if window.description %}<p class="text-xs text-slate-500 mt-0.5">{{ window.description|truncatewords:12 }}</p>{% endif %}
             </td>
             <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ window.starts_at|date:"M d, Y H:i" }}</span></td>
-            <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ window.ends_at|date:"M d, Y H:i" }}</span></td>
+            <td class="px-6 py-4"><span class="text-sm text-slate-700">{% if window.ends_at %}{{ window.ends_at|date:"M d, Y H:i" }}{% else %}<span class="text-amber-600 font-medium">Indefinite</span>{% endif %}</span></td>
             <td class="px-6 py-4">
               {% if window.is_active %}
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">

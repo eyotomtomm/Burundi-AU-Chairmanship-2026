@@ -3304,7 +3304,7 @@ class ScheduledMaintenance(models.Model):
     description = models.TextField(blank=True)
     description_fr = models.TextField(blank=True)
     starts_at = models.DateTimeField()
-    ends_at = models.DateTimeField()
+    ends_at = models.DateTimeField(null=True, blank=True, help_text='Leave empty for indefinite maintenance (turn off manually)')
     is_active = models.BooleanField(default=True)
     show_banner = models.BooleanField(default=True, help_text='Show maintenance banner in app')
     contact_email = models.EmailField(blank=True, help_text='Contact email for users during maintenance')
@@ -3326,6 +3326,8 @@ class ScheduledMaintenance(models.Model):
     def is_currently_active(self):
         """Check if maintenance is currently in effect (active and within time window)."""
         now = timezone.now()
+        if self.ends_at is None:
+            return self.is_active and self.starts_at <= now
         return self.is_active and self.starts_at <= now <= self.ends_at
 
     @property
@@ -3336,11 +3338,20 @@ class ScheduledMaintenance(models.Model):
     @property
     def is_past(self):
         """Check if maintenance window has ended."""
+        if self.ends_at is None:
+            return False
         return self.ends_at < timezone.now()
+
+    @property
+    def is_indefinite(self):
+        """Check if maintenance has no scheduled end time."""
+        return self.ends_at is None
 
     @property
     def duration_display(self):
         """Return human-readable duration."""
+        if self.ends_at is None:
+            return 'Indefinite'
         delta = self.ends_at - self.starts_at
         hours, remainder = divmod(int(delta.total_seconds()), 3600)
         minutes = remainder // 60
@@ -3356,7 +3367,8 @@ class ScheduledMaintenance(models.Model):
         return [s.strip() for s in self.affected_services.split(',') if s.strip()]
 
     def __str__(self):
-        return f"{self.title} ({self.starts_at} - {self.ends_at})"
+        end = self.ends_at or 'indefinite'
+        return f"{self.title} ({self.starts_at} - {end})"
 
 
 class PromotionalSplash(models.Model):

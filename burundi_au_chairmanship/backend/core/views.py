@@ -4206,7 +4206,9 @@ def maintenance_status(request):
     """Check if there's an active or upcoming maintenance window."""
     now = timezone.now()
     active = ScheduledMaintenance.objects.filter(
-        is_active=True, starts_at__lte=now, ends_at__gt=now
+        is_active=True, starts_at__lte=now,
+    ).filter(
+        models.Q(ends_at__gt=now) | models.Q(ends_at__isnull=True)
     ).first()
     upcoming = ScheduledMaintenance.objects.filter(
         is_active=True, show_banner=True, starts_at__gt=now

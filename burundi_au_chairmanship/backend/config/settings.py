@@ -78,6 +78,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.middleware.firebase_auth.FirebaseAuthenticationMiddleware',  # Firebase auth
+    'core.middleware.maintenance.MaintenanceMiddleware',  # 503 on API during maintenance
     'core.middleware.session_tracking.SessionTrackingMiddleware',  # Analytics session tracking
     'core.middleware.last_active.LastActiveMiddleware',  # "Users online now" heartbeat (throttled 60s)
     'django.contrib.messages.middleware.MessageMiddleware',

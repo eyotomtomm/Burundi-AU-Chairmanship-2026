@@ -54,6 +54,7 @@ import 'screens/events/events_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_main_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_documents_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_credential_screen.dart';
+import 'screens/maintenance/maintenance_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -62,6 +63,9 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final FirebaseAnalytics firebaseAnalytics = FirebaseAnalytics.instance;
 
 Future<void> _initializeApp() async {
+  // Wire up ApiService with the global navigator key for 503 maintenance redirect
+  ApiService.navigatorKey = navigatorKey;
+
   // Initialize Firebase (with timeout — don't block app startup forever)
   try {
     await Firebase.initializeApp(
@@ -336,6 +340,15 @@ class BurundiAUApp extends StatelessWidget {
                 '/youth-dialogue-documents': (context) => const YouthDialogueDocumentsScreen(),
                 '/youth-dialogue-credential': (context) => const YouthDialogueCredentialScreen(),
               };
+
+              // Handle maintenance route with arguments
+              if (settings.name == '/maintenance') {
+                final data = settings.arguments as Map<String, dynamic>?;
+                return CupertinoPageRoute(
+                  builder: (_) => MaintenanceScreen(maintenanceData: data),
+                  settings: settings,
+                );
+              }
 
               final builder = routes[settings.name];
               if (builder != null) {

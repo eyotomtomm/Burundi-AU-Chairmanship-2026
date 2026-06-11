@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +16,12 @@ class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
+
+  /// Set by main.dart so ApiService can redirect to maintenance screen on 503.
+  static GlobalKey<NavigatorState>? navigatorKey;
+
+  /// Tracks whether we're already redirecting to avoid duplicate navigations.
+  static bool _redirectingToMaintenance = false;
 
   /// HTTP client with certificate pinning (production) or standard (development)
   final http.Client _client = PinnedHttpClient.create();
@@ -56,6 +63,37 @@ class ApiService {
     return headers;
   }
 
+  /// Check if a response is a 503 maintenance response and redirect.
+  /// Returns true if the response was a maintenance 503 (caller should stop).
+  bool _checkMaintenance503(http.Response response) {
+    if (response.statusCode != 503) return false;
+    try {
+      final data = json.decode(response.body);
+      if (data is Map && data['code'] == 'maintenance_mode') {
+        _redirectToMaintenance();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  void _redirectToMaintenance() {
+    if (_redirectingToMaintenance) return;
+    final nav = navigatorKey?.currentState;
+    if (nav == null) return;
+    _redirectingToMaintenance = true;
+
+    // Fetch fresh maintenance data, then navigate
+    getMaintenanceStatus().then((status) {
+      nav.pushNamedAndRemoveUntil('/maintenance', (route) => false,
+          arguments: status);
+    }).catchError((_) {
+      nav.pushNamedAndRemoveUntil('/maintenance', (route) => false);
+    }).whenComplete(() {
+      _redirectingToMaintenance = false;
+    });
+  }
+
   Future<dynamic> _get(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
     try {
       final response = await _client
@@ -64,6 +102,9 @@ class ApiService {
             headers: await _headers(auth: auth),
           )
           .timeout(Duration(seconds: timeoutSeconds));
+      if (_checkMaintenance503(response)) {
+        throw ApiException('App is under maintenance', 503);
+      }
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -104,6 +145,9 @@ class ApiService {
             body: json.encode(body),
           )
           .timeout(const Duration(seconds: 20));
+      if (_checkMaintenance503(response)) {
+        throw ApiException('App is under maintenance', 503);
+      }
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
@@ -142,6 +186,9 @@ class ApiService {
             headers: await _headers(auth: auth),
           )
           .timeout(const Duration(seconds: 20));
+      if (_checkMaintenance503(response)) {
+        throw ApiException('App is under maintenance', 503);
+      }
       if (response.statusCode >= 200 && response.statusCode < 300) {
         if (response.body.isEmpty) return {};
         return json.decode(response.body);
@@ -167,6 +214,9 @@ class ApiService {
             body: json.encode(body),
           )
           .timeout(const Duration(seconds: 20));
+      if (_checkMaintenance503(response)) {
+        throw ApiException('App is under maintenance', 503);
+      }
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;

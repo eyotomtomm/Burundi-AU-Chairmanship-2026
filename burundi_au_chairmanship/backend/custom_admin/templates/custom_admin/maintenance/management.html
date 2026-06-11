@@ -58,7 +58,7 @@
           </h2>
           {% if active_window %}
           <p class="text-sm {% if is_maintenance_active %}text-red-600{% else %}text-emerald-600{% endif %} mt-0.5">
-            {{ active_window.title }} &mdash; ends {{ active_window.ends_at|date:"M d, Y H:i" }}
+            {{ active_window.title }} &mdash; {% if active_window.ends_at %}ends {{ active_window.ends_at|date:"M d, Y H:i" }}{% else %}indefinite (turn off manually){% endif %}
           </p>
           {% else %}
           <p class="text-sm text-emerald-600 mt-0.5">No active maintenance windows at this time</p>
@@ -142,10 +142,18 @@
     <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
       <p class="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">Maintenance In Progress</p>
       <p class="text-lg font-bold text-red-800 mb-1">{{ active_window.title }}</p>
+      {% if active_window.ends_at %}
       <div id="countdown-active" class="text-3xl font-bold text-red-700 font-headline my-4" data-end="{{ active_window.ends_at|date:'c' }}">
         --:--:--
       </div>
       <p class="text-sm text-red-600">Estimated time remaining</p>
+      {% else %}
+      <div class="flex items-center justify-center gap-2 my-4">
+        <span class="material-symbols-outlined text-2xl text-red-600 animate-pulse">radio_button_checked</span>
+        <span class="text-2xl font-bold text-red-700 font-headline">Indefinite</span>
+      </div>
+      <p class="text-sm text-red-600">Use the toggle to turn off when done</p>
+      {% endif %}
     </div>
     {% elif next_upcoming %}
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
@@ -239,10 +247,14 @@
             class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
         </div>
         <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">End Date & Time (Estimated) <span class="text-red-500">*</span></label>
-          <input type="datetime-local" name="ends_at" required
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+            End Date & Time
+            <span class="text-xs font-normal text-slate-500 ml-1">(optional)</span>
+          </label>
+          <input type="datetime-local" name="ends_at"
             value="{{ editing_window.ends_at|date:'Y-m-d\TH:i'|default:'' }}"
             class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent">
+          <p class="text-xs text-slate-400 mt-1">Leave empty for indefinite maintenance &mdash; turn off manually when done</p>
         </div>
       </div>
 
@@ -372,7 +384,7 @@
           <div>
             <p class="font-semibold text-slate-900 text-sm">{{ window.title }}</p>
             <div class="flex items-center gap-3 mt-1">
-              <span class="text-xs text-slate-500">{{ window.starts_at|date:"M d, Y H:i" }} - {{ window.ends_at|date:"M d, Y H:i" }}</span>
+              <span class="text-xs text-slate-500">{{ window.starts_at|date:"M d, Y H:i" }} - {% if window.ends_at %}{{ window.ends_at|date:"M d, Y H:i" }}{% else %}Indefinite{% endif %}</span>
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider severity-{{ window.severity }} border">
                 <span class="w-1.5 h-1.5 rounded-full severity-dot-{{ window.severity }}"></span>
                 {{ window.severity }}
@@ -441,7 +453,7 @@
             </td>
             <td class="px-6 py-4">
               <p class="text-sm text-slate-700">{{ window.starts_at|date:"M d, Y H:i" }}</p>
-              <p class="text-xs text-slate-500">to {{ window.ends_at|date:"M d, Y H:i" }}</p>
+              <p class="text-xs text-slate-500">to {% if window.ends_at %}{{ window.ends_at|date:"M d, Y H:i" }}{% else %}<span class="text-amber-500 font-medium">Indefinite</span>{% endif %}</p>
             </td>
             <td class="px-6 py-4">
               <span class="text-sm text-slate-700 font-medium">{{ window.duration_display }}</span>

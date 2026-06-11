@@ -131,7 +131,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
         'Hello,\n\nI need assistance while the app is under maintenance.\n\n');
     final uri = Uri.parse('mailto:$email?subject=$subject&body=$body');
     try {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
       // Fallback: copy the email and tell the user
       if (mounted) {
@@ -271,6 +271,17 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
                   ),
                   const Spacer(),
 
+                  // App logo
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Image.asset(
+                      'assets/images/b4africa_logo_white.png',
+                      height: 140,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+
                   // Bottom card with info
                   Padding(
                     padding: const EdgeInsets.all(20),
@@ -282,7 +293,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
                           width: double.infinity,
                           padding: const EdgeInsets.all(28),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
+                            color: Colors.black.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
                               color: Colors.white.withValues(alpha: 0.15),
@@ -391,12 +402,11 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
 
                               const SizedBox(height: 20),
 
-                              // Tappable contact email chip — tap opens mail, long-press copies
+                              // Email chip — tap to copy address
                               if (contactEmail != null &&
                                   contactEmail.isNotEmpty) ...[
                                 InkWell(
-                                  onTap: () => _launchEmail(contactEmail),
-                                  onLongPress: () => _copyEmail(contactEmail),
+                                  onTap: () => _copyEmail(contactEmail),
                                   borderRadius: BorderRadius.circular(12),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
@@ -435,7 +445,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
                                                 ),
                                               ),
                                               const SizedBox(height: 2),
-                                              SelectableText(
+                                              Text(
                                                 contactEmail,
                                                 style: const TextStyle(
                                                   fontSize: 14,
@@ -448,7 +458,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
                                         ),
                                         const SizedBox(width: 8),
                                         Icon(
-                                          Icons.open_in_new_rounded,
+                                          Icons.content_copy_rounded,
                                           size: 18,
                                           color: Colors.white
                                               .withValues(alpha: 0.8),

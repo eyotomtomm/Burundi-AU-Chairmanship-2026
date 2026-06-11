@@ -4351,14 +4351,19 @@ def maintenance_create(request):
         starts_at_str = request.POST.get('starts_at', '')
         ends_at_str = request.POST.get('ends_at', '')
         starts_at_dt = parse_datetime(starts_at_str)
-        ends_at_dt = parse_datetime(ends_at_str)
-        if not starts_at_dt or not ends_at_dt:
-            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+        if not starts_at_dt:
+            messages.error(request, 'Invalid date format for starts_at.')
             return render(request, 'custom_admin/maintenance/form.html', {'action': 'Create'})
         if is_naive(starts_at_dt):
             starts_at_dt = make_aware(starts_at_dt)
-        if is_naive(ends_at_dt):
-            ends_at_dt = make_aware(ends_at_dt)
+        ends_at_dt = None
+        if ends_at_str:
+            ends_at_dt = parse_datetime(ends_at_str)
+            if not ends_at_dt:
+                messages.error(request, 'Invalid date format for ends_at.')
+                return render(request, 'custom_admin/maintenance/form.html', {'action': 'Create'})
+            if is_naive(ends_at_dt):
+                ends_at_dt = make_aware(ends_at_dt)
         window = ScheduledMaintenance.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
@@ -4387,14 +4392,19 @@ def maintenance_edit(request, pk):
         starts_at_str = request.POST.get('starts_at', '')
         ends_at_str = request.POST.get('ends_at', '')
         starts_at_dt = parse_datetime(starts_at_str)
-        ends_at_dt = parse_datetime(ends_at_str)
-        if not starts_at_dt or not ends_at_dt:
-            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+        if not starts_at_dt:
+            messages.error(request, 'Invalid date format for starts_at.')
             return render(request, 'custom_admin/maintenance/form.html', {'window': window, 'action': 'Edit'})
         if is_naive(starts_at_dt):
             starts_at_dt = make_aware(starts_at_dt)
-        if is_naive(ends_at_dt):
-            ends_at_dt = make_aware(ends_at_dt)
+        ends_at_dt = None
+        if ends_at_str:
+            ends_at_dt = parse_datetime(ends_at_str)
+            if not ends_at_dt:
+                messages.error(request, 'Invalid date format for ends_at.')
+                return render(request, 'custom_admin/maintenance/form.html', {'window': window, 'action': 'Edit'})
+            if is_naive(ends_at_dt):
+                ends_at_dt = make_aware(ends_at_dt)
         window.title = request.POST.get('title')
         window.title_fr = request.POST.get('title_fr', '')
         window.description = request.POST.get('description', '')
@@ -6963,25 +6973,28 @@ def reorder_save(request):
 def maintenance_management(request):
     now = timezone.now()
 
-    # Determine active maintenance window
+    # Determine active maintenance window (includes indefinite windows with no ends_at)
     active_window = ScheduledMaintenance.objects.filter(
         is_active=True,
         starts_at__lte=now,
-        ends_at__gte=now,
+    ).filter(
+        Q(ends_at__gte=now) | Q(ends_at__isnull=True)
     ).first()
 
     is_maintenance_active = active_window is not None
 
     # Upcoming windows (future, ordered by start time)
     upcoming_windows = list(ScheduledMaintenance.objects.filter(
+        is_active=True,
         starts_at__gt=now,
     ).order_by('starts_at'))
 
     # Next upcoming (for countdown)
     next_upcoming = upcoming_windows[0] if upcoming_windows else None
 
-    # Past windows (ended, ordered by most recent first)
+    # Past windows (ended, ordered by most recent first) — only windows with an end time
     past_windows = list(ScheduledMaintenance.objects.filter(
+        ends_at__isnull=False,
         ends_at__lt=now,
     ).order_by('-ends_at'))
 
@@ -7019,11 +7032,12 @@ def maintenance_management(request):
 def maintenance_toggle(request):
     now = timezone.now()
 
-    # Find currently active maintenance window
+    # Find currently active maintenance window (including indefinite ones)
     active_window = ScheduledMaintenance.objects.filter(
         is_active=True,
         starts_at__lte=now,
-        ends_at__gte=now,
+    ).filter(
+        Q(ends_at__gte=now) | Q(ends_at__isnull=True)
     ).first()
 
     if active_window:
@@ -7032,21 +7046,20 @@ def maintenance_toggle(request):
         active_window.save(update_fields=['is_active'])
         messages.success(request, f'Maintenance mode disabled. "{active_window.title}" has been deactivated.')
     else:
-        # Enable: create an immediate maintenance window (4 hours default)
-        from datetime import timedelta as td
+        # Enable: create immediate indefinite maintenance (no end time — turn off manually)
         ScheduledMaintenance.objects.create(
             title='Emergency Maintenance',
             title_fr='Maintenance d\'urgence',
             description='Maintenance mode enabled via quick toggle.',
-            description_fr='Mode maintenance active via le bouton rapide.',
+            description_fr='Mode maintenance activé via le bouton rapide.',
             starts_at=now,
-            ends_at=now + td(hours=4),
+            ends_at=None,
             is_active=True,
             show_banner=True,
             severity='major',
             affected_services='all',
         )
-        messages.success(request, 'Maintenance mode enabled. A 4-hour maintenance window has been created.')
+        messages.success(request, 'Maintenance mode enabled. Turn it off manually when done.')
 
     return redirect('custom_admin:maintenance_management')
 
@@ -7074,20 +7087,27 @@ def maintenance_schedule(request):
     affected_services_list = request.POST.getlist('affected_services')
     affected_services = ','.join(affected_services_list) if affected_services_list else 'all'
 
-    if not title or not starts_at_str or not ends_at_str:
-        messages.error(request, 'Title, start date, and end date are required.')
+    if not title or not starts_at_str:
+        messages.error(request, 'Title and start date are required.')
         return redirect('custom_admin:maintenance_management')
 
     # Parse datetime strings from HTML datetime-local inputs
     starts_at_dt = parse_datetime(starts_at_str)
-    ends_at_dt = parse_datetime(ends_at_str)
-    if not starts_at_dt or not ends_at_dt:
-        messages.error(request, 'Invalid date format for start or end date.')
+    if not starts_at_dt:
+        messages.error(request, 'Invalid date format for start date.')
         return redirect('custom_admin:maintenance_management')
     if is_naive(starts_at_dt):
         starts_at_dt = make_aware(starts_at_dt)
-    if is_naive(ends_at_dt):
-        ends_at_dt = make_aware(ends_at_dt)
+
+    # ends_at is optional — leave empty for indefinite maintenance
+    ends_at_dt = None
+    if ends_at_str:
+        ends_at_dt = parse_datetime(ends_at_str)
+        if not ends_at_dt:
+            messages.error(request, 'Invalid date format for end date.')
+            return redirect('custom_admin:maintenance_management')
+        if is_naive(ends_at_dt):
+            ends_at_dt = make_aware(ends_at_dt)
 
     # Handle image upload
     image_file = request.FILES.get('image')

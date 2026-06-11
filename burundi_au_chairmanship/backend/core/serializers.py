@@ -18,7 +18,7 @@ from .models import (
     EventCheckIn, EventPhoto, Conversation, DirectMessage, Discussion, DiscussionReply,
     Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
-    EmailTemplate, Webhook, ScheduledMaintenance, ABTest,
+    EmailTemplate, Webhook, ScheduledMaintenance, PromotionalSplash, ABTest,
     ContentAnalytics, EngagementHeatmap, WeeklyReport, TranslationEntry, AppRelease,
     AuditLogEntry, AccountMergeRequest, FunnelStep,
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
@@ -97,6 +97,13 @@ class UserSerializer(serializers.ModelSerializer):
         full = f'{obj.first_name} {obj.last_name}'.strip()
         return full or user_handle(obj)
 
+    def to_internal_value(self, data):
+        """Accept 'name' from the client and pass it through to validated_data."""
+        ret = super().to_internal_value(data)
+        if 'name' in data:
+            ret['_name'] = data['name']
+        return ret
+
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         # Ensure profile_picture is a full URL
@@ -125,9 +132,9 @@ class UserSerializer(serializers.ModelSerializer):
         return ret
 
     def update(self, instance, validated_data):
-        # Update user name fields
-        if 'first_name' in validated_data:
-            name = validated_data['first_name']
+        # Update user name fields — split "Full Name" into first_name + last_name
+        if '_name' in validated_data:
+            name = validated_data.pop('_name')
             parts = name.strip().split(None, 1) if name else ['']
             instance.first_name = parts[0][:150]
             instance.last_name = parts[1][:150] if len(parts) > 1 else ''
@@ -2040,4 +2047,22 @@ class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if obj.id_photo and request:
             return request.build_absolute_uri(obj.id_photo.url)
+        return ''
+
+
+class PromotionalSplashSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PromotionalSplash
+        fields = [
+            'id', 'title', 'title_fr', 'image_url', 'action_url',
+            'action_text', 'action_text_fr', 'auto_close_seconds',
+            'starts_at', 'ends_at', 'show_once', 'priority',
+        ]
+
+    def get_image_url(self, obj):
+        request = self.context.get('request')
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
         return ''

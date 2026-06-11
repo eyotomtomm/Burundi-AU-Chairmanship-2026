@@ -223,6 +223,12 @@ urlpatterns = [
     path('maintenance/<int:pk>/edit/', views.maintenance_edit, name='maintenance_edit'),
     path('maintenance/<int:pk>/delete/', views.maintenance_delete, name='maintenance_delete'),
 
+    # Promotional Splashes
+    path('promotional-splashes/', views.promotional_splash_list, name='promotional_splash_list'),
+    path('promotional-splashes/create/', views.promotional_splash_create, name='promotional_splash_create'),
+    path('promotional-splashes/<int:pk>/edit/', views.promotional_splash_edit, name='promotional_splash_edit'),
+    path('promotional-splashes/<int:pk>/delete/', views.promotional_splash_delete, name='promotional_splash_delete'),
+
     # Audit Log
     path('audit-log/', views.admin_audit_log, name='audit_log'),
 

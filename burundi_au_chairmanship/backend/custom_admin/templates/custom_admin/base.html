@@ -974,6 +974,13 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Maintenance</span>
     </a>
     {% endif %}
+
+    {% if 'promotional_splash_list' in allowed_sections %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'promotional_splash' in url_name %}bg-purple-500/10 text-purple-400 border-r-4 border-purple-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:promotional_splash_list' %}">
+      <span class="material-symbols-outlined">ad</span>
+      <span class="text-sm tracking-wide font-headline">Promo Splashes</span>
+    </a>
+    {% endif %}
 {% endwith %}
   </nav>
 

@@ -126,17 +126,17 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
   String? _getContactEmail() => _activeData?['contact_email'] as String?;
 
   Future<void> _launchEmail(String email) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: email,
-      queryParameters: {
-        'subject': 'Support Request - Maintenance',
-        'body':
-            'Hello,\n\nI need assistance while the app is under maintenance.\n\n',
-      },
-    );
-    if (await canLaunchUrl(uri)) {
+    final subject = Uri.encodeComponent('Support Request - Maintenance');
+    final body = Uri.encodeComponent(
+        'Hello,\n\nI need assistance while the app is under maintenance.\n\n');
+    final uri = Uri.parse('mailto:$email?subject=$subject&body=$body');
+    try {
       await launchUrl(uri);
+    } catch (_) {
+      // Fallback: copy the email and tell the user
+      if (mounted) {
+        _copyEmail(email);
+      }
     }
   }
 
@@ -391,11 +391,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
 
                               const SizedBox(height: 20),
 
-                              // Copyable contact email chip
+                              // Tappable contact email chip — tap opens mail, long-press copies
                               if (contactEmail != null &&
                                   contactEmail.isNotEmpty) ...[
                                 InkWell(
-                                  onTap: () => _copyEmail(contactEmail),
+                                  onTap: () => _launchEmail(contactEmail),
+                                  onLongPress: () => _copyEmail(contactEmail),
                                   borderRadius: BorderRadius.circular(12),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
@@ -447,7 +448,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
                                         ),
                                         const SizedBox(width: 8),
                                         Icon(
-                                          Icons.content_copy_rounded,
+                                          Icons.open_in_new_rounded,
                                           size: 18,
                                           color: Colors.white
                                               .withValues(alpha: 0.8),

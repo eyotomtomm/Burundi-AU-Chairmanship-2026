@@ -827,7 +827,12 @@ class AuthProvider extends ChangeNotifier {
     final verificationTitle = user['verification_title'] as String?;
     final verificationRole = user['verification_role'] as String?;
     final verificationName = user['verification_name'] as String?;
-    final receivesNewsletter = user['receives_newsletter'] ?? false;
+    // receives_newsletter may be top-level or nested in profile
+    var receivesNewsletter = user['receives_newsletter'];
+    if (receivesNewsletter == null && user['profile'] is Map) {
+      receivesNewsletter = user['profile']['receives_newsletter'];
+    }
+    receivesNewsletter = receivesNewsletter ?? false;
 
     // Profile picture: can be in top-level or nested in profile
     String? profilePic = user['profile_picture'] as String?;

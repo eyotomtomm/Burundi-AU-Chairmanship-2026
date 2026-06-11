@@ -3359,6 +3359,49 @@ class ScheduledMaintenance(models.Model):
         return f"{self.title} ({self.starts_at} - {self.ends_at})"
 
 
+class PromotionalSplash(models.Model):
+    """Full-screen promotional splash shown on app launch."""
+    title = models.CharField(max_length=200)
+    title_fr = models.CharField(max_length=200, blank=True)
+    image = models.ImageField(upload_to='promotional_splashes/')
+    action_url = models.CharField(max_length=500, blank=True, help_text='In-app route (e.g. /news) or external URL')
+    action_text = models.CharField(max_length=100, blank=True, help_text='Button text (e.g. Learn More)')
+    action_text_fr = models.CharField(max_length=100, blank=True)
+    auto_close_seconds = models.PositiveIntegerField(default=5, help_text='Seconds before auto-dismiss')
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    show_once = models.BooleanField(default=False, help_text='If true, shown only once per user')
+    click_count = models.PositiveIntegerField(default=0)
+    view_count = models.PositiveIntegerField(default=0)
+    priority = models.IntegerField(default=0, help_text='Higher = shown first')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-priority', '-created_at']
+        verbose_name = 'Promotional Splash'
+        verbose_name_plural = 'Promotional Splashes'
+        indexes = [
+            models.Index(fields=['is_active', 'starts_at', 'ends_at']),
+        ]
+
+    @property
+    def is_currently_active(self):
+        now = timezone.now()
+        return self.is_active and self.starts_at <= now <= self.ends_at
+
+    @property
+    def is_upcoming(self):
+        return self.is_active and self.starts_at > timezone.now()
+
+    @property
+    def is_expired(self):
+        return self.ends_at < timezone.now()
+
+    def __str__(self):
+        return self.title
+
+
 class ABTest(models.Model):
     """A/B testing configuration."""
     TEST_TYPE_CHOICES = [

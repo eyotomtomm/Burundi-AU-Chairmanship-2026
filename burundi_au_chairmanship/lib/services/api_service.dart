@@ -1440,6 +1440,19 @@ class ApiService {
   }
 
   // ═══════════════════════════════════════════════════════════
+  //  PROMOTIONAL SPLASH
+  // ═══════════════════════════════════════════════════════════
+
+  Future<Map<String, dynamic>?> getActivePromotionalSplash() async {
+    final data = await _get('promotional-splash/active/');
+    return data['splash'];
+  }
+
+  Future<void> trackPromotionalSplashClick(int id) async {
+    await _post('promotional-splash/$id/click/', {});
+  }
+
+  // ═══════════════════════════════════════════════════════════
   //  YOUTH DIALOGUE
   // ═══════════════════════════════════════════════════════════
 

@@ -1009,13 +1009,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final dialCode = AppConstants.countryDialCodes[selectedCountryCode] ?? '+257';
               final fullPhone = '$dialCode${controller.text.trim()}';
               Navigator.pop(dialogContext);
-              // Update phone via API
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Phone number updated to $fullPhone'),
-                  backgroundColor: AppColors.success,
-                ),
+              final success = await authProvider.updateProfile(
+                authProvider.userName ?? '',
+                phoneNumber: fullPhone,
               );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success
+                        ? 'Phone number updated to $fullPhone'
+                        : 'Failed to update phone number'),
+                    backgroundColor: success ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
             },
             child: Text(l10n.translate('save')),
           ),
@@ -1165,13 +1172,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             onPressed: () async {
               Navigator.pop(dialogContext);
-              // Update gender via API
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Gender updated'),
-                  backgroundColor: AppColors.success,
-                ),
+              final success = await authProvider.updateProfile(
+                authProvider.userName ?? '',
+                gender: selectedGender,
               );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success
+                        ? 'Gender updated'
+                        : 'Failed to update gender'),
+                    backgroundColor: success ? AppColors.success : AppColors.error,
+                  ),
+                );
+              }
             },
             child: Text(l10n.translate('save')),
           ),

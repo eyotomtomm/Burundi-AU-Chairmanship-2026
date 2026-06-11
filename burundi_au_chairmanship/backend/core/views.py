@@ -38,7 +38,7 @@ from .models import (
     Conversation, DirectMessage, Discussion, DiscussionReply,
     Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
-    ScheduledMaintenance, AppRelease, ContentAnalytics,
+    ScheduledMaintenance, PromotionalSplash, AppRelease, ContentAnalytics,
     AuditLogEntry, TranslationEntry, ContentVersion, AccountMergeRequest,
     WeeklyReport, UserSession, FunnelStep, EngagementHeatmap,
     VideoChapter, VideoSubtitle, ArticleRevision, TranslationRequest,
@@ -88,6 +88,8 @@ from .serializers import (
     # Youth Dialogue
     YouthDialogueApplicationCreateSerializer, YouthDialogueApplicationStatusSerializer,
     YouthDialogueDocumentSerializer, YouthDialogueCredentialSerializer,
+    # Promotional Splash
+    PromotionalSplashSerializer,
 )
 
 
@@ -5653,3 +5655,32 @@ def yd_id_card_pdf(request, app_id):
     response = DjangoHttpResponse(buf, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="YD-IDCard-{app.participant_code}.pdf"'
     return response
+
+
+# ═══════════════════════════════════════════════════════════
+#  PROMOTIONAL SPLASH
+# ═══════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def active_promotional_splash(request):
+    """Return the highest-priority active promotional splash, if any."""
+    now = timezone.now()
+    splash = PromotionalSplash.objects.filter(
+        is_active=True, starts_at__lte=now, ends_at__gt=now,
+    ).order_by('-priority').first()
+
+    if splash:
+        PromotionalSplash.objects.filter(pk=splash.pk).update(view_count=F('view_count') + 1)
+        ctx = {'request': request}
+        return Response({'splash': PromotionalSplashSerializer(splash, context=ctx).data})
+    return Response({'splash': None})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def track_promotional_splash_click(request, pk):
+    """Increment the click count for a promotional splash."""
+    splash = get_object_or_404(PromotionalSplash, pk=pk)
+    PromotionalSplash.objects.filter(pk=splash.pk).update(click_count=F('click_count') + 1)
+    return Response({'success': True})

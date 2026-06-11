@@ -36,7 +36,7 @@ from core.models import (
     # New models
     Poll, PollOption, Discussion, ContactDirectory, AnnouncementBanner,
     EmailTemplate, EventSpeaker, OnboardingStep, Webhook, WebhookLog,
-    ScheduledMaintenance, LoginHistory, Bookmark, Reaction,
+    ScheduledMaintenance, PromotionalSplash, LoginHistory, Bookmark, Reaction,
     TranslationEntry, RateLimitLog,
     AdminActivityLog, DatabaseBackup,
     UserSegment, UserSegmentMembership,
@@ -4346,13 +4346,26 @@ def maintenance_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def maintenance_create(request):
     if request.method == 'POST':
+        from django.utils.dateparse import parse_datetime
+        from django.utils.timezone import make_aware, is_naive
+        starts_at_str = request.POST.get('starts_at', '')
+        ends_at_str = request.POST.get('ends_at', '')
+        starts_at_dt = parse_datetime(starts_at_str)
+        ends_at_dt = parse_datetime(ends_at_str)
+        if not starts_at_dt or not ends_at_dt:
+            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+            return render(request, 'custom_admin/maintenance/form.html', {'action': 'Create'})
+        if is_naive(starts_at_dt):
+            starts_at_dt = make_aware(starts_at_dt)
+        if is_naive(ends_at_dt):
+            ends_at_dt = make_aware(ends_at_dt)
         window = ScheduledMaintenance.objects.create(
             title=request.POST.get('title'),
             title_fr=request.POST.get('title_fr', ''),
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
-            starts_at=request.POST.get('starts_at'),
-            ends_at=request.POST.get('ends_at'),
+            starts_at=starts_at_dt,
+            ends_at=ends_at_dt,
             contact_email=request.POST.get('contact_email', ''),
             is_active=request.POST.get('is_active') == 'on',
         )
@@ -4369,12 +4382,25 @@ def maintenance_create(request):
 def maintenance_edit(request, pk):
     window = get_object_or_404(ScheduledMaintenance, pk=pk)
     if request.method == 'POST':
+        from django.utils.dateparse import parse_datetime
+        from django.utils.timezone import make_aware, is_naive
+        starts_at_str = request.POST.get('starts_at', '')
+        ends_at_str = request.POST.get('ends_at', '')
+        starts_at_dt = parse_datetime(starts_at_str)
+        ends_at_dt = parse_datetime(ends_at_str)
+        if not starts_at_dt or not ends_at_dt:
+            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+            return render(request, 'custom_admin/maintenance/form.html', {'window': window, 'action': 'Edit'})
+        if is_naive(starts_at_dt):
+            starts_at_dt = make_aware(starts_at_dt)
+        if is_naive(ends_at_dt):
+            ends_at_dt = make_aware(ends_at_dt)
         window.title = request.POST.get('title')
         window.title_fr = request.POST.get('title_fr', '')
         window.description = request.POST.get('description', '')
         window.description_fr = request.POST.get('description_fr', '')
-        window.starts_at = request.POST.get('starts_at')
-        window.ends_at = request.POST.get('ends_at')
+        window.starts_at = starts_at_dt
+        window.ends_at = ends_at_dt
         window.contact_email = request.POST.get('contact_email', '')
         window.is_active = request.POST.get('is_active') == 'on'
         if request.FILES.get('image'):
@@ -4395,6 +4421,106 @@ def maintenance_delete(request, pk):
     window.delete()
     messages.success(request, 'Maintenance window deleted successfully!')
     return redirect('custom_admin:maintenance_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PROMOTIONAL SPLASH
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def promotional_splash_list(request):
+    splashes = PromotionalSplash.objects.all().order_by('-priority', '-created_at')
+    return render(request, 'custom_admin/promotional_splash/list.html', {'splashes': splashes})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def promotional_splash_create(request):
+    if request.method == 'POST':
+        from django.utils.dateparse import parse_datetime
+        from django.utils.timezone import make_aware, is_naive
+        starts_at_str = request.POST.get('starts_at', '')
+        ends_at_str = request.POST.get('ends_at', '')
+        starts_at_dt = parse_datetime(starts_at_str)
+        ends_at_dt = parse_datetime(ends_at_str)
+        if not starts_at_dt or not ends_at_dt:
+            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+            return render(request, 'custom_admin/promotional_splash/form.html', {'action': 'Create'})
+        if is_naive(starts_at_dt):
+            starts_at_dt = make_aware(starts_at_dt)
+        if is_naive(ends_at_dt):
+            ends_at_dt = make_aware(ends_at_dt)
+        if not request.FILES.get('image'):
+            messages.error(request, 'An image is required for promotional splashes.')
+            return render(request, 'custom_admin/promotional_splash/form.html', {'action': 'Create'})
+        splash = PromotionalSplash.objects.create(
+            title=request.POST.get('title', ''),
+            title_fr=request.POST.get('title_fr', ''),
+            image=request.FILES.get('image'),
+            action_url=request.POST.get('action_url', ''),
+            action_text=request.POST.get('action_text', ''),
+            action_text_fr=request.POST.get('action_text_fr', ''),
+            auto_close_seconds=int(request.POST.get('auto_close_seconds', 5) or 5),
+            starts_at=starts_at_dt,
+            ends_at=ends_at_dt,
+            is_active=request.POST.get('is_active') == 'on',
+            show_once=request.POST.get('show_once') == 'on',
+            priority=int(request.POST.get('priority', 0) or 0),
+        )
+        messages.success(request, f'Promotional splash "{splash.title}" created successfully!')
+        return redirect('custom_admin:promotional_splash_list')
+    return render(request, 'custom_admin/promotional_splash/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def promotional_splash_edit(request, pk):
+    splash = get_object_or_404(PromotionalSplash, pk=pk)
+    if request.method == 'POST':
+        from django.utils.dateparse import parse_datetime
+        from django.utils.timezone import make_aware, is_naive
+        starts_at_str = request.POST.get('starts_at', '')
+        ends_at_str = request.POST.get('ends_at', '')
+        starts_at_dt = parse_datetime(starts_at_str)
+        ends_at_dt = parse_datetime(ends_at_str)
+        if not starts_at_dt or not ends_at_dt:
+            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+            return render(request, 'custom_admin/promotional_splash/form.html', {'splash': splash, 'action': 'Edit'})
+        if is_naive(starts_at_dt):
+            starts_at_dt = make_aware(starts_at_dt)
+        if is_naive(ends_at_dt):
+            ends_at_dt = make_aware(ends_at_dt)
+        splash.title = request.POST.get('title', '')
+        splash.title_fr = request.POST.get('title_fr', '')
+        splash.action_url = request.POST.get('action_url', '')
+        splash.action_text = request.POST.get('action_text', '')
+        splash.action_text_fr = request.POST.get('action_text_fr', '')
+        splash.auto_close_seconds = int(request.POST.get('auto_close_seconds', 5) or 5)
+        splash.starts_at = starts_at_dt
+        splash.ends_at = ends_at_dt
+        splash.is_active = request.POST.get('is_active') == 'on'
+        splash.show_once = request.POST.get('show_once') == 'on'
+        splash.priority = int(request.POST.get('priority', 0) or 0)
+        if request.FILES.get('image'):
+            splash.image = request.FILES.get('image')
+        if request.POST.get('remove_image') == 'on' and not request.FILES.get('image'):
+            messages.error(request, 'Promotional splashes require an image.')
+            return render(request, 'custom_admin/promotional_splash/form.html', {'splash': splash, 'action': 'Edit'})
+        splash.save()
+        messages.success(request, f'Promotional splash "{splash.title}" updated successfully!')
+        return redirect('custom_admin:promotional_splash_list')
+    return render(request, 'custom_admin/promotional_splash/form.html', {'splash': splash, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def promotional_splash_delete(request, pk):
+    splash = get_object_or_404(PromotionalSplash, pk=pk)
+    splash.delete()
+    messages.success(request, 'Promotional splash deleted successfully!')
+    return redirect('custom_admin:promotional_splash_list')
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -6929,12 +7055,15 @@ def maintenance_toggle(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def maintenance_schedule(request):
+    from django.utils.dateparse import parse_datetime
+    from django.utils.timezone import make_aware, is_naive
+
     title = request.POST.get('title', '').strip()
     title_fr = request.POST.get('title_fr', '').strip()
     description = request.POST.get('description', '').strip()
     description_fr = request.POST.get('description_fr', '').strip()
-    starts_at = request.POST.get('starts_at', '')
-    ends_at = request.POST.get('ends_at', '')
+    starts_at_str = request.POST.get('starts_at', '')
+    ends_at_str = request.POST.get('ends_at', '')
     contact_email = request.POST.get('contact_email', '').strip()
     severity = request.POST.get('severity', 'minor')
     is_active = request.POST.get('is_active') == 'on'
@@ -6945,9 +7074,20 @@ def maintenance_schedule(request):
     affected_services_list = request.POST.getlist('affected_services')
     affected_services = ','.join(affected_services_list) if affected_services_list else 'all'
 
-    if not title or not starts_at or not ends_at:
+    if not title or not starts_at_str or not ends_at_str:
         messages.error(request, 'Title, start date, and end date are required.')
         return redirect('custom_admin:maintenance_management')
+
+    # Parse datetime strings from HTML datetime-local inputs
+    starts_at_dt = parse_datetime(starts_at_str)
+    ends_at_dt = parse_datetime(ends_at_str)
+    if not starts_at_dt or not ends_at_dt:
+        messages.error(request, 'Invalid date format for start or end date.')
+        return redirect('custom_admin:maintenance_management')
+    if is_naive(starts_at_dt):
+        starts_at_dt = make_aware(starts_at_dt)
+    if is_naive(ends_at_dt):
+        ends_at_dt = make_aware(ends_at_dt)
 
     # Handle image upload
     image_file = request.FILES.get('image')
@@ -6961,8 +7101,8 @@ def maintenance_schedule(request):
             window.title_fr = title_fr
             window.description = description
             window.description_fr = description_fr
-            window.starts_at = starts_at
-            window.ends_at = ends_at
+            window.starts_at = starts_at_dt
+            window.ends_at = ends_at_dt
             window.contact_email = contact_email
             window.severity = severity
             window.is_active = is_active
@@ -6981,8 +7121,8 @@ def maintenance_schedule(request):
             title_fr=title_fr,
             description=description,
             description_fr=description_fr,
-            starts_at=starts_at,
-            ends_at=ends_at,
+            starts_at=starts_at_dt,
+            ends_at=ends_at_dt,
             contact_email=contact_email,
             severity=severity,
             is_active=is_active,

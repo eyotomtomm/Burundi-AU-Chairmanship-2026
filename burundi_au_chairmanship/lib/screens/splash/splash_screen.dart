@@ -107,8 +107,9 @@ class _SplashScreenState extends State<SplashScreen>
         );
         return;
       }
-    } catch (_) {
+    } catch (e) {
       // If maintenance check fails, proceed normally
+      if (kDebugMode) print('Maintenance check failed: $e');
     }
     if (!mounted) return;
 

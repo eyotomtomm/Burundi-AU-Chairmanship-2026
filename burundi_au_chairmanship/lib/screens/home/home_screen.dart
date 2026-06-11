@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -11,10 +12,12 @@ import '../../widgets/app_update_dialog.dart';
 import '../../widgets/whats_new_dialog.dart';
 import '../../widgets/offline_banner.dart';
 import '../../widgets/confetti_overlay.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/popup_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/api_service.dart';
 import '../../config/app_constants.dart';
+import '../../widgets/promotional_splash_overlay.dart';
 import '../maintenance/maintenance_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/magazine_tab.dart';
@@ -40,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkVerificationStatus();
       _checkAndShowPopups();
+      _checkPromotionalSplash();
       _checkForAppUpdate();
       _showWhatsNew();
     });
@@ -70,7 +74,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           (route) => false,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) print('Maintenance check failed: $e');
+    }
   }
 
   /// Check verification status and show popup if needed
@@ -156,6 +162,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (e) {
       // Silently fail - don't disrupt user experience
+    }
+  }
+
+  /// Check and show promotional splash screen
+  Future<void> _checkPromotionalSplash() async {
+    try {
+      final splash = await ApiService().getActivePromotionalSplash();
+      if (splash == null || !mounted) return;
+
+      // Check show_once via SharedPreferences
+      if (splash['show_once'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        final seenKey = 'seen_splash_${splash['id']}';
+        if (prefs.getBool(seenKey) == true) return;
+        await prefs.setBool(seenKey, true);
+      }
+
+      if (!mounted) return;
+      final languageProvider = context.read<LanguageProvider>();
+      final languageCode = languageProvider.locale.languageCode;
+
+      await PromotionalSplashOverlay.show(
+        context: context,
+        splash: splash,
+        languageCode: languageCode,
+      );
+    } catch (e) {
+      if (kDebugMode) print('Promotional splash check failed: $e');
     }
   }
 

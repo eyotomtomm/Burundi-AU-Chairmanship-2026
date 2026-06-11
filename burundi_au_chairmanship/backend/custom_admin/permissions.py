@@ -90,6 +90,7 @@ ADMIN_MENU_GROUPS = [
     ]),
     ('Maintenance', [
         ('maintenance_list',          'Maintenance Windows',    'engineering'),
+        ('promotional_splash_list',   'Promotional Splashes',   'ad'),
     ]),
     ('Settings', [
         ('app_settings',              'App Settings',           'settings'),
@@ -262,6 +263,10 @@ def get_required_section(url_name):
         return 'onboarding_steps_list'
     if 'quick_access' in url_name:
         return 'quick_access_list'
+
+    # Promotional Splashes
+    if 'promotional_splash' in url_name:
+        return 'promotional_splash_list'
 
     # Maintenance
     if url_name.startswith('maintenance'):

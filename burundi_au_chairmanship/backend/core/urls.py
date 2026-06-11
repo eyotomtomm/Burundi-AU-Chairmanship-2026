@@ -125,6 +125,10 @@ urlpatterns = [
     path('maintenance/', views.maintenance_status, name='maintenance-status'),
     path('app-update/', views.check_app_update, name='check-app-update'),
 
+    # Promotional Splash
+    path('promotional-splash/active/', views.active_promotional_splash, name='active-promotional-splash'),
+    path('promotional-splash/<int:pk>/click/', views.track_promotional_splash_click, name='track-promotional-splash-click'),
+
     # Admin Audit & Management (NEW)
     path('admin/audit-log/', views.admin_audit_log, name='admin-audit-log'),
     path('admin/translations/', views.translation_entries, name='translation-entries'),

@@ -156,6 +156,26 @@
       </div>
     </div>
 
+    <!-- Media Gallery Card -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center">
+            <span class="material-symbols-outlined text-purple-600">perm_media</span>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-slate-800">Media Gallery</h2>
+            <p class="text-sm text-slate-500">Manage photos and videos for the programme</p>
+          </div>
+        </div>
+        <a href="{% url 'custom_admin:youth_dialogue_media_list' %}"
+           class="inline-flex items-center gap-2 bg-purple-600 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-purple-700 transition-all shadow-sm">
+          <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          Manage Media
+        </a>
+      </div>
+    </div>
+
     <!-- Application Form Fields -->
     <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
       <div class="flex items-center justify-between">

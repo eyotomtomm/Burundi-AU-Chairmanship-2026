@@ -37,7 +37,7 @@ def _get_image_field_names(model):
 
 def _on_post_save(sender, instance, created, **kwargs):
     """Generate multi-size thumbnails when an image field changes."""
-    from .image_utils import generate_thumbnails_on_disk
+    from .image_utils import generate_thumbnails_on_disk, generate_thumbnails_to_storage
 
     field_names = _get_image_field_names(sender)
     if not field_names:
@@ -60,24 +60,23 @@ def _on_post_save(sender, instance, created, **kwargs):
         # Remember current name for subsequent saves within same process.
         setattr(instance, cache_attr, image.name)
 
-        # Resolve to an absolute filesystem path.
+        logger.info(
+            "Generating thumbnails for %s.%s (pk=%s): %s",
+            sender.__name__, field_name, instance.pk, image.name,
+        )
+
+        # Resolve to an absolute filesystem path if possible;
+        # fall back to remote (S3) generation otherwise.
         try:
             full_path = image.path  # works for default FileSystemStorage
         except NotImplementedError:
-            # Remote storage (S3, etc.) -- skip disk-based generation.
-            logger.debug(
-                "Skipping thumbnail generation for %s.%s (remote storage)",
-                sender.__name__, field_name,
-            )
+            # Remote storage (S3, Spaces, etc.)
+            generate_thumbnails_to_storage(image)
             continue
 
         if not os.path.isfile(full_path):
             continue
 
-        logger.info(
-            "Generating thumbnails for %s.%s (pk=%s): %s",
-            sender.__name__, field_name, instance.pk, image.name,
-        )
         generate_thumbnails_on_disk(full_path)
 
 

@@ -17,6 +17,7 @@ import '../../../providers/language_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/verification_provider.dart';
 import '../../../services/api_service.dart';
+import '../../../services/data_saver_service.dart';
 import '../../../widgets/verified_badge.dart';
 import '../../security/login_history_screen.dart';
 import '../../security/active_sessions_screen.dart';
@@ -229,6 +230,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                               child: isLoggedIn && authProvider.profilePictureUrl != null && authProvider.profilePictureUrl!.isNotEmpty
                                   ? CachedNetworkImage(
                                       imageUrl: Environment.fixMediaUrl(authProvider.profilePictureUrl!),
+                                      memCacheWidth: 200,
                                       width: 64,
                                       height: 64,
                                       fit: BoxFit.cover,
@@ -536,6 +538,43 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             Uri.parse('${Environment.siteBaseUrl}/privacy-policy/'),
                             mode: LaunchMode.externalApplication,
                           ),
+                        ),
+                        // Data Saver toggle
+                        SwitchListTile(
+                          secondary: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF66BB6A).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.data_saver_on,
+                              color: Color(0xFF66BB6A),
+                              size: 22,
+                            ),
+                          ),
+                          title: Text(
+                            l10n.dataSaver,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          subtitle: Text(
+                            l10n.dataSaverDesc,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? Colors.white54 : Colors.grey[600],
+                            ),
+                          ),
+                          value: DataSaverService().enabled,
+                          activeColor: AppColors.burundiGreen,
+                          onChanged: (val) async {
+                            await DataSaverService().setEnabled(val);
+                            setState(() {});
+                          },
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         ),
                         _buildMenuItem(
                           context: context,

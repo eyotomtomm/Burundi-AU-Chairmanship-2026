@@ -9,9 +9,11 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../services/like_service.dart';
 import 'in_app_webview_screen.dart';
+import '../../widgets/fullscreen_back_button.dart';
 
 class YouTubePlayerScreen extends StatefulWidget {
   final ApiLiveFeed feed;
@@ -88,6 +90,8 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
       _replyingToId = null;
       _replyingToName = null;
       await _loadComments();
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (_) {}
     if (mounted) setState(() => _postingComment = false);
   }
@@ -167,27 +171,37 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     if (_controller != null && !_hasError) {
-      return YoutubePlayerBuilder(
-        player: YoutubePlayer(
-          controller: _controller!,
-          showVideoProgressIndicator: true,
-          progressIndicatorColor: AppColors.burundiGreen,
-          progressColors: ProgressBarColors(
-            playedColor: AppColors.burundiGreen,
-            handleColor: AppColors.auGold,
+      final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+      // Always wrap in Stack so YoutubePlayerBuilder keeps the same
+      // parent across orientation changes (prevents video restart).
+      return Stack(
+        children: [
+          YoutubePlayerBuilder(
+            player: YoutubePlayer(
+              controller: _controller!,
+              showVideoProgressIndicator: true,
+              progressIndicatorColor: AppColors.burundiGreen,
+              progressColors: ProgressBarColors(
+                playedColor: AppColors.burundiGreen,
+                handleColor: AppColors.auGold,
+              ),
+            ),
+            builder: (context, player) {
+              return _buildScaffold(langCode, theme, isDark, playerWidget: player);
+            },
           ),
-        ),
-        builder: (context, player) {
-          // In landscape (fullscreen), show only the player
-          final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-          if (isLandscape) {
-            return Scaffold(
-              backgroundColor: Colors.black,
-              body: Center(child: player),
-            );
-          }
-          return _buildScaffold(langCode, theme, isDark, playerWidget: player);
-        },
+          // Overlay only in landscape (fullscreen)
+          if (isLandscape)
+            FullscreenBackButton(
+              title: widget.feed.getTitle(langCode),
+              onBack: () {
+                // Use YouTube controller's own toggle which handles
+                // orientation + isFullScreen state correctly
+                _controller?.toggleFullScreenMode();
+              },
+            ),
+        ],
       );
     }
 
@@ -305,13 +319,22 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                           child: Row(
                             children: [
                               Icon(
-                                likeState.isLiked ? Icons.favorite : Icons.favorite_border,
-                                size: 16,
+                                likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                size: 22,
                                 color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${likeState.likeCount}',
+                                style: TextStyle(
+                                  color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${likeState.likeCount}',
+                                'Like',
                                 style: TextStyle(
                                   color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                                   fontSize: 14,
@@ -408,16 +431,22 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                         final feedId = widget.feed.id;
                         return CommentTile.fromMap(
                           comment,
+                          key: ValueKey(comment['id']),
                           isAuthenticated: auth.isAuthenticated,
                           onReply: () => setState(() {
                             _replyingToId = comment['id'];
                             _replyingToName = comment['user_name'];
                           }),
+                          onPostReply: (content, parentId) async {
+                            await ApiService().postLiveFeedComment(feedId, content, parentId: parentId);
+                            await _loadComments();
+                          },
                           onDelete: () => _deleteComment(comment['id']),
                           onToggleLike: () => ApiService().toggleLiveFeedCommentLike(feedId, comment['id']),
                           onEdit: (content) => ApiService().editLiveFeedComment(feedId, comment['id'], content),
                           replyBuilder: (reply) => CommentTile.fromMap(
                             reply,
+                            key: ValueKey(reply['id']),
                             isReply: true,
                             isAuthenticated: auth.isAuthenticated,
                             onDelete: () => _deleteComment(reply['id']),

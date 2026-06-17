@@ -102,23 +102,28 @@ def initialize_firebase():
         firebase_admin.initialize_app(cred)
 
 
-def verify_firebase_token(id_token):
+def verify_firebase_token(id_token, check_revoked=False):
     """
     Verify a Firebase ID token and return the decoded token.
 
     Args:
         id_token (str): The Firebase ID token to verify
+        check_revoked (bool): When True, makes an additional request to
+            Firebase to verify the token has not been revoked (user signed
+            out everywhere, account disabled, etc.).  Adds latency but
+            closes the window where a revoked token is accepted until its
+            natural expiry (~1 hour).
 
     Returns:
         dict: Decoded token containing uid, email, email_verified, etc.
 
     Raises:
-        ValueError: If token is invalid, expired, or verification fails
+        ValueError: If token is invalid, expired, revoked, or verification fails
     """
     if not firebase_admin._apps:
         raise ValueError("Firebase Admin SDK is not initialized. Check server credentials.")
     try:
-        decoded_token = auth.verify_id_token(id_token)
+        decoded_token = auth.verify_id_token(id_token, check_revoked=check_revoked)
         return decoded_token
     except auth.InvalidIdTokenError:
         raise ValueError("Invalid Firebase ID token")

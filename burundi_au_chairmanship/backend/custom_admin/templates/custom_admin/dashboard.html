@@ -595,7 +595,7 @@
         <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-quick-actions">expand_less</span>
       </div>
       <div class="widget-body" id="body-quick-actions">
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-3 gap-3">
           <a href="{% url 'custom_admin:article_create' %}" class="flex flex-col items-center gap-3 p-5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all group no-underline text-center">
             <span class="material-symbols-outlined text-3xl text-secondary">add_circle</span>
             <span class="text-sm font-bold">New Article</span>
@@ -619,6 +619,26 @@
           <a href="{% url 'custom_admin:resource_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
             <span class="material-symbols-outlined text-3xl text-secondary">folder_open</span>
             <span class="text-sm font-bold">New Resource</span>
+          </a>
+          <a href="{% url 'custom_admin:verification_requests_list' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary">verified</span>
+            <span class="text-sm font-bold">Verify Users</span>
+          </a>
+          <a href="{% url 'custom_admin:youth_dialogue_list' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary">diversity_3</span>
+            <span class="text-sm font-bold">Youth Dialogue</span>
+          </a>
+          <a href="{% url 'custom_admin:promotional_splash_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary">ad</span>
+            <span class="text-sm font-bold">New Splash</span>
+          </a>
+          <a href="{% url 'custom_admin:poll_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary">poll</span>
+            <span class="text-sm font-bold">New Poll</span>
+          </a>
+          <a href="{% url 'custom_admin:gallery_create' %}" class="flex flex-col items-center gap-3 p-5 bg-white text-primary rounded-xl border border-slate-200 hover:border-secondary hover:shadow-md transition-all group no-underline text-center">
+            <span class="material-symbols-outlined text-3xl text-secondary">photo_library</span>
+            <span class="text-sm font-bold">Add Gallery</span>
           </a>
         </div>
       </div>

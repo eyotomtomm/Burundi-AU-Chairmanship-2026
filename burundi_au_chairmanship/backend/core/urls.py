@@ -9,7 +9,7 @@ router.register('hero-slides', views.HeroSlideViewSet)
 router.register('magazines', views.MagazineEditionViewSet)
 router.register('articles', views.ArticleViewSet, basename='article')
 router.register('events', views.EventViewSet)
-router.register('live-feeds', views.LiveFeedViewSet)
+router.register('live-feeds', views.LiveFeedViewSet, basename='live-feed')
 router.register('resources', views.ResourceViewSet)
 router.register('feature-cards', views.FeatureCardViewSet)
 router.register('categories', views.CategoryViewSet)
@@ -89,6 +89,9 @@ urlpatterns = [
     # OTP Verification (for badge verification flow)
     path('otp/send-email/', views.send_email_otp, name='otp-send-email'),
     path('otp/verify-email/', views.verify_email_otp, name='otp-verify-email'),
+
+    # QR Code Verification
+    path('verify-qr/', views.verify_qr, name='verify-qr'),
 
     # Event registrations
     path('my-registrations/', views.my_event_registrations, name='my-registrations'),

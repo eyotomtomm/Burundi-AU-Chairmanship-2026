@@ -30,6 +30,7 @@ dependencies:
   # Sharing
   share_plus: ^10.1.2
   in_app_review: ^2.0.9
+  open_filex: ^4.5.0
 
   # Device Info
   device_info_plus: ^11.2.0
@@ -48,10 +49,15 @@ dependencies:
   # Storage
   shared_preferences: ^2.3.3
   flutter_secure_storage: ^9.2.4
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  uuid: ^4.5.1
 
   # Utilities
   intl: ^0.20.2
   http: ^1.2.2
+  web_socket_channel: ^3.0.1
 
   # Video Player for Live Feeds
   video_player: ^2.9.2
@@ -87,6 +93,10 @@ dependencies:
   # Local Notifications (for foreground push notifications)
   flutter_local_notifications: ^20.1.0
 
+  # QR Code
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.0
+
   # Error Tracking & Performance Monitoring
   sentry_flutter: ^8.3.0
   image_cropper: ^12.2.0
@@ -111,6 +121,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/youth_dialogue/
     - assets/icons/
     - assets/patterns/
     - assets/fonts/

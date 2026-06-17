@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../config/app_constants.dart';
 import '../config/environment.dart';
+import '../main.dart' show getOrCreateDeviceId;
 import '../models/api_models.dart';
 import '../models/magazine_model.dart';
 import '../models/event_registration_model.dart';
@@ -35,23 +37,52 @@ class ApiService {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
   );
 
+  /// Whether Firebase token fetch has failed and we're using the JWT fallback.
+  /// UI can listen to this to show a "Reconnecting..." banner.
+  final ValueNotifier<bool> authDegraded = ValueNotifier<bool>(false);
+
   Future<Map<String, String>> _headers({bool auth = false}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
+    // Persistent device ID for ban enforcement
+    try {
+      final deviceId = await getOrCreateDeviceId();
+      if (deviceId.isNotEmpty) {
+        headers['X-Device-Id'] = deviceId;
+      }
+    } catch (_) {}
     // Always include Firebase token when user is logged in so the
     // backend can return personalised fields (is_liked, etc.)
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser != null) {
+      // First attempt: cached token (5s ceiling so a stalled SDK
+      // doesn't block the entire API call indefinitely)
       try {
-        final idToken = await firebaseUser.getIdToken();
+        final idToken = await firebaseUser
+            .getIdToken()
+            .timeout(const Duration(seconds: 5));
         if (idToken != null) {
           headers['Authorization'] = 'Bearer $idToken';
+          _notifyAuthHealthy();
           return headers;
         }
-      } catch (_) {
-        // Token fetch failed; fall through to JWT fallback if auth required
-      }
+      } catch (_) {}
+
+      // Second attempt: force-refresh the token
+      try {
+        final idToken = await firebaseUser
+            .getIdToken(true)
+            .timeout(const Duration(seconds: 5));
+        if (idToken != null) {
+          headers['Authorization'] = 'Bearer $idToken';
+          _notifyAuthHealthy();
+          return headers;
+        }
+      } catch (_) {}
+
+      // Both Firebase attempts failed — we're degraded
+      _notifyAuthDegraded();
     }
     if (auth) {
       // Fallback to JWT token from secure storage (for backward compatibility)
@@ -61,6 +92,14 @@ class ApiService {
       }
     }
     return headers;
+  }
+
+  void _notifyAuthDegraded() {
+    if (!authDegraded.value) authDegraded.value = true;
+  }
+
+  void _notifyAuthHealthy() {
+    if (authDegraded.value) authDegraded.value = false;
   }
 
   /// Check if a response is a 503 maintenance response and redirect.
@@ -154,6 +193,7 @@ class ApiService {
       }
       // Extract error message
       String message = 'Request failed';
+      String? referenceId;
       if (data is Map) {
         if (data.containsKey('detail')) {
           message = data['detail'];
@@ -169,8 +209,11 @@ class ApiService {
           });
           if (errors.isNotEmpty) message = errors.join('\n');
         }
+        if (data.containsKey('reference_id')) {
+          referenceId = data['reference_id']?.toString();
+        }
       }
-      throw ApiException(message, response.statusCode);
+      throw ApiException(message, response.statusCode, referenceId: referenceId);
     } on ApiException {
       rethrow;
     } catch (e) {
@@ -222,12 +265,16 @@ class ApiService {
         return data;
       }
       String message = 'Request failed';
+      String? referenceId;
       if (data is Map) {
         if (data.containsKey('detail')) {
           message = data['detail'];
         }
+        if (data.containsKey('reference_id')) {
+          referenceId = data['reference_id']?.toString();
+        }
       }
-      throw ApiException(message, response.statusCode);
+      throw ApiException(message, response.statusCode, referenceId: referenceId);
     } on ApiException {
       rethrow;
     } catch (e) {
@@ -509,7 +556,7 @@ class ApiService {
 
   Future<List<ArticleComment>> getArticleComments(String articleId) async {
     final data = await _get('articles/$articleId/comments/');
-    return (data as List).map((j) => ArticleComment.fromJson(j)).toList();
+    return _extractResults(data).map((j) => ArticleComment.fromJson(j)).toList();
   }
 
   Future<ArticleComment> postArticleComment(
@@ -578,7 +625,7 @@ class ApiService {
 
   Future<List<ArticleComment>> getMagazineComments(String magazineId) async {
     final data = await _get('magazines/$magazineId/comments/');
-    return (data as List).map((j) => ArticleComment.fromJson(j)).toList();
+    return _extractResults(data).map((j) => ArticleComment.fromJson(j)).toList();
   }
 
   Future<ArticleComment> postMagazineComment(
@@ -862,6 +909,12 @@ class ApiService {
     }, auth: true);
   }
 
+  // ── QR Code Verification ─────────────────────────────────
+  Future<Map<String, dynamic>> verifyQrCode(String qrData) async {
+    final data = await _post('verify-qr/', {'qr_data': qrData}, auth: true);
+    return data as Map<String, dynamic>;
+  }
+
   // ── Event Ticket & Calendar ────────────────────────────────
   Future<Map<String, dynamic>> getEventQrTicket(int submissionId) async {
     final data = await _get('event-submissions/$submissionId/qr-ticket/', auth: true);
@@ -875,17 +928,18 @@ class ApiService {
 
   // ── Home Feed (combined) ─────────────────────────────────
   Future<Map<String, dynamic>> getHomeFeed() async {
-    // Retry up to 2 times with exponential backoff (handles transient network/Cloudflare issues)
+    // Retry once with short backoff (handles transient network/Cloudflare 502s).
+    // Worst case: 2 × 10s + 1s backoff = 21s. Callers should have cached
+    // data to show while this runs in the background.
     Exception? lastError;
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int attempt = 0; attempt < 2; attempt++) {
       try {
-        final data = await _get('home-feed/', timeoutSeconds: 25);
+        final data = await _get('home-feed/', timeoutSeconds: 10);
         return data as Map<String, dynamic>;
       } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
-        if (attempt < 2) {
-          // Exponential backoff: 1s, then 3s
-          await Future.delayed(Duration(seconds: attempt == 0 ? 1 : 3));
+        if (attempt < 1) {
+          await Future.delayed(const Duration(seconds: 1));
         }
       }
     }
@@ -930,6 +984,7 @@ class ApiService {
     String? lastName,
     String? countryCode,
     String? gender,
+    String? badgeType,
     String? reasoningMessage,
     String? twitterUrl,
     String? linkedinUrl,
@@ -950,6 +1005,7 @@ class ApiService {
     if (lastName != null) body['last_name'] = lastName;
     if (countryCode != null) body['country_code'] = countryCode;
     if (gender != null && gender.isNotEmpty) body['gender'] = gender;
+    if (badgeType != null && badgeType.isNotEmpty) body['badge_type'] = badgeType;
     if (reasoningMessage != null) body['reasoning_message'] = reasoningMessage;
     if (twitterUrl != null && twitterUrl.isNotEmpty) body['twitter_url'] = twitterUrl;
     if (linkedinUrl != null && linkedinUrl.isNotEmpty) body['linkedin_url'] = linkedinUrl;
@@ -1524,7 +1580,7 @@ class ApiService {
     int? replacesId,
   }) async {
     try {
-      final uri = Uri.parse('${_baseUrl}youth-dialogue/upload-document/');
+      final uri = Uri.parse('$_baseUrl/youth-dialogue/upload-document/');
       final request = http.MultipartRequest('POST', uri);
 
       final headers = await _headers(auth: true);
@@ -1563,6 +1619,19 @@ class ApiService {
     return await _get('youth-dialogue/credential/', auth: true);
   }
 
+  /// Downloads the credential PDF with auth headers and returns the file bytes.
+  Future<List<int>> downloadCredentialPdf() async {
+    final headers = await _headers(auth: true);
+    headers.remove('Content-Type'); // Not needed for download
+    final response = await _client
+        .get(Uri.parse('$_baseUrl/youth-dialogue/credential-pdf/'), headers: headers)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    }
+    throw ApiException('Failed to download PDF: HTTP ${response.statusCode}', response.statusCode);
+  }
+
   Future<Map<String, dynamic>> youthDialogueEligibility() async {
     return await _get('youth-dialogue/eligibility/', auth: true);
   }
@@ -1587,7 +1656,8 @@ class ApiService {
 class ApiException implements Exception {
   final String message;
   final int statusCode;
-  ApiException(this.message, this.statusCode);
+  final String? referenceId;
+  ApiException(this.message, this.statusCode, {this.referenceId});
 
   @override
   String toString() => 'ApiException: $message (status: $statusCode)';

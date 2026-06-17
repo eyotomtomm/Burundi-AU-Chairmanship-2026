@@ -1,10 +1,15 @@
 """
-Custom S3 storage backend that handles DigitalOcean Spaces permission issues.
+Custom S3 storage backends for DigitalOcean Spaces.
 
 Spaces returns 403 Forbidden on head_object calls, which Django's default
-S3 storage uses in exists() to check for filename collisions. This backend
+S3 storage uses in exists() to check for filename collisions. The mixin below
 catches that error and falls back to assuming the file doesn't exist, allowing
 uploads to proceed.
+
+Two backends are provided:
+  - SpacesMediaStorage: public-read for editorial content (articles, gallery, etc.)
+  - PrivateSpacesMediaStorage: private ACL with signed URLs for user-submitted
+    files (support attachments, verification docs, youth dialogue documents).
 """
 
 import logging
@@ -20,7 +25,8 @@ class S3CredentialsError(OSError):
     pass
 
 
-class SpacesMediaStorage(S3Boto3Storage):
+class _SpacesErrorHandlingMixin:
+    """Shared error handling for DigitalOcean Spaces storage backends."""
     # Auth-related S3 error codes that indicate bad credentials
     _AUTH_ERROR_CODES = {'InvalidAccessKeyId', 'SignatureDoesNotMatch', 'AccessDenied'}
 
@@ -54,3 +60,19 @@ class SpacesMediaStorage(S3Boto3Storage):
                     'in the App Platform environment variables.'
                 ) from e
             raise
+
+
+class SpacesMediaStorage(_SpacesErrorHandlingMixin, S3Boto3Storage):
+    """Public storage for editorial content (article images, gallery photos, etc.)."""
+    pass
+
+
+class PrivateSpacesMediaStorage(_SpacesErrorHandlingMixin, S3Boto3Storage):
+    """Private storage for user-submitted files (support attachments, verification
+    documents, youth dialogue documents). Uses signed URLs with expiry instead of
+    public-read ACL so files are not accessible at guessable URLs.
+    """
+    default_acl = 'private'
+    querystring_auth = True
+    querystring_expire = 3600  # Signed URLs expire after 1 hour
+    location = 'private-media'

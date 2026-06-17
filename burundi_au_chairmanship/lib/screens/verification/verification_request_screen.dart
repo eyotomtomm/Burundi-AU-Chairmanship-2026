@@ -6,7 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/api_service.dart';
+import '../../providers/verification_provider.dart';
+import '../../services/api_service.dart' show ApiService, ApiException;
 import '../../widgets/confetti_overlay.dart';
 
 class VerificationRequestScreen extends StatefulWidget {
@@ -27,6 +28,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   String? _selectedTitle;
   String? _selectedNationality;
   String? _selectedGender;
+  String? _selectedBadgeType;
+  String _selectedPhoneCode = '+257';
+  String _selectedPhoneCountry = 'BI';
   File? _supportingDocument;
   bool _isLoading = false;
 
@@ -36,7 +40,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   bool _sendingEmailOtp = false;
   bool _verifyingEmailOtp = false;
   Timer? _emailTimer;
-  int _emailCountdown = 0;
+  final ValueNotifier<int> _emailCountdown = ValueNotifier<int>(0);
 
   // Phone OTP state
 
@@ -136,6 +140,92 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     {'code': 'OTHER', 'name': 'Other'},
   ];
 
+  // Phone country codes with dial codes
+  static const List<Map<String, String>> _phoneCountryCodes = [
+    {'code': 'BI', 'dial': '+257'},
+    {'code': 'DZ', 'dial': '+213'},
+    {'code': 'AO', 'dial': '+244'},
+    {'code': 'BJ', 'dial': '+229'},
+    {'code': 'BW', 'dial': '+267'},
+    {'code': 'BF', 'dial': '+226'},
+    {'code': 'CV', 'dial': '+238'},
+    {'code': 'CM', 'dial': '+237'},
+    {'code': 'CF', 'dial': '+236'},
+    {'code': 'TD', 'dial': '+235'},
+    {'code': 'KM', 'dial': '+269'},
+    {'code': 'CG', 'dial': '+242'},
+    {'code': 'CD', 'dial': '+243'},
+    {'code': 'CI', 'dial': '+225'},
+    {'code': 'DJ', 'dial': '+253'},
+    {'code': 'EG', 'dial': '+20'},
+    {'code': 'GQ', 'dial': '+240'},
+    {'code': 'ER', 'dial': '+291'},
+    {'code': 'SZ', 'dial': '+268'},
+    {'code': 'ET', 'dial': '+251'},
+    {'code': 'GA', 'dial': '+241'},
+    {'code': 'GM', 'dial': '+220'},
+    {'code': 'GH', 'dial': '+233'},
+    {'code': 'GN', 'dial': '+224'},
+    {'code': 'GW', 'dial': '+245'},
+    {'code': 'KE', 'dial': '+254'},
+    {'code': 'LS', 'dial': '+266'},
+    {'code': 'LR', 'dial': '+231'},
+    {'code': 'LY', 'dial': '+218'},
+    {'code': 'MG', 'dial': '+261'},
+    {'code': 'MW', 'dial': '+265'},
+    {'code': 'ML', 'dial': '+223'},
+    {'code': 'MR', 'dial': '+222'},
+    {'code': 'MU', 'dial': '+230'},
+    {'code': 'MA', 'dial': '+212'},
+    {'code': 'MZ', 'dial': '+258'},
+    {'code': 'NA', 'dial': '+264'},
+    {'code': 'NE', 'dial': '+227'},
+    {'code': 'NG', 'dial': '+234'},
+    {'code': 'RW', 'dial': '+250'},
+    {'code': 'ST', 'dial': '+239'},
+    {'code': 'SN', 'dial': '+221'},
+    {'code': 'SC', 'dial': '+248'},
+    {'code': 'SL', 'dial': '+232'},
+    {'code': 'SO', 'dial': '+252'},
+    {'code': 'ZA', 'dial': '+27'},
+    {'code': 'SS', 'dial': '+211'},
+    {'code': 'SD', 'dial': '+249'},
+    {'code': 'TZ', 'dial': '+255'},
+    {'code': 'TG', 'dial': '+228'},
+    {'code': 'TN', 'dial': '+216'},
+    {'code': 'UG', 'dial': '+256'},
+    {'code': 'ZM', 'dial': '+260'},
+    {'code': 'ZW', 'dial': '+263'},
+    {'code': 'US', 'dial': '+1'},
+    {'code': 'GB', 'dial': '+44'},
+    {'code': 'FR', 'dial': '+33'},
+    {'code': 'DE', 'dial': '+49'},
+    {'code': 'CN', 'dial': '+86'},
+    {'code': 'IN', 'dial': '+91'},
+    {'code': 'BR', 'dial': '+55'},
+    {'code': 'CA', 'dial': '+1'},
+    {'code': 'AU', 'dial': '+61'},
+    {'code': 'JP', 'dial': '+81'},
+    {'code': 'BE', 'dial': '+32'},
+    {'code': 'IT', 'dial': '+39'},
+    {'code': 'ES', 'dial': '+34'},
+    {'code': 'NL', 'dial': '+31'},
+    {'code': 'SE', 'dial': '+46'},
+    {'code': 'CH', 'dial': '+41'},
+    {'code': 'AE', 'dial': '+971'},
+    {'code': 'SA', 'dial': '+966'},
+    {'code': 'TR', 'dial': '+90'},
+    {'code': 'RU', 'dial': '+7'},
+    {'code': 'KR', 'dial': '+82'},
+  ];
+
+  /// Convert a 2-letter country code to its flag emoji.
+  static String _countryCodeToEmoji(String code) {
+    if (code == 'OTHER' || code.length != 2) return '';
+    final int first = code.codeUnitAt(0) - 0x41 + 0x1F1E6;
+    final int second = code.codeUnitAt(1) - 0x41 + 0x1F1E6;
+    return String.fromCharCode(first) + String.fromCharCode(second);
+  }
 
   // Social media platforms with icons
   static const List<Map<String, dynamic>> _socialPlatforms = [
@@ -188,6 +278,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     _phoneController.dispose();
     _positionController.dispose();
     _emailTimer?.cancel();
+    _emailCountdown.dispose();
     for (final c in _socialMediaControllers.values) {
       c.dispose();
     }
@@ -195,11 +286,11 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   void _startEmailCountdown() {
-    _emailCountdown = 60;
+    _emailCountdown.value = 60;
     _emailTimer?.cancel();
     _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_emailCountdown > 0) {
-        setState(() => _emailCountdown--);
+      if (_emailCountdown.value > 0) {
+        _emailCountdown.value--;
       } else {
         timer.cancel();
       }
@@ -214,7 +305,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       _showError('Please enter your email address');
       return;
     }
-    final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
+    final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,}$');
     if (!emailRegex.hasMatch(email)) {
       _showError('Please enter a valid email address');
       return;
@@ -222,19 +313,26 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
     setState(() => _sendingEmailOtp = true);
     try {
-      await ApiService().post('otp/send-email/', {'email': email}, auth: true);
+      final api = ApiService();
+      await api.post('otp/send-email/', {'email': email}, auth: true);
       if (mounted) {
         setState(() {
           _emailOtpSent = true;
           _sendingEmailOtp = false;
         });
         _startEmailCountdown();
-        _showSuccess('Verification code sent to your email!');
+        _showSuccess('Verification code sent to $email');
       }
     } catch (e) {
       if (mounted) {
         setState(() => _sendingEmailOtp = false);
-        _showError('Failed to send code: $e');
+        String errorMsg;
+        if (e is ApiException) {
+          errorMsg = e.message;
+        } else {
+          errorMsg = 'Failed to send verification code. Please check your connection and try again.';
+        }
+        _showError(errorMsg);
       }
     }
   }
@@ -248,7 +346,8 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
     setState(() => _verifyingEmailOtp = true);
     try {
-      await ApiService().post('otp/verify-email/', {
+      final api = ApiService();
+      await api.post('otp/verify-email/', {
         'email': _emailController.text.trim(),
         'otp_code': code,
       }, auth: true);
@@ -262,7 +361,13 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _verifyingEmailOtp = false);
-        _showError('Invalid code. Please try again.');
+        String errorMsg;
+        if (e is ApiException) {
+          errorMsg = e.message;
+        } else {
+          errorMsg = 'Invalid code. Please try again.';
+        }
+        _showError(errorMsg);
       }
     }
   }
@@ -328,10 +433,116 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     );
   }
 
+  Widget _buildPendingStatusScreen(bool isDark) {
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      appBar: AppBar(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_rounded, color: isDark ? Colors.white : Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Verification Status',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.hourglass_top_rounded, size: 56, color: Colors.orange),
+                ),
+                const SizedBox(height: 28),
+                Text(
+                  'Application Under Review',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Your verification request has been submitted and is currently being reviewed by our team. You will be notified once a decision is made.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.schedule_rounded, size: 18, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Status: Pending',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                    label: const Text('Go Back'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.burundiGreen,
+                      side: BorderSide(color: AppColors.burundiGreen.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final verificationProvider = context.watch<VerificationProvider>();
+    final requestStatus = verificationProvider.requestStatus;
+
+    // If there's a pending request, show status page instead of the form
+    if (requestStatus == 'pending') {
+      return _buildPendingStatusScreen(isDark);
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
@@ -445,34 +656,115 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildBadgeTypeInfo(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Badge Types', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
-          const SizedBox(height: 12),
-          Row(children: [
-            const Icon(Icons.verified, color: Color(0xFFFFD700), size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Gold Badge - VIPs, Government Officials, Ambassadors', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87))),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
-            const Icon(Icons.verified, color: Color(0xFF409843), size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Blue Badge - Verified professionals and notable individuals', style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87))),
-          ]),
-          const SizedBox(height: 12),
-          Text('Our team will review your application and assign the appropriate badge.',
-            style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black45, fontStyle: FontStyle.italic)),
-        ],
-      ),
+    final badgeTypes = [
+      {
+        'value': 'GOLD',
+        'label': 'Gold Badge',
+        'description': 'VIPs, Government Officials, Ambassadors',
+        'color': const Color(0xFFFFD700),
+      },
+      {
+        'value': 'BLUE',
+        'label': 'Blue Badge',
+        'description': 'Verified professionals and notable individuals',
+        'color': const Color(0xFF1DA1F2),
+      },
+      {
+        'value': 'GREEN',
+        'label': 'Green Badge',
+        'description': 'Verified community members and contributors',
+        'color': const Color(0xFF409843),
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Select Badge Type *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        const SizedBox(height: 4),
+        Text(
+          'Choose the badge type that best represents your role',
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
+        ),
+        const SizedBox(height: 12),
+        ...badgeTypes.map((badge) {
+          final isSelected = _selectedBadgeType == badge['value'];
+          final badgeColor = badge['color'] as Color;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedBadgeType = badge['value'] as String),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? badgeColor.withValues(alpha: 0.1)
+                      : (isDark ? AppColors.darkSurface : AppColors.lightBackground),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSelected ? badgeColor : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.verified, color: badgeColor, size: 24),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            badge['label'] as String,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? badgeColor : (isDark ? Colors.white : Colors.black87),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            badge['description'] as String,
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? badgeColor : (isDark ? Colors.white30 : Colors.grey[400]!),
+                          width: 2,
+                        ),
+                        color: isSelected ? badgeColor : Colors.transparent,
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check, size: 14, color: Colors.white)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+        Text(
+          'Our team will review your application and may assign a different badge based on your profile.',
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black45, fontStyle: FontStyle.italic),
+        ),
+      ],
     );
   }
 
@@ -522,8 +814,26 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           value: _selectedNationality,
           decoration: _inputDecoration(isDark: isDark, hint: 'Select your nationality', prefixIcon: const Icon(Icons.public)),
           isExpanded: true,
-          items: _nationalities.map((n) => DropdownMenuItem(value: n['code'], child: Text(n['name']!))).toList(),
-          onChanged: (v) => setState(() => _selectedNationality = v),
+          items: _nationalities.map((n) {
+            final flag = _countryCodeToEmoji(n['code']!);
+            return DropdownMenuItem(
+              value: n['code'],
+              child: Text('$flag  ${n['name']}', style: const TextStyle(fontSize: 15)),
+            );
+          }).toList(),
+          onChanged: (v) {
+            setState(() {
+              _selectedNationality = v;
+              // Auto-sync phone country code when nationality changes
+              if (v != null && v != 'OTHER') {
+                final match = _phoneCountryCodes.where((c) => c['code'] == v);
+                if (match.isNotEmpty) {
+                  _selectedPhoneCountry = match.first['code']!;
+                  _selectedPhoneCode = match.first['dial']!;
+                }
+              }
+            });
+          },
           validator: (v) => (v == null || v.isEmpty) ? 'Please select your nationality' : null,
         ),
       ],
@@ -676,23 +986,28 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             ),
             if (!_emailVerified) ...[
               const SizedBox(width: 10),
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: (_sendingEmailOtp || _emailCountdown > 0) ? null : _sendEmailOtp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.burundiGreen,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  child: _sendingEmailOtp
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(
-                          _emailCountdown > 0 ? '${_emailCountdown}s' : 'Get Code',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                        ),
-                ),
+              ValueListenableBuilder<int>(
+                valueListenable: _emailCountdown,
+                builder: (context, countdown, _) {
+                  return SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: (_sendingEmailOtp || countdown > 0) ? null : _sendEmailOtp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.burundiGreen,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      child: _sendingEmailOtp
+                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(
+                              countdown > 0 ? '${countdown}s' : 'Get Code',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                    ),
+                  );
+                },
               ),
             ],
           ],
@@ -758,15 +1073,60 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       children: [
         Text('Phone Number', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: _inputDecoration(
-            isDark: isDark,
-            hint: 'Phone number (optional)',
-            prefixIcon: const Icon(Icons.phone_outlined, size: 20),
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Country code selector with flag
+            Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedPhoneCountry,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  borderRadius: BorderRadius.circular(12),
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                  items: _phoneCountryCodes.map((c) {
+                    final flag = _countryCodeToEmoji(c['code']!);
+                    return DropdownMenuItem(
+                      value: c['code'],
+                      child: Text(
+                        '$flag ${c['dial']}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) {
+                    if (v != null) {
+                      final match = _phoneCountryCodes.firstWhere((c) => c['code'] == v);
+                      setState(() {
+                        _selectedPhoneCountry = v;
+                        _selectedPhoneCode = match['dial']!;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Phone number input
+            Expanded(
+              child: TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: _inputDecoration(
+                  isDark: isDark,
+                  hint: 'Phone number (optional)',
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -900,11 +1260,27 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildSubmitButton(bool isDark) {
-    final canSubmit = _emailVerified;
+    final canSubmit = _emailVerified && _selectedBadgeType != null;
 
     return Column(
       children: [
-        if (!canSubmit)
+        if (!_emailVerified)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.auGold),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Please verify your email to submit',
+                    style: TextStyle(fontSize: 13, color: AppColors.auGold, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (_selectedBadgeType == null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -913,7 +1289,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Please verify your email to submit',
+                    'Please select a badge type',
                     style: TextStyle(fontSize: 13, color: AppColors.auGold, fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -951,6 +1327,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_emailVerified) return;
+    if (_selectedBadgeType == null) {
+      _showError('Please select a badge type');
+      return;
+    }
     HapticFeedback.lightImpact();
 
     setState(() => _isLoading = true);
@@ -978,14 +1358,19 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         }
       }
 
+      // Prepend country code to phone number if provided
+      final rawPhone = _phoneController.text.trim();
+      final fullPhone = rawPhone.isNotEmpty ? '$_selectedPhoneCode$rawPhone' : '';
+
       await api.submitVerificationRequest(
         title: _selectedTitle!,
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber: fullPhone,
         positionRole: _positionController.text.trim(),
         countryCode: _selectedNationality,
         gender: _selectedGender,
+        badgeType: _selectedBadgeType,
         twitterUrl: twitterUrl,
         linkedinUrl: linkedinUrl,
         facebookUrl: facebookUrl,

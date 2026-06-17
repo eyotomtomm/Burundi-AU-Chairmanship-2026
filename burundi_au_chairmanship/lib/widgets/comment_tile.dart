@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../config/app_colors.dart';
+import '../services/api_service.dart' show ApiException;
+import 'comment_ban_dialog.dart';
 
 /// Shared comment tile widget used across all content types.
 ///
@@ -29,6 +31,7 @@ class CommentTile extends StatefulWidget {
   final VoidCallback? onDelete;
   final Future<Map<String, dynamic>> Function()? onToggleLike;
   final Future<Map<String, dynamic>> Function(String content)? onEdit;
+  final Future<void> Function(String content, int parentId)? onPostReply;
 
   // Builder for nested reply tiles
   final Widget Function(Map<String, dynamic> reply)? replyBuilder;
@@ -55,6 +58,7 @@ class CommentTile extends StatefulWidget {
     this.onDelete,
     this.onToggleLike,
     this.onEdit,
+    this.onPostReply,
     this.replyBuilder,
   });
 
@@ -69,6 +73,7 @@ class CommentTile extends StatefulWidget {
     VoidCallback? onDelete,
     Future<Map<String, dynamic>> Function()? onToggleLike,
     Future<Map<String, dynamic>> Function(String content)? onEdit,
+    Future<void> Function(String content, int parentId)? onPostReply,
     Widget Function(Map<String, dynamic> reply)? replyBuilder,
   }) {
     return CommentTile(
@@ -97,6 +102,7 @@ class CommentTile extends StatefulWidget {
       onDelete: onDelete,
       onToggleLike: onToggleLike,
       onEdit: onEdit,
+      onPostReply: onPostReply,
       replyBuilder: replyBuilder,
     );
   }
@@ -114,8 +120,11 @@ class _CommentTileState extends State<CommentTile> {
 
   bool _isEditing = false;
   bool _likePending = false;
+  bool _isReplying = false;
+  bool _postingReply = false;
   Timer? _editTimer;
   final _editController = TextEditingController();
+  final _replyController = TextEditingController();
 
   @override
   void initState() {
@@ -132,9 +141,29 @@ class _CommentTileState extends State<CommentTile> {
   }
 
   @override
+  void didUpdateWidget(CommentTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.commentId != widget.commentId ||
+        oldWidget.content != widget.content ||
+        oldWidget.isLiked != widget.isLiked ||
+        oldWidget.likeCount != widget.likeCount ||
+        oldWidget.isEdited != widget.isEdited ||
+        oldWidget.canEdit != widget.canEdit) {
+      setState(() {
+        _isLiked = widget.isLiked;
+        _likeCount = widget.likeCount;
+        _content = widget.content;
+        _isEdited = widget.isEdited;
+        _canEdit = widget.canEdit;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _editTimer?.cancel();
     _editController.dispose();
+    _replyController.dispose();
     super.dispose();
   }
 
@@ -203,12 +232,46 @@ class _CommentTileState extends State<CommentTile> {
           _isEditing = false;
         });
       }
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
         );
       }
+    }
+  }
+
+  void _startReplying() {
+    _replyController.clear();
+    setState(() => _isReplying = true);
+  }
+
+  void _cancelReplying() {
+    setState(() => _isReplying = false);
+  }
+
+  Future<void> _submitReply() async {
+    final content = _replyController.text.trim();
+    if (content.isEmpty || widget.onPostReply == null) return;
+    setState(() => _postingReply = true);
+    try {
+      await widget.onPostReply!(content, widget.commentId);
+      if (mounted) {
+        _replyController.clear();
+        setState(() {
+          _isReplying = false;
+          _postingReply = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _postingReply = false);
+        showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _postingReply = false);
     }
   }
 
@@ -240,7 +303,7 @@ class _CommentTileState extends State<CommentTile> {
                 radius: avatarRadius,
                 backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
                 backgroundImage: widget.profilePicture != null && widget.profilePicture!.isNotEmpty
-                    ? CachedNetworkImageProvider(widget.profilePicture!)
+                    ? CachedNetworkImageProvider(widget.profilePicture!, maxWidth: 100)
                     : null,
                 child: widget.profilePicture == null || widget.profilePicture!.isEmpty
                     ? Text(
@@ -328,6 +391,72 @@ class _CommentTileState extends State<CommentTile> {
             ],
           ),
 
+          // Inline reply field
+          if (_isReplying)
+            Padding(
+              padding: const EdgeInsets.only(left: 44, top: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _replyController,
+                      autofocus: true,
+                      maxLines: null,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white : AppColors.lightText,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Reply to ${widget.userName}...',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(
+                            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: AppColors.burundiGreen),
+                        ),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_postingReply)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 12),
+                                child: SizedBox(
+                                  width: 18, height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.burundiGreen),
+                                ),
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.send_rounded, size: 20, color: AppColors.burundiGreen),
+                                onPressed: _submitReply,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              ),
+                            IconButton(
+                              icon: Icon(Icons.close, size: 18, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              onPressed: _cancelReplying,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Nested replies
           if (!widget.isReply && widget.replies.isNotEmpty)
             Padding(
@@ -339,6 +468,7 @@ class _CommentTileState extends State<CommentTile> {
                   }
                   return CommentTile.fromMap(
                     reply,
+                    key: ValueKey(reply['id']),
                     isReply: true,
                     isAuthenticated: widget.isAuthenticated,
                     userNameKey: widget.userNameKey,
@@ -480,21 +610,29 @@ class _CommentTileState extends State<CommentTile> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _isLiked ? Icons.favorite : Icons.favorite_border,
-                  size: 16,
+                  _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  size: 20,
                   color: _isLiked ? AppColors.burundiRed : secondaryColor,
                 ),
                 if (_likeCount > 0) ...[
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 4),
                   Text(
                     '$_likeCount',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: _isLiked ? AppColors.burundiRed : secondaryColor,
                     ),
                   ),
                 ],
+                const SizedBox(width: 3),
+                Text(
+                  'Like',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _isLiked ? AppColors.burundiRed : secondaryColor,
+                  ),
+                ),
               ],
             ),
           )
@@ -502,24 +640,29 @@ class _CommentTileState extends State<CommentTile> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.favorite, size: 14, color: secondaryColor),
+              Icon(Icons.favorite_rounded, size: 16, color: secondaryColor),
               const SizedBox(width: 3),
               Text(
                 '$_likeCount',
                 style: TextStyle(fontSize: 12, color: secondaryColor),
               ),
+              const SizedBox(width: 3),
+              Text(
+                'Like',
+                style: TextStyle(fontSize: 11, color: secondaryColor),
+              ),
             ],
           ),
 
         // Reply button
-        if (!widget.isReply && widget.isAuthenticated && widget.onReply != null) ...[
+        if (!widget.isReply && widget.isAuthenticated && (widget.onPostReply != null || widget.onReply != null)) ...[
           const SizedBox(width: 16),
           GestureDetector(
-            onTap: widget.onReply,
+            onTap: widget.onPostReply != null ? _startReplying : widget.onReply,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.reply_rounded, size: 16, color: secondaryColor),
+                Icon(Icons.reply_rounded, size: 18, color: secondaryColor),
                 const SizedBox(width: 3),
                 Text(
                   'Reply',

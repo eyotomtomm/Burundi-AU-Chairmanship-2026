@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify — Be 4 Africa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            max-width: 420px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #409843, #2D6E31);
+            padding: 28px 24px;
+            text-align: center;
+            color: #fff;
+        }
+        .header h1 { font-size: 18px; font-weight: 600; letter-spacing: 1px; }
+        .header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+        .body { padding: 32px 24px; text-align: center; }
+        .icon {
+            width: 72px; height: 72px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px; font-size: 36px;
+        }
+        .icon.valid { background: #e8f5e9; color: #2e7d32; }
+        .icon.invalid { background: #ffebee; color: #c62828; }
+        .icon.revoked { background: #ffebee; color: #c62828; }
+        .icon.pending { background: #fff8e1; color: #f57f17; }
+        .status-label {
+            font-size: 14px; font-weight: 600; letter-spacing: 1.5px;
+            text-transform: uppercase; margin-bottom: 16px;
+        }
+        .status-label.valid { color: #2e7d32; }
+        .status-label.invalid { color: #c62828; }
+        .status-label.revoked { color: #c62828; }
+        .status-label.pending { color: #f57f17; }
+        .person-name {
+            font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px;
+        }
+        .event-title {
+            font-size: 15px; color: #666; margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        .info-row .label { color: #999; }
+        .info-row .value { color: #333; font-weight: 600; }
+        .duplicate-warning {
+            background: #fff3e0; border: 1px solid #ffcc80; border-radius: 10px;
+            padding: 12px 16px; margin-top: 20px; text-align: left;
+        }
+        .duplicate-warning .title {
+            font-size: 13px; font-weight: 700; color: #e65100; margin-bottom: 4px;
+        }
+        .duplicate-warning .text { font-size: 12px; color: #bf360c; }
+        .error-msg { font-size: 15px; color: #666; margin-top: 8px; }
+        .footer {
+            padding: 16px 24px; text-align: center;
+            background: #fafafa; border-top: 1px solid #f0f0f0;
+            font-size: 12px; color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <h1>BE 4 AFRICA</h1>
+            <p>Credential Verification</p>
+        </div>
+        <div class="body">
+            {% if error %}
+                <div class="icon invalid">&#10007;</div>
+                <div class="status-label invalid">NOT FOUND</div>
+                <p class="error-msg">{{ error }}</p>
+            {% elif valid %}
+                <div class="icon valid">&#10003;</div>
+                <div class="status-label valid">VERIFIED</div>
+                <div class="person-name">{{ person_name }}</div>
+                {% if event_title %}
+                    <div class="event-title">{{ event_title }}</div>
+                {% elif programme %}
+                    <div class="event-title">{{ programme }}</div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="label">Status</span>
+                    <span class="value">{{ status_display }}</span>
+                </div>
+                {% if qr_type == 'event' %}
+                <div class="info-row">
+                    <span class="label">Type</span>
+                    <span class="value">Event Ticket</span>
+                </div>
+                {% elif qr_type == 'youth_dialogue' %}
+                <div class="info-row">
+                    <span class="label">Type</span>
+                    <span class="value">Youth Dialogue</span>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="icon {{ status_class }}">&#10007;</div>
+                <div class="status-label {{ status_class }}">{{ status_display|default:'INVALID' }}</div>
+                <div class="person-name">{{ person_name }}</div>
+                {% if programme %}
+                    <div class="event-title">{{ programme }}</div>
+                {% endif %}
+            {% endif %}
+
+            {% if is_duplicate %}
+            <div class="duplicate-warning">
+                <div class="title">&#9888; Duplicate Scan Detected</div>
+                <div class="text">This code has been scanned {{ scan_count }} time{{ scan_count|pluralize }}. It may have already been used for check-in.</div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="footer">Be 4 Africa 2026 &mdash; African Union Chairmanship</div>
+    </div>
+</body>
+</html>

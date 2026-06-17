@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAdminUser
+from .permissions import HasAdminSection
 from rest_framework.response import Response
 
 from .models import (
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('analytics')])
 def analytics_overview(request):
     """High-level summary: users + content engagement."""
     now = timezone.now()
@@ -68,7 +68,7 @@ def analytics_overview(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('analytics')])
 def analytics_user_growth(request):
     """Monthly user growth data."""
     months = int(request.GET.get('months', 12))
@@ -92,7 +92,7 @@ def analytics_user_growth(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('analytics')])
 def analytics_countries(request):
     """Country breakdown by nationality and IP geolocation."""
     # By nationality (from UserProfile)
@@ -118,7 +118,7 @@ def analytics_countries(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('analytics')])
 def analytics_content_engagement(request):
     """Top content by type."""
     top_articles = list(
@@ -142,7 +142,7 @@ def analytics_content_engagement(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('analytics')])
 def analytics_export_pdf(request):
     """Generate and download PDF analytics report."""
     report_type = request.GET.get('report_type', 'marketing')

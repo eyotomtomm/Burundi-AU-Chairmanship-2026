@@ -1,0 +1,732 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} Youth Dialogue Event - B4Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:youth_dialogue_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+      <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+    </a>
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 font-headline">{% if is_edit %}Edit Event{% else %}Create Event{% endif %}</h1>
+      <p class="text-sm text-slate-500 mt-1">{% if is_edit %}{{ yd_event.programme_title }}{% else %}Set up a new Youth Dialogue event{% endif %}</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Event Identity Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-indigo-600">event</span>
+        Event Identity
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Slug <span class="text-red-500">*</span></label>
+          <input type="text" name="slug" value="{{ yd_event.slug|default:'' }}" placeholder="yd-bujumbura-june-2026" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono" required>
+          <p class="text-xs text-slate-500 mt-1">URL-friendly identifier. Must be unique.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Location</label>
+          <input type="text" name="location" value="{{ yd_event.location|default:'' }}" placeholder="Bujumbura, Burundi" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Start Date</label>
+          <input type="date" name="start_date" value="{{ yd_event.start_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">End Date</label>
+          <input type="date" name="end_date" value="{{ yd_event.end_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+        </div>
+      </div>
+      <div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="is_active" {% if yd_event.is_active %}checked{% endif %} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700">Active Event</span>
+            <p class="text-xs text-slate-500">The Flutter app serves the active event. Only one event can be active at a time.</p>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Visibility & Quick Access Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sky-600">visibility</span>
+        Visibility & Quick Access
+      </h2>
+      <p class="text-sm text-slate-500 -mt-2">Controls how Youth Dialogue appears in the app's Quick Access grid</p>
+
+      <div class="space-y-4">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="is_visible" {% if yd_event.is_visible %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700">Visible in Quick Access</span>
+            <p class="text-xs text-slate-500">When unchecked, Youth Dialogue is completely hidden from the home screen</p>
+          </div>
+        </label>
+
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="is_registration_open" {% if yd_event.is_registration_open %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
+          <div>
+            <span class="text-sm font-semibold text-slate-700">Registration Open</span>
+            <p class="text-xs text-slate-500">When unchecked, the icon appears greyed out and users see the closed message</p>
+          </div>
+        </label>
+      </div>
+
+      {% if is_edit %}
+      <!-- State preview -->
+      <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Current State</p>
+        {% if not yd_event.is_visible %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span> OFF &mdash; Hidden from Quick Access
+          </span>
+        {% elif not yd_event.is_registration_open %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span> CLOSED &mdash; Visible but greyed out
+          </span>
+        {% else %}
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span> ON &mdash; Visible and accepting applications
+          </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Quick Access Icon</label>
+          <input type="file" name="quick_access_icon" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if yd_event.quick_access_icon %}
+            <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <img src="{{ yd_event.quick_access_icon.url }}" alt="Quick Access icon" class="h-10 w-10 object-contain rounded-lg">
+              <span class="text-xs text-slate-500">{{ yd_event.quick_access_icon.name }}</span>
+            </div>
+          {% endif %}
+          <p class="text-xs text-slate-500 mt-1">Square icon for the grid (falls back to default icon)</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (EN)</label>
+          <input type="text" name="quick_access_title_en" value="{{ yd_event.quick_access_title_en|default:'Youth Dialogue' }}" placeholder="Youth Dialogue" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (FR)</label>
+          <input type="text" name="quick_access_title_fr" value="{{ yd_event.quick_access_title_fr|default:'' }}" placeholder="Dialogue Jeunesse" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Closed Message (EN)</label>
+          <textarea name="registration_closed_message" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ yd_event.registration_closed_message|default:'' }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Closed Message (FR)</label>
+          <textarea name="registration_closed_message_fr" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ yd_event.registration_closed_message_fr|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Branding Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sky-600">palette</span>
+        Branding & Logos
+      </h2>
+      <p class="text-sm text-slate-500 -mt-2">Upload language-specific logos. The app and emails will show the correct logo based on the user's language.</p>
+
+      <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider pt-2">Programme Logo — English</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">English Logo (Light Mode)</label>
+          <input type="file" name="logo_light" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if yd_event.logo_light %}
+            <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <img src="{{ yd_event.logo_light.url }}" alt="EN light logo" class="h-12 object-contain">
+              <span class="text-xs text-slate-500">{{ yd_event.logo_light.name }}</span>
+            </div>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">English Logo (Dark Mode)</label>
+          <input type="file" name="logo_dark" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if yd_event.logo_dark %}
+            <div class="mt-2 flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700">
+              <img src="{{ yd_event.logo_dark.url }}" alt="EN dark logo" class="h-12 object-contain">
+              <span class="text-xs text-slate-400">{{ yd_event.logo_dark.name }}</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider pt-2">Programme Logo — French</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">French Logo (Light Mode)</label>
+          <input type="file" name="logo_light_fr" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if yd_event.logo_light_fr %}
+            <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <img src="{{ yd_event.logo_light_fr.url }}" alt="FR light logo" class="h-12 object-contain">
+              <span class="text-xs text-slate-500">{{ yd_event.logo_light_fr.name }}</span>
+            </div>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">French Logo (Dark Mode)</label>
+          <input type="file" name="logo_dark_fr" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+          {% if yd_event.logo_dark_fr %}
+            <div class="mt-2 flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-700">
+              <img src="{{ yd_event.logo_dark_fr.url }}" alt="FR dark logo" class="h-12 object-contain">
+              <span class="text-xs text-slate-400">{{ yd_event.logo_dark_fr.name }}</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider pt-2">Secondary Logo</h3>
+      <div class="max-w-md">
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Secondary Logo (e.g. B4 Africa)</label>
+        <input type="file" name="secondary_logo" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+        {% if yd_event.secondary_logo %}
+          <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <img src="{{ yd_event.secondary_logo.url }}" alt="Secondary logo" class="h-12 object-contain">
+            <span class="text-xs text-slate-500">{{ yd_event.secondary_logo.name }}</span>
+          </div>
+        {% endif %}
+        <p class="text-xs text-slate-500 mt-1">Displayed alongside the programme logo in the app and emails (same for both languages)</p>
+      </div>
+    </div>
+
+    <!-- Programme Info Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sky-600">description</span>
+        Programme Information
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Programme Title (EN) <span class="text-red-500">*</span></label>
+          <input type="text" name="programme_title" required value="{{ yd_event.programme_title|default:'Youth Dialogue Programme' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Programme Title (FR)</label>
+          <input type="text" name="programme_title_fr" value="{{ yd_event.programme_title_fr|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Description (EN)</label>
+          <textarea name="description" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ yd_event.description|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">Shown under the logo on the welcome screen</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Description (FR)</label>
+          <textarea name="description_fr" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ yd_event.description_fr|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Landing Page Content Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-emerald-600">web</span>
+        Landing Page Content
+      </h2>
+      <p class="text-sm text-slate-500 -mt-2">Rich content shown on the Youth Dialogue landing page in the app</p>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Banner Image</label>
+        <input type="file" name="banner_image" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+        {% if yd_event.banner_image %}
+          <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <img src="{{ yd_event.banner_image.url }}" alt="Banner" class="h-16 object-cover rounded-lg">
+            <span class="text-xs text-slate-500">{{ yd_event.banner_image.name }}</span>
+          </div>
+        {% endif %}
+        <p class="text-xs text-slate-500 mt-1">Hero banner image for the landing page (recommended: 1200×400)</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event Tagline (EN)</label>
+          <input type="text" name="event_tagline" value="{{ yd_event.event_tagline|default:'' }}" placeholder="Shaping Africa's future through youth leadership" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+          <p class="text-xs text-slate-500 mt-1">Short tagline shown below the programme title</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event Tagline (FR)</label>
+          <input type="text" name="event_tagline_fr" value="{{ yd_event.event_tagline_fr|default:'' }}" placeholder="Façonner l'avenir de l'Afrique par le leadership des jeunes" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Venue Name (EN)</label>
+          <input type="text" name="venue_name" value="{{ yd_event.venue_name|default:'' }}" placeholder="Palais des Congrès" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Venue Name (FR)</label>
+          <input type="text" name="venue_name_fr" value="{{ yd_event.venue_name_fr|default:'' }}" placeholder="Palais des Congrès" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Venue Address (EN)</label>
+          <textarea name="venue_address" rows="2" placeholder="123 Boulevard de l'Indépendance, Bujumbura" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.venue_address|default:'' }}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Venue Address (FR)</label>
+          <textarea name="venue_address_fr" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.venue_address_fr|default:'' }}</textarea>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Key Highlights (EN)</label>
+          <textarea name="key_highlights" rows="4" placeholder="Networking with African leaders&#10;Policy workshops&#10;Cultural exchange programme" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.key_highlights|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">One highlight per line</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Key Highlights (FR)</label>
+          <textarea name="key_highlights_fr" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.key_highlights_fr|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">One highlight per line</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Eligibility Criteria (EN)</label>
+          <textarea name="eligibility_criteria" rows="4" placeholder="Ages 18-35&#10;African nationality&#10;Valid passport" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.eligibility_criteria|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">One criterion per line</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Eligibility Criteria (FR)</label>
+          <textarea name="eligibility_criteria_fr" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.eligibility_criteria_fr|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">One criterion per line</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Side Events (EN)</label>
+          <textarea name="side_events_info" rows="4" placeholder="Cultural Night | An evening celebrating African arts and music&#10;Innovation Hub | Showcase of youth-led startups" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.side_events_info|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">One per line, format: Title | Description</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Side Events (FR)</label>
+          <textarea name="side_events_info_fr" rows="4" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.side_events_info_fr|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">One per line, format: Titre | Description</p>
+        </div>
+      </div>
+
+      <!-- Privacy Policy -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Privacy Policy (EN)</label>
+          <textarea name="privacy_policy" rows="8" placeholder="Enter the data privacy policy text shown to applicants before they submit their application..." class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.privacy_policy|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">Displayed before the application form — applicants must agree before proceeding</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Privacy Policy (FR)</label>
+          <textarea name="privacy_policy_fr" rows="8" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent">{{ yd_event.privacy_policy_fr|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Required Documents Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-amber-600">folder_open</span>
+        Required Documents
+      </h2>
+      <p class="text-sm text-slate-500 -mt-2">Configure which documents accepted applicants must upload. The app reads this list dynamically.</p>
+
+      <div id="required-docs-container" class="space-y-3"></div>
+
+      <button type="button" onclick="addDocRow()" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold hover:bg-amber-100 transition-colors border border-amber-200">
+        <span class="material-symbols-outlined text-base">add</span>
+        Add Document Type
+      </button>
+    </div>
+
+    <script>
+    const DEFAULT_DOCS = [
+      {key: 'passport', label: 'Passport Copy', label_fr: 'Copie du Passeport', camera_only: false},
+      {key: 'national_id', label: 'National ID', label_fr: 'Carte d\'Identit\u00e9', camera_only: false},
+      {key: 'photo', label: 'Passport Photo', label_fr: 'Photo d\'Identit\u00e9', camera_only: true},
+      {key: 'cv', label: 'CV / Resume', label_fr: 'CV / R\u00e9sum\u00e9', camera_only: false},
+    ];
+
+    let existingDocs = [];
+    try {
+      const raw = '{{ yd_event.required_documents|escapejs }}';
+      existingDocs = JSON.parse(raw || '[]');
+    } catch(e) {}
+
+    // If no docs configured yet, use defaults
+    if (!existingDocs.length) existingDocs = DEFAULT_DOCS;
+
+    const container = document.getElementById('required-docs-container');
+
+    function addDocRow(doc) {
+      doc = doc || {key: '', label: '', label_fr: '', camera_only: false};
+      const idx = container.children.length;
+      const div = document.createElement('div');
+      div.className = 'flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200';
+      div.innerHTML = `
+        <span class="material-symbols-outlined text-slate-400 cursor-grab drag-handle">drag_indicator</span>
+        <input type="text" name="doc_${idx}_key" value="${doc.key}" placeholder="key (e.g. passport)" class="w-32 border border-slate-200 rounded-lg py-2 px-3 text-sm font-mono" required>
+        <input type="text" name="doc_${idx}_label" value="${doc.label}" placeholder="Label (EN)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm" required>
+        <input type="text" name="doc_${idx}_label_fr" value="${doc.label_fr}" placeholder="Label (FR)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
+        <label class="flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap" title="Require live camera capture (no file upload)">
+          <input type="checkbox" name="doc_${idx}_camera_only" value="1" ${doc.camera_only ? 'checked' : ''} class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+          <span class="material-symbols-outlined text-sm">photo_camera</span>
+          Live only
+        </label>
+        <button type="button" onclick="this.parentElement.remove()" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+          <span class="material-symbols-outlined text-base">delete</span>
+        </button>
+      `;
+      container.appendChild(div);
+    }
+
+    existingDocs.forEach(d => addDocRow(d));
+    </script>
+
+    <!-- Credential Roles Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span class="material-symbols-outlined text-teal-600">badge</span>
+          Credential Roles
+        </h2>
+        <button type="button" onclick="addRoleRow()" class="bg-teal-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-teal-700 transition-all shadow-sm inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sm">add</span>
+          Add Role
+        </button>
+      </div>
+      <p class="text-sm text-slate-500 -mt-2">Define roles for credentials (e.g. Participant, Moderator). Each role has a unique colour shown on the ID card.</p>
+
+      <div id="roles-container" class="space-y-3"></div>
+    </div>
+
+    {% if is_edit %}
+    <!-- Media Gallery Card -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center">
+            <span class="material-symbols-outlined text-purple-600">perm_media</span>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-slate-800">Media Gallery</h2>
+            <p class="text-sm text-slate-500">Manage photos and videos for the programme</p>
+          </div>
+        </div>
+        <a href="{% url 'custom_admin:youth_dialogue_media_list' event_pk=yd_event.pk %}"
+           class="inline-flex items-center gap-2 bg-purple-600 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-purple-700 transition-all shadow-sm">
+          <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          Manage Media
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Application Form Fields -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sky-600">dynamic_form</span>
+          Application Form Fields
+        </h2>
+        <button type="button" onclick="addFormField()" class="bg-sky-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-sky-700 transition-all shadow-sm inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sm">add</span>
+          Add Field
+        </button>
+      </div>
+      <p class="text-sm text-slate-500 -mt-2">Configure the fields shown on the application form. Drag to reorder, expand for advanced settings.</p>
+
+      <div id="formFieldsContainer" class="space-y-3">
+        <!-- Dynamic fields will be added here by JS -->
+      </div>
+    </div>
+
+    <!-- Support & Contact Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-sky-600">support_agent</span>
+        Support & Contact
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Support Note (EN)</label>
+          <textarea name="support_note" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ yd_event.support_note|default:'' }}</textarea>
+          <p class="text-xs text-slate-500 mt-1">Text shown above the contact options</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Support Note (FR)</label>
+          <textarea name="support_note_fr" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">{{ yd_event.support_note_fr|default:'' }}</textarea>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Support Email</label>
+          <input type="email" name="support_email" value="{{ yd_event.support_email|default:'' }}" placeholder="support@example.com" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Support Phone</label>
+          <input type="text" name="support_phone" value="{{ yd_event.support_phone|default:'' }}" placeholder="+257 ..." class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Live Chat URL</label>
+          <input type="url" name="live_chat_url" value="{{ yd_event.live_chat_url|default:'' }}" placeholder="https://wa.me/... or https://tawk.to/..." class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+          <p class="text-xs text-slate-500 mt-1">WhatsApp, Tawk.to, or any live chat link</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <a href="{% url 'custom_admin:youth_dialogue_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
+      <button type="submit" class="bg-sky-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-sky-700 transition-all shadow-sm">{% if is_edit %}Save Changes{% else %}Create Event{% endif %}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .collapsible-arrow.expanded {
+        transform: rotate(90deg);
+    }
+    .field-row {
+        transition: all 0.15s ease;
+    }
+    .field-row:hover {
+        border-color: #93c5fd;
+    }
+    .field-advanced {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.25s ease-out, padding 0.25s ease-out, opacity 0.2s ease;
+        opacity: 0;
+    }
+    .field-advanced.expanded {
+        max-height: 600px;
+        opacity: 1;
+        transition: max-height 0.35s ease-in, padding 0.25s ease-in, opacity 0.2s ease;
+    }
+</style>
+<script>
+let fieldCounter = 0;
+const existingFieldsJson = {{ existing_fields_json|safe|default:"[]" }};
+const fieldTypeChoices = {{ field_type_choices|safe|default:"[]" }};
+
+function slugify(text) {
+    return text.toLowerCase().trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+function toggleFieldAdvanced(index) {
+    const adv = document.getElementById('fieldAdvanced_' + index);
+    const arrow = document.getElementById('fieldAdvArrow_' + index);
+    if (adv) {
+        adv.classList.toggle('expanded');
+        if (arrow) arrow.classList.toggle('expanded');
+    }
+}
+
+function addFormField(existingData = null) {
+    const index = fieldCounter++;
+    const fieldData = existingData || {};
+
+    const optionsValue = Array.isArray(fieldData.options)
+        ? fieldData.options.join(', ')
+        : (fieldData.options || '');
+
+    const showOptions = ['select', 'radio', 'multi_checkbox'].includes(fieldData.field_type);
+
+    const fieldHtml = `
+        <div class="field-row bg-slate-50 rounded-xl border border-slate-200" data-field-index="${index}">
+            <input type="hidden" name="field_${index}_id" value="${fieldData.id || ''}">
+            <div class="flex items-center gap-3 p-3">
+                <span class="material-symbols-outlined text-slate-300 text-base cursor-default select-none">drag_indicator</span>
+                <div class="w-44 shrink-0">
+                    <select name="field_${index}_type" class="w-full border border-slate-200 bg-white rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800" required onchange="toggleOptionsField(this)">
+                        ${fieldTypeChoices.map(choice => `<option value="${choice[0]}" ${fieldData.field_type === choice[0] ? 'selected' : ''}>${choice[1]}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <input type="text" name="field_${index}_label" value="${escapeAttr(fieldData.field_label || '')}" placeholder="Field Label (EN)" class="w-full border border-slate-200 bg-white rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800" required
+                        oninput="autoSlugify(this, ${index})">
+                </div>
+                <label class="flex items-center gap-1.5 cursor-pointer shrink-0 select-none">
+                    <input type="checkbox" name="field_${index}_required" ${fieldData.is_required ? 'checked' : ''} class="w-4 h-4 text-sky-600 bg-white border-slate-300 rounded focus:ring-sky-500 focus:ring-2">
+                    <span class="text-xs text-slate-600 font-medium">Required</span>
+                </label>
+                <button type="button" onclick="toggleFieldAdvanced(${index})" class="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-200 shrink-0" title="Advanced options">
+                    <span id="fieldAdvArrow_${index}" class="material-symbols-outlined text-base transition-transform duration-200 collapsible-arrow">tune</span>
+                </button>
+                <button type="button" onclick="removeFormField(this)" class="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 shrink-0" title="Remove field">
+                    <span class="material-symbols-outlined text-base">close</span>
+                </button>
+            </div>
+            <div class="options-field px-3 pb-3 ${showOptions ? '' : 'hidden'}">
+                <div class="flex items-center gap-2 ml-8">
+                    <span class="material-symbols-outlined text-slate-400 text-sm">list</span>
+                    <input type="text" name="field_${index}_options" value="${escapeAttr(optionsValue)}" placeholder="Option 1, Option 2, Option 3" class="flex-1 border border-slate-200 bg-white rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                </div>
+            </div>
+            <div id="fieldAdvanced_${index}" class="field-advanced">
+                <div class="mx-3 mb-3 p-4 bg-white rounded-lg border border-slate-200">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Advanced Field Settings</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Label (FR)</label>
+                            <input type="text" name="field_${index}_label_fr" value="${escapeAttr(fieldData.field_label_fr || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Field Name</label>
+                            <input type="text" name="field_${index}_name" id="fieldName_${index}" value="${escapeAttr(fieldData.field_name || '')}" placeholder="auto_generated" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800 font-mono" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Validation Regex</label>
+                            <input type="text" name="field_${index}_validation_regex" value="${escapeAttr(fieldData.validation_regex || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Placeholder (EN)</label>
+                            <input type="text" name="field_${index}_placeholder" value="${escapeAttr(fieldData.placeholder || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Placeholder (FR)</label>
+                            <input type="text" name="field_${index}_placeholder_fr" value="${escapeAttr(fieldData.placeholder_fr || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Help Text (EN)</label>
+                            <input type="text" name="field_${index}_help_text" value="${escapeAttr(fieldData.help_text || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Help Text (FR)</label>
+                            <input type="text" name="field_${index}_help_text_fr" value="${escapeAttr(fieldData.help_text_fr || '')}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent text-slate-800">
+                        </div>
+                        <div class="flex items-end pb-1">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="field_${index}_active" ${fieldData.is_active !== false ? 'checked' : ''} class="w-4 h-4 text-sky-600 bg-white border-slate-300 rounded focus:ring-sky-500 focus:ring-2">
+                                <span class="text-sm text-slate-700 font-medium">Active</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('formFieldsContainer').insertAdjacentHTML('beforeend', fieldHtml);
+}
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function autoSlugify(labelInput, index) {
+    const nameInput = document.getElementById('fieldName_' + index);
+    if (nameInput && (!nameInput.dataset.userEdited || nameInput.dataset.userEdited === 'false')) {
+        nameInput.value = slugify(labelInput.value);
+    }
+}
+
+document.addEventListener('input', function(e) {
+    if (e.target.id && e.target.id.startsWith('fieldName_')) {
+        e.target.dataset.userEdited = 'true';
+    }
+});
+
+function removeFormField(button) {
+    const fieldContainer = button.closest('[data-field-index]');
+    if (fieldContainer) {
+        fieldContainer.remove();
+    }
+}
+
+function toggleOptionsField(selectElement) {
+    const fieldContainer = selectElement.closest('[data-field-index]');
+    const optionsField = fieldContainer.querySelector('.options-field');
+    const selectedType = selectElement.value;
+
+    if (['select', 'radio', 'multi_checkbox'].includes(selectedType)) {
+        optionsField.classList.remove('hidden');
+    } else {
+        optionsField.classList.add('hidden');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (existingFieldsJson && existingFieldsJson.length > 0) {
+        existingFieldsJson.forEach(field => {
+            addFormField(field);
+        });
+        document.querySelectorAll('[id^="fieldName_"]').forEach(el => {
+            el.dataset.userEdited = 'true';
+        });
+    }
+});
+
+/* ── Credential Roles ── */
+const existingRolesJson = {{ existing_roles_json|safe|default:"[]" }};
+const rolesContainer = document.getElementById('roles-container');
+let roleCounter = 0;
+
+const DEFAULT_ROLES = [
+    {name: 'Participant', name_fr: 'Participant', color: '#4CAF50'},
+    {name: 'Moderator', name_fr: 'Mod\u00e9rateur', color: '#2196F3'},
+    {name: 'Panelist', name_fr: 'Pan\u00e9liste', color: '#9C27B0'},
+    {name: 'Technician', name_fr: 'Technicien', color: '#FF9800'},
+    {name: 'Scientific Committee', name_fr: 'Comit\u00e9 Scientifique', color: '#00BCD4'},
+    {name: 'Co-organizer', name_fr: 'Co-organisateur', color: '#E91E63'},
+    {name: 'Guest of Honor', name_fr: 'Invit\u00e9 d\'Honneur', color: '#FFD700'},
+    {name: 'Security', name_fr: 'S\u00e9curit\u00e9', color: '#607D8B'},
+    {name: 'Protocol', name_fr: 'Protocole', color: '#795548'},
+];
+
+function addRoleRow(role) {
+    role = role || {id: '', name: '', name_fr: '', color: '#4CAF50'};
+    const idx = roleCounter++;
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200';
+    div.innerHTML = `
+        <span class="material-symbols-outlined text-slate-400 text-base">drag_indicator</span>
+        <input type="hidden" name="role_${idx}_id" value="${role.id || ''}">
+        <input type="text" name="role_${idx}_name" value="${escapeAttr(role.name)}" placeholder="Role Name (EN)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm" required>
+        <input type="text" name="role_${idx}_name_fr" value="${escapeAttr(role.name_fr)}" placeholder="Role Name (FR)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
+        <label class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap shrink-0">
+            <input type="color" name="role_${idx}_color" value="${role.color || '#4CAF50'}" class="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0.5">
+            Colour
+        </label>
+        <button type="button" onclick="this.parentElement.remove()" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+            <span class="material-symbols-outlined text-base">delete</span>
+        </button>
+    `;
+    rolesContainer.appendChild(div);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const roles = existingRolesJson && existingRolesJson.length > 0 ? existingRolesJson : DEFAULT_ROLES;
+    roles.forEach(r => addRoleRow(r));
+});
+</script>
+{% endblock %}

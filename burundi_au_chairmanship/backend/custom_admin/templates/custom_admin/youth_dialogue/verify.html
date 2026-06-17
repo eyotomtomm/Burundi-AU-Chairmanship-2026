@@ -1,0 +1,147 @@
+{% extends 'custom_admin/base.html' %}
+{% block title %}QR Verification — Youth Dialogue — Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+  <!-- Header -->
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:youth_dialogue_list' %}"
+       class="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+    </a>
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">qr_code_scanner</span>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900 font-headline">QR Verification</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Scan or enter QR data to verify a participant credential</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Form -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <form method="get" class="space-y-4">
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2">QR Code Data or Participant Code</label>
+        <div class="relative">
+          <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">qr_code</span>
+          <input type="text" name="q" value="{{ query }}"
+                 placeholder="e.g. YD-2026-0001:abc123hash or YD-2026-0001"
+                 autofocus
+                 class="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-mono">
+        </div>
+        <p class="text-xs text-slate-400 mt-2">
+          Enter the full QR code data (code:hash) or just the participant code to look up a credential.
+        </p>
+      </div>
+      <button type="submit"
+              class="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 text-white font-semibold rounded-xl py-3.5 px-6 text-sm hover:bg-emerald-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">verified</span>
+        Verify Credential
+      </button>
+    </form>
+  </div>
+
+  <!-- Result -->
+  {% if result %}
+  {% if result.found %}
+    {% with app=result.application %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <!-- Status header -->
+      <div class="p-6 {% if result.status == 'VALID' %}bg-emerald-50 border-b border-emerald-200{% else %}bg-red-50 border-b border-red-200{% endif %}">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-full flex items-center justify-center {% if result.status == 'VALID' %}bg-emerald-100{% else %}bg-red-100{% endif %}">
+            <span class="material-symbols-outlined text-3xl {% if result.status == 'VALID' %}text-emerald-600{% else %}text-red-600{% endif %}">
+              {% if result.status == 'VALID' %}verified{% else %}block{% endif %}
+            </span>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold {% if result.status == 'VALID' %}text-emerald-800{% else %}text-red-800{% endif %}">
+              {% if result.status == 'VALID' %}VALID CREDENTIAL{% else %}REVOKED CREDENTIAL{% endif %}
+            </h2>
+            <p class="text-sm {% if result.status == 'VALID' %}text-emerald-600{% else %}text-red-600{% endif %}">
+              {% if result.status == 'VALID' %}This participant is authorized.{% else %}This credential is no longer valid.{% endif %}
+            </p>
+            {% if result.partial_match %}
+            <p class="text-xs text-amber-600 mt-1 font-semibold">
+              Matched by participant code only (QR hash not provided)
+            </p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Participant details -->
+      <div class="p-8">
+        <div class="flex items-center gap-4 mb-6">
+          {% if app.id_photo %}
+          <img src="{{ app.id_photo.url }}" alt="Photo"
+               class="w-20 h-20 rounded-full object-cover shadow-lg border-2 border-slate-200">
+          {% else %}
+          <div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+            {{ app.first_name|first|upper }}
+          </div>
+          {% endif %}
+          <div>
+            <p class="text-xl font-bold text-slate-900">{{ app.first_name }} {{ app.last_name }}</p>
+            <p class="text-sm text-slate-500">{{ app.organization }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1">Participant Code</label>
+            <p class="text-lg font-bold font-mono text-indigo-600">{{ app.participant_code }}</p>
+          </div>
+          <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1">Nationality</label>
+            <p class="text-slate-800 font-medium">{{ app.nationality_flag }} {{ app.get_nationality_display }}</p>
+          </div>
+          <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1">Position</label>
+            <p class="text-slate-800 font-medium">{{ app.position|default:"—" }}</p>
+          </div>
+          <div>
+            <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1">Credential Issued</label>
+            <p class="text-slate-800 font-medium">{{ app.credential_issued_at|date:"M d, Y g:i A" }}</p>
+          </div>
+        </div>
+
+        {% if result.status == 'REVOKED' %}
+        <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+          <p class="text-sm font-semibold text-red-800">Revocation Details</p>
+          {% if app.revoked_at %}
+          <p class="text-xs text-red-600 mt-1">Revoked on {{ app.revoked_at|date:"M d, Y g:i A" }}</p>
+          {% endif %}
+          {% if app.revoked_reason %}
+          <p class="text-sm text-red-700 mt-2">{{ app.revoked_reason }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <a href="{% url 'custom_admin:youth_dialogue_review' app.pk %}"
+           class="inline-flex items-center gap-2 bg-slate-900 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-800 transition-all shadow-sm">
+          <span class="material-symbols-outlined text-sm">visibility</span>
+          View Full Application
+        </a>
+      </div>
+    </div>
+    {% endwith %}
+  {% else %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 text-center">
+      <div class="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+        <span class="material-symbols-outlined text-3xl text-red-400">search_off</span>
+      </div>
+      <h3 class="text-lg font-bold text-slate-900 mb-2">Credential Not Found</h3>
+      <p class="text-sm text-slate-500">
+        No valid credential matches the data provided. Please check the QR code and try again.
+      </p>
+    </div>
+  {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}

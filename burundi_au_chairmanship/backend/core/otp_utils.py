@@ -1,9 +1,10 @@
 """OTP utility functions for email verification"""
+import hashlib
 import logging
 import secrets
 import string
 from datetime import timedelta
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives, send_mail
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import F as models_F
@@ -12,6 +13,11 @@ from .models import OTPVerification
 logger = logging.getLogger(__name__)
 
 MAX_OTP_ATTEMPTS = 5
+
+
+def _hash_otp(code) -> str:
+    """Return the SHA-256 hex digest of a plaintext OTP code."""
+    return hashlib.sha256(str(code).strip().encode()).hexdigest()
 
 
 def generate_otp(length=6):
@@ -33,12 +39,12 @@ def send_email_otp(user, email):
         # Generate OTP
         otp_code = generate_otp()
 
-        # Create OTP record
+        # Create OTP record (store SHA-256 hash, never plaintext)
         otp = OTPVerification.objects.create(
             user=user,
             type='email',
             contact=email,
-            otp_code=otp_code,
+            otp_code=_hash_otp(otp_code),
             expires_at=timezone.now() + timedelta(minutes=10)
         )
 
@@ -102,6 +108,7 @@ def verify_email_otp(user, email, otp_code):
     Verify email OTP code with brute-force protection
     Returns (success, message)
     """
+    otp_code = str(otp_code).strip()
     try:
         otp = OTPVerification.objects.filter(
             user=user,
@@ -111,6 +118,14 @@ def verify_email_otp(user, email, otp_code):
         ).order_by('-created_at').first()
 
         if not otp:
+            logger.warning(
+                'OTP verify: no pending OTP for user=%s email=%s '
+                '(total records=%d)',
+                user.pk, email,
+                OTPVerification.objects.filter(
+                    user=user, type='email', contact=email,
+                ).count(),
+            )
             return False, 'No pending verification found. Please request a new code.'
 
         attempts = getattr(otp, 'attempts', 0)
@@ -122,9 +137,15 @@ def verify_email_otp(user, email, otp_code):
         if otp.is_expired():
             return False, 'OTP has expired. Please request a new one.'
 
-        if otp.otp_code != otp_code:
+        if otp.otp_code != _hash_otp(otp_code):
             OTPVerification.objects.filter(pk=otp.pk).update(
                 attempts=models_F('attempts') + 1
+            )
+            logger.warning(
+                'OTP verify: hash mismatch for user=%s email=%s '
+                'stored_len=%d input_len=%d attempts=%d',
+                user.pk, email, len(otp.otp_code), len(otp_code),
+                attempts + 1,
             )
             return False, 'Invalid OTP code'
 
@@ -139,5 +160,5 @@ def verify_email_otp(user, email, otp_code):
         return True, 'Email verified successfully'
 
     except Exception as e:
-        logger.exception('Failed to verify email OTP')
+        logger.exception('Failed to verify email OTP: %s', e)
         return False, 'Verification failed. Please try again.'

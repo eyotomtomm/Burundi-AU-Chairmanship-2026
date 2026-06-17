@@ -9,6 +9,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
 
 import 'firebase_options.dart';
 import 'config/app_theme.dart';
@@ -23,8 +26,11 @@ import 'services/api_service.dart';
 import 'services/app_link_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/remote_config_service.dart';
+import 'services/content_cache_service.dart';
+import 'services/data_saver_service.dart';
 import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart';
 import 'l10n/app_localizations.dart';
+import 'l10n/app_localizations_generated.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/home/home_screen.dart';
@@ -55,12 +61,17 @@ import 'screens/youth_dialogue/youth_dialogue_main_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_documents_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_credential_screen.dart';
 import 'screens/maintenance/maintenance_screen.dart';
+import 'screens/scanner/qr_scanner_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // Firebase Analytics — available globally for screen/event logging
 final FirebaseAnalytics firebaseAnalytics = FirebaseAnalytics.instance;
+
+// Keep a strong reference so the service (and its stream subscriptions) are
+// never garbage-collected after the fire-and-forget Future completes.
+FirebaseMessagingService? _messagingService;
 
 Future<void> _initializeApp() async {
   // Wire up ApiService with the global navigator key for 503 maintenance redirect
@@ -82,6 +93,12 @@ Future<void> _initializeApp() async {
       print('App will continue without Firebase features');
     }
   }
+
+  // Initialize Hive for offline content caching
+  await Hive.initFlutter();
+  await ContentCacheService().init();
+  await DataSaverService().init();
+  await ContentCacheService().migrateFromSharedPreferences();
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -119,8 +136,8 @@ void _initFirebaseServicesAsync() {
   // Fire-and-forget — these run in the background
   Future(() async {
     try {
-      final messaging = FirebaseMessagingService();
-      await messaging.initialize(navigatorKey).timeout(const Duration(seconds: 8));
+      _messagingService = FirebaseMessagingService();
+      await _messagingService!.initialize(navigatorKey).timeout(const Duration(seconds: 8));
     } catch (e) {
       if (kDebugMode) print('Firebase Messaging init failed: $e');
     }
@@ -169,12 +186,43 @@ void _recordBackendAppOpen() {
   });
 }
 
+/// Persistent device UUID stored in iOS Keychain / Android Keystore.
+/// Survives app reinstalls on iOS and encrypted prefs on Android.
+const _deviceIdKey = 'persistent_device_id';
+const _deviceIdStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+);
+
+/// Cached in-memory so we don't hit the keystore on every API call.
+String? _cachedDeviceId;
+
+Future<String> getOrCreateDeviceId() async {
+  if (_cachedDeviceId != null) return _cachedDeviceId!;
+  try {
+    String? stored = await _deviceIdStorage.read(key: _deviceIdKey);
+    if (stored != null && stored.isNotEmpty) {
+      _cachedDeviceId = stored;
+      return stored;
+    }
+    final newId = const Uuid().v4();
+    await _deviceIdStorage.write(key: _deviceIdKey, value: newId);
+    _cachedDeviceId = newId;
+    return newId;
+  } catch (_) {
+    // Fallback: generate a non-persistent UUID (better than nothing)
+    _cachedDeviceId = const Uuid().v4();
+    return _cachedDeviceId!;
+  }
+}
+
 /// Gather basic device info for analytics
 Future<Map<String, String>> _getDeviceInfo() async {
   String deviceType = 'unknown';
   String deviceOs = 'unknown';
   String deviceId = '';
   try {
+    deviceId = await getOrCreateDeviceId();
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       deviceType = 'iOS';
       deviceOs = 'iOS';
@@ -300,6 +348,7 @@ class BurundiAUApp extends StatelessWidget {
             ],
             localizationsDelegates: const [
               AppLocalizations.delegate,
+              AppLocalizationsGenerated.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
@@ -339,6 +388,7 @@ class BurundiAUApp extends StatelessWidget {
                 '/youth-dialogue-apply': (context) => const YouthDialogueMainScreen(),
                 '/youth-dialogue-documents': (context) => const YouthDialogueDocumentsScreen(),
                 '/youth-dialogue-credential': (context) => const YouthDialogueCredentialScreen(),
+                '/qr-scanner': (context) => const QrScannerScreen(),
               };
 
               // Handle maintenance route with arguments

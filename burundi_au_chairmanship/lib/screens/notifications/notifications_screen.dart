@@ -327,6 +327,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           constraints: const BoxConstraints(maxHeight: 160),
                           child: CachedNetworkImage(
                             imageUrl: imageUrl,
+                            memCacheWidth: 200,
                             width: double.infinity,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(

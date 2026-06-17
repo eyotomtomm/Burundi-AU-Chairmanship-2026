@@ -4,7 +4,7 @@ from rest_framework import serializers
 from .models import (
     MagazineLike, ArticleLike, GalleryAlbumLike, VideoLike,
     HeroSlide, MagazineEdition, MagazineImage, Article, EmbassyLocation,
-    Event, LiveFeed, Resource, Notification, AppSettings,
+    Event, LiveFeed, LiveFeedLike, LiveFeedComment, LiveFeedCommentLike, Resource, Notification, AppSettings,
     FeatureCard, UserProfile, ArticleComment, ArticleLike,
     Category, ArticleMedia, PriorityAgenda, GalleryAlbum,
     GalleryPhoto, Video, SocialMediaLink, HeroTextContent, QuickAccessMenuItem,
@@ -29,7 +29,7 @@ from .models import (
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
-    YouthDialogueSettings, YouthDialogueFormField, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    YouthDialogueEvent, YouthDialogueFormField, YouthDialogueRole, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog, YouthDialogueMedia,
 )
 
 
@@ -63,10 +63,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ['phone_number', 'gender', 'nationality', 'date_of_birth', 'profile_picture', 'is_email_verified',
                   'is_government_official', 'is_verified', 'badge_type', 'verification_requested_at',
-                  'email_verified_at', 'government_verified_at', 'verified_at', 'receives_newsletter']
+                  'email_verified_at', 'government_verified_at', 'verified_at', 'receives_newsletter',
+                  'admin_sections', 'is_usher']
         read_only_fields = ['is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
                             'email_verified_at', 'government_verified_at', 'verified_at',
-                            'verification_requested_at']
+                            'verification_requested_at', 'is_usher']
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -87,8 +88,10 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'name', 'email', 'profile', 'phone_number', 'gender', 'nationality', 'date_of_birth',
-                  'profile_picture', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
-        read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type']
+                  'profile_picture', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
+                  'is_staff']
+        read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
+                            'is_staff']
 
     def get_name(self, obj):
         """Return full name from first_name + last_name, falling back to a safe handle.
@@ -210,11 +213,14 @@ class MagazineEditionSerializer(serializers.ModelSerializer):
     images = MagazineImageSerializer(many=True, read_only=True)
     is_liked = serializers.BooleanField(read_only=True, default=False)
     recent_likers = serializers.SerializerMethodField()
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
 
     class Meta:
         model = MagazineEdition
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'cover_image', 'pdf_file', 'external_url', 'effective_pdf_url',
+                  'cover_image', 'thumbnail_url', 'medium_url',
+                  'pdf_file', 'external_url', 'effective_pdf_url',
                   'publish_date', 'is_featured', 'view_count', 'like_count',
                   'page_count', 'file_size', 'images', 'is_liked', 'recent_likers']
 
@@ -302,13 +308,15 @@ class MagazineCommentSerializer(serializers.ModelSerializer):
     def get_replies(self, obj):
         if obj.parent_id is not None:
             return []
-        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        # Use prefetch cache (set by view queryset) — avoids N+1 queries
+        replies = sorted(obj.replies.all(), key=lambda r: r.created_at)
         return MagazineCommentSerializer(replies, many=True, context=self.context).data
 
     def get_reply_count(self, obj):
         if obj.parent_id is not None:
             return 0
-        return obj.replies.count()
+        # Use prefetch cache — len() reads from memory, .count() fires a query
+        return len(obj.replies.all())
 
 
 class VideoCommentSerializer(serializers.ModelSerializer):
@@ -381,13 +389,13 @@ class VideoCommentSerializer(serializers.ModelSerializer):
     def get_replies(self, obj):
         if obj.parent_id is not None:
             return []
-        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        replies = sorted(obj.replies.all(), key=lambda r: r.created_at)
         return VideoCommentSerializer(replies, many=True, context=self.context).data
 
     def get_reply_count(self, obj):
         if obj.parent_id is not None:
             return 0
-        return obj.replies.count()
+        return len(obj.replies.all())
 
 
 class GalleryCommentSerializer(serializers.ModelSerializer):
@@ -460,13 +468,13 @@ class GalleryCommentSerializer(serializers.ModelSerializer):
     def get_replies(self, obj):
         if obj.parent_id is not None:
             return []
-        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        replies = sorted(obj.replies.all(), key=lambda r: r.created_at)
         return GalleryCommentSerializer(replies, many=True, context=self.context).data
 
     def get_reply_count(self, obj):
         if obj.parent_id is not None:
             return 0
-        return obj.replies.count()
+        return len(obj.replies.all())
 
 
 class ArticleCommentSerializer(serializers.ModelSerializer):
@@ -539,13 +547,13 @@ class ArticleCommentSerializer(serializers.ModelSerializer):
     def get_replies(self, obj):
         if obj.parent_id is not None:
             return []
-        replies = obj.replies.select_related('user', 'user__profile').order_by('created_at')
+        replies = sorted(obj.replies.all(), key=lambda r: r.created_at)
         return ArticleCommentSerializer(replies, many=True, context=self.context).data
 
     def get_reply_count(self, obj):
         if obj.parent_id is not None:
             return 0
-        return obj.replies.count()
+        return len(obj.replies.all())
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -560,7 +568,8 @@ class ArticleMediaSerializer(serializers.ModelSerializer):
         fields = ['id', 'media_type', 'image', 'video_url', 'caption', 'caption_fr', 'order']
 
 
-class ArticleSerializer(serializers.ModelSerializer):
+class ArticleListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for article list/feed — omits full body content."""
     category = CategorySerializer(read_only=True)
     media = ArticleMediaSerializer(many=True, read_only=True)
     comment_count = serializers.IntegerField(read_only=True, default=0)
@@ -572,7 +581,7 @@ class ArticleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ['id', 'title', 'title_fr', 'content', 'content_fr',
+        fields = ['id', 'title', 'title_fr',
                   'image', 'thumbnail_url', 'medium_url',
                   'author', 'category', 'publish_date', 'content_type', 'is_featured',
                   'view_count', 'comment_count', 'like_count', 'is_liked', 'media',
@@ -581,6 +590,12 @@ class ArticleSerializer(serializers.ModelSerializer):
     def get_recent_likers(self, obj):
         request = self.context.get('request')
         return get_recent_likers(ArticleLike, 'article', obj, request)
+
+
+class ArticleSerializer(ArticleListSerializer):
+    """Full serializer for article detail — includes body content."""
+    class Meta(ArticleListSerializer.Meta):
+        fields = ArticleListSerializer.Meta.fields + ['content', 'content_fr']
 
 
 class EmbassyLocationSerializer(serializers.ModelSerializer):
@@ -592,17 +607,99 @@ class EmbassyLocationSerializer(serializers.ModelSerializer):
 
 
 class EventSerializer(serializers.ModelSerializer):
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
+
     class Meta:
         model = Event
         fields = ['id', 'name', 'name_fr', 'description', 'description_fr',
                   'address', 'latitude', 'longitude', 'event_date', 'image',
+                  'thumbnail_url', 'medium_url',
                   'recurrence_type', 'recurrence_end_date']
+
+
+class LiveFeedCommentSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    username = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    profile_picture = serializers.SerializerMethodField()
+    badge_type = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+    is_edited = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LiveFeedComment
+        fields = ['id', 'user_id', 'user_name', 'username', 'profile_picture', 'badge_type',
+                  'parent', 'content', 'like_count', 'created_at', 'updated_at',
+                  'replies', 'reply_count', 'is_liked', 'is_owner', 'can_edit', 'is_edited']
+
+    def get_user_name(self, obj):
+        from .utils import user_handle
+        return obj.user.get_full_name().strip() or user_handle(obj.user)
+
+    def get_username(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.user)
+
+    def get_profile_picture(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.user.profile.profile_picture.url)
+        return None
+
+    def get_badge_type(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.is_verified:
+            return obj.user.profile.badge_type
+        return None
+
+    def get_is_liked(self, obj):
+        if hasattr(obj, '_is_liked'):
+            return obj._is_liked
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return LiveFeedCommentLike.objects.filter(user=request.user, comment=obj).exists()
+        return False
+
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.user_id == request.user.id
+        return False
+
+    def get_can_edit(self, obj):
+        from django.utils import timezone
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and obj.user_id == request.user.id:
+            return (timezone.now() - obj.created_at).total_seconds() <= 120
+        return False
+
+    def get_is_edited(self, obj):
+        return obj.updated_at is not None
+
+    def get_replies(self, obj):
+        if obj.parent_id is not None:
+            return []
+        replies = sorted(obj.replies.all(), key=lambda r: r.created_at)
+        return LiveFeedCommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_count(self, obj):
+        if obj.parent_id is not None:
+            return 0
+        return len(obj.replies.all())
 
 
 class LiveFeedSerializer(serializers.ModelSerializer):
     event_name = serializers.CharField(source='event.name', read_only=True, default=None)
     event_date = serializers.DateTimeField(source='event.event_date', read_only=True, default=None)
     speakers = serializers.SerializerMethodField()
+    like_count = serializers.IntegerField(read_only=True, default=0)
+    is_liked = serializers.BooleanField(read_only=True, default=False)
+    recent_likers = serializers.SerializerMethodField()
 
     class Meta:
         model = LiveFeed
@@ -610,13 +707,18 @@ class LiveFeedSerializer(serializers.ModelSerializer):
                   'event', 'event_name', 'event_date', 'speakers',
                   'stream_url', 'stream_type',
                   'meeting_id', 'passcode', 'thumbnail', 'status',
-                  'viewer_count', 'duration', 'scheduled_time']
+                  'viewer_count', 'duration', 'scheduled_time',
+                  'like_count', 'is_liked', 'recent_likers']
 
     def get_speakers(self, obj):
         if not obj.event_id:
             return []
         qs = obj.event.event_speakers.filter(is_active=True).order_by('order', 'name')
         return EventSpeakerSerializer(qs, many=True, context=self.context).data
+
+    def get_recent_likers(self, obj):
+        request = self.context.get('request')
+        return get_recent_likers(LiveFeedLike, 'feed', obj, request)
 
 
 class ResourceSerializer(serializers.ModelSerializer):
@@ -671,11 +773,14 @@ class FeatureCardSerializer(serializers.ModelSerializer):
     impact_areas = serializers.SerializerMethodField()
     impact_areas_fr = serializers.SerializerMethodField()
     media = FeatureCardMediaSerializer(many=True, read_only=True)
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
 
     class Meta:
         model = FeatureCard
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'image', 'gradient_start', 'gradient_end', 'icon_name', 'icon_image',
+                  'image', 'thumbnail_url', 'medium_url',
+                  'gradient_start', 'gradient_end', 'icon_name', 'icon_image',
                   'action_type', 'action_value', 'order',
                   'overview', 'overview_fr', 'key_points', 'key_points_fr',
                   'impact_areas', 'impact_areas_fr', 'extra_content', 'extra_content_fr',
@@ -741,7 +846,10 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'app_store_url', 'play_store_url',
                   'app_store_id', 'play_store_id',
                   'bookmarks_enabled', 'discussions_enabled',
-                  'polls_enabled', 'newsletter_enabled']
+                  'polls_enabled', 'newsletter_enabled',
+                  'qr_code_mode',
+                  'countdown_target_date', 'countdown_label',
+                  'countdown_label_fr', 'countdown_enabled']
 
 
 class PriorityAgendaSerializer(serializers.ModelSerializer):
@@ -810,11 +918,14 @@ class VideoSerializer(serializers.ModelSerializer):
     chapters = VideoChapterSerializer(many=True, read_only=True)
     subtitles = VideoSubtitleSerializer(many=True, read_only=True)
     recent_likers = serializers.SerializerMethodField()
+    thumbnail_url = serializers.CharField(read_only=True)
+    medium_url = serializers.CharField(read_only=True)
 
     class Meta:
         model = Video
         fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
-                  'video_url', 'thumbnail', 'duration', 'category', 'view_count',
+                  'video_url', 'thumbnail', 'thumbnail_url', 'medium_url',
+                  'duration', 'category', 'view_count',
                   'like_count', 'publish_date', 'is_featured', 'is_liked',
                   'chapters', 'subtitles', 'recent_likers']
 
@@ -1117,10 +1228,11 @@ class EventSubmissionSerializer(serializers.ModelSerializer):
         model = EventSubmission
         fields = ['id', 'event_registration', 'event_title', 'user', 'user_name', 'user_email',
                   'form_data', 'uploaded_files',
-                  'is_proxy', 'proxy_name', 'proxy_email', 'proxy_phone',
+                  'is_proxy', 'proxy_name', 'proxy_email', 'proxy_email_verified', 'proxy_phone',
                   'status', 'is_waitlisted', 'checked_in_at', 'qr_ticket_hash',
                   'submitted_at', 'reviewed_at', 'reviewed_by']
         read_only_fields = ['id', 'user', 'is_waitlisted', 'checked_in_at', 'qr_ticket_hash',
+                            'proxy_email_verified',
                             'submitted_at', 'reviewed_at', 'reviewed_by']
 
 
@@ -1831,13 +1943,17 @@ class EventCommentSerializer(serializers.ModelSerializer):
     def get_replies(self, obj):
         if obj.parent is not None:
             return []
-        replies = obj.replies.filter(is_approved=True).select_related('user', 'user__profile').order_by('created_at')
+        # Filter from prefetch cache in Python — avoids N+1 queries
+        replies = sorted(
+            [r for r in obj.replies.all() if r.is_approved],
+            key=lambda r: r.created_at,
+        )
         return EventCommentSerializer(replies, many=True, context=self.context).data
 
     def get_reply_count(self, obj):
         if obj.parent is not None:
             return 0
-        return obj.replies.filter(is_approved=True).count()
+        return sum(1 for r in obj.replies.all() if r.is_approved)
 
 
 class NewsletterEditionSerializer(serializers.ModelSerializer):
@@ -1933,32 +2049,124 @@ class YouthDialogueFormFieldSerializer(serializers.ModelSerializer):
                   'max_length', 'min_length', 'order']
 
 
-class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
-    form_fields = YouthDialogueFormFieldSerializer(many=True, read_only=True)
-    quick_access_icon_url = serializers.SerializerMethodField()
+class YouthDialogueMediaSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
-        model = YouthDialogueSettings
+        model = YouthDialogueMedia
         fields = [
-            'logo_light', 'logo_dark',
-            'programme_title', 'programme_title_fr',
-            'description', 'description_fr',
-            'is_visible', 'is_registration_open',
-            'registration_closed_message', 'registration_closed_message_fr',
-            'quick_access_icon_url', 'quick_access_title_en', 'quick_access_title_fr',
-            'support_email', 'support_phone', 'live_chat_url',
-            'support_note', 'support_note_fr',
-            'form_fields',
+            'id', 'media_type', 'title', 'title_fr', 'caption', 'caption_fr',
+            'edition_tag', 'file_url', 'external_url', 'thumbnail_url',
+            'is_promotional', 'display_order',
         ]
 
-    def get_quick_access_icon_url(self, obj):
+    def get_file_url(self, obj):
         request = self.context.get('request')
-        if obj.quick_access_icon and request:
-            return request.build_absolute_uri(obj.quick_access_icon.url)
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return ''
+
+    def get_thumbnail_url(self, obj):
+        request = self.context.get('request')
+        if obj.thumbnail and request:
+            return request.build_absolute_uri(obj.thumbnail.url)
         return ''
 
 
+class YouthDialogueRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YouthDialogueRole
+        fields = ['id', 'name', 'name_fr', 'color', 'order']
+
+
+class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
+    form_fields = YouthDialogueFormFieldSerializer(many=True, read_only=True)
+    roles = serializers.SerializerMethodField()
+    quick_access_icon_url = serializers.SerializerMethodField()
+    banner_image_url = serializers.SerializerMethodField()
+    logo_light_url = serializers.SerializerMethodField()
+    logo_light_fr_url = serializers.SerializerMethodField()
+    logo_dark_url = serializers.SerializerMethodField()
+    logo_dark_fr_url = serializers.SerializerMethodField()
+    secondary_logo_url = serializers.SerializerMethodField()
+    media = serializers.SerializerMethodField()
+    promotional_video = serializers.SerializerMethodField()
+
+    class Meta:
+        model = YouthDialogueEvent
+        fields = [
+            'logo_light', 'logo_light_fr', 'logo_dark', 'logo_dark_fr',
+            'logo_light_url', 'logo_light_fr_url', 'logo_dark_url', 'logo_dark_fr_url',
+            'secondary_logo', 'secondary_logo_url',
+            'programme_title', 'programme_title_fr',
+            'description', 'description_fr',
+            'location', 'start_date', 'end_date',
+            'is_visible', 'is_registration_open',
+            'registration_closed_message', 'registration_closed_message_fr',
+            'quick_access_icon_url', 'quick_access_title_en', 'quick_access_title_fr',
+            'banner_image_url',
+            'event_tagline', 'event_tagline_fr',
+            'venue_name', 'venue_name_fr',
+            'venue_address', 'venue_address_fr',
+            'key_highlights', 'key_highlights_fr',
+            'eligibility_criteria', 'eligibility_criteria_fr',
+            'side_events_info', 'side_events_info_fr',
+            'privacy_policy', 'privacy_policy_fr',
+            'required_documents',
+            'support_email', 'support_phone', 'live_chat_url',
+            'support_note', 'support_note_fr',
+            'form_fields', 'roles', 'media', 'promotional_video',
+        ]
+
+    def _build_url(self, field):
+        request = self.context.get('request')
+        if field and request:
+            try:
+                return request.build_absolute_uri(field.url)
+            except Exception:
+                pass
+        return ''
+
+    def get_banner_image_url(self, obj):
+        return self._build_url(obj.banner_image)
+
+    def get_logo_light_url(self, obj):
+        return self._build_url(obj.logo_light)
+
+    def get_logo_light_fr_url(self, obj):
+        return self._build_url(obj.logo_light_fr)
+
+    def get_logo_dark_url(self, obj):
+        return self._build_url(obj.logo_dark)
+
+    def get_logo_dark_fr_url(self, obj):
+        return self._build_url(obj.logo_dark_fr)
+
+    def get_secondary_logo_url(self, obj):
+        return self._build_url(obj.secondary_logo)
+
+    def get_quick_access_icon_url(self, obj):
+        return self._build_url(obj.quick_access_icon)
+
+    def get_roles(self, obj):
+        return YouthDialogueRoleSerializer(obj.roles.filter(is_active=True), many=True).data
+
+    def get_media(self, obj):
+        items = obj.media_items.filter(is_published=True).order_by('display_order', '-created_at')
+        return YouthDialogueMediaSerializer(items, many=True, context=self.context).data
+
+    def get_promotional_video(self, obj):
+        promo = obj.media_items.filter(is_published=True, is_promotional=True).first()
+        if promo:
+            return YouthDialogueMediaSerializer(promo, context=self.context).data
+        return None
+
+
 class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(required=False, allow_blank=True, default='')
+    last_name = serializers.CharField(required=False, allow_blank=True, default='')
+
     class Meta:
         model = YouthDialogueApplication
         fields = [
@@ -1966,9 +2174,16 @@ class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
             'country_code', 'nationality', 'date_of_birth', 'gender',
             'organization', 'position', 'motivation',
         ]
+        extra_kwargs = {
+            'email': {'required': False, 'allow_blank': True},
+        }
 
     def validate_email(self, value):
-        if YouthDialogueApplication.objects.filter(email=value).exists():
+        active_event = YouthDialogueEvent.get_active()
+        qs = YouthDialogueApplication.objects.filter(email=value)
+        if active_event:
+            qs = qs.filter(event=active_event)
+        if qs.exists():
             raise serializers.ValidationError('An application with this email address already exists.')
         return value
 
@@ -1981,8 +2196,12 @@ class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {'detail': 'Please verify your email address before applying.'}
                 )
-            # Check one-per-user
-            if YouthDialogueApplication.objects.filter(user=request.user).exists():
+            # Check one-per-user per active event
+            active_event = YouthDialogueEvent.get_active()
+            qs = YouthDialogueApplication.objects.filter(user=request.user)
+            if active_event:
+                qs = qs.filter(event=active_event)
+            if qs.exists():
                 raise serializers.ValidationError(
                     {'detail': 'You have already submitted an application.'}
                 )
@@ -2007,7 +2226,7 @@ class YouthDialogueApplicationStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = YouthDialogueApplication
         fields = [
-            'id', 'status', 'title', 'first_name', 'last_name', 'email',
+            'id', 'reference_id', 'status', 'title', 'first_name', 'last_name', 'email',
             'nationality', 'organization', 'position',
             'rejection_reason', 'documents_rejection_notes',
             'participant_code', 'has_credential', 'documents', 'created_at',
@@ -2028,19 +2247,34 @@ class YouthDialogueApplicationStatusSerializer(serializers.ModelSerializer):
 class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
     qr_data = serializers.SerializerMethodField()
     id_photo_url = serializers.SerializerMethodField()
+    nationality_display = serializers.CharField(source='get_nationality_display', read_only=True)
+    nationality_flag = serializers.CharField(read_only=True)
+    role = serializers.SerializerMethodField()
+    role_color = serializers.SerializerMethodField()
+    event_start_date = serializers.DateField(source='event.start_date', read_only=True)
+    event_end_date = serializers.DateField(source='event.end_date', read_only=True)
 
     class Meta:
         model = YouthDialogueApplication
         fields = [
             'first_name', 'last_name', 'email', 'nationality',
+            'nationality_display', 'nationality_flag',
             'organization', 'position', 'participant_code',
             'qr_data', 'id_photo_url', 'credential_issued_at',
+            'is_revoked', 'role', 'role_color', 'event_start_date', 'event_end_date',
         ]
         read_only_fields = fields
 
     def get_qr_data(self, obj):
         if obj.participant_code and obj.qr_hash:
-            return f"{obj.participant_code}:{obj.qr_hash}"
+            raw = f"YD:{obj.participant_code}:{obj.qr_hash}"
+            settings_obj = AppSettings.load()
+            if settings_obj.qr_code_mode == 'url':
+                request = self.context.get('request')
+                if request:
+                    base = request.build_absolute_uri('/').rstrip('/')
+                    return f'{base}/verify?code={raw}'
+            return raw
         return ''
 
     def get_id_photo_url(self, obj):
@@ -2048,6 +2282,17 @@ class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
         if obj.id_photo and request:
             return request.build_absolute_uri(obj.id_photo.url)
         return ''
+
+    def get_role(self, obj):
+        return obj.position if obj.position else 'Participant'
+
+    def get_role_color(self, obj):
+        position = obj.position or 'Participant'
+        try:
+            role = YouthDialogueRole.objects.get(event=obj.event, name__iexact=position, is_active=True)
+            return role.color
+        except YouthDialogueRole.DoesNotExist:
+            return '#4CAF50'
 
 
 class PromotionalSplashSerializer(serializers.ModelSerializer):

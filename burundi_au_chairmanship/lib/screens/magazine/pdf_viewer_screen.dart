@@ -15,6 +15,7 @@ import '../../services/api_service.dart';
 import '../../models/magazine_model.dart';
 import '../../services/like_service.dart';
 import '../../widgets/verified_badge.dart';
+import '../../widgets/comment_ban_dialog.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfUrl;
@@ -22,6 +23,7 @@ class PdfViewerScreen extends StatefulWidget {
   final String? magazineId;
   final bool initialIsLiked;
   final int initialLikeCount;
+  final bool scrollToComments;
 
   const PdfViewerScreen({
     super.key,
@@ -30,6 +32,7 @@ class PdfViewerScreen extends StatefulWidget {
     this.magazineId,
     this.initialIsLiked = false,
     this.initialLikeCount = 0,
+    this.scrollToComments = false,
   });
 
   @override
@@ -81,6 +84,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _enableScreenProtection();
     _loadPdf();
     _recordView();
+    if (widget.scrollToComments) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted) _showCommentSheet();
+        });
+      });
+    }
   }
 
   /// Load PDF: check permanent download first, then temp cache, then download to cache.
@@ -416,6 +426,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     try {
       await ApiService().postMagazineComment(widget.magazineId!, content, parentId: parentId);
       await _loadComments();
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -557,7 +569,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             radius: 16,
             backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
             backgroundImage: comment.profilePicture != null
-                ? CachedNetworkImageProvider(comment.profilePicture!)
+                ? CachedNetworkImageProvider(comment.profilePicture!, maxWidth: 100)
                 : null,
             child: comment.profilePicture == null
                 ? Text(

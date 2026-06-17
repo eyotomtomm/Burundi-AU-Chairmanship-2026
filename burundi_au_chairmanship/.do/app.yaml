@@ -15,16 +15,14 @@ services:
     github:
       repo: eyotomtomm/Burundi-AU-Chairmanship-2026
       branch: main
-      deploy_on_push: true
+      deploy_on_push: false
     source_dir: /burundi_au_chairmanship/backend
     environment_slug: python
     instance_count: 1
     instance_size_slug: professional-xs  # $12/mo, 1 vCPU, 1GB RAM
     http_port: 8080
-    run_command: |
-      python manage.py migrate --noinput &&
-      python manage.py collectstatic --noinput &&
-      gunicorn config.wsgi --bind 0.0.0.0:8080 --workers 3 --timeout 120 --log-file -
+    # Web process only — migrate and collectstatic run once in the pre-deploy job below.
+    run_command: gunicorn config.wsgi --bind 0.0.0.0:8080 --workers 3 --timeout 120 --log-file -
     health_check:
       http_path: /api/health/
       initial_delay_seconds: 30
@@ -88,6 +86,40 @@ services:
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: GEMINI_API_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_BUCKET
+        value: "burundi-au-media"
+      - key: DO_SPACES_ENDPOINT
+        value: "https://fra1.digitaloceanspaces.com"
+
+# Pre-deploy job — runs ONCE per deploy, before any web container starts.
+# This prevents migration races when instance_count > 1.
+jobs:
+  - name: pre-deploy
+    kind: PRE_DEPLOY
+    github:
+      repo: eyotomtomm/Burundi-AU-Chairmanship-2026
+      branch: main
+    source_dir: /burundi_au_chairmanship/backend
+    environment_slug: python
+    instance_size_slug: professional-xs
+    run_command: python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    envs:
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+      - key: DJANGO_SECRET_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DATABASE_URL
+        type: SECRET
+        value: "${db.DATABASE_URL}"
+      - key: DO_SPACES_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_SECRET
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: DO_SPACES_BUCKET

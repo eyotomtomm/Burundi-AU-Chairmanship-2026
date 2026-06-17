@@ -167,6 +167,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
             if (imageUrl.isNotEmpty)
               CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(imageUrl),
+                memCacheWidth: 800,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
                   decoration: BoxDecoration(
@@ -322,6 +323,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
     if (iconImageUrl.isNotEmpty) {
       return CachedNetworkImage(
         imageUrl: Environment.fixMediaUrl(iconImageUrl),
+        memCacheWidth: 128,
         width: size,
         height: size,
         fit: BoxFit.contain,
@@ -423,6 +425,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
               if (imageUrl.isNotEmpty)
                 CachedNetworkImage(
                   imageUrl: Environment.fixMediaUrl(imageUrl),
+                  memCacheWidth: 800,
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(
                     color: isDark ? Colors.grey[800] : Colors.grey[200],
@@ -540,6 +543,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
               borderRadius: BorderRadius.circular(12),
               child: CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(imageUrl),
+                memCacheWidth: 800,
                 fit: BoxFit.contain,
                 placeholder: (_, _) => const SizedBox(
                   height: 200,

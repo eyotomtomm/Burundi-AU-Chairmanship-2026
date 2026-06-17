@@ -8,6 +8,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
+import '../../config/app_spacing.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/verified_badge.dart';
@@ -117,8 +118,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   child: ClipOval(
                                     child: authProvider.profilePictureUrl != null &&
                                             authProvider.profilePictureUrl!.isNotEmpty
-                                        ? CachedNetworkImage(
+                                        ? Semantics(
+                                            label: 'Profile picture',
+                                            child: CachedNetworkImage(
                                             imageUrl: authProvider.profilePictureUrl!,
+                                            memCacheWidth: 200,
                                             width: 88,
                                             height: 88,
                                             fit: BoxFit.cover,
@@ -127,6 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     strokeWidth: 2, color: Colors.white),
                                             errorWidget: (context, url, error) =>
                                                 _buildInitialsAvatar(authProvider),
+                                          ),
                                           )
                                         : _buildInitialsAvatar(authProvider),
                                   ),
@@ -145,6 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       Icons.camera_alt,
                                       size: 16,
                                       color: Colors.white,
+                                      semanticLabel: 'Change profile picture',
                                     ),
                                   ),
                                 ),
@@ -250,12 +256,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (_completionLoaded && _completionPercent < 100)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                    padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, 20, AppSpacing.pagePadding, 0),
                     child: Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(AppSpacing.lg),
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.darkSurface : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
                         border: Border.all(
                           color: AppColors.burundiGreen.withValues(alpha: 0.3),
                         ),
@@ -294,7 +300,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          SizedBox(width: AppSpacing.lg),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Personal Information Section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.xl, AppSpacing.pagePadding, AppSpacing.sm),
                   child: Text(
                     l10n.translate('personal_info'),
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -342,11 +348,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
                   child: Container(
                     decoration: BoxDecoration(
                       color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.05),
@@ -364,6 +370,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           title: Text(l10n.translate('full_name')),
                           subtitle: Text(authProvider.userName ?? 'Not set'),
                           trailing: IconButton(
+                            tooltip: 'Edit name',
                             icon: const Icon(Icons.edit_outlined,
                                 color: AppColors.burundiGreen, size: 20),
                             onPressed: () =>
@@ -384,9 +391,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           leading: const Icon(Icons.phone_outlined,
                               color: AppColors.patternOrange),
                           title: const Text('Phone Number'),
-                          subtitle: Text(authProvider.phoneNumber?.isEmpty ?? true
-                              ? 'Not set' : authProvider.phoneNumber!),
+                          subtitle: Text(_getPhoneLabel(authProvider.phoneNumber)),
                           trailing: IconButton(
+                            tooltip: 'Edit phone number',
                             icon: const Icon(Icons.edit_outlined,
                                 color: AppColors.patternOrange, size: 20),
                             onPressed: () =>
@@ -401,6 +408,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           title: const Text('Gender'),
                           subtitle: Text(_getGenderLabel(authProvider.gender)),
                           trailing: IconButton(
+                            tooltip: 'Edit gender',
                             icon: const Icon(Icons.edit_outlined,
                                 color: AppColors.success, size: 20),
                             onPressed: () =>
@@ -415,6 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           title: const Text('Nationality'),
                           subtitle: Text(_getNationalityLabel(authProvider.nationality)),
                           trailing: IconButton(
+                            tooltip: 'Edit nationality',
                             icon: const Icon(Icons.edit_outlined,
                                 color: AppColors.burundiGreen, size: 20),
                             onPressed: () =>
@@ -429,6 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           title: const Text('Date of Birth'),
                           subtitle: Text(_formatDob(authProvider.dateOfBirth)),
                           trailing: IconButton(
+                            tooltip: 'Edit date of birth',
                             icon: const Icon(Icons.edit_outlined,
                                 color: AppColors.auGold, size: 20),
                             onPressed: () =>
@@ -444,7 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Data & Privacy Section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.xl, AppSpacing.pagePadding, AppSpacing.sm),
                   child: Text(
                     l10n.translate('data_privacy'),
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -458,11 +468,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
                   child: Container(
                     decoration: BoxDecoration(
                       color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.05),
@@ -522,7 +532,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Danger Zone Section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.xl, AppSpacing.pagePadding, AppSpacing.sm),
                   child: Text(
                     l10n.translate('danger_zone'),
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -536,11 +546,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
                   child: Container(
                     decoration: BoxDecoration(
                       color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
                       border: Border.all(
                         color: AppColors.error.withValues(alpha: 0.3),
                       ),
@@ -888,7 +898,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   String _getNationalityLabel(String? code) {
     if (code == null || code.isEmpty) return 'Not set';
-    return AppConstants.nationalityChoices[code] ?? code;
+    final name = AppConstants.nationalityChoices[code] ?? code;
+    final flag = AppConstants.countryFlag(code);
+    return '$flag  $name';
+  }
+
+  String _getPhoneLabel(String? phone) {
+    if (phone == null || phone.isEmpty) return 'Not set';
+    // Try to find the country flag from the dial code prefix
+    for (final entry in AppConstants.countryDialCodes.entries) {
+      if (phone.startsWith(entry.value)) {
+        final flag = AppConstants.countryFlag(entry.key);
+        return '$flag  $phone';
+      }
+    }
+    return phone;
   }
 
   String _formatDob(String? dob) {

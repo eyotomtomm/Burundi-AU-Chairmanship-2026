@@ -19,12 +19,14 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
+  final bool scrollToComments;
 
-  const ArticleDetailScreen({super.key, required this.article});
+  const ArticleDetailScreen({super.key, required this.article, this.scrollToComments = false});
 
   @override
   State<ArticleDetailScreen> createState() => _ArticleDetailScreenState();
@@ -58,6 +60,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   List<Article> _relatedArticles = [];
   bool _loadingRelated = true;
 
+  // Scroll to comments
+  final GlobalKey _commentsSectionKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -85,6 +90,26 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _loadRelatedArticles();
     _loadReadingProgress();
     _scrollController.addListener(_onScroll);
+    if (widget.scrollToComments) {
+      _scheduleScrollToComments();
+    }
+  }
+
+  void _scheduleScrollToComments() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
+      return _loadingComments && mounted;
+    }).then((_) {
+      if (!mounted || _showContinueReading) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _commentsSectionKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic).then((_) {
+            if (mounted) _commentFocusNode.requestFocus();
+          });
+        }
+      });
+    });
   }
 
   @override
@@ -275,6 +300,11 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
       } else {
         await _loadComments();
       }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _postingComment = false);
+        showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _postingComment = false);
@@ -463,7 +493,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   fit: StackFit.expand,
                   children: [
                     CachedNetworkImage(
-                      imageUrl: _article.imageUrl,
+                      imageUrl: _article.mediumUrl.isNotEmpty ? _article.mediumUrl : _article.imageUrl,
+                      memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
                       errorWidget: (_, _, _) => Container(
@@ -532,7 +563,14 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     children: [
                       const Icon(Icons.person_rounded, size: 16, color: AppColors.auGold),
                       const SizedBox(width: 6),
-                      Text(_article.author, style: TextStyle(fontSize: 14, color: AppColors.auGold)),
+                      Flexible(
+                        child: Text(
+                          _article.author,
+                          style: TextStyle(fontSize: 14, color: AppColors.auGold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       const SizedBox(width: 20),
                       const Icon(Icons.schedule_rounded, size: 16, color: AppColors.auGold),
                       const SizedBox(width: 6),
@@ -674,6 +712,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   child: CachedNetworkImage(
                                     imageUrl: m.imageUrl,
+                                    memCacheWidth: 800,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
                                     placeholder: (_, _) => Container(
@@ -805,6 +844,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   const SizedBox(height: 32),
 
                   // Comments section header
+                  SizedBox(key: _commentsSectionKey, height: 0),
                   Row(
                     children: [
                       Icon(Icons.chat_bubble_rounded, size: 20, color: AppColors.auGold),
@@ -958,9 +998,19 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                       final c = _comments[index];
                       return CommentTile.fromMap(
                         c.toMap(),
+                        key: ValueKey(c.id),
                         isReply: false,
                         isAuthenticated: auth.isAuthenticated,
                         onReply: () => _startReply(c),
+                        onPostReply: (content, parentId) async {
+                          try {
+                            await ApiService().postArticleComment(
+                              widget.article.id, content, parentId: parentId);
+                            await _loadComments();
+                          } on ApiException catch (e) {
+                            if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
+                          }
+                        },
                         onDelete: () => _deleteComment(c),
                         onToggleLike: () => ApiService().toggleArticleCommentLike(
                           widget.article.id, c.id),
@@ -970,6 +1020,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           final rc = ArticleComment.fromJson(reply);
                           return CommentTile.fromMap(
                             reply,
+                            key: ValueKey(rc.id),
                             isReply: true,
                             isAuthenticated: auth.isAuthenticated,
                             onDelete: () => _deleteComment(rc),
@@ -998,7 +1049,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         Navigator.push(
           context,
           CupertinoPageRoute(
-            builder: (_) => ArticleDetailScreen(article: article),
+            builder: (_) => ArticleDetailScreen(article: article, scrollToComments: context.read<AuthProvider>().isAuthenticated),
           ),
         );
       },
@@ -1026,7 +1077,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: CachedNetworkImage(
-                imageUrl: article.imageUrl,
+                imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                memCacheWidth: 400,
                 height: 110,
                 width: double.infinity,
                 fit: BoxFit.cover,

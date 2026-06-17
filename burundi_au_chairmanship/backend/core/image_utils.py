@@ -174,6 +174,73 @@ def generate_thumbnails_on_disk(image_path):
     return generated
 
 
+def generate_thumbnails_to_storage(image_field):
+    """
+    Generate multi-size WebP thumbnails and save them via the field's
+    storage backend (works with S3 / DigitalOcean Spaces).
+
+    Downloads the original image into memory, resizes it, and uploads
+    the variants back to the same storage in the same directory.
+
+    Args:
+        image_field: A Django FieldFile / ImageFieldFile with a valid name.
+
+    Returns:
+        dict: Mapping of size name to the storage name of the generated file.
+              e.g. {'thumb': 'hero_slides/photo_thumb.webp', ...}
+              Returns empty dict if processing fails.
+    """
+    if not image_field or not image_field.name:
+        return {}
+
+    generated = {}
+    try:
+        image_field.open('rb')
+        img = Image.open(image_field)
+        img.load()  # force read before closing the file handle
+        image_field.close()
+
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+
+        base, _ext = os.path.splitext(image_field.name)
+        for suffix in ('_thumb', '_medium', '_large'):
+            if base.endswith(suffix):
+                base = base[: -len(suffix)]
+                break
+
+        storage = image_field.storage
+
+        for size_name, max_width in IMAGE_SIZES.items():
+            if img.width <= max_width:
+                resized = img.copy()
+            else:
+                ratio = max_width / img.width
+                new_height = int(img.height * ratio)
+                resized = img.resize((max_width, new_height), Image.LANCZOS)
+
+            quality = 70 if size_name == 'thumb' else 80 if size_name == 'medium' else 85
+            buf = BytesIO()
+            resized.save(buf, format='WEBP', quality=quality, optimize=True)
+            buf.seek(0)
+
+            variant_name = f"{base}_{size_name}.webp"
+            # Overwrite if the variant already exists.
+            if storage.exists(variant_name):
+                storage.delete(variant_name)
+            saved_name = storage.save(variant_name, ContentFile(buf.read()))
+            generated[size_name] = saved_name
+            logger.info("Generated %s variant (remote): %s", size_name, saved_name)
+
+    except Exception:
+        logger.exception(
+            "Failed to generate remote thumbnails for %s",
+            image_field.name if image_field else '(none)',
+        )
+
+    return generated
+
+
 def get_variant_url(image_field, size_name):
     """
     Return the URL of a size variant for a given ImageField value.

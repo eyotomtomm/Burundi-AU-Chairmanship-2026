@@ -433,6 +433,50 @@
                 </div>
             </div>
 
+            <!-- Link to Content -->
+            <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
+                <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
+                    <span class="material-symbols-outlined">link</span>
+                    Link to Content
+                </h2>
+                <p class="text-sm text-on-surface-variant mb-6">
+                    Optionally link this card to specific content. When tapped in the app, the card will open that content directly instead of the default detail page.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Action Type
+                        </label>
+                        <select name="action_type"
+                                id="action_type"
+                                onchange="updateActionValueField()"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                            <option value="none" {% if card.action_type == 'none' or not card.action_type %}selected{% endif %}>No Action (default detail page)</option>
+                            <option value="url" {% if card.action_type == 'url' %}selected{% endif %}>External URL</option>
+                            <option value="route" {% if card.action_type == 'route' %}selected{% endif %}>App Route</option>
+                            <option value="article" {% if card.action_type == 'article' %}selected{% endif %}>Article</option>
+                            <option value="event" {% if card.action_type == 'event' %}selected{% endif %}>Event</option>
+                            <option value="magazine" {% if card.action_type == 'magazine' %}selected{% endif %}>Magazine</option>
+                            <option value="youth_dialogue" {% if card.action_type == 'youth_dialogue' %}selected{% endif %}>Youth Dialogue</option>
+                            <option value="video" {% if card.action_type == 'video' %}selected{% endif %}>Video</option>
+                        </select>
+                    </div>
+
+                    <div id="action_value_wrapper">
+                        <label class="font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold block mb-2">
+                            Action Value
+                        </label>
+                        <input type="text"
+                               name="action_value"
+                               id="action_value"
+                               value="{{ card.action_value }}"
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface">
+                        <p id="action_value_hint" class="text-xs text-on-surface-variant mt-2"></p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Settings -->
             <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
                 <h2 class="font-headline text-2xl font-bold text-on-surface mb-6 flex items-center gap-2">
@@ -644,5 +688,32 @@ function addMediaRow() {
 function removeRow(btn) {
     btn.closest('.dynamic-row').remove();
 }
+
+/* --- Link to Content: dynamic placeholder & visibility --- */
+function updateActionValueField() {
+    const type = document.getElementById('action_type').value;
+    const wrapper = document.getElementById('action_value_wrapper');
+    const input = document.getElementById('action_value');
+    const hint = document.getElementById('action_value_hint');
+
+    const config = {
+        'none':            { hidden: true,  placeholder: '', hint: '' },
+        'url':             { hidden: false, placeholder: 'https://example.com', hint: 'Full URL including https://' },
+        'route':           { hidden: false, placeholder: '/calendar', hint: 'App route path starting with /' },
+        'article':         { hidden: false, placeholder: 'Enter article ID', hint: 'Numeric ID of the article' },
+        'event':           { hidden: false, placeholder: 'Enter event ID', hint: 'Numeric ID of the event' },
+        'magazine':        { hidden: false, placeholder: 'Enter magazine ID', hint: 'Numeric ID of the magazine edition' },
+        'youth_dialogue':  { hidden: true,  placeholder: '', hint: '' },
+        'video':           { hidden: false, placeholder: 'Enter video ID', hint: 'Numeric ID of the video' },
+    };
+
+    const c = config[type] || config['none'];
+    wrapper.style.display = c.hidden ? 'none' : '';
+    input.placeholder = c.placeholder;
+    hint.textContent = c.hint;
+    if (c.hidden) input.value = '';
+}
+
+document.addEventListener('DOMContentLoaded', updateActionValueField);
 </script>
 {% endblock %}

@@ -38,6 +38,7 @@
             <td class="px-6 py-4">
               <p class="font-semibold text-slate-900 text-sm">{{ banner.title }}</p>
               <p class="text-xs text-slate-500 mt-0.5">{{ banner.message|truncatewords:12 }}</p>
+              {% if banner.action_url %}<p class="text-xs text-blue-500 mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-xs">link</span> {{ banner.action_url }}</p>{% elif banner.link_url %}<p class="text-xs text-blue-500 mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-xs">link</span> {{ banner.link_url }}</p>{% endif %}
             </td>
             <td class="px-6 py-4">
               <span class="px-2 py-1 text-xs font-semibold rounded

@@ -7,6 +7,7 @@ WebSocket routes are defined in core.routing.
 import os
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -19,7 +20,9 @@ from core import routing  # noqa: E402 — must be imported after Django setup
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
-    'websocket': AuthMiddlewareStack(
-        URLRouter(routing.websocket_urlpatterns)
+    'websocket': AllowedHostsOriginValidator(
+        AuthMiddlewareStack(
+            URLRouter(routing.websocket_urlpatterns)
+        ),
     ),
 })

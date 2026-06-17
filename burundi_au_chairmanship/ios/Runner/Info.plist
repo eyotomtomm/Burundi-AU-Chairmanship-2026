@@ -75,7 +75,14 @@
 	<string>We need permission to save photos from the app to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to allow you to select photos for your profile.</string>
-	<!-- Certificate pinning for API domain (iOS 14+) -->
+	<!--
+		Certificate pinning for API domain (iOS 14+).
+		Pins the Google Trust Services intermediate and root CAs used by Cloudflare.
+		Same SPKI hashes as Android network_security_config.xml.
+		NOTE: Android pin-set expires 2027-06-01 (graceful fallback). iOS has no
+		expiration — if the CA rotates, a forced app update is required.
+		Set a calendar reminder before 2027-06-01 to re-evaluate both configs.
+	-->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSPinnedDomains</key>
@@ -92,22 +99,6 @@
 						<string>kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=</string>
 					</dict>
 					<!-- GTS Root R4 (root CA) -->
-					<dict>
-						<key>SPKI-SHA256-BASE64</key>
-						<string>mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</string>
-					</dict>
-				</array>
-			</dict>
-			<key>burundi4africa.com</key>
-			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSPinnedCAIdentities</key>
-				<array>
-					<dict>
-						<key>SPKI-SHA256-BASE64</key>
-						<string>kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=</string>
-					</dict>
 					<dict>
 						<key>SPKI-SHA256-BASE64</key>
 						<string>mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</string>

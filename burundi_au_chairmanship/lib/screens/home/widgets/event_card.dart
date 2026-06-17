@@ -51,6 +51,7 @@ class EventCard extends StatelessWidget {
               if (event.eventPoster != null && event.eventPoster!.isNotEmpty)
                 CachedNetworkImage(
                   imageUrl: Environment.fixMediaUrl(event.eventPoster!),
+                  memCacheWidth: 800,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => _greetingGradient(),
                   errorWidget: (context, url, error) => _greetingGradient(),
@@ -239,6 +240,7 @@ class EventCard extends StatelessWidget {
                     if (event.eventPoster != null && event.eventPoster!.isNotEmpty)
                       CachedNetworkImage(
                         imageUrl: Environment.fixMediaUrl(event.eventPoster!),
+                        memCacheWidth: 800,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => _gradientFallback(),
                         errorWidget: (context, url, error) => _gradientFallback(),

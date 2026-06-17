@@ -7,7 +7,9 @@ import '../../models/event_registration_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/haptic_service.dart';
+import '../../services/content_cache_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/translate_button.dart';
 import 'event_detail_screen.dart';
 
@@ -49,7 +51,6 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       if (isAuth) {
         events = await api.getEventRegistrations();
       } else {
-        // Try without auth — API may return public events
         try {
           events = await api.getEventRegistrations();
         } catch (_) {
@@ -58,12 +59,24 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       }
 
       if (!mounted) return;
+      // Cache on success
+      ContentCacheService().cacheEvents(events);
       setState(() {
         _allEvents = events;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
+      // Fall back to cache
+      final cached = ContentCacheService().getEvents();
+      if (cached != null && cached.isNotEmpty) {
+        setState(() {
+          _allEvents = cached;
+          _isLoading = false;
+          _error = null;
+        });
+        return;
+      }
       setState(() { _error = e.toString(); _isLoading = false; });
     }
   }
@@ -120,7 +133,12 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       body: _isLoading
           ? _buildShimmer()
           : _error != null
-              ? _buildError(lang)
+              ? AsyncContentView(
+                  state: AsyncContentState.error,
+                  onRetry: _loadData,
+                  onRefresh: () async => _loadData(),
+                  child: const SizedBox.shrink(),
+                )
               : TabBarView(
                   controller: _tabController,
                   children: [
@@ -220,7 +238,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
         HapticService.light();
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => EventDetailScreen(event: event)),
+          MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: context.read<AuthProvider>().isAuthenticated)),
         );
       },
       child: Opacity(
@@ -249,6 +267,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                       child: CachedNetworkImage(
                         imageUrl: event.eventPoster!,
+                        memCacheWidth: 800,
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,
@@ -555,33 +574,6 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
               ),
             )),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildError(String lang) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 56, color: AppColors.burundiRed.withValues(alpha: 0.6)),
-            const SizedBox(height: 16),
-            Text(
-              lang == 'fr' ? 'Impossible de charger les \u00e9v\u00e9nements' : 'Failed to load events',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _loadData,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: Text(lang == 'fr' ? 'R\u00e9essayer' : 'Retry'),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.burundiGreen),
-            ),
-          ],
         ),
       ),
     );

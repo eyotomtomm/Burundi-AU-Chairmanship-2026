@@ -77,6 +77,16 @@ class Environment {
     return apiUrl;
   }
 
+  /// Get WebSocket base URL derived from the API base URL.
+  /// Result: `wss://burundi4africa.com` (prod) or `ws://localhost:8000` (dev).
+  static String get wsBaseUrl {
+    final api = apiBaseUrl;
+    final base = api.endsWith('/api') ? api.substring(0, api.length - 4) : api;
+    return base
+        .replaceFirst('https://', 'wss://')
+        .replaceFirst('http://', 'ws://');
+  }
+
   /// Base URL for legal/public web pages (privacy policy, terms of service)
   static String get siteBaseUrl {
     switch (current) {

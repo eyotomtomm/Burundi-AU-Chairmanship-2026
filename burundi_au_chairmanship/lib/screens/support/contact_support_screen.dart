@@ -28,11 +28,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-fill email from user profile
+    // Auto-fill email from user profile and pre-fill subject from route argument
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<AuthProvider>();
       if (authProvider.userEmail != null) {
         _emailController.text = authProvider.userEmail!;
+      }
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is String && args.isNotEmpty) {
+        _subjectController.text = args;
       }
     });
   }

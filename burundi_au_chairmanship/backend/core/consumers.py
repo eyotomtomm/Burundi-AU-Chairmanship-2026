@@ -5,11 +5,17 @@ LiveFeedConsumer  - ws/live-feeds/   Broadcasts live feed status changes and vie
 NotificationConsumer - ws/notifications/  Delivers real-time notifications to authenticated users.
 """
 import logging
+import time
 
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.db.models import F
 
 logger = logging.getLogger(__name__)
+
+# Rate-limit: max messages per connection per window
+_RATE_LIMIT_COUNT = 10
+_RATE_LIMIT_WINDOW = 5  # seconds
 
 
 class LiveFeedConsumer(AsyncJsonWebsocketConsumer):
@@ -28,24 +34,63 @@ class LiveFeedConsumer(AsyncJsonWebsocketConsumer):
     GROUP_NAME = 'live_feeds'
 
     async def connect(self):
+        self.user = self.scope.get('user')
+        if self.user is None or self.user.is_anonymous:
+            await self.close(code=4001)
+            return
+
+        self._joined_feeds = set()
+        self._msg_timestamps = []
         await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)
         await self.accept()
-        logger.info("LiveFeed WebSocket connected: %s", self.channel_name)
+        logger.info("LiveFeed WebSocket connected: %s (user=%s)", self.channel_name, self.user.id)
 
     async def disconnect(self, close_code):
+        # Decrement viewer count for every feed this connection was watching
+        for feed_id in self._joined_feeds:
+            feed_group = f'live_feed_{feed_id}'
+            new_count = await self._decrement_viewer_count(feed_id)
+            await self.channel_layer.group_send(feed_group, {
+                'type': 'viewer_count_update',
+                'feed_id': feed_id,
+                'viewer_count': new_count,
+            })
+            await self.channel_layer.group_discard(feed_group, self.channel_name)
+        self._joined_feeds.clear()
         await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)
         logger.info("LiveFeed WebSocket disconnected: %s (code=%s)", self.channel_name, close_code)
 
+    def _is_rate_limited(self):
+        """Return True if this connection is sending messages too fast."""
+        now = time.monotonic()
+        # Purge timestamps outside the window
+        self._msg_timestamps = [
+            t for t in self._msg_timestamps if now - t < _RATE_LIMIT_WINDOW
+        ]
+        if len(self._msg_timestamps) >= _RATE_LIMIT_COUNT:
+            return True
+        self._msg_timestamps.append(now)
+        return False
+
     async def receive_json(self, content, **kwargs):
         """Handle incoming messages from the client."""
+        if self._is_rate_limited():
+            await self.send_json({'type': 'error', 'message': 'Rate limit exceeded.'})
+            return
+
         msg_type = content.get('type')
         feed_id = content.get('feed_id')
 
-        if msg_type == 'join_feed' and feed_id:
-            # Add client to a feed-specific group for targeted updates
+        if not isinstance(feed_id, int) or feed_id <= 0:
+            return
+
+        if msg_type == 'join_feed':
+            # Ignore duplicate joins from the same connection
+            if feed_id in self._joined_feeds:
+                return
+            self._joined_feeds.add(feed_id)
             feed_group = f'live_feed_{feed_id}'
             await self.channel_layer.group_add(feed_group, self.channel_name)
-            # Increment viewer count
             new_count = await self._increment_viewer_count(feed_id)
             await self.channel_layer.group_send(feed_group, {
                 'type': 'viewer_count_update',
@@ -53,10 +98,13 @@ class LiveFeedConsumer(AsyncJsonWebsocketConsumer):
                 'viewer_count': new_count,
             })
 
-        elif msg_type == 'leave_feed' and feed_id:
+        elif msg_type == 'leave_feed':
+            # Only decrement if this connection actually joined that feed
+            if feed_id not in self._joined_feeds:
+                return
+            self._joined_feeds.discard(feed_id)
             feed_group = f'live_feed_{feed_id}'
             await self.channel_layer.group_discard(feed_group, self.channel_name)
-            # Decrement viewer count
             new_count = await self._decrement_viewer_count(feed_id)
             await self.channel_layer.group_send(feed_group, {
                 'type': 'viewer_count_update',
@@ -98,10 +146,10 @@ class LiveFeedConsumer(AsyncJsonWebsocketConsumer):
     def _increment_viewer_count(self, feed_id):
         from .models import LiveFeed
         try:
-            feed = LiveFeed.objects.get(pk=feed_id)
-            feed.viewer_count = max(0, feed.viewer_count + 1)
-            feed.save(update_fields=['viewer_count'])
-            return feed.viewer_count
+            LiveFeed.objects.filter(pk=feed_id).update(
+                viewer_count=F('viewer_count') + 1
+            )
+            return LiveFeed.objects.values_list('viewer_count', flat=True).get(pk=feed_id)
         except LiveFeed.DoesNotExist:
             return 0
 
@@ -109,10 +157,11 @@ class LiveFeedConsumer(AsyncJsonWebsocketConsumer):
     def _decrement_viewer_count(self, feed_id):
         from .models import LiveFeed
         try:
-            feed = LiveFeed.objects.get(pk=feed_id)
-            feed.viewer_count = max(0, feed.viewer_count - 1)
-            feed.save(update_fields=['viewer_count'])
-            return feed.viewer_count
+            # Clamp to zero: only decrement if currently > 0
+            LiveFeed.objects.filter(pk=feed_id, viewer_count__gt=0).update(
+                viewer_count=F('viewer_count') - 1
+            )
+            return LiveFeed.objects.values_list('viewer_count', flat=True).get(pk=feed_id)
         except LiveFeed.DoesNotExist:
             return 0
 

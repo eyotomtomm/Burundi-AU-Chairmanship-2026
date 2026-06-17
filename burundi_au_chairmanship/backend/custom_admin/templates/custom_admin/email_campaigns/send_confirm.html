@@ -1,0 +1,105 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Send Campaign: {{ campaign.name }} - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+  <div class="flex items-center gap-4 mb-8">
+    <a href="{% url 'custom_admin:email_campaign_edit' campaign.pk %}" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+      <span class="material-symbols-outlined text-slate-600 dark:text-slate-300">arrow_back</span>
+    </a>
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Send Campaign</h1>
+      <p class="text-slate-600 dark:text-slate-400 mt-1">{{ campaign.name }}</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left: Details + Actions -->
+    <div class="space-y-6">
+
+      <!-- Campaign summary -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-600">info</span> Summary
+        </h2>
+        <div class="space-y-3 text-sm">
+          <div>
+            <span class="text-slate-500 dark:text-slate-400">Subject:</span>
+            <p class="font-medium text-slate-900 dark:text-white">{{ campaign.subject }}</p>
+          </div>
+          <div>
+            <span class="text-slate-500 dark:text-slate-400">Audience:</span>
+            <p class="font-medium text-slate-900 dark:text-white">{{ campaign.get_audience_type_display }}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-emerald-600">group</span>
+            <span class="text-2xl font-bold text-emerald-600">{{ recipient_count }}</span>
+            <span class="text-slate-600 dark:text-slate-400">recipient(s)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Send / Cancel -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-slate-200 dark:border-slate-700 space-y-4">
+        <div class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-900 dark:text-amber-100 flex items-start gap-2">
+          <span class="material-symbols-outlined text-amber-600 mt-0.5">warning</span>
+          <span>This will send <strong>{{ recipient_count }}</strong> email(s) immediately. This action cannot be undone.</span>
+        </div>
+        <form method="POST" action="{% url 'custom_admin:email_campaign_send' campaign.pk %}">
+          {% csrf_token %}
+          <div class="flex gap-3">
+            <a href="{% url 'custom_admin:email_campaign_edit' campaign.pk %}"
+               class="flex-1 text-center bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-lg py-3 px-4 text-sm hover:bg-slate-50 dark:hover:bg-slate-600">
+              Back to Edit
+            </a>
+            <button type="submit"
+                    class="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold rounded-lg py-3 px-4 text-sm hover:shadow-lg transition-all shadow-sm">
+              <span class="material-symbols-outlined text-sm">send</span> Send Now
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Sender info -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 border border-slate-200 dark:border-slate-700">
+        <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm text-slate-500">alternate_email</span> Sending from
+        </h3>
+        <p class="text-sm text-slate-600 dark:text-slate-400">newsletter@burundichairship.africa</p>
+      </div>
+    </div>
+
+    <!-- Right: Email Preview -->
+    <div class="lg:col-span-2">
+      <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-600">preview</span>
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Email Preview</h2>
+          <span class="text-xs text-slate-500 dark:text-slate-400 ml-2">(sample with first recipient)</span>
+        </div>
+        <div class="p-4 bg-slate-100 dark:bg-slate-900">
+          <div class="bg-white rounded-lg shadow-inner overflow-hidden" style="max-height:700px;overflow-y:auto;">
+            <iframe id="previewFrame" style="width:100%;border:none;min-height:600px;" sandbox="allow-same-origin"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  var html = "{{ preview_html|escapejs }}";
+  var iframe = document.getElementById('previewFrame');
+  iframe.srcdoc = html;
+  iframe.onload = function() {
+    try {
+      iframe.style.height = iframe.contentDocument.documentElement.scrollHeight + 'px';
+    } catch(e) {}
+  };
+})();
+</script>
+{% endblock %}

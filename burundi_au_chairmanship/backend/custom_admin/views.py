@@ -5,15 +5,18 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.parse
 import urllib.request
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User as AuthUser
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpResponse
+from axes.exceptions import AxesBackendRequestParameterRequired
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
@@ -23,6 +26,25 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_csv_value(value):
+    """Neutralize CSV formula injection.
+
+    Any cell whose string representation starts with a formula-trigger
+    character (= + - @ TAB CR LF) is prefixed with an apostrophe so
+    spreadsheet applications treat it as a literal text value.
+    """
+    if isinstance(value, str) and value and value[0] in ('=', '+', '-', '@', '\t', '\r', '\n'):
+        return "'" + value
+    return value
+
+
+def _sanitize_csv_row(row):
+    """Apply formula-injection sanitization to every cell in a CSV row."""
+    return [_sanitize_csv_value(v) for v in row]
+
+
 from core.utils import log_admin_action, compute_model_diff
 from core.models import (
     HeroSlide, FeatureCard, Article, MagazineEdition, Event,
@@ -43,16 +65,21 @@ from core.models import (
     AdminNotification,
     ABTest, ABTestParticipant,
     TranslationRequest, VideoChapter,
-    ArticleComment, EventComment,
+    ArticleComment, EventComment, MagazineComment, LiveFeedComment,
+    VideoComment, GalleryComment, DiscussionReply,
     DeviceToken,
     AppRelease, AppReleaseHighlight,
     ArticleLike,
     NewsletterEdition,
-    YouthDialogueSettings,
+    YouthDialogueEvent,
     YouthDialogueFormField,
     YouthDialogueApplication,
     YouthDialogueDocument,
     YouthDialogueActivityLog,
+    YouthDialogueRole,
+    YouthDialogueMedia,
+    EventPhoto,
+    DeviceBan,
 )
 
 # Email-related views live in custom_admin/email_views.py. Re-exported here so
@@ -66,6 +93,7 @@ from .email_views import (  # noqa: F401
     email_campaign_create,
     email_campaign_edit,
     email_campaign_send,
+    email_campaign_send_confirm,
     email_campaign_delete,
     email_logs_list,
     email_inbox,
@@ -152,26 +180,75 @@ def admin_login(request):
     if request.user.is_authenticated and is_staff(request.user):
         return redirect('custom_admin:dashboard')
 
+    is_locked = False
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
 
-        if user and is_staff(user):
-            login(request, user)
-            # "Remember Me" — keep session for 30 days, otherwise expire on browser close
-            if request.POST.get('remember_me'):
-                request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+        try:
+            user = authenticate(request, username=username, password=password)
+        except AxesBackendRequestParameterRequired:
+            user = None
+
+        if user is None:
+            # Check if this was a lockout (axes returns None for locked accounts)
+            from axes.handlers.proxy import AxesProxyHandler
+            if AxesProxyHandler.is_locked(request):
+                is_locked = True
             else:
-                request.session.set_expiry(0)  # Browser close
-            # Force-save so _session_expiry is persisted before the redirect
+                messages.error(request, 'Invalid credentials or insufficient permissions')
+        elif not is_staff(user):
+            messages.error(request, 'Invalid credentials or insufficient permissions')
+        else:
+            # Password OK — complete login
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            remember_me = bool(request.POST.get('remember_me'))
+            request.session['_staff_session_created'] = time.time()
+            if remember_me:
+                request.session.set_expiry(settings.STAFF_SESSION_MAX_AGE)
+            else:
+                request.session.set_expiry(0)
             request.session.save()
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
+            if hasattr(user, 'profile') and user.profile.force_password_change:
+                return redirect('custom_admin:force_password_change')
             return redirect('custom_admin:dashboard')
-        else:
-            messages.error(request, 'Invalid credentials or insufficient permissions')
 
-    return render(request, 'custom_admin/login.html')
+    return render(request, 'custom_admin/login.html', {'is_locked': is_locked})
+
+
+def axes_lockout_response(request, credentials, *args, **kwargs):
+    """Custom lockout response for django-axes — renders the login page with a lockout warning."""
+    return render(request, 'custom_admin/login.html', {'is_locked': True}, status=403)
+
+
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def force_password_change(request):
+    """Force a user to set a new password before accessing the admin panel."""
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+        if not new_password or len(new_password) < 10:
+            messages.error(request, 'Password must be at least 10 characters.')
+        elif new_password != confirm_password:
+            messages.error(request, 'Passwords do not match.')
+        elif request.user.check_password(new_password):
+            messages.error(request, 'New password must be different from the temporary password.')
+        else:
+            request.user.set_password(new_password)
+            request.user.save()
+            request.user.profile.force_password_change = False
+            request.user.profile.save(update_fields=['force_password_change'])
+            # Re-authenticate so the session stays valid after password change
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, request.user)
+            log_admin_action(request, 'password_change', 'Auth', object_repr=request.user.username)
+            messages.success(request, 'Password changed successfully.')
+            return redirect('custom_admin:dashboard')
+    return render(request, 'custom_admin/force_password_change.html')
 
 
 @login_required(login_url='custom_admin:login')
@@ -1536,12 +1613,15 @@ def users_list(request):
         users = users.filter(is_staff=True)
     elif status_filter == 'verified':
         users = users.filter(profile__is_verified=True)
+    elif status_filter == 'comment_banned':
+        users = users.filter(profile__is_comment_banned=True)
 
     total_count = User.objects.count()
     active_count = User.objects.filter(is_active=True).count()
     blocked_count = User.objects.filter(is_active=False).count()
     staff_count = User.objects.filter(is_staff=True).count()
     verified_count = UserProfile.objects.filter(is_verified=True).count()
+    comment_banned_count = UserProfile.objects.filter(is_comment_banned=True).count()
     pending_verifications = VerificationRequest.objects.filter(status='pending').count()
 
     paginator = Paginator(users, 20)
@@ -1554,6 +1634,7 @@ def users_list(request):
         'blocked_count': blocked_count,
         'staff_count': staff_count,
         'verified_count': verified_count,
+        'comment_banned_count': comment_banned_count,
         'pending_verifications': pending_verifications,
         'current_filter': status_filter or 'all',
     })
@@ -1595,6 +1676,12 @@ def user_create(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def user_edit(request, pk):
     target_user = get_object_or_404(User, pk=pk)
+
+    # Only superusers may edit other superuser or staff accounts
+    if (target_user.is_superuser or target_user.is_staff) and not request.user.is_superuser:
+        messages.error(request, 'Only superusers can edit staff or superuser accounts.')
+        return redirect('custom_admin:users_list')
+
     profile = getattr(target_user, 'profile', None)
     if not profile:
         profile = UserProfile.objects.create(user=target_user)
@@ -1621,16 +1708,20 @@ def user_edit(request, pk):
         profile.is_verified = request.POST.get('is_verified') == 'on'
         profile.badge_type = request.POST.get('badge_type') or None
         profile.is_government_official = request.POST.get('is_government_official') == 'on'
+        profile.is_usher = request.POST.get('is_usher') == 'on'
         profile.save()
 
         messages.success(request, f'User "{target_user.username}" updated successfully!')
         return redirect('custom_admin:users_list')
 
     verification_requests = VerificationRequest.objects.filter(user=target_user).order_by('-created_at')
+    from core.models import ProfanityStrikeLog
+    strike_logs = ProfanityStrikeLog.objects.filter(user=target_user).order_by('-created_at')[:20]
     return render(request, 'custom_admin/users/form.html', {
         'target_user': target_user,
         'profile': profile,
         'verification_requests': verification_requests,
+        'strike_logs': strike_logs,
         'action': 'Edit',
     })
 
@@ -1642,6 +1733,10 @@ def user_toggle_active(request, pk):
     target_user = get_object_or_404(User, pk=pk)
     if target_user == request.user:
         messages.error(request, 'You cannot block yourself.')
+        return redirect('custom_admin:users_list')
+    # Only superusers may toggle staff/superuser accounts
+    if (target_user.is_superuser or target_user.is_staff) and not request.user.is_superuser:
+        messages.error(request, 'Only superusers can modify staff or superuser accounts.')
         return redirect('custom_admin:users_list')
     old_active = target_user.is_active
     target_user.is_active = not target_user.is_active
@@ -1751,6 +1846,13 @@ def admin_invite(request):
         user.is_staff = True
         user.is_superuser = (role == 'superuser')
         user.save()
+
+        # Force the invited user to change their password on first login
+        try:
+            user.profile.force_password_change = True
+            user.profile.save(update_fields=['force_password_change'])
+        except Exception:
+            pass
 
         # Save per-section permissions (staff only; superusers have full access)
         from .permissions import SECTION_KEYS
@@ -2123,6 +2225,8 @@ def feature_card_create(request):
             overview_fr=request.POST.get('overview_fr', ''),
             extra_content=request.POST.get('extra_content', ''),
             extra_content_fr=request.POST.get('extra_content_fr', ''),
+            action_type=request.POST.get('action_type', 'none'),
+            action_value=request.POST.get('action_value', ''),
             order=request.POST.get('order', 0),
             is_active=request.POST.get('is_active') == 'on',
         )
@@ -2157,6 +2261,8 @@ def feature_card_edit(request, pk):
         card.extra_content = request.POST.get('extra_content', '')
         card.extra_content_fr = request.POST.get('extra_content_fr', '')
         card.order = request.POST.get('order', 0)
+        card.action_type = request.POST.get('action_type', 'none')
+        card.action_value = request.POST.get('action_value', '')
         card.is_active = request.POST.get('is_active') == 'on'
         card.save()
         _save_feature_card_children(request, card)
@@ -2283,6 +2389,32 @@ def _save_form_fields(request, reg):
         RegistrationFormField.objects.filter(pk__in=to_delete).delete()
 
 
+def _save_event_photos(request, reg):
+    """Handle photo uploads and deletions for an event registration."""
+    # Delete photos marked for removal
+    delete_ids = request.POST.getlist('delete_photo')
+    if delete_ids:
+        EventPhoto.objects.filter(
+            pk__in=delete_ids, event_registration=reg
+        ).delete()
+
+    # Save new photo uploads
+    idx = 0
+    while True:
+        photo_file = request.FILES.get(f'event_photo_{idx}')
+        if photo_file is None:
+            break
+        caption = request.POST.get(f'event_photo_caption_{idx}', '')
+        EventPhoto.objects.create(
+            user=request.user,
+            event_registration=reg,
+            image=photo_file,
+            caption=caption,
+            is_approved=True,
+        )
+        idx += 1
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @_catch_upload_errors
@@ -2318,13 +2450,14 @@ def event_registration_create(request):
             order=request.POST.get('order') or 0,
         )
         _save_form_fields(request, reg)
+        _save_event_photos(request, reg)
         messages.success(request, 'Event created successfully!')
         return redirect('custom_admin:event_registrations_list')
     import json as _json
     return render(request, 'custom_admin/event_registrations/form.html', {
         'action': 'Create',
         'categories': EventCategory.objects.filter(is_active=True),
-        'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)),
+        'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)).replace('<', '\\u003c'),
     })
 
 
@@ -2364,6 +2497,7 @@ def event_registration_edit(request, pk):
         reg.order = request.POST.get('order') or 0
         reg.save()
         _save_form_fields(request, reg)
+        _save_event_photos(request, reg)
         messages.success(request, 'Event updated successfully!')
         return redirect('custom_admin:event_registrations_list')
 
@@ -2374,12 +2508,14 @@ def event_registration_edit(request, pk):
         'placeholder', 'placeholder_fr', 'is_required', 'is_active',
         'options', 'help_text', 'help_text_fr', 'validation_regex', 'order',
     ))
+    existing_photos = list(reg.user_photos.order_by('-created_at').values('id', 'image', 'caption'))
     return render(request, 'custom_admin/event_registrations/form.html', {
         'reg': reg,
         'action': 'Edit',
         'categories': EventCategory.objects.filter(is_active=True),
-        'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)),
-        'existing_fields_json': _json.dumps(existing_fields, default=str),
+        'field_type_choices': _json.dumps(list(RegistrationFormField.FIELD_TYPE_CHOICES)).replace('<', '\\u003c'),
+        'existing_fields_json': _json.dumps(existing_fields, default=str).replace('<', '\\u003c'),
+        'existing_photos': existing_photos,
     })
 
 
@@ -2410,7 +2546,7 @@ def event_registration_submissions(request, pk):
                         all_keys.append(k)
 
         writer = _csv.writer(response)
-        header = ['#', 'User', 'Email', 'Status', 'Submitted At', 'Is Proxy', 'Proxy Name', 'Proxy Email', 'Proxy Phone']
+        header = ['#', 'User', 'Email', 'Status', 'Submitted At', 'Is Proxy', 'Proxy Name', 'Proxy Email', 'Proxy Email Verified', 'Proxy Phone']
         header += [field_map.get(k, k.replace('_', ' ').title()) for k in all_keys]
         writer.writerow(header)
         for i, sub in enumerate(qs, 1):
@@ -2423,6 +2559,7 @@ def event_registration_submissions(request, pk):
                 'Yes' if sub.is_proxy else 'No',
                 sub.proxy_name or '',
                 sub.proxy_email or '',
+                'Yes' if sub.proxy_email_verified else ('No' if sub.is_proxy else ''),
                 sub.proxy_phone or '',
             ]
             for k in all_keys:
@@ -2430,7 +2567,7 @@ def event_registration_submissions(request, pk):
                 if isinstance(val, list):
                     val = ', '.join(str(v) for v in val)
                 row.append(val)
-            writer.writerow(row)
+            writer.writerow(_sanitize_csv_row(row))
         return response
 
     paginator = Paginator(qs, 20)
@@ -2545,6 +2682,36 @@ def event_submission_review(request, pk):
                 except Exception:
                     pass  # Don't fail the review if email fails
 
+            # Send push notification to the user's device(s)
+            try:
+                import firebase_admin.messaging as fcm_messaging
+                event_title = submission.event_registration.event_title
+                tokens = set(
+                    DeviceToken.objects.filter(
+                        user=submission.user, is_active=True,
+                    ).exclude(token='').values_list('token', flat=True)
+                )
+                legacy = UserProfile.objects.filter(
+                    user=submission.user, fcm_token__isnull=False,
+                ).exclude(fcm_token='').values_list('fcm_token', flat=True).first()
+                if legacy:
+                    tokens.add(legacy)
+                for tok in tokens:
+                    fcm_messaging.send(fcm_messaging.Message(
+                        token=tok,
+                        notification=fcm_messaging.Notification(
+                            title='Registration Approved',
+                            body=f'Your registration for {event_title} has been approved.',
+                        ),
+                        data={
+                            'action_type': 'route',
+                            'action_value': '/events',
+                            'type': 'event',
+                        },
+                    ))
+            except Exception:
+                pass  # Push is best-effort — don't fail the review
+
         elif action == 'reject':
             submission.status = 'rejected'
             submission.admin_notes = request.POST.get('admin_notes', '')
@@ -2620,6 +2787,36 @@ def event_submission_review(request, pk):
                     )
                 except Exception:
                     pass  # Don't fail the review if email fails
+
+            # Send push notification to the user's device(s)
+            try:
+                import firebase_admin.messaging as fcm_messaging
+                event_title = submission.event_registration.event_title
+                tokens = set(
+                    DeviceToken.objects.filter(
+                        user=submission.user, is_active=True,
+                    ).exclude(token='').values_list('token', flat=True)
+                )
+                legacy = UserProfile.objects.filter(
+                    user=submission.user, fcm_token__isnull=False,
+                ).exclude(fcm_token='').values_list('fcm_token', flat=True).first()
+                if legacy:
+                    tokens.add(legacy)
+                for tok in tokens:
+                    fcm_messaging.send(fcm_messaging.Message(
+                        token=tok,
+                        notification=fcm_messaging.Notification(
+                            title='Registration Not Approved',
+                            body=f'Your registration for {event_title} was not approved. Open the app for details.',
+                        ),
+                        data={
+                            'action_type': 'route',
+                            'action_value': '/events',
+                            'type': 'event',
+                        },
+                    ))
+            except Exception:
+                pass  # Push is best-effort — don't fail the review
 
         return redirect('custom_admin:event_registration_submissions', pk=submission.event_registration.pk)
 
@@ -3289,6 +3486,10 @@ def app_settings(request):
         settings.play_store_url = request.POST.get('play_store_url', '')
         settings.app_store_id = request.POST.get('app_store_id', '')
         settings.play_store_id = request.POST.get('play_store_id', '')
+        settings.countdown_enabled = request.POST.get('countdown_enabled') == 'on'
+        settings.countdown_label = request.POST.get('countdown_label', '')
+        settings.countdown_label_fr = request.POST.get('countdown_label_fr', '')
+        settings.countdown_target_date = request.POST.get('countdown_target_date') or None
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')
@@ -3709,13 +3910,14 @@ def analytics_dashboard(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def analytics_export_pdf(request):
     """Admin dashboard PDF export route."""
     from core.analytics_views import generate_analytics_pdf
     from core.models import AuditLogEntry
 
-    report_type = request.GET.get('report_type', 'marketing')
-    month_str = request.GET.get('month', '')
+    report_type = request.POST.get('report_type', 'marketing')
+    month_str = request.POST.get('month', '')
 
     if report_type not in ('marketing', 'technical', 'diplomacy'):
         from django.http import HttpResponseBadRequest
@@ -4149,6 +4351,9 @@ def announcement_create(request):
             message_fr=request.POST.get('message_fr', ''),
             banner_type=request.POST.get('banner_type', 'info'),
             link_url=request.POST.get('link_url', ''),
+            action_url=request.POST.get('action_url', ''),
+            action_text=request.POST.get('action_text', ''),
+            action_text_fr=request.POST.get('action_text_fr', ''),
             is_dismissible=request.POST.get('is_dismissible') == 'on',
             is_active=request.POST.get('is_active') == 'on',
             starts_at=request.POST.get('starts_at') or None,
@@ -4170,6 +4375,9 @@ def announcement_edit(request, pk):
         banner.message_fr = request.POST.get('message_fr', '')
         banner.banner_type = request.POST.get('banner_type', 'info')
         banner.link_url = request.POST.get('link_url', '')
+        banner.action_url = request.POST.get('action_url', '')
+        banner.action_text = request.POST.get('action_text', '')
+        banner.action_text_fr = request.POST.get('action_text_fr', '')
         banner.is_dismissible = request.POST.get('is_dismissible') == 'on'
         banner.is_active = request.POST.get('is_active') == 'on'
         banner.starts_at = request.POST.get('starts_at') or None
@@ -4450,8 +4658,8 @@ def promotional_splash_create(request):
     if request.method == 'POST':
         from django.utils.dateparse import parse_datetime
         from django.utils.timezone import make_aware, is_naive
-        starts_at_str = request.POST.get('starts_at', '')
-        ends_at_str = request.POST.get('ends_at', '')
+        starts_at_str = request.POST.get('starts_at', '').replace('T', ' ')
+        ends_at_str = request.POST.get('ends_at', '').replace('T', ' ')
         starts_at_dt = parse_datetime(starts_at_str)
         ends_at_dt = parse_datetime(ends_at_str)
         if not starts_at_dt or not ends_at_dt:
@@ -4490,8 +4698,8 @@ def promotional_splash_edit(request, pk):
     if request.method == 'POST':
         from django.utils.dateparse import parse_datetime
         from django.utils.timezone import make_aware, is_naive
-        starts_at_str = request.POST.get('starts_at', '')
-        ends_at_str = request.POST.get('ends_at', '')
+        starts_at_str = request.POST.get('starts_at', '').replace('T', ' ')
+        ends_at_str = request.POST.get('ends_at', '').replace('T', ' ')
         starts_at_dt = parse_datetime(starts_at_str)
         ends_at_dt = parse_datetime(ends_at_str)
         if not starts_at_dt or not ends_at_dt:
@@ -4583,7 +4791,7 @@ def admin_audit_log(request):
         writer = csv.writer(response)
         writer.writerow(['Timestamp', 'User', 'Action', 'Model', 'Object ID', 'Object', 'Changes', 'IP Address', 'Path'])
         for log in logs[:5000]:  # Limit export to 5000 rows
-            writer.writerow([
+            writer.writerow(_sanitize_csv_row([
                 log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else '',
                 log.user.username if log.user else 'System',
                 log.action_type,
@@ -4593,7 +4801,7 @@ def admin_audit_log(request):
                 json.dumps(log.changes) if log.changes else '',
                 log.ip_address or '',
                 log.path or '',
-            ])
+            ]))
         return response
 
     # Get distinct values for filter dropdowns
@@ -4774,11 +4982,28 @@ def _search_admin_menus(query, user, limit=10):
     return items
 
 
-@login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
+def _user_allowed_sections(user):
+    """Return the set of section keys the user may access.
+
+    Superusers get None (meaning *all*); regular staff get their explicit list.
+    """
+    if user.is_superuser:
+        return None  # sentinel: unrestricted
+    try:
+        return set(user.profile.admin_sections or [])
+    except Exception:
+        return set()
+
+
 def admin_global_search(request):
-    """Full-page search results view."""
+    """Full-page search results view.
+
+    Results are scoped to sections the caller has access to so that a
+    staff user scoped to, say, 'Weather' cannot discover user records,
+    support tickets, or other data outside their remit.
+    """
     query = request.GET.get('q', '').strip()
+    allowed = _user_allowed_sections(request.user)
     results = {
         'menus': [],
         'users': [],
@@ -4791,44 +5016,51 @@ def admin_global_search(request):
 
     if query and len(query) >= 2:
         results['menus'] = _search_admin_menus(query, request.user, limit=20)
-        results['users'] = User.objects.filter(
-            Q(username__icontains=query) |
-            Q(email__icontains=query) |
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
-        ).select_related('profile')[:20]
 
-        results['articles'] = Article.objects.filter(
-            Q(title__icontains=query) |
-            Q(title_fr__icontains=query) |
-            Q(content__icontains=query) |
-            Q(author__icontains=query)
-        )[:20]
+        if allowed is None or 'users_list' in allowed:
+            results['users'] = User.objects.filter(
+                Q(username__icontains=query) |
+                Q(email__icontains=query) |
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query)
+            ).select_related('profile')[:20]
 
-        results['events'] = Event.objects.filter(
-            Q(name__icontains=query) |
-            Q(name_fr__icontains=query) |
-            Q(description__icontains=query) |
-            Q(address__icontains=query)
-        )[:20]
+        if allowed is None or 'articles_list' in allowed:
+            results['articles'] = Article.objects.filter(
+                Q(title__icontains=query) |
+                Q(title_fr__icontains=query) |
+                Q(content__icontains=query) |
+                Q(author__icontains=query)
+            )[:20]
 
-        results['magazines'] = MagazineEdition.objects.filter(
-            Q(title__icontains=query) |
-            Q(title_fr__icontains=query) |
-            Q(description__icontains=query)
-        )[:20]
+        if allowed is None or 'events_list' in allowed:
+            results['events'] = Event.objects.filter(
+                Q(name__icontains=query) |
+                Q(name_fr__icontains=query) |
+                Q(description__icontains=query) |
+                Q(address__icontains=query)
+            )[:20]
 
-        results['tickets'] = SupportTicket.objects.filter(
-            Q(subject__icontains=query) |
-            Q(user__username__icontains=query) |
-            Q(user__email__icontains=query)
-        ).select_related('user')[:20]
+        if allowed is None or 'magazines_list' in allowed:
+            results['magazines'] = MagazineEdition.objects.filter(
+                Q(title__icontains=query) |
+                Q(title_fr__icontains=query) |
+                Q(description__icontains=query)
+            )[:20]
 
-        results['videos'] = Video.objects.filter(
-            Q(title__icontains=query) |
-            Q(title_fr__icontains=query) |
-            Q(description__icontains=query)
-        )[:20]
+        if allowed is None or 'support_tickets_list' in allowed:
+            results['tickets'] = SupportTicket.objects.filter(
+                Q(subject__icontains=query) |
+                Q(user__username__icontains=query) |
+                Q(user__email__icontains=query)
+            ).select_related('user')[:20]
+
+        if allowed is None or 'videos_list' in allowed:
+            results['videos'] = Video.objects.filter(
+                Q(title__icontains=query) |
+                Q(title_fr__icontains=query) |
+                Q(description__icontains=query)
+            )[:20]
 
     total_results = sum(len(v) for v in results.values())
 
@@ -4854,6 +5086,9 @@ def admin_global_search_api(request):
     max_per_category = 5
     max_total = 20
 
+    # Section-scope: only return categories the caller is allowed to see
+    allowed = _user_allowed_sections(request.user)
+
     # --- Navigation (sidebar menus) ---
     menu_items = _search_admin_menus(query, request.user, limit=max_per_category)
     if menu_items:
@@ -4861,27 +5096,28 @@ def admin_global_search_api(request):
         total_count += len(menu_items)
 
     # --- Users ---
-    users = User.objects.filter(
-        Q(username__icontains=query) |
-        Q(email__icontains=query) |
-        Q(first_name__icontains=query) |
-        Q(last_name__icontains=query)
-    )[:max_per_category]
-    if users:
-        items = []
-        for u in users:
-            full_name = f"{u.first_name} {u.last_name}".strip()
-            items.append({
-                'title': u.username,
-                'subtitle': full_name if full_name else u.email,
-                'url': f'/admin/users/{u.pk}/edit/',
-                'icon': 'person',
-            })
-        categories.append({'category': 'Users', 'items': items})
-        total_count += len(items)
+    if allowed is None or 'users_list' in allowed:
+        users = User.objects.filter(
+            Q(username__icontains=query) |
+            Q(email__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query)
+        )[:max_per_category]
+        if users:
+            items = []
+            for u in users:
+                full_name = f"{u.first_name} {u.last_name}".strip()
+                items.append({
+                    'title': u.username,
+                    'subtitle': full_name if full_name else u.email,
+                    'url': f'/admin/users/{u.pk}/edit/',
+                    'icon': 'person',
+                })
+            categories.append({'category': 'Users', 'items': items})
+            total_count += len(items)
 
     # --- Articles ---
-    if total_count < max_total:
+    if total_count < max_total and (allowed is None or 'articles_list' in allowed):
         articles = Article.objects.filter(
             Q(title__icontains=query) |
             Q(title_fr__icontains=query)
@@ -4899,7 +5135,7 @@ def admin_global_search_api(request):
             total_count += len(items)
 
     # --- Events ---
-    if total_count < max_total:
+    if total_count < max_total and (allowed is None or 'events_list' in allowed):
         events = Event.objects.filter(
             Q(name__icontains=query) |
             Q(name_fr__icontains=query)
@@ -4918,7 +5154,7 @@ def admin_global_search_api(request):
             total_count += len(items)
 
     # --- Magazines ---
-    if total_count < max_total:
+    if total_count < max_total and (allowed is None or 'magazines_list' in allowed):
         magazines = MagazineEdition.objects.filter(
             Q(title__icontains=query) |
             Q(title_fr__icontains=query)
@@ -4939,7 +5175,7 @@ def admin_global_search_api(request):
             total_count += len(items)
 
     # --- Support Tickets ---
-    if total_count < max_total:
+    if total_count < max_total and (allowed is None or 'support_tickets_list' in allowed):
         tickets = SupportTicket.objects.filter(
             Q(subject__icontains=query) |
             Q(user__username__icontains=query) |
@@ -4958,7 +5194,7 @@ def admin_global_search_api(request):
             total_count += len(items)
 
     # --- Videos ---
-    if total_count < max_total:
+    if total_count < max_total and (allowed is None or 'videos_list' in allowed):
         videos = Video.objects.filter(
             Q(title__icontains=query) |
             Q(title_fr__icontains=query)
@@ -4987,6 +5223,7 @@ def admin_global_search_api(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def export_users_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
@@ -5001,7 +5238,7 @@ def export_users_csv(request):
     users = User.objects.all().select_related('profile').order_by('-date_joined')
     for user in users:
         profile = getattr(user, 'profile', None)
-        writer.writerow([
+        writer.writerow(_sanitize_csv_row([
             user.id,
             user.username,
             user.email,
@@ -5015,7 +5252,7 @@ def export_users_csv(request):
             profile.nationality if profile else '',
             profile.gender if profile else '',
             profile.is_verified if profile else False,
-        ])
+        ]))
 
     # Log the export (both old AuditLogEntry and new AdminActivityLog)
     AuditLogEntry.objects.create(
@@ -5032,6 +5269,7 @@ def export_users_csv(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def export_analytics_csv(request):
     from datetime import timedelta
 
@@ -5074,7 +5312,7 @@ def export_analytics_csv(request):
         .order_by('-count')[:20]
     )
     for entry in nationality_data:
-        writer.writerow([entry['nationality'], entry['count']])
+        writer.writerow(_sanitize_csv_row([entry['nationality'], entry['count']]))
     writer.writerow([])
 
     # Content engagement
@@ -5574,7 +5812,7 @@ def activity_log(request):
         writer = csv.writer(response)
         writer.writerow(['Timestamp', 'Admin', 'Action', 'Model', 'Object ID', 'Object', 'IP Address', 'Path', 'Changes'])
         for log in logs[:5000]:  # Limit CSV rows
-            writer.writerow([
+            writer.writerow(_sanitize_csv_row([
                 log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 log.user.username if log.user else 'Unknown',
                 log.get_action_type_display(),
@@ -5584,7 +5822,7 @@ def activity_log(request):
                 log.ip_address or '',
                 log.path,
                 json_mod.dumps(log.changes) if log.changes else '',
-            ])
+            ]))
         return response
 
     # ── Filter dropdown data ──
@@ -5800,6 +6038,7 @@ def segment_preview(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def segment_export(request, pk):
     """Export segment members as a CSV download."""
     segment = get_object_or_404(UserSegment, pk=pk)
@@ -5813,7 +6052,7 @@ def segment_export(request, pk):
 
     for user in users:
         profile = getattr(user, 'profile', None)
-        writer.writerow([
+        writer.writerow(_sanitize_csv_row([
             user.username,
             user.email,
             user.first_name,
@@ -5824,7 +6063,7 @@ def segment_export(request, pk):
             user.date_joined.strftime('%Y-%m-%d %H:%M'),
             'Yes' if profile and profile.is_email_verified else 'No',
             'Yes' if user.is_active else 'No',
-        ])
+        ]))
 
     return response
 
@@ -6327,6 +6566,7 @@ def _format_file_size(size_bytes):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def download_backup(request, pk):
     """Serve a backup file for download."""
     import os
@@ -7393,6 +7633,17 @@ def webhook_create(request):
                 'event_choices': event_choices, 'selected_events': events,
             })
 
+        # SSRF guard: reject URLs targeting private/internal networks
+        from core.webhooks import _validate_webhook_url
+        try:
+            _validate_webhook_url(url)
+        except ValueError as e:
+            messages.error(request, f'Invalid webhook URL: {e}')
+            return render(request, 'custom_admin/webhooks/form.html', {
+                'action': 'Create', 'webhook': None,
+                'event_choices': event_choices, 'selected_events': events,
+            })
+
         Webhook.objects.create(
             name=name,
             url=url,
@@ -7434,6 +7685,18 @@ def webhook_edit(request, pk):
             if k:
                 custom_headers[k] = v
         webhook.custom_headers = custom_headers
+
+        # SSRF guard: reject URLs targeting private/internal networks
+        from core.webhooks import _validate_webhook_url
+        try:
+            _validate_webhook_url(webhook.url)
+        except ValueError as e:
+            messages.error(request, f'Invalid webhook URL: {e}')
+            selected_events = webhook.events if isinstance(webhook.events, list) else []
+            return render(request, 'custom_admin/webhooks/form.html', {
+                'action': 'Edit', 'webhook': webhook,
+                'event_choices': event_choices, 'selected_events': selected_events,
+            })
 
         webhook.save()
         messages.success(request, f'Webhook "{webhook.name}" updated successfully.')
@@ -7589,55 +7852,95 @@ def translation_queue_update(request, pk):
 # ==============================================================
 
 
+COMMENT_MODEL_MAP = {
+    'article': ArticleComment,
+    'event': EventComment,
+    'magazine': MagazineComment,
+    'livefeed': LiveFeedComment,
+    'video': VideoComment,
+    'gallery': GalleryComment,
+    'discussion': DiscussionReply,
+}
+
+# (Model, type_key, content_fk, title_accessor, user_field)
+_COMMENT_SOURCES = [
+    (ArticleComment, 'article', 'article', lambda c: c.article.title, 'user'),
+    (EventComment, 'event', 'event', lambda c: c.event.name, 'user'),
+    (MagazineComment, 'magazine', 'edition', lambda c: c.edition.title, 'user'),
+    (LiveFeedComment, 'livefeed', 'feed', lambda c: c.feed.title, 'user'),
+    (VideoComment, 'video', 'video', lambda c: c.video.title, 'user'),
+    (GalleryComment, 'gallery', 'album', lambda c: c.album.title, 'user'),
+    (DiscussionReply, 'discussion', 'discussion', lambda c: c.discussion.title, 'author'),
+]
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def comments_list(request):
-    """List all comments across articles and events with filters."""
+    """List all comments across all 7 content types with filters."""
     content_filter = request.GET.get('type', 'all')
     search_query = request.GET.get('q', '').strip()
-    article_qs = ArticleComment.objects.select_related('user', 'article').all()
-    event_qs = EventComment.objects.select_related('user', 'event').all()
-    if search_query:
-        article_qs = article_qs.filter(
-            Q(content__icontains=search_query)
-            | Q(user__username__icontains=search_query)
-            | Q(article__title__icontains=search_query)
-        )
-        event_qs = event_qs.filter(
-            Q(content__icontains=search_query)
-            | Q(user__username__icontains=search_query)
-            | Q(event__name__icontains=search_query)
-        )
-    total_article = article_qs.count()
-    total_event = event_qs.count()
-    total_all = total_article + total_event
-    if content_filter == 'articles':
-        event_qs = EventComment.objects.none()
-    elif content_filter == 'events':
-        article_qs = ArticleComment.objects.none()
+
+    # Build querysets for each type with search filtering
+    type_counts = {}
+    querysets = {}
+    for model, type_key, content_fk, title_fn, user_field in _COMMENT_SOURCES:
+        qs = model.objects.select_related(user_field, content_fk).all()
+        if search_query:
+            q_filter = (
+                Q(content__icontains=search_query)
+                | Q(**{f'{user_field}__username__icontains': search_query})
+                | Q(**{f'{user_field}__first_name__icontains': search_query})
+                | Q(**{f'{user_field}__last_name__icontains': search_query})
+            )
+            # Add content title search
+            if content_fk == 'event':
+                q_filter |= Q(event__name__icontains=search_query)
+            elif content_fk == 'edition':
+                q_filter |= Q(edition__title__icontains=search_query)
+            elif content_fk == 'feed':
+                q_filter |= Q(feed__title__icontains=search_query)
+            elif content_fk == 'album':
+                q_filter |= Q(album__title__icontains=search_query)
+            else:
+                q_filter |= Q(**{f'{content_fk}__title__icontains': search_query})
+            qs = qs.filter(q_filter)
+        type_counts[type_key] = qs.count()
+        querysets[type_key] = qs
+
+    total_all = sum(type_counts.values())
+
+    # Build unified list based on filter
     unified = []
-    for c in article_qs:
-        unified.append({
-            'pk': c.pk, 'content': c.content, 'user': c.user,
-            'content_type': 'article', 'content_title': c.article.title,
-            'content_pk': c.article.pk, 'created_at': c.created_at,
-            'is_approved': True,
-        })
-    for c in event_qs:
-        unified.append({
-            'pk': c.pk, 'content': c.content, 'user': c.user,
-            'content_type': 'event', 'content_title': c.event.name,
-            'content_pk': c.event.pk, 'created_at': c.created_at,
-            'is_approved': c.is_approved,
-        })
+    for model, type_key, content_fk, title_fn, user_field in _COMMENT_SOURCES:
+        if content_filter != 'all' and content_filter != type_key:
+            continue
+        for c in querysets[type_key]:
+            user = getattr(c, user_field)
+            profile = getattr(user, 'profile', None)
+            content_obj = getattr(c, content_fk)
+            unified.append({
+                'pk': c.pk,
+                'content': c.content,
+                'user': user,
+                'content_type': type_key,
+                'content_title': title_fn(c),
+                'content_pk': content_obj.pk,
+                'created_at': c.created_at,
+                'is_banned': getattr(profile, 'is_comment_banned', False),
+                'reference_id': getattr(profile, 'reference_id', ''),
+            })
+
     unified.sort(key=lambda x: x['created_at'], reverse=True)
     paginator = Paginator(unified, 25)
     page = request.GET.get('page')
     comments_page = paginator.get_page(page)
     return render(request, 'custom_admin/comments/list.html', {
-        'comments': comments_page, 'total_all': total_all,
-        'total_article': total_article, 'total_event': total_event,
-        'current_filter': content_filter, 'search_query': search_query,
+        'comments': comments_page,
+        'total_all': total_all,
+        'type_counts': type_counts,
+        'current_filter': content_filter,
+        'search_query': search_query,
     })
 
 
@@ -7645,16 +7948,17 @@ def comments_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def comment_delete(request, pk):
-    """Delete a specific comment (article or event)."""
+    """Delete a specific comment of any type."""
     comment_type = request.POST.get('comment_type', 'article')
-    if comment_type == 'event':
-        comment = get_object_or_404(EventComment, pk=pk)
-        label = f'event comment by {comment.user.username}'
-    else:
-        comment = get_object_or_404(ArticleComment, pk=pk)
-        label = f'article comment by {comment.user.username}'
+    model = COMMENT_MODEL_MAP.get(comment_type)
+    if not model:
+        messages.error(request, 'Invalid comment type.')
+        return redirect('custom_admin:comments_list')
+    comment = get_object_or_404(model, pk=pk)
+    user_field = 'author' if comment_type == 'discussion' else 'user'
+    username = getattr(comment, user_field).username
     comment.delete()
-    messages.success(request, f'Comment deleted: {label}')
+    messages.success(request, f'Deleted {comment_type} comment by {username}.')
     return redirect('custom_admin:comments_list')
 
 
@@ -7662,22 +7966,69 @@ def comment_delete(request, pk):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def comment_bulk_delete(request):
-    """Bulk delete selected comments."""
-    article_ids = request.POST.getlist('article_comment_ids')
-    event_ids = request.POST.getlist('event_comment_ids')
+    """Bulk delete selected comments across all types."""
     deleted_count = 0
-    if article_ids:
-        pks = [int(x) for x in article_ids if x.isdigit()]
-        count, _ = ArticleComment.objects.filter(pk__in=pks).delete()
-        deleted_count += count
-    if event_ids:
-        pks = [int(x) for x in event_ids if x.isdigit()]
-        count, _ = EventComment.objects.filter(pk__in=pks).delete()
-        deleted_count += count
+    for type_key, model in COMMENT_MODEL_MAP.items():
+        ids = request.POST.getlist(f'{type_key}_ids')
+        if ids:
+            pks = [int(x) for x in ids if x.isdigit()]
+            count, _ = model.objects.filter(pk__in=pks).delete()
+            deleted_count += count
     if deleted_count:
         messages.success(request, f'{deleted_count} comment(s) deleted successfully.')
     else:
         messages.warning(request, 'No comments were selected for deletion.')
+    return redirect('custom_admin:comments_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def comment_toggle_ban(request, user_pk):
+    """Toggle comment ban on a user from the comments management page."""
+    target_user = get_object_or_404(User, pk=user_pk)
+    profile = target_user.profile
+
+    if profile.is_comment_banned:
+        old_strikes = profile.profanity_strikes
+        profile.is_comment_banned = False
+        profile.comment_banned_at = None
+        profile.profanity_strikes = 0
+        profile.save(update_fields=['is_comment_banned', 'comment_banned_at', 'profanity_strikes'])
+        if profile.device_id:
+            DeviceBan.objects.filter(device_id=profile.device_id, is_active=True).update(
+                is_active=False,
+                unbanned_at=timezone.now(),
+                unbanned_by=request.user,
+            )
+        log_admin_action(
+            request, 'status_change', 'User', object_id=user_pk,
+            object_repr=target_user.username,
+            changes={
+                'is_comment_banned': {'old': 'True', 'new': 'False'},
+                'profanity_strikes': {'old': str(old_strikes), 'new': '0'},
+            }
+        )
+        messages.success(request, f'Comment ban lifted for "{target_user.username}". Strikes reset to 0.')
+    else:
+        profile.is_comment_banned = True
+        profile.comment_banned_at = timezone.now()
+        profile.save(update_fields=['is_comment_banned', 'comment_banned_at'])
+        if profile.device_id:
+            DeviceBan.objects.get_or_create(
+                device_id=profile.device_id,
+                defaults={
+                    'user': target_user,
+                    'reason': f'Manual ban by admin {request.user.username}',
+                },
+            )
+        log_admin_action(
+            request, 'status_change', 'User', object_id=user_pk,
+            object_repr=target_user.username,
+            changes={'is_comment_banned': {'old': 'False', 'new': 'True'}}
+        )
+        messages.success(request, f'User "{target_user.username}" has been banned from commenting.')
+
     return redirect('custom_admin:comments_list')
 
 
@@ -8043,55 +8394,147 @@ def media_library_api(request):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  YOUTH DIALOGUE
+#  YOUTH DIALOGUE (Multi-Event)
 # ═══════════════════════════════════════════════════════════════
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_events_list(request):
+    """Landing page: list all Youth Dialogue events."""
+    events = YouthDialogueEvent.objects.annotate(
+        app_count=Count('applications'),
+    ).order_by('-is_active', '-created_at')
+    return render(request, 'custom_admin/youth_dialogue/events_list.html', {
+        'events': events,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @_catch_upload_errors
-def youth_dialogue_settings(request):
-    yd_settings = YouthDialogueSettings.load()
+def youth_dialogue_event_form(request, event_pk=None):
+    """Create or edit a Youth Dialogue event (settings + form fields)."""
+    yd_event = None
+    if event_pk:
+        yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+
     if request.method == 'POST':
-        yd_settings.programme_title = request.POST.get('programme_title', yd_settings.programme_title)
-        yd_settings.programme_title_fr = request.POST.get('programme_title_fr', '')
-        yd_settings.description = request.POST.get('description', '')
-        yd_settings.description_fr = request.POST.get('description_fr', '')
+        if not yd_event:
+            yd_event = YouthDialogueEvent()
+
+        yd_event.programme_title = request.POST.get('programme_title', yd_event.programme_title)
+        yd_event.programme_title_fr = request.POST.get('programme_title_fr', '')
+        yd_event.description = request.POST.get('description', '')
+        yd_event.description_fr = request.POST.get('description_fr', '')
+        # Event identity
+        slug = request.POST.get('slug', '').strip()
+        if slug:
+            yd_event.slug = slug
+        elif not yd_event.slug:
+            from django.utils.text import slugify as django_slugify
+            yd_event.slug = django_slugify(yd_event.programme_title)[:120] or 'yd-event'
+        yd_event.is_active = request.POST.get('is_active') == 'on'
+        yd_event.location = request.POST.get('location', '')
+        start_date = request.POST.get('start_date', '').strip()
+        end_date = request.POST.get('end_date', '').strip()
+        yd_event.start_date = start_date or None
+        yd_event.end_date = end_date or None
         # Visibility & Quick Access
-        yd_settings.is_visible = request.POST.get('is_visible') == 'on'
-        yd_settings.is_registration_open = request.POST.get('is_registration_open') == 'on'
-        yd_settings.quick_access_title_en = request.POST.get('quick_access_title_en', 'Youth Dialogue')
-        yd_settings.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
-        yd_settings.registration_closed_message = request.POST.get('registration_closed_message', '')
-        yd_settings.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
-        yd_settings.support_email = request.POST.get('support_email', '')
-        yd_settings.support_phone = request.POST.get('support_phone', '')
-        yd_settings.live_chat_url = request.POST.get('live_chat_url', '')
-        yd_settings.support_note = request.POST.get('support_note', '')
-        yd_settings.support_note_fr = request.POST.get('support_note_fr', '')
+        yd_event.is_visible = request.POST.get('is_visible') == 'on'
+        yd_event.is_registration_open = request.POST.get('is_registration_open') == 'on'
+        yd_event.quick_access_title_en = request.POST.get('quick_access_title_en', 'Youth Dialogue')
+        yd_event.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
+        yd_event.registration_closed_message = request.POST.get('registration_closed_message', '')
+        yd_event.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
+        yd_event.support_email = request.POST.get('support_email', '')
+        yd_event.support_phone = request.POST.get('support_phone', '')
+        yd_event.live_chat_url = request.POST.get('live_chat_url', '')
+        yd_event.support_note = request.POST.get('support_note', '')
+        yd_event.support_note_fr = request.POST.get('support_note_fr', '')
+        # Landing page content
+        yd_event.event_tagline = request.POST.get('event_tagline', '')
+        yd_event.event_tagline_fr = request.POST.get('event_tagline_fr', '')
+        yd_event.venue_name = request.POST.get('venue_name', '')
+        yd_event.venue_name_fr = request.POST.get('venue_name_fr', '')
+        yd_event.venue_address = request.POST.get('venue_address', '')
+        yd_event.venue_address_fr = request.POST.get('venue_address_fr', '')
+        yd_event.key_highlights = request.POST.get('key_highlights', '')
+        yd_event.key_highlights_fr = request.POST.get('key_highlights_fr', '')
+        yd_event.eligibility_criteria = request.POST.get('eligibility_criteria', '')
+        yd_event.eligibility_criteria_fr = request.POST.get('eligibility_criteria_fr', '')
+        yd_event.side_events_info = request.POST.get('side_events_info', '')
+        yd_event.side_events_info_fr = request.POST.get('side_events_info_fr', '')
+        yd_event.privacy_policy = request.POST.get('privacy_policy', '')
+        yd_event.privacy_policy_fr = request.POST.get('privacy_policy_fr', '')
         if request.FILES.get('logo_light'):
-            yd_settings.logo_light = request.FILES['logo_light']
+            yd_event.logo_light = request.FILES['logo_light']
+        if request.FILES.get('logo_light_fr'):
+            yd_event.logo_light_fr = request.FILES['logo_light_fr']
         if request.FILES.get('logo_dark'):
-            yd_settings.logo_dark = request.FILES['logo_dark']
+            yd_event.logo_dark = request.FILES['logo_dark']
+        if request.FILES.get('logo_dark_fr'):
+            yd_event.logo_dark_fr = request.FILES['logo_dark_fr']
+        if request.FILES.get('secondary_logo'):
+            yd_event.secondary_logo = request.FILES['secondary_logo']
         if request.FILES.get('quick_access_icon'):
-            yd_settings.quick_access_icon = request.FILES['quick_access_icon']
-        yd_settings.save()
-        _save_yd_form_fields(request, yd_settings)
-        messages.success(request, 'Youth Dialogue settings updated successfully!')
-        return redirect('custom_admin:youth_dialogue_settings')
+            yd_event.quick_access_icon = request.FILES['quick_access_icon']
+        if request.FILES.get('banner_image'):
+            yd_event.banner_image = request.FILES['banner_image']
+        # Parse required documents from form
+        req_docs = []
+        idx = 0
+        while True:
+            key = request.POST.get(f'doc_{idx}_key', '').strip()
+            if not key:
+                break
+            req_docs.append({
+                'key': key,
+                'label': request.POST.get(f'doc_{idx}_label', '').strip(),
+                'label_fr': request.POST.get(f'doc_{idx}_label_fr', '').strip(),
+                'camera_only': bool(request.POST.get(f'doc_{idx}_camera_only')),
+            })
+            idx += 1
+        yd_event.required_documents = req_docs
+        yd_event.save()
+        _save_yd_form_fields(request, yd_event)
+        _save_yd_roles(request, yd_event)
+        messages.success(request, f'Youth Dialogue event {"updated" if event_pk else "created"} successfully!')
+        return redirect('custom_admin:youth_dialogue_event_edit', event_pk=yd_event.pk)
 
     # Prepare form field data for template JS
-    existing_fields = list(yd_settings.form_fields.values(
-        'id', 'field_type', 'field_label', 'field_label_fr', 'field_name',
-        'placeholder', 'placeholder_fr', 'is_required', 'is_active',
-        'options', 'validation_regex', 'help_text', 'help_text_fr', 'order',
-    ))
+    existing_fields = []
+    if yd_event:
+        existing_fields = list(yd_event.form_fields.values(
+            'id', 'field_type', 'field_label', 'field_label_fr', 'field_name',
+            'placeholder', 'placeholder_fr', 'is_required', 'is_active',
+            'options', 'validation_regex', 'help_text', 'help_text_fr', 'order',
+        ))
     field_type_choices = list(YouthDialogueFormField.FIELD_TYPE_CHOICES)
 
-    return render(request, 'custom_admin/youth_dialogue/settings.html', {
-        'settings': yd_settings,
-        'existing_fields_json': json.dumps(existing_fields),
-        'field_type_choices': json.dumps(field_type_choices),
+    # Prepare roles data for template JS
+    existing_roles = []
+    if yd_event:
+        existing_roles = list(yd_event.roles.values('id', 'name', 'name_fr', 'color', 'order'))
+
+    return render(request, 'custom_admin/youth_dialogue/event_form.html', {
+        'yd_event': yd_event,
+        'is_edit': event_pk is not None,
+        'existing_fields_json': json.dumps(existing_fields).replace('<', '\\u003c'),
+        'field_type_choices': json.dumps(field_type_choices).replace('<', '\\u003c'),
+        'existing_roles_json': json.dumps(existing_roles).replace('<', '\\u003c'),
     })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def youth_dialogue_toggle_active(request, event_pk):
+    """Set an event as the active event (deactivates others)."""
+    event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    event.is_active = True
+    event.save()  # save() deactivates others
+    messages.success(request, f'"{event.programme_title}" is now the active event.')
+    return redirect('custom_admin:youth_dialogue_list')
 
 
 def _save_yd_form_fields(request, yd_settings):
@@ -8158,10 +8601,116 @@ def _save_yd_form_fields(request, yd_settings):
         YouthDialogueFormField.objects.filter(pk__in=to_delete).delete()
 
 
+def _save_yd_roles(request, yd_event):
+    """Parse and save inline roles from the Youth Dialogue event form."""
+    existing_ids = set(yd_event.roles.values_list('id', flat=True))
+    kept_ids = set()
+    idx = 0
+    while True:
+        name = request.POST.get(f'role_{idx}_name')
+        if name is None:
+            break
+        name = name.strip()
+        if not name:
+            idx += 1
+            continue
+        role_id = request.POST.get(f'role_{idx}_id', '').strip()
+        name_fr = request.POST.get(f'role_{idx}_name_fr', '').strip()
+        color = request.POST.get(f'role_{idx}_color', '#4CAF50').strip()
+        order = idx
+
+        data = {
+            'name': name,
+            'name_fr': name_fr,
+            'color': color,
+            'order': order,
+            'is_active': True,
+        }
+
+        if role_id and role_id.isdigit():
+            rid = int(role_id)
+            YouthDialogueRole.objects.filter(pk=rid, event=yd_event).update(**data)
+            kept_ids.add(rid)
+        else:
+            obj = YouthDialogueRole.objects.create(event=yd_event, **data)
+            kept_ids.add(obj.pk)
+        idx += 1
+
+    to_delete = existing_ids - kept_ids
+    if to_delete:
+        YouthDialogueRole.objects.filter(pk__in=to_delete).delete()
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
-def youth_dialogue_list(request):
-    qs = YouthDialogueApplication.objects.select_related('user').order_by('-created_at')
+def youth_dialogue_media_list(request, event_pk):
+    """List all Youth Dialogue media items for an event."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    media_items = YouthDialogueMedia.objects.filter(settings=yd_event).order_by('display_order', '-created_at')
+    return render(request, 'custom_admin/youth_dialogue/media_list.html', {
+        'media_items': media_items,
+        'yd_event': yd_event,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_media_form(request, event_pk, pk=None):
+    """Create or edit a Youth Dialogue media item."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    media = None
+    if pk:
+        media = get_object_or_404(YouthDialogueMedia, pk=pk, settings=yd_event)
+
+    if request.method == 'POST':
+        if not media:
+            media = YouthDialogueMedia(settings=yd_event)
+
+        media.media_type = request.POST.get('media_type', 'photo')
+        media.title = request.POST.get('title', '')
+        media.title_fr = request.POST.get('title_fr', '')
+        media.caption = request.POST.get('caption', '')
+        media.caption_fr = request.POST.get('caption_fr', '')
+        media.edition_tag = request.POST.get('edition_tag', '')
+        media.external_url = request.POST.get('external_url', '')
+        media.is_promotional = request.POST.get('is_promotional') == 'on'
+        media.is_published = request.POST.get('is_published') == 'on'
+        media.display_order = int(request.POST.get('display_order', 0))
+
+        if request.FILES.get('file'):
+            media.file = request.FILES['file']
+        if request.FILES.get('thumbnail'):
+            media.thumbnail = request.FILES['thumbnail']
+
+        media.save()
+        messages.success(request, f'Media item {"updated" if pk else "created"} successfully.')
+        return redirect('custom_admin:youth_dialogue_media_list', event_pk=event_pk)
+
+    return render(request, 'custom_admin/youth_dialogue/media_form.html', {
+        'media': media,
+        'is_edit': pk is not None,
+        'yd_event': yd_event,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def youth_dialogue_media_delete(request, event_pk, pk):
+    """Delete a Youth Dialogue media item."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    media = get_object_or_404(YouthDialogueMedia, pk=pk, settings=yd_event)
+    media.delete()
+    messages.success(request, 'Media item deleted.')
+    return redirect('custom_admin:youth_dialogue_media_list', event_pk=event_pk)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_applications_list(request, event_pk):
+    """Applications for a specific Youth Dialogue event."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    qs = YouthDialogueApplication.objects.filter(event=yd_event).select_related('user').order_by('-created_at')
 
     status_filter = request.GET.get('status')
     if status_filter == 'pending_review':
@@ -8186,13 +8735,14 @@ def youth_dialogue_list(request):
             Q(participant_code__icontains=search_q)
         )
 
-    total_count = YouthDialogueApplication.objects.count()
-    pending_review_count = YouthDialogueApplication.objects.filter(status__in=['submitted', 'under_review']).count()
-    accepted_count = YouthDialogueApplication.objects.filter(
+    event_apps = YouthDialogueApplication.objects.filter(event=yd_event)
+    total_count = event_apps.count()
+    pending_review_count = event_apps.filter(status__in=['submitted', 'under_review']).count()
+    accepted_count = event_apps.filter(
         status__in=['accepted', 'documents_pending', 'documents_submitted', 'documents_under_review']
     ).count()
-    credential_count = YouthDialogueApplication.objects.filter(status='credential_issued').count()
-    rejected_count = YouthDialogueApplication.objects.filter(status__in=['rejected', 'documents_rejected']).count()
+    credential_count = event_apps.filter(status='credential_issued').count()
+    rejected_count = event_apps.filter(status__in=['rejected', 'documents_rejected']).count()
 
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
@@ -8200,6 +8750,7 @@ def youth_dialogue_list(request):
 
     return render(request, 'custom_admin/youth_dialogue/list.html', {
         'applications': applications,
+        'yd_event': yd_event,
         'total_count': total_count,
         'pending_review_count': pending_review_count,
         'accepted_count': accepted_count,
@@ -8210,11 +8761,104 @@ def youth_dialogue_list(request):
     })
 
 
+def _auto_finalize_docs(request, application):
+    """After individually reviewing docs, check if all are done and auto-update status.
+
+    Only considers the LATEST document per type (highest id = most recent submission).
+    Old rejected docs are ignored if a newer version has been submitted.
+
+    - All approved, none pending → issue credential
+    - Has rejected, none pending → set documents_rejected + notify
+    - Still has pending → do nothing (wait for more reviews)
+    """
+    from django.db.models import Max
+    from core.models import YouthDialogueDocument
+
+    # Deduplicate: only look at the most recent document per type
+    latest_doc_ids = list(
+        application.documents
+        .values('document_type')
+        .annotate(latest_id=Max('id'))
+        .values_list('latest_id', flat=True)
+    )
+    latest_docs = application.documents.filter(id__in=latest_doc_ids)
+
+    pending_count = latest_docs.filter(status='pending').count()
+    if pending_count > 0:
+        return  # Still have docs to review
+
+    has_rejected = latest_docs.filter(status='rejected').exists()
+    all_approved = not has_rejected
+
+    if has_rejected:
+        # Build rejection notes from rejected docs (latest versions only)
+        rejected_docs = latest_docs.filter(status='rejected')
+        rejection_details = []
+        for doc in rejected_docs:
+            reason = doc.rejection_reason or 'No reason specified'
+            rejection_details.append(f'• {doc.get_document_type_display()}: {reason}')
+        auto_notes = '\n'.join(rejection_details)
+
+        application.status = 'documents_rejected'
+        application.documents_rejection_notes = auto_notes
+        application.documents_reviewed_by = request.user
+        application.documents_reviewed_at = timezone.now()
+        application.save()
+        log_admin_action(
+            request, 'reject', 'YouthDialogueApplication', object_id=application.pk,
+            object_repr=f'{application.first_name} {application.last_name}',
+            changes={'status': {'old': 'documents_under_review', 'new': 'documents_rejected'}},
+        )
+        from core.views import _notify_yd
+        _notify_yd(application, 'documents_rejected')
+        messages.info(request, 'All documents reviewed — applicant notified about rejected documents.')
+
+    elif all_approved:
+        # All latest docs approved — auto-issue credential if all required types present
+        approved_types = set(
+            latest_docs.filter(status='approved')
+            .values_list('document_type', flat=True)
+        )
+        # Check against configured required docs
+        event = application.event
+        if event and event.required_documents:
+            required_types = {d.get('key', '') for d in event.required_documents if d.get('key')}
+        else:
+            required_types = {'passport', 'national_id', 'photo', 'cv'}
+        missing_types = required_types - approved_types
+
+        if not missing_types:
+            application.generate_participant_code()
+            application.generate_qr_hash()
+            application.status = 'credential_issued'
+            application.credential_issued_at = timezone.now()
+            application.documents_reviewed_by = request.user
+            application.documents_reviewed_at = timezone.now()
+            application.save()
+            log_admin_action(
+                request, 'issue_credential', 'YouthDialogueApplication', object_id=application.pk,
+                object_repr=f'{application.first_name} {application.last_name}',
+                changes={'status': {'old': 'documents_under_review', 'new': 'credential_issued'}},
+            )
+            from core.views import _notify_yd
+            _notify_yd(application, 'credential_issued')
+            messages.success(request, f'All documents approved — credential issued for {application.first_name} {application.last_name}!')
+        else:
+            # All reviewed docs approved but some required types missing
+            application.status = 'documents_under_review'
+            application.documents_reviewed_by = request.user
+            application.documents_reviewed_at = timezone.now()
+            application.save()
+            labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
+            missing_names = [labels.get(m, m) for m in missing_types]
+            messages.warning(request, f'All documents approved but missing required types: {", ".join(missing_names)}')
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_review(request, pk):
     application = get_object_or_404(
-        YouthDialogueApplication.objects.select_related('user', 'reviewed_by', 'documents_reviewed_by'),
+        YouthDialogueApplication.objects.select_related('user', 'reviewed_by', 'documents_reviewed_by', 'event'),
         pk=pk,
     )
     documents = application.documents.select_related('reviewed_by').order_by('uploaded_at')
@@ -8234,30 +8878,8 @@ def youth_dialogue_review(request, pk):
                 object_repr=f'{application.first_name} {application.last_name}',
                 changes={'status': {'old': old_status, 'new': 'accepted'}},
             )
-            # Send acceptance email
-            try:
-                from django.core.mail import send_mail
-                import threading
-                subject = 'Youth Dialogue Application Accepted'
-                html_message = _yd_email_html(
-                    application,
-                    'Application Accepted',
-                    '#38a169',
-                    '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                      We are pleased to inform you that your application for the <strong>Youth Dialogue Programme</strong>
-                      has been accepted.
-                    </p>
-                    <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                      The next step is to upload your required documents through the Be 4 Africa app.
-                      Please submit your documents at your earliest convenience.
-                    </p>''',
-                )
-                threading.Thread(
-                    target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
-                    daemon=True,
-                ).start()
-            except Exception:
-                pass
+            from core.views import _notify_yd
+            _notify_yd(application, 'accepted')
             messages.success(request, f'Application from {application.first_name} {application.last_name} accepted.')
 
         elif action == 'reject' and application.status in ('submitted', 'under_review'):
@@ -8272,29 +8894,8 @@ def youth_dialogue_review(request, pk):
                 object_repr=f'{application.first_name} {application.last_name}',
                 changes={'status': {'old': old_status, 'new': 'rejected'}, 'reason': reason},
             )
-            try:
-                from django.core.mail import send_mail
-                import threading
-                subject = 'Youth Dialogue Application Update'
-                reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
-                html_message = _yd_email_html(
-                    application,
-                    'Application Not Accepted',
-                    '#e53e3e',
-                    f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                      We regret to inform you that your application for the Youth Dialogue Programme
-                      has not been accepted at this time.
-                    </p>{reason_html}
-                    <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-                      If you have questions, please contact us at info@burundi4africa.com
-                    </p>''',
-                )
-                threading.Thread(
-                    target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
-                    daemon=True,
-                ).start()
-            except Exception:
-                pass
+            from core.views import _notify_yd
+            _notify_yd(application, 'rejected')
             messages.success(request, f'Application from {application.first_name} {application.last_name} rejected.')
 
         elif action == 'approve_document':
@@ -8306,7 +8907,13 @@ def youth_dialogue_review(request, pk):
                     doc.reviewed_by = request.user
                     doc.reviewed_at = timezone.now()
                     doc.save()
+                    # Auto-copy photo doc to id_photo field
+                    if doc.document_type == 'photo' and doc.file:
+                        application.id_photo = doc.file
+                        application.save(update_fields=['id_photo'])
                     messages.success(request, f'Document "{doc.get_document_type_display()}" approved.')
+                    # Auto-check: if all docs are now reviewed, update application status
+                    _auto_finalize_docs(request, application)
             except YouthDialogueDocument.DoesNotExist:
                 messages.error(request, 'Document not found.')
 
@@ -8322,27 +8929,44 @@ def youth_dialogue_review(request, pk):
                     doc.reviewed_at = timezone.now()
                     doc.save()
                     messages.success(request, f'Document "{doc.get_document_type_display()}" rejected.')
+                    # Auto-check: if all docs are now reviewed, update application status
+                    _auto_finalize_docs(request, application)
             except YouthDialogueDocument.DoesNotExist:
                 messages.error(request, 'Document not found.')
 
         elif action == 'approve_all_documents':
+            # Copy photo to id_photo before bulk update
+            photo_doc = application.documents.filter(status='pending', document_type='photo').first()
+            if photo_doc and photo_doc.file:
+                application.id_photo = photo_doc.file
+                application.save(update_fields=['id_photo'])
+
             pending_docs = application.documents.filter(status='pending')
             count = pending_docs.update(
                 status='approved',
                 reviewed_by=request.user,
                 reviewed_at=timezone.now(),
             )
-            if application.status in ('documents_submitted', 'documents_under_review'):
-                application.status = 'documents_under_review'
-                application.documents_reviewed_by = request.user
-                application.documents_reviewed_at = timezone.now()
-                application.save()
             messages.success(request, f'{count} document(s) approved.')
+            # Auto-finalize: check if credential can be issued
+            _auto_finalize_docs(request, application)
 
-        elif action == 'reject_documents':
-            notes = request.POST.get('documents_rejection_notes', '')
+        elif action == 'reject_all_documents':
+            # Reject ALL documents (pending + approved) at once
+            doc_reason = request.POST.get('documents_rejection_notes', '').strip() or 'Documents rejected by reviewer'
+            all_docs = application.documents.all()
+            rejection_details = []
+            for doc in all_docs:
+                if doc.status != 'rejected':
+                    doc.status = 'rejected'
+                    doc.rejection_reason = doc_reason
+                    doc.reviewed_by = request.user
+                    doc.reviewed_at = timezone.now()
+                    doc.save()
+                rejection_details.append(f'• {doc.get_document_type_display()}: {doc.rejection_reason or doc_reason}')
+
             application.status = 'documents_rejected'
-            application.documents_rejection_notes = notes
+            application.documents_rejection_notes = '\n'.join(rejection_details)
             application.documents_reviewed_by = request.user
             application.documents_reviewed_at = timezone.now()
             application.save()
@@ -8351,32 +8975,75 @@ def youth_dialogue_review(request, pk):
                 object_repr=f'{application.first_name} {application.last_name}',
                 changes={'status': {'old': old_status, 'new': 'documents_rejected'}},
             )
-            try:
-                from django.core.mail import send_mail
-                import threading
-                subject = 'Youth Dialogue — Documents Need Attention'
-                notes_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Notes from reviewer:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{notes}</p></div>' if notes else ''
-                html_message = _yd_email_html(
-                    application,
-                    'Documents Need Attention',
-                    '#e53e3e',
-                    f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                      Some of your uploaded documents require attention. Please review the notes
-                      below and re-upload the necessary documents through the Be 4 Africa app.
-                    </p>{notes_html}''',
+            from core.views import _notify_yd
+            _notify_yd(application, 'documents_rejected')
+            messages.success(request, f'All documents rejected. Applicant notified.')
+
+        elif action == 'reject_documents':
+            # Finalize with existing rejections — also reject any remaining pending docs
+            # First reject any still-pending docs with a generic reason
+            pending_docs = application.documents.filter(status='pending')
+            if pending_docs.exists():
+                pending_docs.update(
+                    status='rejected',
+                    rejection_reason='Not approved during review',
+                    reviewed_by=request.user,
+                    reviewed_at=timezone.now(),
                 )
-                threading.Thread(
-                    target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
-                    daemon=True,
-                ).start()
-            except Exception:
-                pass
+
+            rejected_docs = application.documents.filter(status='rejected')
+            if not rejected_docs.exists():
+                messages.error(request, 'No rejected documents found.')
+                return redirect('custom_admin:youth_dialogue_review', pk=pk)
+
+            # Auto-build rejection message listing each rejected doc + its reason
+            rejection_details = []
+            for doc in rejected_docs:
+                reason = doc.rejection_reason or 'No reason specified'
+                rejection_details.append(f'• {doc.get_document_type_display()}: {reason}')
+            auto_notes = '\n'.join(rejection_details)
+
+            general_notes = request.POST.get('documents_rejection_notes', '').strip()
+            full_notes = auto_notes
+            if general_notes:
+                full_notes += f'\n\nAdditional notes: {general_notes}'
+
+            application.status = 'documents_rejected'
+            application.documents_rejection_notes = full_notes
+            application.documents_reviewed_by = request.user
+            application.documents_reviewed_at = timezone.now()
+            application.save()
+            log_admin_action(
+                request, 'reject', 'YouthDialogueApplication', object_id=pk,
+                object_repr=f'{application.first_name} {application.last_name}',
+                changes={'status': {'old': old_status, 'new': 'documents_rejected'}},
+            )
+            from core.views import _notify_yd
+            _notify_yd(application, 'documents_rejected')
             messages.success(request, 'Documents rejected. Applicant notified.')
+
+        elif action == 'save_admin_notes':
+            application.admin_notes = request.POST.get('admin_notes', '')
+            application.save(update_fields=['admin_notes'])
+            messages.success(request, 'Admin notes saved.')
+            return redirect('custom_admin:youth_dialogue_review', pk=pk)
 
         elif action == 'issue_credential':
             all_docs_approved = not application.documents.filter(status='pending').exists()
             has_rejected = application.documents.filter(status='rejected').exists()
-            if application.status in ('accepted', 'documents_submitted', 'documents_under_review') and all_docs_approved and not has_rejected:
+            # Verify all 4 required document types exist and are approved
+            approved_types = set(
+                application.documents.filter(status='approved')
+                .values_list('document_type', flat=True)
+            )
+            required_types = {'passport', 'national_id', 'photo', 'cv'}
+            missing_types = required_types - approved_types
+            if missing_types and application.status in ('accepted', 'documents_submitted', 'documents_under_review'):
+                labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
+                missing_names = [labels.get(m, m) for m in missing_types]
+                messages.error(request, f'Cannot issue credential. Missing approved documents: {", ".join(missing_names)}')
+                return redirect('custom_admin:youth_dialogue_review', pk=pk)
+            if application.status in ('accepted', 'documents_submitted', 'documents_under_review') and all_docs_approved and not has_rejected and not missing_types:
                 application.generate_participant_code()
                 application.generate_qr_hash()
                 application.status = 'credential_issued'
@@ -8387,34 +9054,37 @@ def youth_dialogue_review(request, pk):
                     object_repr=f'{application.first_name} {application.last_name}',
                     changes={'status': {'old': old_status, 'new': 'credential_issued'}, 'participant_code': application.participant_code},
                 )
+                # Copy approved photo doc to id_photo field
                 try:
-                    from django.core.mail import send_mail
-                    import threading
-                    subject = 'Youth Dialogue — Your Credential Has Been Issued'
-                    html_message = _yd_email_html(
-                        application,
-                        'Credential Issued',
-                        '#5a67d8',
-                        f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                          Congratulations! Your participant credential for the Youth Dialogue Programme has been issued.
-                        </p>
-                        <div style="background:#ebf4ff;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
-                          <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">Participant Code</p>
-                          <p style="color:#2b6cb0;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{application.participant_code}</p>
-                        </div>
-                        <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-                          You can view your digital ID card and QR code in the Be 4 Africa app.
-                        </p>''',
-                    )
-                    threading.Thread(
-                        target=lambda: send_mail(subject, '', settings.DEFAULT_FROM_EMAIL, [application.email], html_message=html_message, fail_silently=True),
-                        daemon=True,
-                    ).start()
+                    photo_doc = application.documents.filter(document_type='photo', status='approved').last()
+                    if photo_doc and photo_doc.file:
+                        application.id_photo = photo_doc.file
+                        application.save(update_fields=['id_photo'])
                 except Exception:
                     pass
+                from core.views import _notify_yd
+                _notify_yd(application, 'credential_issued')
                 messages.success(request, f'Credential issued: {application.participant_code}')
             else:
                 messages.error(request, 'Cannot issue credential. Ensure all documents are approved and none are rejected.')
+
+        elif action == 'revoke_credential':
+            if application.status == 'credential_issued' and not application.is_revoked:
+                reason = request.POST.get('revoke_reason', '').strip()
+                application.is_revoked = True
+                application.revoked_at = timezone.now()
+                application.revoked_reason = reason
+                application.save(update_fields=['is_revoked', 'revoked_at', 'revoked_reason'])
+                log_admin_action(
+                    request, 'revoke', 'YouthDialogueApplication', object_id=pk,
+                    object_repr=f'{application.first_name} {application.last_name}',
+                    changes={'is_revoked': True, 'reason': reason},
+                )
+                from core.views import _notify_yd
+                _notify_yd(application, 'credential_revoked')
+                messages.success(request, f'Credential {application.participant_code} has been revoked.')
+            else:
+                messages.error(request, 'Cannot revoke: credential not issued or already revoked.')
 
         return redirect('custom_admin:youth_dialogue_review', pk=pk)
 
@@ -8454,11 +9124,14 @@ def _yd_email_html(application, heading, badge_color, body_html):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
-def youth_dialogue_export_csv(request):
-    qs = YouthDialogueApplication.objects.select_related('user').order_by('-created_at')
+@require_POST
+def youth_dialogue_export_csv(request, event_pk):
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    qs = YouthDialogueApplication.objects.filter(event=yd_event).select_related('user').order_by('-created_at')
 
+    safe_title = yd_event.slug or 'youth_dialogue'
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="youth_dialogue_applications.csv"'
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}_applications.csv"'
 
     writer = csv.writer(response)
     writer.writerow([
@@ -8470,7 +9143,7 @@ def youth_dialogue_export_csv(request):
         total_docs = app.documents.count()
         approved_docs = app.documents.filter(status='approved').count()
         docs_status = f'{approved_docs}/{total_docs} approved' if total_docs else 'No documents'
-        writer.writerow([
+        writer.writerow(_sanitize_csv_row([
             f'{app.first_name} {app.last_name}',
             app.email,
             app.get_nationality_display() if app.nationality else '',
@@ -8480,7 +9153,7 @@ def youth_dialogue_export_csv(request):
             app.participant_code or '',
             app.created_at.strftime('%Y-%m-%d %H:%M:%S') if app.created_at else '',
             docs_status,
-        ])
+        ]))
 
     log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'CSV export of {qs.count()} applications')
 
@@ -8568,4 +9241,165 @@ def youth_dialogue_id_card_pdf(request, pk):
     response = HttpResponse(buf, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="YD-IDCard-{app.participant_code}.pdf"'
     return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_verify_qr(request):
+    """QR code verification page for check-in staff."""
+    result = None
+    query = request.GET.get('q', '').strip()
+
+    if query:
+        # Parse QR data format: "YD-2026-0001:abc123hash"
+        parts = query.split(':', 1)
+        code = parts[0].strip()
+        qr_hash = parts[1].strip() if len(parts) > 1 else ''
+
+        if code and qr_hash:
+            try:
+                app = YouthDialogueApplication.objects.get(
+                    participant_code=code, qr_hash=qr_hash,
+                )
+                result = {
+                    'found': True,
+                    'application': app,
+                    'status': 'REVOKED' if app.is_revoked else 'VALID',
+                }
+            except YouthDialogueApplication.DoesNotExist:
+                result = {'found': False}
+        elif code:
+            # Try lookup by participant code only
+            try:
+                app = YouthDialogueApplication.objects.get(participant_code=code)
+                result = {
+                    'found': True,
+                    'application': app,
+                    'status': 'REVOKED' if app.is_revoked else 'VALID',
+                    'partial_match': True,
+                }
+            except YouthDialogueApplication.DoesNotExist:
+                result = {'found': False}
+        else:
+            result = {'found': False}
+
+    return render(request, 'custom_admin/youth_dialogue/verify.html', {
+        'result': result,
+        'query': query,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  COMMENT BAN MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def user_toggle_comment_ban(request, pk):
+    """Toggle comment ban on a user. Also creates/lifts associated device ban."""
+    target_user = get_object_or_404(User, pk=pk)
+    profile = target_user.profile
+
+    if profile.is_comment_banned:
+        # Unban: reset strikes and lift ban
+        old_strikes = profile.profanity_strikes
+        profile.is_comment_banned = False
+        profile.comment_banned_at = None
+        profile.profanity_strikes = 0
+        profile.save(update_fields=['is_comment_banned', 'comment_banned_at', 'profanity_strikes'])
+        # Lift device ban if exists
+        if profile.device_id:
+            DeviceBan.objects.filter(device_id=profile.device_id, is_active=True).update(
+                is_active=False,
+                unbanned_at=timezone.now(),
+                unbanned_by=request.user,
+            )
+        log_admin_action(
+            request, 'status_change', 'User', object_id=pk,
+            object_repr=target_user.username,
+            changes={
+                'is_comment_banned': {'old': 'True', 'new': 'False'},
+                'profanity_strikes': {'old': str(old_strikes), 'new': '0'},
+            }
+        )
+        messages.success(request, f'Comment ban lifted for "{target_user.username}". Strikes reset to 0.')
+    else:
+        # Ban: set ban and create device ban
+        profile.is_comment_banned = True
+        profile.comment_banned_at = timezone.now()
+        profile.save(update_fields=['is_comment_banned', 'comment_banned_at'])
+        if profile.device_id:
+            DeviceBan.objects.get_or_create(
+                device_id=profile.device_id,
+                defaults={
+                    'user': target_user,
+                    'reason': f'Manual ban by admin {request.user.username}',
+                },
+            )
+        log_admin_action(
+            request, 'status_change', 'User', object_id=pk,
+            object_repr=target_user.username,
+            changes={'is_comment_banned': {'old': 'False', 'new': 'True'}}
+        )
+        messages.success(request, f'User "{target_user.username}" has been banned from commenting.')
+
+    return redirect('custom_admin:user_edit', pk=pk)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def device_bans_list(request):
+    """List all device bans with unban buttons."""
+    bans = DeviceBan.objects.select_related('user', 'unbanned_by').all()
+    q = request.GET.get('q', '').strip()
+    if q:
+        bans = bans.filter(
+            Q(device_id__icontains=q) | Q(user__username__icontains=q) | Q(reason__icontains=q)
+        )
+    status_filter = request.GET.get('status', '')
+    if status_filter == 'active':
+        bans = bans.filter(is_active=True)
+    elif status_filter == 'lifted':
+        bans = bans.filter(is_active=False)
+
+    paginator = Paginator(bans, 50)
+    page = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'custom_admin/device_bans/list.html', {
+        'page': page,
+        'q': q,
+        'status_filter': status_filter,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def device_ban_unban(request, pk):
+    """Lift a device ban."""
+    ban = get_object_or_404(DeviceBan, pk=pk)
+    if not ban.is_active:
+        messages.info(request, 'This device ban has already been lifted.')
+        return redirect('custom_admin:device_bans_list')
+
+    ban.is_active = False
+    ban.unbanned_at = timezone.now()
+    ban.unbanned_by = request.user
+    ban.save(update_fields=['is_active', 'unbanned_at', 'unbanned_by'])
+
+    # Also unban any user profiles linked to this device
+    UserProfile.objects.filter(device_id=ban.device_id, is_comment_banned=True).update(
+        is_comment_banned=False,
+        comment_banned_at=None,
+        profanity_strikes=0,
+    )
+
+    log_admin_action(
+        request, 'status_change', 'DeviceBan', object_id=pk,
+        object_repr=f'Device {ban.device_id[:12]}...',
+        changes={'is_active': {'old': 'True', 'new': 'False'}}
+    )
+    messages.success(request, f'Device ban lifted for {ban.device_id[:12]}...')
+    return redirect('custom_admin:device_bans_list')
 

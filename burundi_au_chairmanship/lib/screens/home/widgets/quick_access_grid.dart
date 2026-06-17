@@ -54,8 +54,9 @@ class QuickAccessGrid extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: CachedNetworkImage(
               imageUrl: iconImageUrl,
-              width: 30,
-              height: 30,
+              memCacheWidth: 240,
+              width: 52,
+              height: 52,
               fit: BoxFit.contain,
               placeholder: (_, __) => Icon(
                 item['icon'] as IconData,
@@ -90,8 +91,8 @@ class QuickAccessGrid extends StatelessWidget {
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 58,
-                      height: 58,
+                      width: 62,
+                      height: 62,
                       decoration: BoxDecoration(
                         color: itemColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(16),

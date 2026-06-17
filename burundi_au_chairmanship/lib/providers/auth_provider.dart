@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_messaging_service.dart';
 import '../services/like_service.dart';
+import '../services/content_cache_service.dart';
 
 /// Authentication provider using Firebase Auth + Django backend
 ///
@@ -50,12 +52,15 @@ class AuthProvider extends ChangeNotifier {
   String? _verificationTitle; // e.g. "H.E. (His/Her Excellency)"
   String? _verificationRole; // e.g. "Ambassador to the AU"
   String? _verificationName; // Real name from verification request
+  bool _isStaff = false;
+  bool _isUsher = false;
   bool _isLoading = false;
   String? _errorMessage;
   bool _requiresEmailVerification = false;
   bool _hasInitialized = false; // Guard against premature sign-out during startup
   bool _isSigningIn = false; // Guard against auth listener racing with active sign-in
   bool _receivesNewsletter = false;
+  List<String> _adminSections = [];
 
   bool get isAuthenticated => _isAuthenticated;
   int? get userId => _userId;
@@ -73,10 +78,16 @@ class AuthProvider extends ChangeNotifier {
   String? get verificationTitle => _verificationTitle;
   String? get verificationRole => _verificationRole;
   String? get verificationName => _verificationName;
+  bool get isStaff => _isStaff;
+  bool get isUsher => _isUsher;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get requiresEmailVerification => _requiresEmailVerification;
   bool get receivesNewsletter => _receivesNewsletter;
+  List<String> get adminSections => _adminSections;
+
+  /// Whether the user has a specific admin section assigned.
+  bool hasSection(String key) => _adminSections.contains(key);
 
   /// Whether the current user has an email/password credential (not SSO-only).
   /// Returns true for email/password users who can change their password.
@@ -151,6 +162,14 @@ class AuthProvider extends ChangeNotifier {
     _verificationRole = prefs.getString('user_verification_role');
     _verificationName = prefs.getString('user_verification_name');
     _receivesNewsletter = prefs.getBool('user_receives_newsletter') ?? false;
+    _isStaff = prefs.getBool('user_is_staff') ?? false;
+    _isUsher = prefs.getBool('user_is_usher') ?? false;
+    final sectionsJson = prefs.getString('user_admin_sections');
+    if (sectionsJson != null) {
+      _adminSections = List<String>.from(jsonDecode(sectionsJson));
+    } else {
+      _adminSections = [];
+    }
   }
 
   /// Check if user is already authenticated.
@@ -604,6 +623,7 @@ class AuthProvider extends ChangeNotifier {
 
     await _firebaseAuth.signOut();
     LikeService().clearAll();
+    await ContentCacheService().clearAll();
     await _clearUserData();
     _isAuthenticated = false;
     _errorMessage = null;
@@ -827,6 +847,15 @@ class AuthProvider extends ChangeNotifier {
     final verificationTitle = user['verification_title'] as String?;
     final verificationRole = user['verification_role'] as String?;
     final verificationName = user['verification_name'] as String?;
+    final isStaff = user['is_staff'] ?? false;
+
+    // is_usher: top-level or nested in profile
+    var isUsher = user['is_usher'];
+    if (isUsher == null && user['profile'] is Map) {
+      isUsher = user['profile']['is_usher'];
+    }
+    isUsher = isUsher ?? false;
+
     // receives_newsletter may be top-level or nested in profile
     var receivesNewsletter = user['receives_newsletter'];
     if (receivesNewsletter == null && user['profile'] is Map) {
@@ -893,6 +922,19 @@ class AuthProvider extends ChangeNotifier {
     _verificationName = verificationName;
     _receivesNewsletter = receivesNewsletter;
     await prefs.setBool('user_receives_newsletter', receivesNewsletter);
+    _isStaff = isStaff;
+    await prefs.setBool('user_is_staff', isStaff);
+    _isUsher = isUsher;
+    await prefs.setBool('user_is_usher', isUsher);
+
+    // admin_sections: top-level or nested in profile
+    var rawSections = user['admin_sections'];
+    if (rawSections == null && user['profile'] is Map) {
+      rawSections = user['profile']['admin_sections'];
+    }
+    final sections = (rawSections is List) ? rawSections.cast<String>().toList() : <String>[];
+    _adminSections = sections;
+    await prefs.setString('user_admin_sections', jsonEncode(sections));
 
     // Link the FCM token to the authenticated user
     try {
@@ -943,6 +985,8 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('user_verification_role');
     await prefs.remove('user_verification_name');
     await prefs.remove('user_receives_newsletter');
+    await prefs.remove('user_admin_sections');
+    await prefs.remove('user_is_usher');
     // Clear verification cache to prevent data leaking between accounts
     await prefs.remove('cached_is_verified');
     await prefs.remove('cached_verification_status');
@@ -965,6 +1009,8 @@ class AuthProvider extends ChangeNotifier {
     _verificationRole = null;
     _verificationName = null;
     _receivesNewsletter = false;
+    _isUsher = false;
+    _adminSections = [];
   }
 
   /// Clear error message

@@ -21,11 +21,87 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _submitted = false;
+  bool _hasTriedSubmit = false;
 
   // Dynamic form state
   final Map<String, TextEditingController> _formControllers = {};
   final Map<String, dynamic> _formValues = {};
   final Map<String, File> _pickedFiles = {};
+
+  // Phone country code state
+  String _phoneCountryCode = '+257'; // Default Burundi
+  String _phoneCountryFlag = '🇧🇮';
+
+  // Common African + international country codes
+  static const List<Map<String, String>> _phoneCodes = [
+    {'code': '+257', 'flag': '🇧🇮', 'name': 'Burundi'},
+    {'code': '+213', 'flag': '🇩🇿', 'name': 'Algeria'},
+    {'code': '+244', 'flag': '🇦🇴', 'name': 'Angola'},
+    {'code': '+229', 'flag': '🇧🇯', 'name': 'Benin'},
+    {'code': '+267', 'flag': '🇧🇼', 'name': 'Botswana'},
+    {'code': '+226', 'flag': '🇧🇫', 'name': 'Burkina Faso'},
+    {'code': '+238', 'flag': '🇨🇻', 'name': 'Cabo Verde'},
+    {'code': '+237', 'flag': '🇨🇲', 'name': 'Cameroon'},
+    {'code': '+236', 'flag': '🇨🇫', 'name': 'Central African Rep.'},
+    {'code': '+235', 'flag': '🇹🇩', 'name': 'Chad'},
+    {'code': '+269', 'flag': '🇰🇲', 'name': 'Comoros'},
+    {'code': '+242', 'flag': '🇨🇬', 'name': 'Congo (Brazzaville)'},
+    {'code': '+243', 'flag': '🇨🇩', 'name': 'Congo (DRC)'},
+    {'code': '+225', 'flag': '🇨🇮', 'name': "Côte d'Ivoire"},
+    {'code': '+253', 'flag': '🇩🇯', 'name': 'Djibouti'},
+    {'code': '+20', 'flag': '🇪🇬', 'name': 'Egypt'},
+    {'code': '+240', 'flag': '🇬🇶', 'name': 'Equatorial Guinea'},
+    {'code': '+291', 'flag': '🇪🇷', 'name': 'Eritrea'},
+    {'code': '+268', 'flag': '🇸🇿', 'name': 'Eswatini'},
+    {'code': '+251', 'flag': '🇪🇹', 'name': 'Ethiopia'},
+    {'code': '+241', 'flag': '🇬🇦', 'name': 'Gabon'},
+    {'code': '+220', 'flag': '🇬🇲', 'name': 'Gambia'},
+    {'code': '+233', 'flag': '🇬🇭', 'name': 'Ghana'},
+    {'code': '+224', 'flag': '🇬🇳', 'name': 'Guinea'},
+    {'code': '+245', 'flag': '🇬🇼', 'name': 'Guinea-Bissau'},
+    {'code': '+254', 'flag': '🇰🇪', 'name': 'Kenya'},
+    {'code': '+266', 'flag': '🇱🇸', 'name': 'Lesotho'},
+    {'code': '+231', 'flag': '🇱🇷', 'name': 'Liberia'},
+    {'code': '+218', 'flag': '🇱🇾', 'name': 'Libya'},
+    {'code': '+261', 'flag': '🇲🇬', 'name': 'Madagascar'},
+    {'code': '+265', 'flag': '🇲🇼', 'name': 'Malawi'},
+    {'code': '+223', 'flag': '🇲🇱', 'name': 'Mali'},
+    {'code': '+222', 'flag': '🇲🇷', 'name': 'Mauritania'},
+    {'code': '+230', 'flag': '🇲🇺', 'name': 'Mauritius'},
+    {'code': '+212', 'flag': '🇲🇦', 'name': 'Morocco'},
+    {'code': '+258', 'flag': '🇲🇿', 'name': 'Mozambique'},
+    {'code': '+264', 'flag': '🇳🇦', 'name': 'Namibia'},
+    {'code': '+227', 'flag': '🇳🇪', 'name': 'Niger'},
+    {'code': '+234', 'flag': '🇳🇬', 'name': 'Nigeria'},
+    {'code': '+250', 'flag': '🇷🇼', 'name': 'Rwanda'},
+    {'code': '+239', 'flag': '🇸🇹', 'name': 'São Tomé'},
+    {'code': '+221', 'flag': '🇸🇳', 'name': 'Senegal'},
+    {'code': '+248', 'flag': '🇸🇨', 'name': 'Seychelles'},
+    {'code': '+232', 'flag': '🇸🇱', 'name': 'Sierra Leone'},
+    {'code': '+252', 'flag': '🇸🇴', 'name': 'Somalia'},
+    {'code': '+27', 'flag': '🇿🇦', 'name': 'South Africa'},
+    {'code': '+211', 'flag': '🇸🇸', 'name': 'South Sudan'},
+    {'code': '+249', 'flag': '🇸🇩', 'name': 'Sudan'},
+    {'code': '+255', 'flag': '🇹🇿', 'name': 'Tanzania'},
+    {'code': '+228', 'flag': '🇹🇬', 'name': 'Togo'},
+    {'code': '+216', 'flag': '🇹🇳', 'name': 'Tunisia'},
+    {'code': '+256', 'flag': '🇺🇬', 'name': 'Uganda'},
+    {'code': '+260', 'flag': '🇿🇲', 'name': 'Zambia'},
+    {'code': '+263', 'flag': '🇿🇼', 'name': 'Zimbabwe'},
+    {'code': '+32', 'flag': '🇧🇪', 'name': 'Belgium'},
+    {'code': '+55', 'flag': '🇧🇷', 'name': 'Brazil'},
+    {'code': '+1', 'flag': '🇨🇦', 'name': 'Canada'},
+    {'code': '+86', 'flag': '🇨🇳', 'name': 'China'},
+    {'code': '+33', 'flag': '🇫🇷', 'name': 'France'},
+    {'code': '+49', 'flag': '🇩🇪', 'name': 'Germany'},
+    {'code': '+91', 'flag': '🇮🇳', 'name': 'India'},
+    {'code': '+81', 'flag': '🇯🇵', 'name': 'Japan'},
+    {'code': '+966', 'flag': '🇸🇦', 'name': 'Saudi Arabia'},
+    {'code': '+90', 'flag': '🇹🇷', 'name': 'Turkey'},
+    {'code': '+971', 'flag': '🇦🇪', 'name': 'UAE'},
+    {'code': '+44', 'flag': '🇬🇧', 'name': 'United Kingdom'},
+    {'code': '+1', 'flag': '🇺🇸', 'name': 'United States'},
+  ];
 
   // Country list for 'country' field type
   static const List<String> _countryList = [
@@ -44,6 +120,16 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     'Tanzania', 'Togo', 'Tunisia', 'Turkey', 'UAE', 'Uganda',
     'United Kingdom', 'United States', 'Zambia', 'Zimbabwe', 'Other',
   ];
+
+  /// Converts ISO 3166-1 alpha-2 code to regional indicator flag emoji
+  static String _countryCodeToFlag(String code) {
+    if (code.length != 2 || code == 'OTHER') return '';
+    final upper = code.toUpperCase();
+    return String.fromCharCodes([
+      upper.codeUnitAt(0) + 0x1F1E6 - 0x41,
+      upper.codeUnitAt(1) + 0x1F1E6 - 0x41,
+    ]);
+  }
 
   // Nationality list for 'nationality' field type
   static const List<Map<String, String>> _nationalities = [
@@ -132,7 +218,17 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    setState(() => _hasTriedSubmit = true);
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fix the errors highlighted in red below.'),
+          backgroundColor: AppColors.burundiRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     final authProvider = context.read<AuthProvider>();
     if (!authProvider.isEmailVerified) {
@@ -155,7 +251,12 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         if (!field.isActive) continue;
         final name = field.fieldName;
         if (_formControllers.containsKey(name)) {
-          formData[name] = _formControllers[name]!.text.trim();
+          var value = _formControllers[name]!.text.trim();
+          // Prepend country code for phone fields
+          if (field.fieldType == 'phone' && value.isNotEmpty && !value.startsWith('+')) {
+            value = '$_phoneCountryCode $value';
+          }
+          formData[name] = value;
         } else if (_formValues.containsKey(name)) {
           formData[name] = _formValues[name];
         }
@@ -166,17 +267,63 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       setState(() => _submitted = true);
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
-      );
+      _showErrorDialog(e.message);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Something went wrong. Please try again.'), backgroundColor: AppColors.burundiRed),
-      );
+      _showErrorDialog('Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showErrorDialog(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Split multi-line error messages into bullet points
+    final errors = message.split('\n').where((e) => e.trim().isNotEmpty).toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.burundiRed, size: 24),
+            const SizedBox(width: 10),
+            Text('Submission Error',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black87)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Please fix the following issues:',
+              style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black54)),
+            const SizedBox(height: 12),
+            ...errors.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('  \u2022  ', style: TextStyle(color: AppColors.burundiRed, fontWeight: FontWeight.bold)),
+                  Expanded(child: Text(e.trim(),
+                    style: TextStyle(fontSize: 14, height: 1.4,
+                      color: isDark ? Colors.white70 : Colors.black87))),
+                ],
+              ),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -185,50 +332,109 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     final langCode = Localizations.localeOf(context).languageCode;
 
     if (_submitted) {
+      final isFr = langCode == 'fr';
       return Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
-          title: const Text('Application Submitted'),
+          title: Text(isFr ? 'Candidature envoyée' : 'Application Submitted'),
           backgroundColor: AppColors.burundiGreen,
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check_circle_rounded, size: 48, color: AppColors.burundiGreen),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // Success icon
+              Container(
+                width: 90, height: 90,
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 24),
-                Text('Application Submitted!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
+                child: const Icon(Icons.check_circle_rounded, size: 54, color: AppColors.burundiGreen),
+              ),
+              const SizedBox(height: 24),
+              Text(isFr ? 'Candidature envoyée !' : 'Application Submitted!',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87)),
-                const SizedBox(height: 12),
-                Text('Your application has been received. We will review it and notify you of the outcome.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, height: 1.5, color: isDark ? Colors.white60 : Colors.black54)),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.burundiGreen,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Back to Youth Dialogue', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  ),
+              const SizedBox(height: 12),
+              Text(
+                isFr
+                    ? 'Votre candidature a été reçue avec succès et est en cours de traitement. Nous vous informerons dès qu\'une décision sera prise.'
+                    : 'Your application has been successfully received and is being processed. We will notify you as soon as a decision has been made.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, height: 1.6, color: isDark ? Colors.white60 : Colors.black54)),
+              const SizedBox(height: 28),
+              // Next steps card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.burundiGreen.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.12)),
                 ),
-              ],
-            ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 18, color: AppColors.burundiGreen),
+                        const SizedBox(width: 8),
+                        Text(isFr ? 'Prochaines étapes' : 'What happens next',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildStepRow('1', isFr ? 'Notre équipe examinera votre candidature' : 'Our team will review your application', isDark),
+                    _buildStepRow('2', isFr ? 'Vous recevrez une notification de la décision' : 'You will receive a notification with the decision', isDark),
+                    _buildStepRow('3', isFr ? 'Si accepté(e), téléchargez les documents requis' : 'If accepted, upload the required documents', isDark),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Email confirmation note
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF7FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.email_outlined, size: 20, color: isDark ? Colors.white38 : Colors.black38),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        isFr
+                            ? 'Un email de confirmation a été envoyé à votre adresse email.'
+                            : 'A confirmation email has been sent to your email address.',
+                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.burundiGreen,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text(isFr ? 'Retour au Dialogue des Jeunes' : 'Back to Youth Dialogue',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
           ),
         ),
       );
@@ -246,6 +452,9 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       ),
       body: Form(
         key: _formKey,
+        autovalidateMode: _hasTriedSubmit
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -310,6 +519,8 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
+            key: ValueKey('select_${field.fieldName}'),
+            value: _formValues[field.fieldName] as String?,
             decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
             hint: placeholder.isNotEmpty ? Text(placeholder) : null,
             isExpanded: true,
@@ -317,7 +528,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             items: options
                 .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
                 .toList(),
-            onChanged: (val) => _formValues[field.fieldName] = val,
+            onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
             validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
           ),
         );
@@ -326,13 +537,15 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
+            key: ValueKey('country_${field.fieldName}'),
+            value: _formValues[field.fieldName] as String?,
             decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
             isExpanded: true,
             menuMaxHeight: 300,
             items: _countryList
                 .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
                 .toList(),
-            onChanged: (val) => _formValues[field.fieldName] = val,
+            onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
             validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
           ),
         );
@@ -341,13 +554,29 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
+            key: ValueKey('nationality_${field.fieldName}'),
+            value: _formValues[field.fieldName] as String?,
             decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
             isExpanded: true,
             menuMaxHeight: 300,
             items: _nationalities
-                .map((n) => DropdownMenuItem(value: n['code'], child: Text(n['name']!, overflow: TextOverflow.ellipsis)))
+                .map((n) {
+                  final flag = _countryCodeToFlag(n['code']!);
+                  return DropdownMenuItem(
+                    value: n['code'],
+                    child: Row(
+                      children: [
+                        if (flag.isNotEmpty) ...[
+                          Text(flag, style: const TextStyle(fontSize: 18)),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(child: Text(n['name']!, overflow: TextOverflow.ellipsis)),
+                      ],
+                    ),
+                  );
+                })
                 .toList(),
-            onChanged: (val) => _formValues[field.fieldName] = val,
+            onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
             validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
           ),
         );
@@ -626,30 +855,109 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           ),
         );
 
+      case 'phone':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: TextFormField(
+            controller: _formControllers[field.fieldName],
+            keyboardType: TextInputType.phone,
+            decoration: _inputDecoration(label, placeholder.isNotEmpty ? placeholder : 'Phone number', helpText, isDark, field.isRequired).copyWith(
+              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+              prefixIcon: GestureDetector(
+                onTap: () => _showPhoneCodePicker(isDark),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_phoneCountryFlag, style: const TextStyle(fontSize: 18)),
+                      const SizedBox(width: 4),
+                      Text(_phoneCountryCode, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87)),
+                      Icon(Icons.arrow_drop_down, size: 16, color: isDark ? Colors.white54 : Colors.black45),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            validator: (v) {
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              return null;
+            },
+          ),
+        );
+
+      case 'email':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: TextFormField(
+            controller: _formControllers[field.fieldName],
+            keyboardType: TextInputType.emailAddress,
+            textCapitalization: TextCapitalization.none,
+            decoration: _inputDecoration(label, placeholder.isNotEmpty ? placeholder : 'your.email@example.com', helpText, isDark, field.isRequired),
+            validator: (v) {
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              if (v != null && v.isNotEmpty) {
+                final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
+              }
+              return null;
+            },
+          ),
+        );
+
       default:
-        // text, email, phone, number, passport, url
-        final isEmailField = field.fieldName == 'email';
+        // text, number, passport, url
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
           child: TextFormField(
             controller: _formControllers[field.fieldName],
             keyboardType: _getKeyboardType(field.fieldType),
-            readOnly: isEmailField,
             textCapitalization: field.fieldType == 'text' ? TextCapitalization.words : TextCapitalization.none,
-            decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired).copyWith(
-              suffixIcon: isEmailField ? const Icon(Icons.lock_outline, size: 18, color: Colors.grey) : null,
-            ),
+            decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired),
             validator: (v) {
               if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
               if (field.validationRegex.isNotEmpty && v != null && v.isNotEmpty) {
-                final regex = RegExp(field.validationRegex);
-                if (!regex.hasMatch(v)) return 'Invalid format';
+                try {
+                  final regex = RegExp(field.validationRegex);
+                  if (!regex.hasMatch(v)) return 'Invalid format';
+                } catch (_) {
+                  // Skip broken regex
+                }
               }
               return null;
             },
           ),
         );
     }
+  }
+
+  Widget _buildStepRow(String number, String text, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24, height: 24,
+            decoration: BoxDecoration(
+              color: AppColors.burundiGreen.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(number, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(text, style: TextStyle(fontSize: 13, height: 1.4, color: isDark ? Colors.white70 : Colors.black54)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildEmailVerificationBanner(bool isDark) {
@@ -689,6 +997,102 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     );
   }
 
+  void _showPhoneCodePicker(bool isDark) {
+    final searchController = TextEditingController();
+    List<Map<String, String>> filtered = List.from(_phoneCodes);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              minChildSize: 0.4,
+              maxChildSize: 0.85,
+              expand: false,
+              builder: (ctx, scrollController) {
+                return Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.black12,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: TextField(
+                        controller: searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search country...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        onChanged: (query) {
+                          setSheetState(() {
+                            final q = query.toLowerCase();
+                            filtered = _phoneCodes.where((c) =>
+                              c['name']!.toLowerCase().contains(q) ||
+                              c['code']!.contains(q)
+                            ).toList();
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (ctx, i) {
+                          final country = filtered[i];
+                          final isSelected = country['code'] == _phoneCountryCode && country['flag'] == _phoneCountryFlag;
+                          return ListTile(
+                            leading: Text(country['flag']!, style: const TextStyle(fontSize: 24)),
+                            title: Text(country['name']!, style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black87,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            )),
+                            trailing: Text(country['code']!, style: TextStyle(
+                              color: isSelected ? AppColors.burundiGreen : (isDark ? Colors.white54 : Colors.black45),
+                              fontWeight: FontWeight.w500,
+                            )),
+                            selected: isSelected,
+                            selectedTileColor: AppColors.burundiGreen.withValues(alpha: 0.08),
+                            onTap: () {
+                              setState(() {
+                                _phoneCountryCode = country['code']!;
+                                _phoneCountryFlag = country['flag']!;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   InputDecoration _inputDecoration(String label, String? placeholder, String? helpText, bool isDark, bool required) {
     return InputDecoration(
       labelText: required ? '$label *' : label,
@@ -708,6 +1112,28 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.burundiGreen, width: 2),
       ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.burundiRed, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.burundiRed, width: 2),
+      ),
+      errorStyle: const TextStyle(
+        color: AppColors.burundiRed,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+      ),
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+        if (states.contains(WidgetState.error)) {
+          return const TextStyle(color: AppColors.burundiRed, fontWeight: FontWeight.w600);
+        }
+        if (states.contains(WidgetState.focused)) {
+          return const TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w500);
+        }
+        return TextStyle(color: isDark ? Colors.white60 : Colors.black54);
+      }),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
   }

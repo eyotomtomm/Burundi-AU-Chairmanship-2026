@@ -5,6 +5,7 @@ import re
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import os
+from PIL import Image
 
 
 def validate_image_file(file):
@@ -44,6 +45,16 @@ def validate_image_file(file):
 
     if not valid_content:
         raise ValidationError('File content does not match a valid image format.')
+
+    # Structurally validate the image using PIL (catches crafted/corrupt files
+    # that have valid magic bytes but malicious or broken internal structure).
+    try:
+        file.seek(0)
+        img = Image.open(file)
+        img.verify()
+        file.seek(0)
+    except Exception:
+        raise ValidationError('Image file is corrupt or has an invalid internal structure.')
 
     return file
 
@@ -390,6 +401,193 @@ def validate_professional_email(email):
         )
 
     return email
+
+
+def check_profanity(text):
+    """
+    Check text for profanity in English and French.
+    Returns (is_clean, matched_word) tuple.
+    Uses word-boundary matching to avoid false positives on substrings.
+    """
+    # Normalize: lowercase, strip extra spaces
+    normalized = text.lower()
+
+    # Common English profane/offensive words
+    EN_WORDS = {
+        'fuck', 'fucking', 'fucked', 'fucker', 'fuckers', 'fucks',
+        'shit', 'shitty', 'shitting', 'bullshit',
+        'ass', 'asshole', 'assholes',
+        'bitch', 'bitches', 'bitching',
+        'damn', 'damned', 'dammit',
+        'dick', 'dicks', 'dickhead',
+        'pussy', 'pussies',
+        'cock', 'cocks', 'cocksucker',
+        'cunt', 'cunts',
+        'bastard', 'bastards',
+        'whore', 'whores',
+        'slut', 'sluts',
+        'nigger', 'niggers', 'nigga', 'niggas',
+        'retard', 'retarded', 'retards',
+        'faggot', 'faggots', 'fag', 'fags',
+        'motherfucker', 'motherfuckers', 'motherfucking',
+        'wanker', 'wankers',
+        'twat', 'twats',
+        'piss', 'pissed', 'pissing',
+        'crap', 'crappy',
+        'douche', 'douchebag',
+        'jackass',
+        'scumbag', 'scumbags',
+        'idiot', 'idiots', 'idiotic',
+        'stupid', 'stupids',
+        'moron', 'morons',
+        'imbecile', 'imbeciles',
+        'kill yourself', 'kys',
+        'stfu', 'gtfo', 'wtf', 'lmfao',
+    }
+
+    # Common French profane/offensive words (incl. African French variants)
+    FR_WORDS = {
+        'merde', 'merdique', 'merdes', 'merdeux', 'merdeuse',
+        'putain', 'putains',
+        'connard', 'connards', 'connasse', 'connasses',
+        'salaud', 'salauds', 'salope', 'salopes', 'saloperie',
+        'enculer', 'encule', 'enculé', 'enculés', 'enculée',
+        'foutre', 'fous', 'foutu', 'foutue', 'foutez',
+        'bordel',
+        'batard', 'bâtard', 'batards', 'bâtards',
+        'nique', 'niquer', 'niqué', 'niquée', 'niques',
+        'pute', 'putes',
+        'con', 'cons', 'conne', 'connes',
+        'bite', 'bites',
+        'couille', 'couilles', 'couillon', 'couillons',
+        'chier', 'chié', 'chierie', 'chieur', 'chieuse',
+        'dégueulasse', 'degueulasse',
+        'enfoiré', 'enfoire', 'enfoirés', 'enfoires', 'enfoirée',
+        'abruti', 'abrutie', 'abrutis',
+        'crétin', 'cretin', 'crétins', 'cretins', 'crétine',
+        'imbécile', 'imbecile', 'imbéciles',
+        'idiot', 'idiote', 'idiots',
+        'débile', 'debile', 'débiles',
+        'ta gueule', 'ferme ta gueule',
+        'va te faire foutre',
+        'fils de pute', 'fils de putain',
+        'nègre', 'negre', 'nègres',
+        'pd', 'pédé', 'pede', 'pédés',
+        # Additional French vulgarities and slurs
+        'branleur', 'branleurs', 'branleuse',
+        'bouffon', 'bouffons', 'bouffonne',
+        'clochard', 'clochards', 'clocharde',
+        'pouffiasse', 'poufiasse',
+        'garce', 'garces',
+        'ordure', 'ordures',
+        'raclure', 'raclures',
+        'trouduc', 'trou du cul',
+        'petasse', 'pétasse',
+        'emmerdeur', 'emmerdeuse', 'emmerder',
+        'niquer sa mère', 'nique ta mère',
+        'casse-toi', 'dégage',
+        'sous-merde', 'sous merde',
+        'encul', 'fdp',
+        'tg', 'ntm', 'ntkm',
+    }
+
+    ALL_WORDS = EN_WORDS | FR_WORDS
+
+    # Check multi-word phrases first
+    phrases = [w for w in ALL_WORDS if ' ' in w]
+    for phrase in phrases:
+        if phrase in normalized:
+            return False, phrase
+
+    # Check single words with word boundaries
+    for word in ALL_WORDS:
+        if ' ' in word:
+            continue
+        pattern = r'\b' + re.escape(word) + r'\b'
+        if re.search(pattern, normalized):
+            return False, word
+
+    return True, None
+
+
+PROFANITY_STRIKE_LIMIT = 5
+
+
+def check_comment_ban(user, device_id):
+    """
+    Check whether the user or device is banned from commenting.
+    Returns (is_banned: bool, reason: str|None).
+    """
+    from .models import DeviceBan
+
+    # User-level ban
+    profile = getattr(user, 'profile', None)
+    if profile and profile.is_comment_banned:
+        return True, 'You have been permanently banned from commenting due to repeated profanity violations.'
+
+    # Device-level ban
+    if device_id:
+        device_ban = DeviceBan.objects.filter(device_id=device_id, is_active=True).first()
+        if device_ban:
+            # Also auto-flag this user if they aren't already banned
+            if profile and not profile.is_comment_banned:
+                profile.is_comment_banned = True
+                profile.comment_banned_at = __import__('django.utils.timezone', fromlist=['now']).now()
+                profile.save(update_fields=['is_comment_banned', 'comment_banned_at'])
+            return True, 'This device has been banned from commenting due to repeated profanity violations.'
+
+    return False, None
+
+
+def record_profanity_strike(user, device_id, flagged_content='', matched_word='', content_type='', user_agent=''):
+    """
+    Increment profanity strikes for a user. At PROFANITY_STRIKE_LIMIT strikes,
+    auto-ban the user and create a DeviceBan entry.
+    Also logs the violation to ProfanityStrikeLog for admin review.
+    Returns (strike_count: int, is_now_banned: bool).
+    """
+    from django.utils import timezone as tz
+    from .models import DeviceBan, ProfanityStrikeLog
+
+    profile = getattr(user, 'profile', None)
+    if not profile:
+        return 0, False
+
+    profile.profanity_strikes += 1
+    update_fields = ['profanity_strikes']
+
+    is_now_banned = profile.profanity_strikes >= PROFANITY_STRIKE_LIMIT
+
+    if is_now_banned:
+        profile.is_comment_banned = True
+        profile.comment_banned_at = tz.now()
+        update_fields += ['is_comment_banned', 'comment_banned_at']
+
+        # Create device ban if device_id is known
+        if device_id:
+            DeviceBan.objects.get_or_create(
+                device_id=device_id,
+                defaults={
+                    'user': user,
+                    'reason': f'Auto-ban: user {user.username} reached {PROFANITY_STRIKE_LIMIT} profanity strikes',
+                },
+            )
+
+    profile.save(update_fields=update_fields)
+
+    # Log the violation for admin review
+    ProfanityStrikeLog.objects.create(
+        user=user,
+        device_id=device_id,
+        user_agent=(user_agent or '')[:1000],
+        flagged_content=flagged_content,
+        matched_word=matched_word or '',
+        content_type=content_type,
+        strike_number=profile.profanity_strikes,
+        resulted_in_ban=is_now_banned,
+    )
+
+    return profile.profanity_strikes, is_now_banned
 
 
 def validate_social_media_url(platform, url):

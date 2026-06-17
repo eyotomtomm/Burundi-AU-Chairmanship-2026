@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/live_feed_socket_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
 import 'video_player_screen.dart';
@@ -35,6 +38,11 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   String? _error;
   Timer? _countdownTimer;
 
+  // WebSocket
+  late final LiveFeedSocketService _socketService;
+  final List<StreamSubscription> _socketSubs = [];
+  int? _watchingFeedId;
+
   @override
   void initState() {
     super.initState();
@@ -52,10 +60,17 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
 
     _loadData();
 
-    // Update countdown every minute
-    _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    // Lightweight countdown timer for "In Xh Ym" text (no network calls)
+    _countdownTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted) setState(() {});
     });
+
+    // WebSocket for real-time updates
+    _socketService = LiveFeedSocketService();
+    _socketService.connect();
+    _socketSubs.add(_socketService.onFeedStarted.listen(_handleFeedStarted));
+    _socketSubs.add(_socketService.onFeedEnded.listen(_handleFeedEnded));
+    _socketSubs.add(_socketService.onViewerCount.listen(_handleViewerCount));
   }
 
   Future<void> _loadData() async {
@@ -98,6 +113,10 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    for (final sub in _socketSubs) {
+      sub.cancel();
+    }
+    _socketService.dispose();
     _tabController.dispose();
     _pulseController.dispose();
     _countdownTimer?.cancel();
@@ -107,13 +126,68 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // Rebuild when app returns from background (e.g., after calendar app closes)
-    if (state == AppLifecycleState.resumed) {
-      if (mounted) {
+    // Refresh data when app returns from background; socket reconnects itself.
+    if (state == AppLifecycleState.resumed && mounted) {
+      _loadData();
+    }
+  }
+
+  // ── WebSocket event handlers ──────────────────────────────────────────
+
+  void _handleFeedStarted(FeedStartedEvent event) async {
+    // Re-fetch live feeds from REST to get the full ApiLiveFeed object
+    // (the WebSocket payload is intentionally minimal).
+    try {
+      final api = ApiService();
+      final liveFeeds = await api.getLiveFeeds(status: 'live');
+      if (!mounted) return;
+
+      // Also remove the newly-live feed from upcoming if it was there
+      final updatedUpcoming = _upcomingFeeds
+          .where((f) => f.id != event.feedId)
+          .toList();
+
+      setState(() {
+        _liveFeeds = liveFeeds;
+        _upcomingFeeds = updatedUpcoming;
+      });
+    } catch (_) {
+      // REST fetch failed — at minimum, remove from upcoming
+      if (!mounted) return;
+      final wasUpcoming = _upcomingFeeds.any((f) => f.id == event.feedId);
+      if (wasUpcoming) {
         setState(() {
-          // Force rebuild to ensure UI is properly restored
+          _upcomingFeeds = _upcomingFeeds
+              .where((f) => f.id != event.feedId)
+              .toList();
         });
       }
+    }
+  }
+
+  void _handleFeedEnded(FeedEndedEvent event) {
+    if (!mounted) return;
+
+    final index = _liveFeeds.indexWhere((f) => f.id == event.feedId);
+    if (index == -1) return;
+
+    final feed = _liveFeeds[index];
+    setState(() {
+      _liveFeeds = List.of(_liveFeeds)..removeAt(index);
+      _recordedFeeds = [feed, ..._recordedFeeds];
+    });
+  }
+
+  void _handleViewerCount(ViewerCountEvent event) {
+    if (!mounted) return;
+
+    final index = _liveFeeds.indexWhere((f) => f.id == event.feedId);
+    if (index == -1) return;
+
+    if (_liveFeeds[index].viewerCount != event.viewerCount) {
+      setState(() {
+        _liveFeeds[index].viewerCount = event.viewerCount;
+      });
     }
   }
 
@@ -295,25 +369,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                   ),
                 ),
               ),
-              // Subtitle badge
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'AU Summit 2026',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -442,6 +497,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 child: feed.thumbnail.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: feed.thumbnail,
+                        memCacheWidth: 800,
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(
                           decoration: const BoxDecoration(
@@ -723,6 +779,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
               feed.thumbnail.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: feed.thumbnail,
+                      memCacheWidth: 400,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.burundiRed.withValues(alpha: 0.3)),
                       errorWidget: (_, _, _) => Container(
@@ -845,6 +902,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                     feed.thumbnail.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: feed.thumbnail,
+                            memCacheWidth: 400,
                             fit: BoxFit.cover,
                             placeholder: (_, _) => Container(
                               color: AppColors.auGold.withValues(alpha: 0.15),
@@ -1041,6 +1099,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                     feed.thumbnail.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: feed.thumbnail,
+                            memCacheWidth: 400,
                             fit: BoxFit.cover,
                             placeholder: (_, _) => Container(
                               color: AppColors.burundiGreen
@@ -1323,9 +1382,20 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       return;
     }
 
+    // Track viewer presence for live feeds
+    if (feed.isLive) {
+      if (_watchingFeedId != null && _watchingFeedId != feed.id) {
+        _socketService.leaveFeed(_watchingFeedId!);
+      }
+      _watchingFeedId = feed.id;
+      _socketService.joinFeed(feed.id);
+    }
+
+    late final Future<Object?> navigationResult;
+
     if (feed.isYouTube) {
       // YouTube → embedded YouTube player
-      Navigator.push(
+      navigationResult = Navigator.push(
         context,
         CupertinoPageRoute(
           builder: (_) => YouTubePlayerScreen(feed: feed),
@@ -1336,17 +1406,33 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       // WebView join doesn't work because these platforms use WebRTC + proprietary SDKs
       // that are not supported inside flutter's WKWebView / Android WebView.
       _showMeetingCredentials(feed);
+      return; // Modal handles its own flow; no navigation push to await
     } else if (feed.streamType == 'external') {
       // Generic external links → in-app WebView
-      _openInWebView(feed);
-    } else {
-      // Direct video streams (MP4/HLS) → chewie player
-      Navigator.push(
+      navigationResult = Navigator.push(
         context,
         CupertinoPageRoute(
-          builder: (_) => VideoPlayerScreen(feed: feed),
+          builder: (_) => InAppWebViewScreen(feed: feed),
         ),
       );
+    } else {
+      // Direct video streams (MP4/HLS) → chewie player
+      navigationResult = Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => VideoPlayerScreen(feed: feed, scrollToComments: context.read<AuthProvider>().isAuthenticated),
+        ),
+      );
+    }
+
+    // When user navigates back, leave the feed
+    if (feed.isLive) {
+      navigationResult.then((_) {
+        if (_watchingFeedId == feed.id) {
+          _socketService.leaveFeed(feed.id);
+          _watchingFeedId = null;
+        }
+      });
     }
   }
 
@@ -1448,15 +1534,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
     }
 
     return null;
-  }
-
-  void _openInWebView(ApiLiveFeed feed) {
-    Navigator.push(
-      context,
-      CupertinoPageRoute(
-        builder: (_) => InAppWebViewScreen(feed: feed),
-      ),
-    );
   }
 
   void _showMeetingCredentials(ApiLiveFeed feed) {
@@ -1620,7 +1697,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                           ? Colors.white.withValues(alpha: 0.08)
                           : Colors.grey[200],
                       backgroundImage: (photo != null && photo.isNotEmpty)
-                          ? CachedNetworkImageProvider(photo)
+                          ? CachedNetworkImageProvider(photo, maxWidth: 100)
                           : null,
                       child: (photo == null || photo.isEmpty)
                           ? Icon(Icons.person,

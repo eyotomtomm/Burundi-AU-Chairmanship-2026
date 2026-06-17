@@ -6,16 +6,23 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-8">
     <div class="flex items-center gap-4">
+      <a href="{% url 'custom_admin:youth_dialogue_list' %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+        <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+      </a>
       <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg">
         <span class="material-symbols-outlined text-3xl text-white" style="font-variation-settings: 'FILL' 1">forum</span>
       </div>
       <div>
-        <h1 class="text-3xl font-bold text-slate-900 font-headline">Youth Dialogue</h1>
-        <p class="text-sm text-slate-500 mt-1">Manage Youth Dialogue Programme applications</p>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">{{ yd_event.programme_title }}</h1>
+        <p class="text-sm text-slate-500 mt-1">
+          Applications
+          {% if yd_event.location %} &middot; {{ yd_event.location }}{% endif %}
+          {% if yd_event.is_active %}<span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">Active</span>{% endif %}
+        </p>
       </div>
     </div>
     <div class="flex items-center gap-3">
-      <a href="{% url 'custom_admin:youth_dialogue_export_csv' %}"
+      <a href="{% url 'custom_admin:youth_dialogue_export_csv' event_pk=yd_event.pk %}"
          class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
         <span class="material-symbols-outlined text-sm">download</span>
         Export CSV
@@ -90,7 +97,7 @@
 
   <!-- Filter Tabs -->
   <div class="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-slate-100 flex-wrap">
-    <a href="{% url 'custom_admin:youth_dialogue_list' %}{% if search_query %}?q={{ search_query }}{% endif %}"
+    <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}{% if search_query %}?q={{ search_query }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if not current_filter %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       All
     </a>
@@ -155,7 +162,7 @@
                 </div>
               </div>
             </td>
-            <td class="px-6 py-4 text-sm text-slate-700">{{ app.get_nationality_display|default:"—" }}</td>
+            <td class="px-6 py-4 text-sm text-slate-700">{{ app.nationality_flag }} {{ app.get_nationality_display|default:"—" }}</td>
             <td class="px-6 py-4 text-sm text-slate-700">{{ app.organization|default:"—" }}</td>
             <td class="px-6 py-4">
               <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold

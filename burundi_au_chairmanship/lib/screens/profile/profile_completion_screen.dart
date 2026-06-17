@@ -20,6 +20,8 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   String? _selectedGender;
   String? _selectedNationality;
+  String _selectedPhoneCountry = 'BI';
+  String _selectedPhoneCode = '+257';
   DateTime? _selectedDob;
   bool _isLoading = false;
 
@@ -29,11 +31,35 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     // Pre-fill with existing data
     final authProvider = context.read<AuthProvider>();
     _nameController.text = authProvider.userName ?? '';
-    _phoneController.text = authProvider.phoneNumber ?? '';
     _selectedGender = authProvider.gender;
     _selectedNationality = authProvider.nationality;
     if (authProvider.dateOfBirth != null && authProvider.dateOfBirth!.isNotEmpty) {
       try { _selectedDob = DateTime.parse(authProvider.dateOfBirth!); } catch (_) {}
+    }
+
+    // Sync phone country code from nationality
+    if (authProvider.nationality != null &&
+        AppConstants.countryDialCodes.containsKey(authProvider.nationality)) {
+      _selectedPhoneCountry = authProvider.nationality!;
+      _selectedPhoneCode = AppConstants.countryDialCodes[authProvider.nationality!]!;
+    }
+
+    // Parse existing phone number: strip dial code prefix if present
+    final existingPhone = authProvider.phoneNumber ?? '';
+    if (existingPhone.isNotEmpty) {
+      bool found = false;
+      for (final entry in AppConstants.countryDialCodes.entries) {
+        if (existingPhone.startsWith(entry.value)) {
+          _selectedPhoneCountry = entry.key;
+          _selectedPhoneCode = entry.value;
+          _phoneController.text = existingPhone.substring(entry.value.length).trim();
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        _phoneController.text = existingPhone;
+      }
     }
   }
 
@@ -212,33 +238,170 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Country code selector with flag
+            GestureDetector(
+              onTap: () => _showPhoneCountryPicker(isDark),
+              child: Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      AppConstants.countryFlag(_selectedPhoneCountry),
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _selectedPhoneCode,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(Icons.keyboard_arrow_down, size: 18, color: isDark ? Colors.white54 : Colors.black45),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Phone number input
+            Expanded(
+              child: TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: InputDecoration(
+                  hintText: 'Phone number (optional)',
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                  filled: true,
+                  fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.burundiGreen, width: 2),
+                  ),
+                ),
+              ),
+            ),
           ],
-          decoration: InputDecoration(
-            hintText: 'Phone number (optional)',
-            prefixIcon: const Icon(Icons.phone_outlined),
-            filled: true,
-            fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.burundiGreen, width: 2),
-            ),
-          ),
         ),
-        const SizedBox(height: 8),
       ],
+    );
+  }
+
+  void _showPhoneCountryPicker(bool isDark) {
+    String searchQuery = '';
+    final entries = AppConstants.countryDialCodes.entries
+        .where((e) => AppConstants.nationalityChoices.containsKey(e.key))
+        .toList();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final filtered = entries.where((e) {
+              final name = AppConstants.nationalityChoices[e.key]?.toLowerCase() ?? '';
+              final code = e.value.toLowerCase();
+              final query = searchQuery.toLowerCase();
+              return name.contains(query) || code.contains(query) || e.key.toLowerCase().contains(query);
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              maxChildSize: 0.85,
+              minChildSize: 0.4,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: TextField(
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Search country...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        onChanged: (value) => setSheetState(() => searchQuery = value),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final entry = filtered[index];
+                          final countryName = AppConstants.nationalityChoices[entry.key] ?? entry.key;
+                          final isSelected = entry.key == _selectedPhoneCountry;
+                          return ListTile(
+                            leading: Text(
+                              AppConstants.countryFlag(entry.key),
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                            title: Text(countryName),
+                            trailing: Text(
+                              entry.value,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? AppColors.burundiGreen : null,
+                              ),
+                            ),
+                            selected: isSelected,
+                            onTap: () {
+                              setState(() {
+                                _selectedPhoneCountry = entry.key;
+                                _selectedPhoneCode = entry.value;
+                              });
+                              Navigator.pop(sheetContext);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 
@@ -352,13 +515,22 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
             ),
           ),
           items: AppConstants.nationalityChoices.entries.map((entry) {
+            final flag = AppConstants.countryFlag(entry.key);
             return DropdownMenuItem<String>(
               value: entry.key,
-              child: Text(entry.value),
+              child: Text('$flag  ${entry.value}', style: const TextStyle(fontSize: 15)),
             );
           }).toList(),
           onChanged: (value) {
-            setState(() => _selectedNationality = value);
+            setState(() {
+              _selectedNationality = value;
+              // Auto-sync phone country code when nationality changes
+              if (value != null && value != 'OTHER' &&
+                  AppConstants.countryDialCodes.containsKey(value)) {
+                _selectedPhoneCountry = value;
+                _selectedPhoneCode = AppConstants.countryDialCodes[value]!;
+              }
+            });
           },
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -526,12 +698,16 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       final authProvider = context.read<AuthProvider>();
       final dobString = '${_selectedDob!.year}-${_selectedDob!.month.toString().padLeft(2, '0')}-${_selectedDob!.day.toString().padLeft(2, '0')}';
 
+      // Prepend country code to phone number if provided
+      final rawPhone = _phoneController.text.trim();
+      final fullPhone = rawPhone.isNotEmpty ? '$_selectedPhoneCode$rawPhone' : '';
+
       final success = await authProvider.updateProfile(
         _nameController.text.trim(),
         gender: _selectedGender,
         nationality: _selectedNationality,
         dateOfBirth: dobString,
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber: fullPhone,
       );
 
       if (success && mounted) {

@@ -9,7 +9,12 @@ transparently captured (subject, recipients, status, error, body preview),
 so the admin "Email Logs" page can show sent + failed mail without
 touching Gmail.
 """
+import re
+
 from django.core.mail.backends.smtp import EmailBackend as SMTPEmailBackend
+
+_OTP_RE = re.compile(r'\b\d{4,8}\b')
+_PASSWORD_RE = re.compile(r'(Temporary Password:\s*)(\S+)', re.IGNORECASE)
 
 
 def _categorize(subject: str) -> str:
@@ -21,6 +26,8 @@ def _categorize(subject: str) -> str:
         return 'verification'
     if 'otp' in s or 'code' in s or 'login' in s or 'reset' in s:
         return 'otp'
+    if 'admin' in s and 'access' in s:
+        return 'admin_invite'
     if 'event' in s or 'registration' in s or 'ticket' in s:
         return 'event'
     if 'support' in s or 'ticket' in s:
@@ -30,8 +37,12 @@ def _categorize(subject: str) -> str:
     return 'other'
 
 
-def _body_preview(msg) -> str:
-    """Extract a short body preview from an EmailMessage / EmailMultiAlternatives."""
+def _body_preview(msg, redact: bool = False) -> str:
+    """Extract a short body preview from an EmailMessage / EmailMultiAlternatives.
+
+    When *redact* is True, credentials and OTP codes are replaced with
+    ``[REDACTED]`` so the log never stores live secrets.
+    """
     try:
         text = msg.body or ''
         # If multipart with HTML alt, prefer stripped HTML
@@ -40,7 +51,11 @@ def _body_preview(msg) -> str:
                 if mimetype == 'text/html':
                     text = content
                     break
-        return (text or '')[:500]
+        preview = (text or '')[:500]
+        if redact:
+            preview = _OTP_RE.sub('[REDACTED]', preview)
+            preview = _PASSWORD_RE.sub(r'\1[REDACTED]', preview)
+        return preview
     except Exception:
         return ''
 
@@ -60,8 +75,9 @@ class LoggingEmailBackend(SMTPEmailBackend):
             subject = getattr(msg, 'subject', '') or ''
             recipients = ', '.join(getattr(msg, 'to', []) or [])
             from_email = getattr(msg, 'from_email', '') or ''
-            body_preview = _body_preview(msg)
             category = _categorize(subject)
+            redact = category in ('otp', 'verification', 'admin_invite')
+            body_preview = _body_preview(msg, redact=redact)
 
             try:
                 sent = super().send_messages([msg]) or 0

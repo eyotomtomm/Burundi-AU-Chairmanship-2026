@@ -1,5 +1,5 @@
 # Define a global platform for your project
-platform :ios, '15.0'
+platform :ios, '15.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -43,7 +43,7 @@ post_install do |installer|
 
     # Set minimum deployment target to iOS 15.0
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
       # Fix module verification errors with Xcode 16+
       config.build_settings['OTHER_SWIFT_FLAGS'] ||= ['$(inherited)']
       config.build_settings['DEFINES_MODULE'] = 'YES'

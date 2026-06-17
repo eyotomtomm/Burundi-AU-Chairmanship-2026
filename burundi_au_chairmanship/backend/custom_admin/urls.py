@@ -7,6 +7,7 @@ urlpatterns = [
     # Auth
     path('', views.admin_login, name='login'),
     path('logout/', views.admin_logout, name='logout'),
+    path('force-password-change/', views.force_password_change, name='force_password_change'),
 
     # Dashboard
     path('dashboard/', views.dashboard, name='dashboard'),
@@ -183,6 +184,7 @@ urlpatterns = [
     path('email-campaigns/create/', views.email_campaign_create, name='email_campaign_create'),
     path('email-campaigns/<int:pk>/edit/', views.email_campaign_edit, name='email_campaign_edit'),
     path('email-campaigns/<int:pk>/send/', views.email_campaign_send, name='email_campaign_send'),
+    path('email-campaigns/<int:pk>/send/confirm/', views.email_campaign_send_confirm, name='email_campaign_send_confirm'),
     path('email-campaigns/<int:pk>/delete/', views.email_campaign_delete, name='email_campaign_delete'),
 
     # Email Logs (sent + failed history)
@@ -322,6 +324,7 @@ urlpatterns = [
     path('comments/', views.comments_list, name='comments_list'),
     path('comments/<int:pk>/delete/', views.comment_delete, name='comment_delete'),
     path('comments/bulk-delete/', views.comment_bulk_delete, name='comment_bulk_delete'),
+    path('comments/<int:user_pk>/toggle-ban/', views.comment_toggle_ban, name='comment_toggle_ban'),
 
     # Error Tracking (Sentry)
     path('error-tracking/', views.error_tracking_dashboard, name='error_tracking'),
@@ -333,11 +336,24 @@ urlpatterns = [
     # Media Library (Browse existing Spaces images)
     path('media-library/api/', views.media_library_api, name='media_library_api'),
 
-    # Youth Dialogue
-    path('youth-dialogue/', views.youth_dialogue_list, name='youth_dialogue_list'),
-    path('youth-dialogue/settings/', views.youth_dialogue_settings, name='youth_dialogue_settings'),
-    path('youth-dialogue/<int:pk>/review/', views.youth_dialogue_review, name='youth_dialogue_review'),
-    path('youth-dialogue/export-csv/', views.youth_dialogue_export_csv, name='youth_dialogue_export_csv'),
-    path('youth-dialogue/<int:pk>/id-card-pdf/', views.youth_dialogue_id_card_pdf, name='youth_dialogue_id_card_pdf'),
+    # Youth Dialogue (Multi-Event)
+    path('youth-dialogue/', views.youth_dialogue_events_list, name='youth_dialogue_list'),
+    path('youth-dialogue/create/', views.youth_dialogue_event_form, name='youth_dialogue_event_create'),
+    path('youth-dialogue/<int:event_pk>/edit/', views.youth_dialogue_event_form, name='youth_dialogue_event_edit'),
+    path('youth-dialogue/<int:event_pk>/toggle-active/', views.youth_dialogue_toggle_active, name='youth_dialogue_toggle_active'),
+    path('youth-dialogue/<int:event_pk>/applications/', views.youth_dialogue_applications_list, name='youth_dialogue_applications_list'),
+    path('youth-dialogue/<int:event_pk>/media/', views.youth_dialogue_media_list, name='youth_dialogue_media_list'),
+    path('youth-dialogue/<int:event_pk>/media/create/', views.youth_dialogue_media_form, name='youth_dialogue_media_create'),
+    path('youth-dialogue/<int:event_pk>/media/<int:pk>/edit/', views.youth_dialogue_media_form, name='youth_dialogue_media_edit'),
+    path('youth-dialogue/<int:event_pk>/media/<int:pk>/delete/', views.youth_dialogue_media_delete, name='youth_dialogue_media_delete'),
+    path('youth-dialogue/applications/<int:pk>/review/', views.youth_dialogue_review, name='youth_dialogue_review'),
+    path('youth-dialogue/<int:event_pk>/export-csv/', views.youth_dialogue_export_csv, name='youth_dialogue_export_csv'),
+    path('youth-dialogue/applications/<int:pk>/id-card-pdf/', views.youth_dialogue_id_card_pdf, name='youth_dialogue_id_card_pdf'),
+    path('youth-dialogue/verify/', views.youth_dialogue_verify_qr, name='youth_dialogue_verify_qr'),
+
+    # Comment Ban Management
+    path('users/<int:pk>/toggle-comment-ban/', views.user_toggle_comment_ban, name='user_toggle_comment_ban'),
+    path('device-bans/', views.device_bans_list, name='device_bans_list'),
+    path('device-bans/<int:pk>/unban/', views.device_ban_unban, name='device_ban_unban'),
 
 ]

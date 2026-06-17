@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../config/app_colors.dart';
 import '../../models/api_models.dart';
+import '../../widgets/fullscreen_back_button.dart';
 
 class InAppWebViewScreen extends StatefulWidget {
   final ApiLiveFeed feed;
@@ -19,13 +21,78 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
   bool _hasError = false;
   String _errorMessage = '';
 
+  /// The allowed host for this WebView session, derived from the initial URL.
+  late final String _allowedHost;
+
+  /// Known safe streaming/embedding domains that navigations may redirect to.
+  static const _trustedDomains = {
+    'youtube.com', 'www.youtube.com', 'youtu.be',
+    'player.vimeo.com', 'vimeo.com',
+    'zoom.us', 'us02web.zoom.us', 'us04web.zoom.us', 'us05web.zoom.us', 'us06web.zoom.us',
+    'teams.microsoft.com', 'teams.live.com',
+    'meet.google.com',
+    'webex.com', 'meetingsamer.webex.com',
+    'facebook.com', 'www.facebook.com', 'web.facebook.com',
+    'livestream.com', 'twitch.tv', 'www.twitch.tv',
+    'dailymotion.com', 'www.dailymotion.com',
+  };
+
+  bool _isAllowedUrl(Uri uri) {
+    // Only allow https (and the initial load which is already validated)
+    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
+
+    final host = uri.host.toLowerCase();
+
+    // Allow the original stream host
+    if (host == _allowedHost || host.endsWith('.$_allowedHost')) return true;
+
+    // Allow known streaming/meeting platform domains
+    for (final domain in _trustedDomains) {
+      if (host == domain || host.endsWith('.$domain')) return true;
+    }
+
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
+    // Allow landscape so embedded videos can go fullscreen
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+
+    // Derive the allowed host from the initial stream URL
+    final initialUri = Uri.tryParse(widget.feed.streamUrl);
+    _allowedHost = initialUri?.host.toLowerCase() ?? '';
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            final uri = Uri.tryParse(request.url);
+            if (uri == null || !_isAllowedUrl(uri)) {
+              // Block navigation to untrusted domains — offer to open externally
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Blocked navigation to external site'),
+                    action: SnackBarAction(
+                      label: 'Open',
+                      onPressed: () async {
+                        if (uri != null && await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                    backgroundColor: AppColors.burundiRed,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
           onProgress: (progress) {
             if (mounted) setState(() => _loadingProgress = progress);
           },
@@ -93,6 +160,16 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
   void _retry() {
     setState(() {
       _hasError = false;
@@ -107,6 +184,32 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
     final langCode = Localizations.localeOf(context).languageCode;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final platformColor = _getPlatformColor(widget.feed.streamType);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    // In landscape, show fullscreen WebView with a back button overlay
+    if (isLandscape) {
+      return Stack(
+        children: [
+          Scaffold(
+            backgroundColor: Colors.black,
+            body: WebViewWidget(controller: _controller),
+          ),
+          FullscreenBackButton(
+            title: widget.feed.getTitle(langCode),
+            onBack: () {
+              // Just rotate back to portrait instead of popping the screen
+              SystemChrome.setPreferredOrientations([
+                DeviceOrientation.portraitUp,
+                DeviceOrientation.portraitDown,
+              ]);
+              Future.delayed(const Duration(milliseconds: 500), () {
+                SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+              });
+            },
+          ),
+        ],
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

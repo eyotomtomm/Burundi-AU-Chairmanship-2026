@@ -22,11 +22,13 @@ import 'event_ticket_screen.dart';
 import '../../services/like_service.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
+  final bool scrollToComments;
 
-  const EventDetailScreen({super.key, required this.event});
+  const EventDetailScreen({super.key, required this.event, this.scrollToComments = false});
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -57,13 +59,13 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   bool _loadingComments = true;
   bool _postingComment = false;
   final _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   int? _replyingToId;
   String? _replyingToName;
 
   // Photos
   List<Map<String, dynamic>> _photos = [];
   bool _loadingPhotos = true;
-  bool _uploadingPhoto = false;
 
   // Attendees
   List<Map<String, dynamic>> _attendees = [];
@@ -77,6 +79,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final _proxyNameController = TextEditingController();
   final _proxyEmailController = TextEditingController();
   final _proxyPhoneController = TextEditingController();
+
+  // Scroll to comments
+  final GlobalKey _commentsSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -101,6 +106,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (_event.showPhotos) _loadPhotos();
     if (_event.showAttendees) _loadAttendees();
     _recordView();
+    if (widget.scrollToComments && _event.showComments) {
+      _scheduleScrollToComments();
+    }
+  }
+
+  void _scheduleScrollToComments() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
+      return _loadingComments && mounted;
+    }).then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _commentsSectionKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic).then((_) {
+            if (mounted) _commentFocusNode.requestFocus();
+          });
+        }
+      });
+    });
   }
 
   Future<void> _recordView() async {
@@ -221,6 +246,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
     _pickedFiles.clear();
     _commentController.dispose();
+    _commentFocusNode.dispose();
     _proxyNameController.dispose();
     _proxyEmailController.dispose();
     _proxyPhoneController.dispose();
@@ -263,6 +289,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   if (_event.eventPoster != null && _event.eventPoster!.isNotEmpty)
                     CachedNetworkImage(
                       imageUrl: Environment.fixMediaUrl(_event.eventPoster!),
+                      memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => _posterFallback(),
                       errorWidget: (context, url, error) => _posterFallback(),
@@ -348,16 +375,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       child: Row(
                         children: [
                           Icon(
-                            likeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                            likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                             size: 22,
                             color: likeState.isLiked ? Colors.redAccent : (isDark ? Colors.grey[400] : Colors.grey),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 5),
                           Text(
                             '${likeState.likeCount}',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
+                              color: likeState.isLiked ? Colors.redAccent : (isDark ? Colors.grey[400] : Colors.grey),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Like',
+                            style: TextStyle(
+                              fontSize: 14,
                               color: likeState.isLiked ? Colors.redAccent : (isDark ? Colors.grey[400] : Colors.grey),
                             ),
                           ),
@@ -490,6 +525,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         Positioned.fill(
                           child: CachedNetworkImage(
                             imageUrl: Environment.fixMediaUrl(_event.eventPoster!),
+                            memCacheWidth: 800,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => _greetingGradient(),
                             errorWidget: (context, url, error) => _greetingGradient(),
@@ -836,7 +872,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       radius: 36,
                       backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
                       backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                          ? CachedNetworkImageProvider(Environment.fixMediaUrl(photoUrl))
+                          ? CachedNetworkImageProvider(Environment.fixMediaUrl(photoUrl), maxWidth: 100)
                           : null,
                       child: photoUrl == null || photoUrl.isEmpty
                           ? Icon(Icons.person, size: 32, color: AppColors.burundiGreen)
@@ -2371,6 +2407,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        SizedBox(key: _commentsSectionKey, height: 0),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -2460,16 +2497,26 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             final eventId = _event.id;
             return CommentTile.fromMap(
               comment,
+              key: ValueKey(comment['id']),
               isAuthenticated: auth.isAuthenticated,
               onReply: () => setState(() {
                 _replyingToId = comment['id'];
                 _replyingToName = comment['user_name'];
               }),
+              onPostReply: (content, parentId) async {
+                try {
+                  await ApiService().postEventComment(eventId, content, parentId: parentId);
+                  await _loadComments();
+                } on ApiException catch (e) {
+                  if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
+                }
+              },
               onDelete: () => _deleteComment(comment['id']),
               onToggleLike: () => ApiService().toggleEventCommentLike(eventId, comment['id']),
               onEdit: (content) => ApiService().editEventComment(eventId, comment['id'], content),
               replyBuilder: (reply) => CommentTile.fromMap(
                 reply,
+                key: ValueKey(reply['id']),
                 isReply: true,
                 isAuthenticated: auth.isAuthenticated,
                 onDelete: () => _deleteComment(reply['id']),
@@ -2534,7 +2581,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 radius: 16,
                 backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.15),
                 backgroundImage: auth.profilePictureUrl != null && auth.profilePictureUrl!.isNotEmpty
-                    ? CachedNetworkImageProvider(Environment.fixMediaUrl(auth.profilePictureUrl!))
+                    ? CachedNetworkImageProvider(Environment.fixMediaUrl(auth.profilePictureUrl!), maxWidth: 100)
                     : null,
                 child: auth.profilePictureUrl == null || auth.profilePictureUrl!.isEmpty
                     ? Text(
@@ -2547,6 +2594,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               Expanded(
                 child: TextField(
                   controller: _commentController,
+                  focusNode: _commentFocusNode,
                   maxLines: 3,
                   minLines: 1,
                   decoration: InputDecoration(
@@ -2608,9 +2656,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       await _loadComments();
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
-        );
+        final isProfanityOrBan = e.message.contains('inappropriate language') ||
+            e.message.contains('banned') || e.statusCode == 403;
+        if (isProfanityOrBan) {
+          showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -2701,34 +2755,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 ),
               ),
             const Spacer(),
-            if (isLoggedIn)
-              GestureDetector(
-                onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.burundiGreen,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_uploadingPhoto)
-                        const SizedBox(
-                          width: 14, height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      else
-                        const Icon(Icons.add_a_photo, size: 14, color: Colors.white),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'Add',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -2781,6 +2807,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       children: [
                         CachedNetworkImage(
                           imageUrl: Environment.fixMediaUrl(imageUrl),
+                          memCacheWidth: 300,
                           width: 140,
                           height: 140,
                           fit: BoxFit.cover,
@@ -2835,82 +2862,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
-  Future<void> _pickAndUploadPhoto() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 85,
-    );
-
-    if (image == null) return;
-
-    // Ask for caption
-    String? caption;
-    if (mounted) {
-      caption = await showDialog<String>(
-        context: context,
-        builder: (ctx) {
-          final captionCtrl = TextEditingController();
-          return AlertDialog(
-            title: const Text('Add a caption'),
-            content: TextField(
-              controller: captionCtrl,
-              maxLength: 200,
-              decoration: const InputDecoration(
-                hintText: 'Optional caption...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, ''),
-                child: const Text('Skip'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, captionCtrl.text.trim()),
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        },
-      );
-    }
-
-    if (caption == null) return;
-
-    setState(() => _uploadingPhoto = true);
-
-    try {
-      await ApiService().uploadEventPhoto(
-        _event.id,
-        File(image.path),
-        caption: caption,
-      );
-      await _loadPhotos();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo uploaded!'), backgroundColor: AppColors.burundiGreen),
-        );
-      }
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: AppColors.burundiRed),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to upload photo'), backgroundColor: AppColors.burundiRed),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
-    }
-  }
-
   void _showPhotoDetail(Map<String, dynamic> photo, bool isDark) {
     final imageUrl = photo['image'] as String? ?? '';
     final caption = photo['caption'] as String? ?? '';
@@ -2928,6 +2879,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               borderRadius: BorderRadius.circular(16),
               child: CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(imageUrl),
+                memCacheWidth: 1200,
                 fit: BoxFit.contain,
                 placeholder: (_, _) => const SizedBox(
                   height: 300,

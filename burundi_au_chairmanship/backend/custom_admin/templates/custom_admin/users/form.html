@@ -239,6 +239,22 @@
                                    {% if profile.is_government_official %}checked{% endif %}
                                    class="w-6 h-6 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600">
                         </div>
+
+                        <!-- Usher Status (Edit only) -->
+                        <div class="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                            <div>
+                                <label for="is_usher" class="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-green-600 dark:text-green-400">badge</span>
+                                    Usher
+                                </label>
+                                <p class="text-sm text-slate-600 dark:text-slate-400">User can scan YD credentials at events</p>
+                            </div>
+                            <input type="checkbox"
+                                   id="is_usher"
+                                   name="is_usher"
+                                   {% if profile.is_usher %}checked{% endif %}
+                                   class="w-6 h-6 text-green-600 bg-slate-100 border-slate-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-slate-800 focus:ring-2 dark:bg-slate-700 dark:border-slate-600">
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -320,6 +336,134 @@
                 </div>
             </div>
         </div>
+
+        <!-- Comment Ban Card -->
+        {% if profile %}
+        <div class="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-red-600 dark:text-red-400">gavel</span>
+                Comment Ban Status
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Profanity Strikes</p>
+                    <p class="font-semibold text-slate-900 dark:text-white text-lg">{{ profile.profanity_strikes }} / 5</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Comment Ban Status</p>
+                    {% if profile.is_comment_banned %}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Banned</span>
+                        {% if profile.comment_banned_at %}
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Since {{ profile.comment_banned_at|date:"M d, Y H:i" }}</p>
+                        {% endif %}
+                    {% else %}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Active</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">User ID</p>
+                    <p class="font-mono text-sm font-semibold text-slate-900 dark:text-white">#{{ target_user.pk }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Reference Number</p>
+                    <p class="font-mono text-sm font-semibold text-blue-700 dark:text-blue-400">{{ profile.reference_id }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Shown to user in ban dialog</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4 mt-2">
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Device ID</p>
+                    <p class="font-mono text-xs text-slate-900 dark:text-white break-all">{% if profile.device_id %}{{ profile.device_id }}{% else %}<span class="text-slate-400">Not set</span>{% endif %}</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Device Type</p>
+                    <p class="text-slate-900 dark:text-white">{% if profile.device_type %}{{ profile.device_type }}{% else %}<span class="text-slate-400">Unknown</span>{% endif %}</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Device OS</p>
+                    <p class="text-slate-900 dark:text-white">{% if profile.device_os %}{{ profile.device_os }}{% else %}<span class="text-slate-400">Unknown</span>{% endif %}</p>
+                </div>
+            </div>
+            <form method="post" action="{% url 'custom_admin:user_toggle_comment_ban' target_user.pk %}"
+                  onsubmit="return confirm('{% if profile.is_comment_banned %}Lift comment ban and reset strikes for this user?{% else %}Ban this user from commenting?{% endif %}')">
+                {% csrf_token %}
+                {% if profile.is_comment_banned %}
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition">
+                        <span class="material-symbols-outlined text-sm">lock_open</span>
+                        Lift Comment Ban
+                    </button>
+                {% else %}
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition">
+                        <span class="material-symbols-outlined text-sm">block</span>
+                        Ban from Commenting
+                    </button>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- Profanity Strike History -->
+        {% if strike_logs %}
+        <div class="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-orange-600 dark:text-orange-400">history</span>
+                Profanity Strike History
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700">
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">#</th>
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">Date</th>
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">Matched Word</th>
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">Content Type</th>
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">Flagged Content</th>
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">Device</th>
+                            <th class="text-left py-2 px-3 font-semibold text-slate-600 dark:text-slate-400">Ban?</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in strike_logs %}
+                        <tr class="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                            <td class="py-2 px-3 font-mono text-slate-900 dark:text-white">{{ log.strike_number }}</td>
+                            <td class="py-2 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ log.created_at|date:"M d, Y H:i" }}</td>
+                            <td class="py-2 px-3">
+                                {% if log.matched_word %}
+                                    <code class="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-xs">{{ log.matched_word }}</code>
+                                {% else %}
+                                    <span class="text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-slate-600 dark:text-slate-400">{{ log.get_content_type_display }}</td>
+                            <td class="py-2 px-3 text-slate-600 dark:text-slate-400 max-w-xs">
+                                <p class="truncate" title="{{ log.flagged_content }}">{{ log.flagged_content|truncatechars:80 }}</p>
+                            </td>
+                            <td class="py-2 px-3 text-xs text-slate-500 dark:text-slate-400 max-w-[140px]">
+                                {% if log.device_id %}
+                                    <p class="font-mono truncate" title="{{ log.device_id }}">{{ log.device_id|truncatechars:16 }}</p>
+                                {% endif %}
+                                {% if log.user_agent %}
+                                    <p class="truncate text-slate-400" title="{{ log.user_agent }}">{{ log.user_agent|truncatechars:30 }}</p>
+                                {% endif %}
+                                {% if not log.device_id and not log.user_agent %}
+                                    <span class="text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3">
+                                {% if log.resulted_in_ban %}
+                                    <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">YES</span>
+                                {% else %}
+                                    <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Warning</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% endif %}
         {% endif %}
     </div>
 </div>

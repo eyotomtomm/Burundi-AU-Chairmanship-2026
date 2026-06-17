@@ -12,7 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/heartbeat_service.dart';
-import '../../widgets/app_update_dialog.dart';
+import '../../services/splash_preloader.dart';
 import '../maintenance/maintenance_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 
@@ -27,7 +27,6 @@ class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _scaleController;
-  late AnimationController _patternController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
@@ -41,88 +40,88 @@ class _SplashScreenState extends State<SplashScreen>
     ));
 
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
 
     _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-
-    _patternController = AnimationController(
-      duration: const Duration(seconds: 10),
-      vsync: this,
-    )..repeat();
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutBack),
     );
 
     _startAnimations();
   }
 
   void _startAnimations() async {
-    await Future.delayed(const Duration(milliseconds: 200));
+    // Start animations immediately — frame 0 is invisible (opacity 0, scale 0.85)
     _fadeController.forward();
     _scaleController.forward();
 
-    // Show splash animation
-    await Future.delayed(AppConstants.splashDuration);
-    if (!mounted) return;
+    // Start preloading home-feed data in parallel with the splash animation
+    SplashPreloader.instance.startPreload();
 
-    // CRITICAL: Await auth provider initialization instead of using a fixed delay.
-    // This Completer-based approach guarantees we wait exactly until auth state
-    // has been fully determined (tokens read, backend synced or timed out).
+    // Run auth init, maintenance check, data preload, and minimum visual duration
+    // all in parallel so the user pays max(~2.5s, auth, maintenance, preload)
+    // instead of sequentially. splashMaxDuration is a hard ceiling.
     final authProvider = context.read<AuthProvider>();
+    Map<String, dynamic>? maintenanceStatus;
+
     try {
-      await authProvider.initialized.timeout(const Duration(seconds: 10));
+      await Future.wait([
+        Future.delayed(AppConstants.splashMinDuration),
+        authProvider.initialized.timeout(const Duration(seconds: 10)).catchError((_) {
+          if (kDebugMode) print('Auth init timed out in splash — proceeding');
+        }),
+        SplashPreloader.instance.waitForCriticalData(AppConstants.splashMaxDuration)
+            .catchError((_) => null),
+        ApiService()
+            .getMaintenanceStatus()
+            .timeout(const Duration(seconds: 5)) // Must resolve before splashMaxDuration
+            .then((status) {
+          maintenanceStatus = status;
+          if (kDebugMode) print('Maintenance check: in_maintenance=${status['in_maintenance']}');
+          return status;
+        }).catchError((e) {
+          if (kDebugMode) print('Maintenance check failed: $e');
+          return <String, dynamic>{};
+        }),
+      ]).timeout(AppConstants.splashMaxDuration);
     } catch (_) {
-      // If init times out, proceed with whatever state we have
-      if (kDebugMode) print('Auth init timed out in splash — proceeding');
+      // Hard ceiling reached — proceed with whatever we have
+      if (kDebugMode) print('Splash max duration reached — proceeding');
     }
     if (!mounted) return;
 
     // Re-sync language with backend + FCM topics on every cold start.
-    // Fire-and-forget so it never blocks the splash flow.
     unawaited(context.read<LanguageProvider>().ensureSynced(authProvider));
 
     // Start presence heartbeat so "users online now" reflects real usage.
-    // Self-manages on AppLifecycleState changes from here on.
     HeartbeatService.instance.start();
 
-    // Check maintenance mode before proceeding
-    try {
-      final maintenanceStatus = await ApiService().getMaintenanceStatus();
-      if (!mounted) return;
-      if (maintenanceStatus['in_maintenance'] == true) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => MaintenanceScreen(maintenanceData: maintenanceStatus),
-          ),
-        );
-        return;
-      }
-    } catch (e) {
-      // If maintenance check fails, proceed normally
-      if (kDebugMode) print('Maintenance check failed: $e');
+    // Check maintenance result from the parallel fetch
+    if (maintenanceStatus != null && maintenanceStatus!['in_maintenance'] == true) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => MaintenanceScreen(maintenanceData: maintenanceStatus!),
+        ),
+      );
+      return;
     }
     if (!mounted) return;
 
-    // Check for app update via Remote Config before navigating
-    final langCode = Localizations.localeOf(context).languageCode;
-    await AppUpdateDialog.check(
-      context: context,
-      currentVersion: AppConstants.appVersion,
-      langCode: langCode,
-    );
-    if (!mounted) return;
+    // App update check removed from splash — HomeScreen already runs it
+    // via _checkForAppUpdate() in addPostFrameCallback, so it no longer
+    // blocks navigation here.
 
-    // Show onboarding on first launch
+    // Show onboarding on first launch (SharedPreferences is fast — ~1ms)
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool(AppConstants.onboardingKey) ?? false;
     if (!onboardingDone) {
@@ -156,7 +155,6 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _fadeController.dispose();
     _scaleController.dispose();
-    _patternController.dispose();
     super.dispose();
   }
 
@@ -182,34 +180,31 @@ class _SplashScreenState extends State<SplashScreen>
         ),
         child: Stack(
           children: [
-            // Subtle geometric pattern background
-            AnimatedBuilder(
-              animation: _patternController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: 0.1,
-                  child: CustomPaint(
-                    size: screenSize,
-                    painter: _SplashPatternPainter(
-                      progress: _patternController.value,
-                    ),
-                  ),
-                );
-              },
+            // Decorative pattern — hidden from screen readers
+            ExcludeSemantics(
+              child: Opacity(
+                opacity: 0.1,
+                child: CustomPaint(
+                  size: screenSize,
+                  painter: const _SplashPatternPainter(),
+                ),
+              ),
             ),
 
             // Main content
-            SafeArea(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+            Semantics(
+              label: 'Republic of Burundi, African Union Chairmanship 2026. Loading application.',
+              child: SafeArea(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
                           const SizedBox(height: 30),
 
                           // Republic of Burundi text
@@ -311,6 +306,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
             ),
+            ),
           ],
         ),
       ),
@@ -372,9 +368,7 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 class _SplashPatternPainter extends CustomPainter {
-  final double progress;
-
-  _SplashPatternPainter({required this.progress});
+  const _SplashPatternPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -416,6 +410,5 @@ class _SplashPatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SplashPatternPainter oldDelegate) =>
-      progress != oldDelegate.progress;
+  bool shouldRepaint(covariant _SplashPatternPainter oldDelegate) => false;
 }

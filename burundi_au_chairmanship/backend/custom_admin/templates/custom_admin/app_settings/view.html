@@ -126,6 +126,64 @@
                     />
                 </div>
 
+                <!-- Home Countdown -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Home Countdown</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">Show a countdown timer next to the greeting on the home screen.</p>
+
+                    <div class="mb-4">
+                        <label class="inline-flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" name="countdown_enabled" id="countdown_enabled"
+                                {% if settings.countdown_enabled %}checked{% endif %}
+                                class="rounded border-outline text-secondary focus:ring-secondary">
+                            <span class="font-label text-sm text-on-surface">Enable Countdown</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="countdown_target_date" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Target Date & Time
+                            </label>
+                            <input
+                                type="datetime-local"
+                                id="countdown_target_date"
+                                name="countdown_target_date"
+                                value="{{ settings.countdown_target_date|date:'Y-m-d\TH:i'|default:'' }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                            />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label for="countdown_label" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Label (English)
+                            </label>
+                            <input
+                                type="text"
+                                id="countdown_label"
+                                name="countdown_label"
+                                value="{{ settings.countdown_label|default:'' }}"
+                                placeholder="e.g. AU Summit"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                            />
+                        </div>
+                        <div>
+                            <label for="countdown_label_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Label (French)
+                            </label>
+                            <input
+                                type="text"
+                                id="countdown_label_fr"
+                                name="countdown_label_fr"
+                                value="{{ settings.countdown_label_fr|default:'' }}"
+                                placeholder="e.g. Sommet de l'UA"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 <!-- About Page -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">About Page</h3>

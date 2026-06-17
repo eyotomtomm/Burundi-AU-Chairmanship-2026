@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import 'discussion_detail_screen.dart';
 
 class DiscussionsScreen extends StatefulWidget {
@@ -162,7 +164,7 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => DiscussionDetailScreen(discussionId: d['id'])),
+                                  MaterialPageRoute(builder: (_) => DiscussionDetailScreen(discussionId: d['id'], scrollToComments: context.read<AuthProvider>().isAuthenticated)),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:io';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
@@ -392,40 +393,30 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
     );
   }
 
-  /// Builds a text-based QR code representation.
-  /// Since qr_flutter is not in pubspec.yaml, we render the QR data as a
-  /// visually distinctive code pattern that can be read by the API endpoint.
   Widget _buildQrCodeWidget(String qrData) {
-    // Generate a visual deterministic grid from the qr_data hash
-    final hash = qrData.hashCode;
-    final cells = <List<bool>>[];
-    for (int row = 0; row < 15; row++) {
-      final rowCells = <bool>[];
-      for (int col = 0; col < 15; col++) {
-        // Create a symmetric pattern for visual appeal
-        final mirrorCol = col < 8 ? col : 14 - col;
-        final seed = (hash + row * 17 + mirrorCol * 31) % 97;
-        rowCells.add(seed > 40);
-      }
-      cells.add(rowCells);
+    if (qrData.isEmpty) {
+      return const SizedBox(
+        width: 180,
+        height: 180,
+        child: Center(child: Text('No QR data', style: TextStyle(color: Colors.grey))),
+      );
     }
-
-    // Add finder patterns (top-left, top-right, bottom-left corners)
-    for (int i = 0; i < 5; i++) {
-      for (int j = 0; j < 5; j++) {
-        final isBorder = i == 0 || i == 4 || j == 0 || j == 4;
-        final isCenter = i == 2 && j == 2;
-        cells[i][j] = isBorder || isCenter;
-        cells[i][14 - j] = isBorder || isCenter;
-        cells[14 - i][j] = isBorder || isCenter;
-      }
-    }
-
     return SizedBox(
       width: 180,
       height: 180,
-      child: CustomPaint(
-        painter: _QrPatternPainter(cells),
+      child: QrImageView(
+        data: qrData,
+        version: QrVersions.auto,
+        size: 180,
+        backgroundColor: Colors.white,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: Color(0xFF1a1a1a),
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: Color(0xFF1a1a1a),
+        ),
       ),
     );
   }
@@ -517,33 +508,4 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
       }
     }
   }
-}
-
-/// Custom painter that renders a QR-code-like pattern from a boolean grid.
-class _QrPatternPainter extends CustomPainter {
-  final List<List<bool>> cells;
-
-  _QrPatternPainter(this.cells);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cellSize = size.width / cells.length;
-    final paint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.fill;
-
-    for (int row = 0; row < cells.length; row++) {
-      for (int col = 0; col < cells[row].length; col++) {
-        if (cells[row][col]) {
-          canvas.drawRect(
-            Rect.fromLTWH(col * cellSize, row * cellSize, cellSize, cellSize),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

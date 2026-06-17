@@ -21,10 +21,26 @@ class AuthRateThrottle(SimpleRateThrottle):
 
 class OTPRateThrottle(SimpleRateThrottle):
     """
-    Strict throttle for OTP send/verify endpoints.
-    Limits: 3 attempts per minute per user to prevent OTP flooding.
+    Strict throttle for OTP *send* endpoints only.
+    Limits: 3 sends per minute per user to prevent OTP flooding.
     """
     scope = 'otp'
+
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            ident = str(request.user.pk)
+        else:
+            ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class OTPVerifyThrottle(SimpleRateThrottle):
+    """
+    Separate throttle for OTP *verify* endpoints.
+    Limits: 10 attempts per minute per user — more generous than send
+    so that a typo doesn't lock the user out.
+    """
+    scope = 'otp_verify'
 
     def get_cache_key(self, request, view):
         if request.user and request.user.is_authenticated:
@@ -121,6 +137,25 @@ class SearchRateThrottle(SimpleRateThrottle):
     Limits: 30 searches per minute per IP.
     """
     scope = 'search'
+
+    def get_cache_key(self, request, view):
+        if request.user and request.user.is_authenticated:
+            ident = str(request.user.pk)
+        else:
+            ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class ProxyRegistrationThrottle(SimpleRateThrottle):
+    """
+    Throttle for proxy (on-behalf-of) event registration.
+    Limits: 5 proxy registrations per hour per user.
+
+    Without this, any authenticated user can bulk-register thousands of
+    arbitrary third-party emails into an event, turning the server into
+    a government-branded email-spam relay.
+    """
+    scope = 'proxy_registration'
 
     def get_cache_key(self, request, view):
         if request.user and request.user.is_authenticated:

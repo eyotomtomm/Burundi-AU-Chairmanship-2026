@@ -74,7 +74,18 @@
                     </div>
                     <div>
                         <p class="text-xs uppercase tracking-wider text-purple-600 font-semibold mb-1">Email</p>
-                        <p class="text-slate-800 font-medium">{{ submission.proxy_email|default:"N/A" }}</p>
+                        <p class="text-slate-800 font-medium">
+                            {{ submission.proxy_email|default:"N/A" }}
+                            {% if submission.proxy_email_verified %}
+                            <span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="material-symbols-outlined text-xs">verified</span> Verified
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200" title="This email was submitted by another user and has not been verified by the owner">
+                                <span class="material-symbols-outlined text-xs">warning</span> Unverified
+                            </span>
+                            {% endif %}
+                        </p>
                     </div>
                     <div>
                         <p class="text-xs uppercase tracking-wider text-purple-600 font-semibold mb-1">Phone</p>

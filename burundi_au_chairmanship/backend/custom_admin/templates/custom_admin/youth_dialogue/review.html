@@ -20,13 +20,20 @@
 
   <!-- Header -->
   <div class="flex items-center gap-4 mb-8">
-    <a href="{% url 'custom_admin:youth_dialogue_list' %}"
+    <a href="{% if application.event %}{% url 'custom_admin:youth_dialogue_applications_list' event_pk=application.event.pk %}{% else %}{% url 'custom_admin:youth_dialogue_list' %}{% endif %}"
        class="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all shadow-sm">
       <span class="material-symbols-outlined text-slate-600">arrow_back</span>
     </a>
     <div>
       <h1 class="text-2xl font-bold text-slate-900 font-headline">Review Application</h1>
-      <p class="text-sm text-slate-500 mt-0.5">{{ application.first_name }} {{ application.last_name }}</p>
+      <p class="text-sm text-slate-500 mt-0.5">
+        {{ application.first_name }} {{ application.last_name }}
+        {% if application.event %}
+        <span class="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          {{ application.event.programme_title }}
+        </span>
+        {% endif %}
+      </p>
     </div>
   </div>
 
@@ -102,9 +109,14 @@
     </h2>
 
     <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+      {% if application.id_photo %}
+      <img src="{{ application.id_photo.url }}" alt="ID Photo"
+           class="h-16 w-16 rounded-full object-cover shadow-lg border-2 border-indigo-200">
+      {% else %}
       <div class="h-16 w-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
         {{ application.first_name|first|upper }}
       </div>
+      {% endif %}
       <div>
         <p class="text-lg font-bold text-slate-900">
           {% if application.title %}{{ application.get_title_display }} {% endif %}{{ application.first_name }} {{ application.last_name }}
@@ -137,7 +149,7 @@
       {% if application.nationality %}
       <div>
         <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Nationality</label>
-        <p class="text-slate-800 font-medium">{{ application.get_nationality_display }}</p>
+        <p class="text-slate-800 font-medium">{{ application.nationality_flag }} {{ application.get_nationality_display }}</p>
       </div>
       {% endif %}
       {% if application.date_of_birth %}
@@ -186,6 +198,72 @@
       </div>
     </div>
     {% endif %}
+  </div>
+
+  <!-- User Account Card -->
+  {% if application.user %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+      <span class="material-symbols-outlined text-slate-600">account_circle</span>
+      User Account
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Username</label>
+        <p class="text-slate-800 font-medium font-mono text-sm">{{ application.user.username }}</p>
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Email Verified</label>
+        {% if application.user.emailaddress_set.exists %}
+          {% with primary_email=application.user.emailaddress_set.first %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold
+            {% if primary_email.verified %}bg-emerald-50 text-emerald-700 border border-emerald-200{% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
+            <span class="material-symbols-outlined" style="font-size:12px;">
+              {% if primary_email.verified %}verified{% else %}schedule{% endif %}
+            </span>
+            {% if primary_email.verified %}Verified{% else %}Not Verified{% endif %}
+          </span>
+          {% endwith %}
+        {% else %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-50 text-slate-500 border border-slate-200">
+            <span class="material-symbols-outlined" style="font-size:12px;">help</span>
+            Unknown
+          </span>
+        {% endif %}
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Date Joined</label>
+        <p class="text-slate-800 font-medium text-sm">{{ application.user.date_joined|date:"M d, Y g:i A" }}</p>
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-1.5">Last Login</label>
+        <p class="text-slate-800 font-medium text-sm">
+          {% if application.user.last_login %}{{ application.user.last_login|date:"M d, Y g:i A" }}{% else %}Never{% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Admin Notes -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+      <span class="material-symbols-outlined text-amber-600">sticky_note_2</span>
+      Admin Notes
+      <span class="text-xs font-normal text-slate-400 ml-1">(internal only)</span>
+    </h2>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_admin_notes">
+      <textarea name="admin_notes" rows="4"
+                class="w-full bg-slate-50 border border-slate-200 rounded-lg py-3 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent text-slate-800 mb-3"
+                placeholder="Add internal notes about this applicant...">{{ application.admin_notes }}</textarea>
+      <button type="submit"
+              class="inline-flex items-center gap-1.5 bg-amber-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-amber-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">save</span>
+        Save Notes
+      </button>
+    </form>
   </div>
 
   <!-- Documents Section -->
@@ -302,10 +380,36 @@
   <!-- Credential Section -->
   {% if application.status == 'credential_issued' %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
-    <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-      <span class="material-symbols-outlined text-indigo-600" style="font-variation-settings: 'FILL' 1">badge</span>
-      Credential
-    </h2>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-indigo-600" style="font-variation-settings: 'FILL' 1">badge</span>
+        Credential
+      </h2>
+      {% if application.is_revoked %}
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+        <span class="material-symbols-outlined" style="font-size:14px;">block</span>
+        REVOKED
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span class="material-symbols-outlined" style="font-size:14px;">verified</span>
+        ACTIVE
+      </span>
+      {% endif %}
+    </div>
+
+    {% if application.is_revoked %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+      <p class="text-sm font-semibold text-red-800">This credential has been revoked.</p>
+      {% if application.revoked_at %}
+      <p class="text-xs text-red-600 mt-1">Revoked on {{ application.revoked_at|date:"M d, Y g:i A" }}</p>
+      {% endif %}
+      {% if application.revoked_reason %}
+      <p class="text-sm text-red-700 mt-2">{{ application.revoked_reason }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-6 mb-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
@@ -322,11 +426,42 @@
         </div>
       </div>
     </div>
-    <a href="{% url 'custom_admin:youth_dialogue_id_card_pdf' application.pk %}"
-       class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm">
-      <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
-      Download PDF ID Card
-    </a>
+
+    <div class="flex flex-wrap gap-3">
+      <a href="{% url 'custom_admin:youth_dialogue_id_card_pdf' application.pk %}"
+         class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+        Download PDF ID Card
+      </a>
+      {% if not application.is_revoked %}
+      <button type="button" onclick="document.getElementById('revoke-form').classList.toggle('hidden')"
+              class="inline-flex items-center gap-2 bg-red-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-red-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">block</span>
+        Revoke Credential
+      </button>
+      {% endif %}
+    </div>
+
+    {% if not application.is_revoked %}
+    <form method="post" id="revoke-form" class="hidden mt-6 bg-red-50 border border-red-200 rounded-xl p-6">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="revoke_credential">
+      <h3 class="text-sm font-bold text-red-800 mb-3 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-sm">warning</span>
+        Revoke Credential
+      </h3>
+      <p class="text-xs text-red-600 mb-3">This action cannot be undone. The participant's digital ID will become invalid.</p>
+      <label class="text-xs uppercase tracking-wider text-red-700 font-semibold block mb-2">Reason for Revocation *</label>
+      <textarea name="revoke_reason" rows="3" required
+                class="w-full bg-white border border-red-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-800 mb-4"
+                placeholder="Provide a reason for revoking this credential..."></textarea>
+      <button type="submit"
+              class="bg-red-600 text-white font-semibold rounded-lg py-2.5 px-6 text-sm hover:bg-red-700 transition-all"
+              onclick="return confirm('Are you sure you want to revoke this credential? This cannot be undone.')">
+        Confirm Revocation
+      </button>
+    </form>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -384,7 +519,7 @@
         <span class="material-symbols-outlined text-sm">cancel</span>
         Reject Application
       </button>
-      <a href="{% url 'custom_admin:youth_dialogue_list' %}"
+      <a href="{% if application.event %}{% url 'custom_admin:youth_dialogue_applications_list' event_pk=application.event.pk %}{% else %}{% url 'custom_admin:youth_dialogue_list' %}{% endif %}"
          class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-8 hover:bg-slate-50 transition-all">
         Cancel
       </a>
@@ -487,41 +622,71 @@
   </div>
   {% endif %}
 
-  <!-- Activity Log -->
+  <!-- Activity Timeline -->
   {% if activity_logs %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 mb-6">
     <button type="button" onclick="document.getElementById('activity-log-body').classList.toggle('hidden'); this.querySelector('.expand-icon').classList.toggle('rotate-180')"
             class="w-full p-6 flex items-center justify-between text-left">
       <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-        <span class="material-symbols-outlined text-slate-500">history</span>
-        Activity Log
+        <span class="material-symbols-outlined text-slate-500">timeline</span>
+        Activity Timeline
         <span class="text-sm font-normal text-slate-500">({{ activity_logs|length }})</span>
       </h2>
       <span class="material-symbols-outlined text-slate-400 expand-icon transition-transform">expand_more</span>
     </button>
-    <div id="activity-log-body" class="hidden border-t border-slate-100">
-      <div class="divide-y divide-slate-50">
-        {% for log in activity_logs %}
-        <div class="px-6 py-3 flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-            <span class="material-symbols-outlined text-sm text-slate-500">
-              {% if log.action == 'form_submitted' %}send
-              {% elif log.action == 'document_uploaded' %}upload_file
-              {% elif log.action == 'document_deleted' %}delete
-              {% elif log.action == 'status_viewed' %}visibility
-              {% elif log.action == 'credential_viewed' %}badge
-              {% elif log.action == 'credential_shared' %}share
-              {% elif log.action == 'qr_scanned' %}qr_code_scanner
-              {% elif log.action == 'screen_visit' %}monitor
-              {% else %}radio_button_checked{% endif %}
-            </span>
+    <div id="activity-log-body" class="hidden border-t border-slate-100 p-6">
+      <div class="relative">
+        <!-- Vertical line -->
+        <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+        <div class="space-y-6">
+          {% for log in activity_logs %}
+          <div class="relative flex gap-4 items-start">
+            <!-- Dot on timeline -->
+            <div class="relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+              {% if log.action == 'form_submitted' %}bg-blue-100
+              {% elif log.action == 'document_uploaded' %}bg-cyan-100
+              {% elif log.action == 'document_deleted' %}bg-red-100
+              {% elif log.action == 'status_viewed' %}bg-slate-100
+              {% elif log.action == 'credential_viewed' %}bg-indigo-100
+              {% elif log.action == 'credential_shared' %}bg-purple-100
+              {% elif log.action == 'qr_scanned' %}bg-emerald-100
+              {% elif log.action == 'screen_visit' %}bg-slate-100
+              {% else %}bg-slate-100{% endif %}">
+              <span class="material-symbols-outlined text-sm
+                {% if log.action == 'form_submitted' %}text-blue-600
+                {% elif log.action == 'document_uploaded' %}text-cyan-600
+                {% elif log.action == 'document_deleted' %}text-red-600
+                {% elif log.action == 'status_viewed' %}text-slate-500
+                {% elif log.action == 'credential_viewed' %}text-indigo-600
+                {% elif log.action == 'credential_shared' %}text-purple-600
+                {% elif log.action == 'qr_scanned' %}text-emerald-600
+                {% elif log.action == 'screen_visit' %}text-slate-500
+                {% else %}text-slate-500{% endif %}">
+                {% if log.action == 'form_submitted' %}send
+                {% elif log.action == 'document_uploaded' %}upload_file
+                {% elif log.action == 'document_deleted' %}delete
+                {% elif log.action == 'status_viewed' %}visibility
+                {% elif log.action == 'credential_viewed' %}badge
+                {% elif log.action == 'credential_shared' %}share
+                {% elif log.action == 'qr_scanned' %}qr_code_scanner
+                {% elif log.action == 'screen_visit' %}monitor
+                {% else %}radio_button_checked{% endif %}
+              </span>
+            </div>
+            <!-- Content -->
+            <div class="flex-1 min-w-0 pb-1">
+              <p class="text-sm text-slate-800 font-semibold">{{ log.get_action_display }}</p>
+              <p class="text-xs text-slate-400 mt-0.5">
+                {{ log.timestamp|date:"M d, Y" }} at {{ log.timestamp|date:"g:i A" }}
+                {% if log.screen_name %}<span class="text-slate-300 mx-1">&middot;</span><span class="text-slate-500">{{ log.screen_name }}</span>{% endif %}
+              </p>
+              {% if log.metadata %}
+              <p class="text-xs text-slate-500 mt-1 bg-slate-50 rounded px-2 py-1 inline-block">{{ log.metadata }}</p>
+              {% endif %}
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-slate-800 font-medium">{{ log.get_action_display }}</p>
-            <p class="text-xs text-slate-400">{{ log.timestamp|date:"M d, Y g:i A" }}{% if log.screen_name %} &middot; {{ log.screen_name }}{% endif %}</p>
-          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
   </div>

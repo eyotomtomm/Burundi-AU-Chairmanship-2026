@@ -2,30 +2,34 @@ import logging
 import threading
 import urllib.request
 import json as json_module
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from datetime import timedelta
 from django.conf import settings as django_settings
-from django.db import models
+import hashlib
+from django.core.cache import cache
+from django.db import models, transaction
 from django.db.models import Count, Exists, OuterRef, F, Q
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .permissions import HasAdminSection
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
-from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, SupportTicketThrottle, SearchRateThrottle
+from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, OTPVerifyThrottle, SupportTicketThrottle, SearchRateThrottle, ProxyRegistrationThrottle
 
 logger = logging.getLogger(__name__)
 from .models import (
     HeroSlide, MagazineEdition, MagazineLike, MagazineComment, Article, EmbassyLocation,
-    Event, LiveFeed, Resource, AppSettings,
+    Event, LiveFeed, LiveFeedLike, LiveFeedComment, LiveFeedCommentLike, Resource, AppSettings,
     FeatureCard, ArticleComment, ArticleCommentMention, ArticleLike, Category, UserProfile,
     PriorityAgenda, GalleryAlbum, GalleryAlbumLike, GalleryPhoto, Video, VideoLike, SocialMediaLink,
     Notification, HeroTextContent, QuickAccessMenuItem, VerificationRequest,
@@ -50,7 +54,9 @@ from .models import (
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
-    YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    YouthDialogueEvent, YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    YouthDialogueRole,
+    QRScanLog,
 )
 from .serializers import (
     get_recent_likers,
@@ -58,7 +64,7 @@ from .serializers import (
     EmbassyLocationSerializer, EventSerializer, LiveFeedSerializer,
     ResourceSerializer, AppSettingsSerializer,
     FeatureCardSerializer, RegisterSerializer, UserSerializer,
-    MagazineCommentSerializer, ArticleCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
+    MagazineCommentSerializer, ArticleCommentSerializer, LiveFeedCommentSerializer, CategorySerializer, PriorityAgendaSerializer,
     GalleryAlbumSerializer, VideoSerializer, SocialMediaLinkSerializer,
     NotificationSerializer, HeroTextContentSerializer, QuickAccessMenuItemSerializer,
     VerificationRequestSerializer, VerificationStatusSerializer,
@@ -139,16 +145,53 @@ def _generate_unique_username(email, firebase_uid, display_name=None):
 
 
 def get_client_ip(request):
-    """Extract real client IP from request headers."""
-    # Cloudflare
-    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
-    if cf_ip:
-        return cf_ip
-    # Standard proxy header
-    xff = request.META.get('HTTP_X_FORWARDED_FOR')
-    if xff:
-        return xff.split(',')[0].strip()
+    """Extract real client IP from request.
+
+    CloudflareProxyMiddleware (first in the stack) already copies
+    CF-Connecting-IP into REMOTE_ADDR, so we just read that.
+    Reading X-Forwarded-For directly would be client-spoofable.
+    """
     return request.META.get('REMOTE_ADDR', '')
+
+
+def _atomic_toggle_like(model_class, like_model, like_kwargs, obj):
+    """Toggle a like inside a transaction; return (new_count, is_liked).
+
+    Wraps the get_or_create + counter update in transaction.atomic() so
+    the like row and the denormalized like_count cannot drift apart.
+    Returns an optimistic count (old ± 1) to avoid a refresh_from_db() round-trip.
+    """
+    with transaction.atomic():
+        like, created = like_model.objects.get_or_create(**like_kwargs)
+        if not created:
+            like.delete()
+            model_class.objects.filter(pk=obj.pk).update(like_count=F('like_count') - 1)
+            return max(0, obj.like_count - 1), False
+        else:
+            model_class.objects.filter(pk=obj.pk).update(like_count=F('like_count') + 1)
+            return obj.like_count + 1, True
+
+
+def _dedup_record_view(model_class, pk, request, content_label):
+    """Increment view_count with IP+UA+day dedup to resist inflation.
+
+    Returns True if the view was counted, False if it was a duplicate.
+    Uses cache-based fingerprint: hash(IP + UA prefix + content + day).
+    """
+    ip = get_client_ip(request)
+    ua = request.META.get('HTTP_USER_AGENT', '')[:64]
+    day = timezone.now().strftime('%Y-%m-%d')
+    fingerprint = hashlib.sha256(
+        f'{ip}:{ua}:{content_label}:{pk}:{day}'.encode()
+    ).hexdigest()[:32]
+    cache_key = f'view_dedup:{fingerprint}'
+
+    if cache.get(cache_key):
+        return False  # already counted today
+    rows = model_class.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+    if rows:
+        cache.set(cache_key, 1, 86400)  # 24-hour expiry
+    return bool(rows)
 
 
 def lookup_ip_geolocation(login_history_id):
@@ -336,6 +379,10 @@ def login(request):
     try:
         user = User.objects.get(email=email)
     except User.DoesNotExist:
+        # Dummy password hash to equalize timing with the real check_password
+        # branch, preventing account-enumeration via response-time analysis.
+        make_password(password)
+
         # Record failed login - user not found
         lh = LoginHistory.objects.create(
             user=None,
@@ -662,12 +709,34 @@ def firebase_register(request):
             profile = UserProfile.objects.select_related('user').get(firebase_uid=firebase_uid)
             existing_user = profile.user
         except UserProfile.DoesNotExist:
-            # Also check by email — link existing email accounts to Firebase
-            if email:
+            # Only link an existing email account to this Firebase UID when the
+            # incoming token proves the caller truly owns the email address.
+            # Without this guard an attacker can register an unverified Firebase
+            # account with a victim's email and hijack their Django account.
+            email_verified = decoded_token.get('email_verified', False)
+            sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
+            trusted_provider = sign_in_provider in ('google.com', 'apple.com')
+
+            if email and email_verified and trusted_provider:
                 try:
                     existing_user = User.objects.get(email=email)
                 except User.DoesNotExist:
                     pass
+            elif email:
+                # Check if there's a collision — refuse silently to avoid
+                # leaking whether the email is registered.
+                if User.objects.filter(email=email).exists():
+                    logger.warning(
+                        'Blocked Firebase account linking: uid=%s email=%s '
+                        'email_verified=%s provider=%s',
+                        firebase_uid, email, email_verified, sign_in_provider,
+                    )
+                    return Response(
+                        {'detail': 'An account with this email already exists. '
+                                   'Please sign in with your original method, '
+                                   'or verify your email first.'},
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
         if existing_user:
             # Update name if provided (split into first/last for long social names)
@@ -769,15 +838,34 @@ def firebase_login(request):
             profile = UserProfile.objects.select_related('user').get(firebase_uid=firebase_uid)
             user = profile.user
         except UserProfile.DoesNotExist:
-            # Try to find existing user by email before creating a new one
+            # Only link an existing email account when the token proves the
+            # caller owns the address (verified + trusted OAuth provider).
+            # Without this, an attacker with an unverified Firebase account
+            # using a victim's email could hijack their Django account.
             user = None
-            if email:
+            email_verified = decoded_token.get('email_verified', False)
+            sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
+            trusted_provider = sign_in_provider in ('google.com', 'apple.com')
+
+            if email and email_verified and trusted_provider:
                 try:
                     user = User.objects.get(email=email)
                     profile = user.profile
                     profile.firebase_uid = firebase_uid
                 except User.DoesNotExist:
                     pass
+            elif email and User.objects.filter(email=email).exists():
+                logger.warning(
+                    'Blocked Firebase login account linking: uid=%s email=%s '
+                    'email_verified=%s provider=%s',
+                    firebase_uid, email, email_verified, sign_in_provider,
+                )
+                return Response(
+                    {'detail': 'An account with this email already exists. '
+                               'Please sign in with your original method, '
+                               'or verify your email first.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             if user is None:
                 # Auto-create user if they don't exist (standard for social logins)
@@ -845,6 +933,18 @@ def firebase_login(request):
             elif decoded_token.get('email_verified', False):
                 # Firebase says verified — trust it
                 profile.is_email_verified = True
+
+        # Store device ID and cross-check device bans
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        if device_id:
+            profile.device_id = device_id
+            # Cross-check: if this device is banned, auto-flag the account
+            from .models import DeviceBan
+            if DeviceBan.objects.filter(device_id=device_id, is_active=True).exists():
+                if not profile.is_comment_banned:
+                    profile.is_comment_banned = True
+                    profile.comment_banned_at = timezone.now()
+
         profile.save()
 
         # Record login history
@@ -1141,11 +1241,8 @@ def record_app_open(request):
 
 
 def _get_client_ip(request):
-    """Extract the client IP from X-Forwarded-For or REMOTE_ADDR."""
-    xff = request.META.get('HTTP_X_FORWARDED_FOR')
-    if xff:
-        return xff.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
+    """Extract the client IP (REMOTE_ADDR, already set by CloudflareProxyMiddleware)."""
+    return request.META.get('REMOTE_ADDR', '')
 
 
 @api_view(['GET'])
@@ -1216,66 +1313,55 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle], url_path='record-view')
     def record_view(self, request, pk=None):
-        """
-        Record a view for this magazine edition.
-
-        Throttled to 1 view per content per minute per user/IP
-        to prevent view count manipulation.
-        """
-        edition = self.get_object()
-        MagazineEdition.objects.filter(pk=edition.pk).update(view_count=F('view_count') + 1)
-        edition.refresh_from_db()
-        return Response({'view_count': edition.view_count})
+        """Record a view for this magazine edition (deduped per IP+UA per day)."""
+        _dedup_record_view(MagazineEdition, pk, request, 'magazine')
+        return Response({'status': 'ok'})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle], url_path='toggle-like')
     def toggle_like(self, request, pk=None):
-        """
-        Toggle like on magazine. Requires authentication.
-
-        Throttled to 10 toggles per minute to prevent spam.
-        """
-        if not request.user.is_authenticated:
-            return Response(
-                {'error': 'Authentication required to like content'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
+        """Toggle like on magazine. Requires authentication."""
         edition = self.get_object()
-        like, created = MagazineLike.objects.get_or_create(
-            user=request.user, edition=edition,
+        new_count, is_liked = _atomic_toggle_like(
+            MagazineEdition, MagazineLike,
+            {'user': request.user, 'edition': edition}, edition,
         )
-        if not created:
-            # Unlike: delete the like record
-            like.delete()
-            MagazineEdition.objects.filter(pk=edition.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            # Like: increment count
-            MagazineEdition.objects.filter(pk=edition.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-
-        edition.refresh_from_db()
         return Response({
-            'like_count': edition.like_count,
+            'like_count': new_count,
             'is_liked': is_liked,
             'recent_likers': get_recent_likers(MagazineLike, 'edition', edition, request),
         })
 
-    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """Get or post comments on a magazine edition."""
         from django.utils.html import escape
+        from django.db.models import Prefetch
         edition = self.get_object()
         if request.method == 'GET':
+            reply_qs = MagazineComment.objects.select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 edition.comments
                 .filter(parent__isnull=True)
                 .select_related('user', 'user__profile')
-                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
             )
-            serializer = MagazineCommentSerializer(comments, many=True, context={'request': request})
-            return Response(serializer.data)
+            if request.user.is_authenticated:
+                like_exists = Exists(MagazineCommentLike.objects.filter(user=request.user, comment=OuterRef('pk')))
+                reply_qs = reply_qs.annotate(_is_liked=like_exists)
+                comments = (
+                    edition.comments
+                    .filter(parent__isnull=True)
+                    .select_related('user', 'user__profile')
+                    .prefetch_related(Prefetch('replies', queryset=reply_qs))
+                    .annotate(_is_liked=like_exists)
+                    .order_by('-created_at')
+                )
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            page = paginator.paginate_queryset(comments, request)
+            serializer = MagazineCommentSerializer(page, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         content = request.data.get('content', '').strip()
@@ -1285,6 +1371,22 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) < 2:
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='magazine_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
@@ -1311,6 +1413,9 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
         if comment.user != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if comment.user == request.user and not request.user.is_staff:
+            if (timezone.now() - comment.created_at).total_seconds() > 120:
+                return Response({'detail': 'Delete window has expired (2 minutes). Contact admin to remove.'}, status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1331,6 +1436,22 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) > 5000:
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='magazine_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         comment.content = escape(content)
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
@@ -1368,6 +1489,12 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     serializer_class = ArticleSerializer
     filterset_fields = ['category', 'is_featured', 'content_type']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            from .serializers import ArticleListSerializer
+            return ArticleListSerializer
+        return ArticleSerializer
 
     def get_queryset(self):
         now = timezone.now()
@@ -1431,7 +1558,8 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             from django.db.models import Value, BooleanField
             related_qs = related_qs.annotate(is_liked=Value(False, output_field=BooleanField()))
 
-        serializer = ArticleSerializer(related_qs, many=True, context={'request': request})
+        from .serializers import ArticleListSerializer
+        serializer = ArticleListSerializer(related_qs, many=True, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=True, methods=['get', 'post'], url_path='reading-progress', permission_classes=[IsAuthenticated])
@@ -1460,36 +1588,46 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """
-        Record a view for this article.
+        """Record a view for this article (deduped per IP+UA per day)."""
+        _dedup_record_view(Article, pk, request, 'article')
+        return Response({'status': 'ok'})
 
-        Throttled to 1 view per content per minute per user/IP
-        to prevent view count manipulation.
-        """
-        Article.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        article = self.get_object()
-        return Response({'view_count': article.view_count})
-
-    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """
         Get or post comments on an article.
 
-        POST is throttled to prevent spam (10/min).
+        Throttled to 30/min via SearchRateThrottle.
         """
         import re
+        from django.db.models import Prefetch
         article = self.get_object()
         if request.method == 'GET':
             # Return only top-level comments; replies are nested via the serializer.
+            reply_qs = ArticleComment.objects.select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 article.comments
                 .filter(parent__isnull=True)
                 .select_related('user', 'user__profile')
-                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
             )
-            serializer = ArticleCommentSerializer(comments, many=True, context={'request': request})
-            return Response(serializer.data)
+            if request.user.is_authenticated:
+                like_exists = Exists(ArticleCommentLike.objects.filter(user=request.user, comment=OuterRef('pk')))
+                reply_qs = reply_qs.annotate(_is_liked=like_exists)
+                comments = (
+                    article.comments
+                    .filter(parent__isnull=True)
+                    .select_related('user', 'user__profile')
+                    .prefetch_related(Prefetch('replies', queryset=reply_qs))
+                    .annotate(_is_liked=like_exists)
+                    .order_by('-created_at')
+                )
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            page = paginator.paginate_queryset(comments, request)
+            serializer = ArticleCommentSerializer(page, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
         # POST — require auth
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -1506,6 +1644,24 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
         if len(content) < 2:
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ban check + profanity filter with strike system
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='article_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
 
         # HTML sanitization: escape all HTML entities (treat as plain text)
         from django.utils.html import escape
@@ -1557,6 +1713,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
         if comment.user != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if comment.user == request.user and not request.user.is_staff:
+            if (timezone.now() - comment.created_at).total_seconds() > 120:
+                return Response({'detail': 'Delete window has expired (2 minutes). Contact admin to remove.'}, status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1577,6 +1736,22 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) > 5000:
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='article_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         comment.content = escape(content)
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
@@ -1602,24 +1777,15 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
-        """
-        Toggle like on article. Requires authentication.
-
-        Throttled to 10 toggles per minute to prevent spam.
-        """
+        """Toggle like on article. Requires authentication."""
         article = self.get_object()
-        like, created = ArticleLike.objects.get_or_create(user=request.user, article=article)
-        if not created:
-            like.delete()
-            Article.objects.filter(pk=article.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            Article.objects.filter(pk=article.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        article.refresh_from_db()
+        new_count, is_liked = _atomic_toggle_like(
+            Article, ArticleLike,
+            {'user': request.user, 'article': article}, article,
+        )
         return Response({
             'is_liked': is_liked,
-            'like_count': article.like_count,
+            'like_count': new_count,
             'recent_likers': get_recent_likers(ArticleLike, 'article', article, request),
         })
 
@@ -1728,26 +1894,20 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this event. Throttled to prevent manipulation."""
-        Event.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        event = self.get_object()
-        return Response({'view_count': event.view_count})
+        """Record a view for this event (deduped per IP+UA per day)."""
+        _dedup_record_view(Event, pk, request, 'event')
+        return Response({'status': 'ok'})
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on event. Requires authentication."""
         event = self.get_object()
-        like, created = EventLike.objects.get_or_create(user=request.user, event=event)
-        if not created:
-            like.delete()
-            Event.objects.filter(pk=event.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            Event.objects.filter(pk=event.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        event.refresh_from_db()
+        new_count, is_liked = _atomic_toggle_like(
+            Event, EventLike,
+            {'user': request.user, 'event': event}, event,
+        )
         return Response({
-            'like_count': event.like_count,
+            'like_count': new_count,
             'is_liked': is_liked,
         })
 
@@ -1755,9 +1915,16 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
 class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can view live feeds"""
     permission_classes = [AllowAny]
-    queryset = LiveFeed.objects.filter(content_status='published').order_by('-created_at')
     serializer_class = LiveFeedSerializer
     filterset_fields = ['status']
+
+    def get_queryset(self):
+        qs = LiveFeed.objects.filter(content_status='published').order_by('-created_at')
+        if self.request.user.is_authenticated:
+            qs = qs.annotate(
+                is_liked=Exists(LiveFeedLike.objects.filter(user=self.request.user, feed=OuterRef('pk')))
+            )
+        return qs
 
     def list(self, request, *args, **kwargs):
         # Auto-transition stale upcoming feeds to recorded before listing
@@ -1769,10 +1936,168 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this live feed. Throttled to prevent manipulation."""
-        LiveFeed.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
+        """Record a view for this live feed (deduped per IP+UA per day)."""
+        _dedup_record_view(LiveFeed, pk, request, 'livefeed')
+        return Response({'status': 'ok'})
+
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_like(self, request, pk=None):
+        """Toggle like on a live feed."""
         feed = self.get_object()
-        return Response({'view_count': feed.view_count})
+        new_count, is_liked = _atomic_toggle_like(
+            LiveFeed, LiveFeedLike,
+            {'user': request.user, 'feed': feed}, feed,
+        )
+        return Response({
+            'is_liked': is_liked,
+            'like_count': new_count,
+            'recent_likers': get_recent_likers(LiveFeedLike, 'feed', feed, request),
+        })
+
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
+    def comments(self, request, pk=None):
+        """Get or post comments on a live feed."""
+        from django.db.models import Prefetch
+        feed = self.get_object()
+        if request.method == 'GET':
+            reply_qs = LiveFeedComment.objects.select_related('user', 'user__profile').order_by('created_at')
+            comments = (
+                feed.comments
+                .filter(parent__isnull=True)
+                .select_related('user', 'user__profile')
+                .prefetch_related(Prefetch('replies', queryset=reply_qs))
+                .order_by('-created_at')
+            )
+            if request.user.is_authenticated:
+                like_exists = Exists(LiveFeedCommentLike.objects.filter(user=request.user, comment=OuterRef('pk')))
+                reply_qs = reply_qs.annotate(_is_liked=like_exists)
+                comments = (
+                    feed.comments
+                    .filter(parent__isnull=True)
+                    .select_related('user', 'user__profile')
+                    .prefetch_related(Prefetch('replies', queryset=reply_qs))
+                    .annotate(_is_liked=like_exists)
+                    .order_by('-created_at')
+                )
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            page = paginator.paginate_queryset(comments, request)
+            serializer = LiveFeedCommentSerializer(page, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
+        # POST
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='livefeed_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
+        from django.utils.html import escape
+        content = escape(content)
+        parent_id = request.data.get('parent')
+        parent = None
+        if parent_id:
+            try:
+                parent = LiveFeedComment.objects.get(pk=parent_id, feed=feed)
+                if parent.parent_id is not None:
+                    parent = parent.parent
+            except LiveFeedComment.DoesNotExist:
+                return Response({'detail': 'Parent comment not found.'}, status=status.HTTP_400_BAD_REQUEST)
+        comment = LiveFeedComment.objects.create(
+            user=request.user, feed=feed, parent=parent, content=content,
+        )
+        serializer = LiveFeedCommentSerializer(comment, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[0-9]+)')
+    def delete_comment(self, request, pk=None, comment_id=None):
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            comment = LiveFeedComment.objects.get(pk=comment_id, feed_id=pk)
+        except LiveFeedComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user and not request.user.is_staff:
+            return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if comment.user == request.user and not request.user.is_staff:
+            if (timezone.now() - comment.created_at).total_seconds() > 120:
+                return Response({'detail': 'Delete window has expired (2 minutes). Contact admin to remove.'}, status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
+            permission_classes=[IsAuthenticated])
+    def edit_comment(self, request, pk=None, comment_id=None):
+        from django.utils.html import escape
+        try:
+            comment = LiveFeedComment.objects.get(pk=comment_id, feed_id=pk)
+        except LiveFeedComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if comment.user != request.user:
+            return Response({'detail': 'You can only edit your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if (timezone.now() - comment.created_at).total_seconds() > 120:
+            return Response({'detail': 'Edit window has expired (2 minutes).'}, status=status.HTTP_403_FORBIDDEN)
+        content = request.data.get('content', '').strip()
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='livefeed_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
+        comment.content = escape(content)
+        comment.updated_at = timezone.now()
+        comment.save(update_fields=['content', 'updated_at'])
+        return Response(LiveFeedCommentSerializer(comment, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
+            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    def toggle_comment_like(self, request, pk=None, comment_id=None):
+        try:
+            comment = LiveFeedComment.objects.get(pk=comment_id, feed_id=pk)
+        except LiveFeedComment.DoesNotExist:
+            return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        like, created = LiveFeedCommentLike.objects.get_or_create(user=request.user, comment=comment)
+        if not created:
+            like.delete()
+            LiveFeedComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') - 1)
+            is_liked = False
+        else:
+            LiveFeedComment.objects.filter(pk=comment.pk).update(like_count=F('like_count') + 1)
+            is_liked = True
+        comment.refresh_from_db()
+        return Response({'is_liked': is_liked, 'like_count': comment.like_count})
 
 
 class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1784,10 +2109,9 @@ class ResourceViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this resource. Throttled to prevent manipulation."""
-        Resource.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        resource = self.get_object()
-        return Response({'view_count': resource.view_count})
+        """Record a view for this resource (deduped per IP+UA per day)."""
+        _dedup_record_view(Resource, pk, request, 'resource')
+        return Response({'status': 'ok'})
 
 
 class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1801,10 +2125,9 @@ class FeatureCardViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this feature card. Throttled to prevent manipulation."""
-        FeatureCard.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        card = self.get_object()
-        return Response({'view_count': card.view_count})
+        """Record a view for this feature card (deduped per IP+UA per day)."""
+        _dedup_record_view(FeatureCard, pk, request, 'featurecard')
+        return Response({'status': 'ok'})
 
 
 class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1816,10 +2139,9 @@ class PriorityAgendaViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this priority agenda. Throttled to prevent manipulation."""
-        PriorityAgenda.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        agenda = self.get_object()
-        return Response({'view_count': agenda.view_count})
+        """Record a view for this priority agenda (deduped per IP+UA per day)."""
+        _dedup_record_view(PriorityAgenda, pk, request, 'agenda')
+        return Response({'status': 'ok'})
 
 
 class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1842,45 +2164,55 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this gallery album. Throttled to prevent manipulation."""
-        GalleryAlbum.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        album = self.get_object()
-        return Response({'view_count': album.view_count})
+        """Record a view for this gallery album (deduped per IP+UA per day)."""
+        _dedup_record_view(GalleryAlbum, pk, request, 'album')
+        return Response({'status': 'ok'})
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on gallery album. Requires authentication."""
         album = self.get_object()
-        like, created = GalleryAlbumLike.objects.get_or_create(user=request.user, album=album)
-        if not created:
-            like.delete()
-            GalleryAlbum.objects.filter(pk=album.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            GalleryAlbum.objects.filter(pk=album.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        album.refresh_from_db()
+        new_count, is_liked = _atomic_toggle_like(
+            GalleryAlbum, GalleryAlbumLike,
+            {'user': request.user, 'album': album}, album,
+        )
         return Response({
-            'like_count': album.like_count,
+            'like_count': new_count,
             'is_liked': is_liked,
             'recent_likers': get_recent_likers(GalleryAlbumLike, 'album', album, request),
         })
 
-    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """Get or post comments on a gallery album."""
         from django.utils.html import escape
+        from django.db.models import Prefetch
         album = self.get_object()
         if request.method == 'GET':
+            reply_qs = GalleryComment.objects.select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 album.comments
                 .filter(parent__isnull=True)
                 .select_related('user', 'user__profile')
-                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
             )
-            serializer = GalleryCommentSerializer(comments, many=True, context={'request': request})
-            return Response(serializer.data)
+            if request.user.is_authenticated:
+                like_exists = Exists(GalleryCommentLike.objects.filter(user=request.user, comment=OuterRef('pk')))
+                reply_qs = reply_qs.annotate(_is_liked=like_exists)
+                comments = (
+                    album.comments
+                    .filter(parent__isnull=True)
+                    .select_related('user', 'user__profile')
+                    .prefetch_related(Prefetch('replies', queryset=reply_qs))
+                    .annotate(_is_liked=like_exists)
+                    .order_by('-created_at')
+                )
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            page = paginator.paginate_queryset(comments, request)
+            serializer = GalleryCommentSerializer(page, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         content = request.data.get('content', '').strip()
@@ -1890,6 +2222,22 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) < 2:
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='gallery_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
@@ -1916,6 +2264,9 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
         if comment.user != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if comment.user == request.user and not request.user.is_staff:
+            if (timezone.now() - comment.created_at).total_seconds() > 120:
+                return Response({'detail': 'Delete window has expired (2 minutes). Contact admin to remove.'}, status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1936,6 +2287,22 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) > 5000:
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='gallery_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         comment.content = escape(content)
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
@@ -1982,26 +2349,20 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view for this video. Throttled to prevent manipulation."""
-        Video.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        video = self.get_object()
-        return Response({'view_count': video.view_count})
+        """Record a view for this video (deduped per IP+UA per day)."""
+        _dedup_record_view(Video, pk, request, 'video')
+        return Response({'status': 'ok'})
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on video. Requires authentication."""
         video = self.get_object()
-        like, created = VideoLike.objects.get_or_create(user=request.user, video=video)
-        if not created:
-            like.delete()
-            Video.objects.filter(pk=video.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            Video.objects.filter(pk=video.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        video.refresh_from_db()
+        new_count, is_liked = _atomic_toggle_like(
+            Video, VideoLike,
+            {'user': request.user, 'video': video}, video,
+        )
         return Response({
-            'like_count': video.like_count,
+            'like_count': new_count,
             'is_liked': is_liked,
             'recent_likers': get_recent_likers(VideoLike, 'video', video, request),
         })
@@ -2014,21 +2375,37 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = VideoChapterSerializer(chapters, many=True, context={'request': request})
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['get', 'post'], url_path='comments', throttle_classes=[SearchRateThrottle])
     def comments(self, request, pk=None):
         """Get or post comments on a video."""
         from django.utils.html import escape
+        from django.db.models import Prefetch
         video = self.get_object()
         if request.method == 'GET':
+            reply_qs = VideoComment.objects.select_related('user', 'user__profile').order_by('created_at')
             comments = (
                 video.comments
                 .filter(parent__isnull=True)
                 .select_related('user', 'user__profile')
-                .prefetch_related('replies', 'replies__user', 'replies__user__profile')
+                .prefetch_related(Prefetch('replies', queryset=reply_qs))
                 .order_by('-created_at')
             )
-            serializer = VideoCommentSerializer(comments, many=True, context={'request': request})
-            return Response(serializer.data)
+            if request.user.is_authenticated:
+                like_exists = Exists(VideoCommentLike.objects.filter(user=request.user, comment=OuterRef('pk')))
+                reply_qs = reply_qs.annotate(_is_liked=like_exists)
+                comments = (
+                    video.comments
+                    .filter(parent__isnull=True)
+                    .select_related('user', 'user__profile')
+                    .prefetch_related(Prefetch('replies', queryset=reply_qs))
+                    .annotate(_is_liked=like_exists)
+                    .order_by('-created_at')
+                )
+            paginator = PageNumberPagination()
+            paginator.page_size = 20
+            page = paginator.paginate_queryset(comments, request)
+            serializer = VideoCommentSerializer(page, many=True, context={'request': request})
+            return paginator.get_paginated_response(serializer.data)
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
         content = request.data.get('content', '').strip()
@@ -2038,6 +2415,22 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) < 2:
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='video_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         content = escape(content)
         parent_id = request.data.get('parent')
         parent = None
@@ -2064,6 +2457,9 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment not found.'}, status=status.HTTP_404_NOT_FOUND)
         if comment.user != request.user and not request.user.is_staff:
             return Response({'detail': 'You can only delete your own comments.'}, status=status.HTTP_403_FORBIDDEN)
+        if comment.user == request.user and not request.user.is_staff:
+            if (timezone.now() - comment.created_at).total_seconds() > 120:
+                return Response({'detail': 'Delete window has expired (2 minutes). Contact admin to remove.'}, status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -2084,6 +2480,22 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) > 5000:
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='video_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         comment.content = escape(content)
         comment.updated_at = timezone.now()
         comment.save(update_fields=['content', 'updated_at'])
@@ -2262,7 +2674,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('notifications_list')])
 def notification_target_count(request):
     """
     Preview target audience count for a notification before sending.
@@ -2307,6 +2719,12 @@ def health_check(request):
     Returns 200 OK with basic status for anonymous users.
     Returns detailed component statuses (DB, cache, disk, memory) only for staff.
     """
+    # Anonymous / non-staff get a fixed minimal response (for load balancers).
+    # No version, no infrastructure detail, no healthy/degraded distinction.
+    if not (request.user.is_authenticated and request.user.is_staff):
+        return Response({'status': 'ok'})
+
+    # ── Staff-only: detailed component checks ─────────────────
     import time
     import os
     from django.db import connection
@@ -2378,18 +2796,11 @@ def health_check(request):
 
     response_status = status.HTTP_200_OK if overall_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
 
-    # Only expose detailed checks to authenticated staff users
-    if request.user.is_authenticated and request.user.is_staff:
-        return Response({
-            'status': 'healthy' if overall_healthy else 'degraded',
-            'version': '1.0.0',
-            'timestamp': timezone.now().isoformat(),
-            'checks': checks,
-        }, status=response_status)
-
-    # Anonymous / non-staff get minimal response (for load balancers)
     return Response({
         'status': 'healthy' if overall_healthy else 'degraded',
+        'version': '1.0.0',
+        'timestamp': timezone.now().isoformat(),
+        'checks': checks,
     }, status=response_status)
 
 
@@ -2480,9 +2891,59 @@ def home_feed(request):
         event['current_registration_count'] = 0
         event['event_end_date'] = None
 
-    # Combine and sort by date
+    # Inject active Youth Dialogue event as a featured upcoming event
+    yd_event = YouthDialogueEvent.get_active()
+    yd_card = None
+    if yd_event and yd_event.is_visible and yd_event.start_date:
+        poster_url = ''
+        if yd_event.banner_image:
+            try:
+                poster_url = request.build_absolute_uri(yd_event.banner_image.url)
+            except Exception:
+                pass
+        yd_card = {
+            'id': yd_event.pk,
+            'card_type': 'event',
+            'event_type': 'in_person',
+            'category_data': None,
+            'event_title': yd_event.programme_title or 'Youth Dialogue',
+            'event_title_fr': yd_event.programme_title_fr or 'Dialogue Jeunesse',
+            'event_description': yd_event.description or '',
+            'event_description_fr': yd_event.description_fr or '',
+            'event_poster': poster_url,
+            'event_date': yd_event.start_date.isoformat() if yd_event.start_date else None,
+            'event_end_date': yd_event.end_date.isoformat() if yd_event.end_date else None,
+            'venue': yd_event.venue_name or yd_event.location or '',
+            'venue_fr': yd_event.venue_name_fr or '',
+            'venue_address': yd_event.venue_address or yd_event.location or '',
+            'contact_email': yd_event.support_email or '',
+            'contact_phone': yd_event.support_phone or '',
+            'has_registration': False,
+            'is_registration_enabled': False,
+            'registration_deadline': None,
+            'max_registrations': 0,
+            'allow_proxy_registration': False,
+            'confirmation_message': '',
+            'confirmation_message_fr': '',
+            'is_active': True,
+            'order': -1,
+            'form_fields': [],
+            'has_registered': False,
+            'user_submission_status': None,
+            'is_registration_open': False,
+            'current_registration_count': 0,
+            'spots_remaining': None,
+            'show_photos': False,
+            'show_attendees': False,
+            'show_comments': False,
+            'is_youth_dialogue': True,
+        }
+
+    # Combine and sort by date (soonest upcoming first, null dates last)
     all_event_cards = list(event_reg_data) + list(info_event_data)
-    all_event_cards.sort(key=lambda x: x.get('event_date', ''))
+    if yd_card:
+        all_event_cards.insert(0, yd_card)  # Featured: always first
+    all_event_cards.sort(key=lambda x: x.get('event_date') or '9999-12-31T23:59:59')
 
     # Latest magazines (published only, newest first)
     magazines = MagazineEdition.objects.prefetch_related('images').filter(
@@ -2948,6 +3409,16 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             except Exception:
                 pass  # Don't fail registration if email fails
 
+    @staticmethod
+    def _build_qr_data(prefix, ref_id, qr_hash, request):
+        """Build QR data string respecting the qr_code_mode setting."""
+        raw = f'{prefix}:{ref_id}:{qr_hash}'
+        settings_obj = AppSettings.load()
+        if settings_obj.qr_code_mode == 'url':
+            base = request.build_absolute_uri('/').rstrip('/')
+            return f'{base}/verify?code={raw}'
+        return raw
+
     @action(detail=True, methods=['get'], url_path='qr-ticket')
     def qr_ticket(self, request, pk=None):
         """Generate QR ticket data for a submission."""
@@ -2981,7 +3452,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             'status': submission.status,
             'is_waitlisted': submission.is_waitlisted,
             'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
-            'qr_data': f'{submission.id}:{submission.qr_ticket_hash}',
+            'qr_data': self._build_qr_data('EVT', str(submission.id), submission.qr_ticket_hash, request),
             'qr_hash': submission.qr_ticket_hash,
             'event_poster': event_reg.event_poster.url if event_reg.event_poster else None,
         }
@@ -2996,14 +3467,24 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         if not qr_data:
             return Response({'detail': 'qr_data field is required.'}, status=400)
 
-        # Parse qr_data format: "submission_id:hash"
+        # Handle URL-wrapped QR data
+        if '?' in qr_data and 'code=' in qr_data:
+            from urllib.parse import urlparse, parse_qs
+            code_vals = parse_qs(urlparse(qr_data).query).get('code', [])
+            if code_vals:
+                qr_data = code_vals[0]
+
+        # Parse qr_data format: "EVT:submission_id:hash" or legacy "submission_id:hash"
         parts = qr_data.split(':')
-        if len(parts) != 2:
+        if len(parts) == 3 and parts[0] == 'EVT':
+            qr_sub_id_str, qr_hash = parts[1], parts[2]
+        elif len(parts) == 2:
+            qr_sub_id_str, qr_hash = parts[0], parts[1]
+        else:
             return Response({'detail': 'Invalid QR code format.'}, status=400)
 
-        qr_sub_id, qr_hash = parts
         try:
-            qr_sub_id = int(qr_sub_id)
+            qr_sub_id = int(qr_sub_id_str)
         except ValueError:
             return Response({'detail': 'Invalid QR code.'}, status=400)
 
@@ -3033,9 +3514,10 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             'event': submission.event_registration.event_title,
         })
 
-    @action(detail=False, methods=['post'], url_path='register-proxy')
+    @action(detail=False, methods=['post'], url_path='register-proxy',
+            throttle_classes=[ProxyRegistrationThrottle])
     def register_proxy(self, request):
-        """Register on behalf of someone else"""
+        """Register on behalf of someone else."""
         serializer = ProxyRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -3048,7 +3530,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         if not event_reg.allow_proxy_registration:
             return Response({'detail': 'Proxy registration is not allowed for this event.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Feature 2: Proxy duplicate detection
+        # Duplicate detection (case-insensitive email)
         if EventSubmission.objects.filter(
             event_registration=event_reg,
             proxy_email__iexact=data['proxy_email'],
@@ -3065,16 +3547,21 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             is_proxy=True,
             proxy_name=data['proxy_name'],
             proxy_email=data['proxy_email'],
+            proxy_email_verified=False,  # Proxy never consented — treat as unverified
             proxy_phone=data.get('proxy_phone', ''),
             form_data=data.get('form_data', {}),
         )
 
-        # Feature 3: Send confirmation email to proxy recipient
+        # Notify the proxy recipient.  The email is deliberately *not*
+        # worded as a confirmation — the proxy never consented, so we tell
+        # them someone registered on their behalf and give them a way to
+        # dispute it.  This prevents abuse as a government-branded spam relay.
         if event_reg.send_confirmation_email and data['proxy_email']:
             try:
                 registrant_name = request.user.get_full_name() or request.user.username
                 proxy_name = data['proxy_name']
-                subject = f'Registration Confirmation: {event_reg.event_title}'
+                contact_email = event_reg.contact_email or 'info@burundi4africa.com'
+                subject = f'Someone registered you for: {event_reg.event_title}'
 
                 html_message = f'''<!DOCTYPE html>
 <html>
@@ -3086,7 +3573,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
       <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
-      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Notice</h1>
       <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
     </div>
     <div style="padding:32px;">
@@ -3094,7 +3581,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         Dear <strong>{proxy_name}</strong>,
       </p>
       <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
-        This registration was submitted on your behalf by <strong>{registrant_name}</strong> for <strong>{event_reg.event_title}</strong>. Your registration has been received and is being processed.
+        A user named <strong>{registrant_name}</strong> has submitted an event registration on your behalf for <strong>{event_reg.event_title}</strong>. This registration is pending review.
       </p>
       <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
         <h3 style="color:#2d3748;font-size:14px;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px;">Event Details</h3>
@@ -3112,15 +3599,17 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         </table>
       </div>'''
 
-                if event_reg.confirmation_message:
-                    html_message += f'''
-      <div style="background:#fffff0;border-left:4px solid #ecc94b;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-        <p style="color:#744210;font-size:14px;line-height:1.6;margin:0;">{event_reg.confirmation_message}</p>
+                html_message += f'''
+      <div style="background:#fff5f5;border-left:4px solid #fc8181;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+        <p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">
+          <strong>Did not expect this?</strong> If you did not ask anyone to register you, please contact us at
+          <a href="mailto:{contact_email}" style="color:#c53030;">{contact_email}</a> and we will remove this registration.
+        </p>
       </div>'''
 
                 html_message += f'''
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+        Questions? Contact us at <a href="mailto:{contact_email}" style="color:#3182ce;">{contact_email}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
@@ -3131,10 +3620,15 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 </body>
 </html>'''
 
-                plain_message = f"Dear {proxy_name},\n\nThis registration was submitted on your behalf by {registrant_name} for {event_reg.event_title}.\n\n"
-                if event_reg.confirmation_message:
-                    plain_message += f"{event_reg.confirmation_message}\n\n"
-                plain_message += "Best regards,\nBe 4 Africa Team"
+                plain_message = (
+                    f"Dear {proxy_name},\n\n"
+                    f"A user named {registrant_name} has submitted an event registration "
+                    f"on your behalf for {event_reg.event_title}. "
+                    f"This registration is pending review.\n\n"
+                    f"If you did not expect this, please contact us at "
+                    f"{contact_email} and we will remove this registration.\n\n"
+                    f"Best regards,\nBe 4 Africa Team"
+                )
 
                 send_mail(
                     subject=subject,
@@ -3242,7 +3736,7 @@ def send_signup_otp(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@throttle_classes([OTPRateThrottle])
+@throttle_classes([OTPVerifyThrottle])
 def verify_signup_otp(request):
     """Verify sign-up email OTP and mark user as email-verified"""
     from .otp_utils import verify_email_otp as _verify_email_otp
@@ -3255,7 +3749,7 @@ def verify_signup_otp(request):
         )
 
     email = request.user.email
-    success, message = _verify_email_otp(request.user, email, otp_code)
+    success, message = _verify_email_otp(request.user, email, str(otp_code).strip())
 
     if success:
         # Mark profile as email verified
@@ -3318,7 +3812,7 @@ def send_email_otp(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@throttle_classes([OTPRateThrottle])
+@throttle_classes([OTPVerifyThrottle])
 def verify_email_otp(request):
     """Verify email OTP code"""
     from .otp_utils import verify_email_otp
@@ -3332,7 +3826,7 @@ def verify_email_otp(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    success, message = verify_email_otp(request.user, email, otp_code)
+    success, message = verify_email_otp(request.user, email, str(otp_code).strip())
 
     if success:
         return Response({'message': message})
@@ -3574,10 +4068,18 @@ def change_password(request):
         # Log password change
         PasswordChangeHistory.objects.create(
             user=user,
-            ip_address=request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '')).split(',')[0].strip(),
+            ip_address=request.META.get('REMOTE_ADDR', ''),
         )
-        # Generate new tokens
+        # Revoke all existing refresh tokens so compromised sessions can't persist
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+        outstanding = OutstandingToken.objects.filter(user=user)
+        for token in outstanding:
+            BlacklistedToken.objects.get_or_create(token=token)
+        # Clear all other active sessions (the caller gets a fresh token below)
+        ActiveSession.objects.filter(user=user).delete()
+        # Generate new tokens for the current device
         refresh = RefreshToken.for_user(user)
+        _create_active_session(user, request, session_key=str(refresh.access_token.payload.get('jti', '')))
         return Response({
             'message': 'Password changed successfully',
             'access': str(refresh.access_token),
@@ -3821,11 +4323,10 @@ def join_event_waitlist(request):
     return Response(EventWaitlistSerializer(waitlist).data, status=201)
 
 
-class EventPhotoViewSet(viewsets.ModelViewSet):
-    """User-uploaded event photos."""
-    permission_classes = [IsAuthenticated]
+class EventPhotoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Event photos (admin-managed, read-only for app users)."""
+    permission_classes = [AllowAny]
     serializer_class = EventPhotoSerializer
-    http_method_names = ['get', 'post']
 
     def get_queryset(self):
         qs = EventPhoto.objects.filter(is_approved=True).select_related(
@@ -3838,9 +4339,6 @@ class EventPhotoViewSet(viewsets.ModelViewSet):
         elif event_reg_id:
             qs = qs.filter(event_registration_id=event_reg_id)
         return qs
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -3937,9 +4435,30 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Discussion is locked'}, status=400)
 
         from django.utils.html import escape
-        content = escape(request.data.get('content', '').strip())
+        content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Content required'}, status=400)
+        if len(content) > 5000:
+            return Response({'detail': 'Comment too long (max 5000 characters).'}, status=400)
+        if len(content) < 2:
+            return Response({'detail': 'Comment too short (min 2 characters).'}, status=400)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='discussion_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=400)
+        content = escape(content)
 
         parent_id = request.data.get('parent')
         reply = DiscussionReply.objects.create(
@@ -3954,26 +4473,20 @@ class DiscussionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='record-view', permission_classes=[AllowAny], throttle_classes=[ViewCountThrottle])
     def record_view(self, request, pk=None):
-        """Record a view on a discussion. Throttled to prevent manipulation."""
-        Discussion.objects.filter(pk=pk).update(view_count=F('view_count') + 1)
-        discussion = self.get_object()
-        return Response({'view_count': discussion.view_count})
+        """Record a view on a discussion (deduped per IP+UA per day)."""
+        _dedup_record_view(Discussion, pk, request, 'discussion')
+        return Response({'status': 'ok'})
 
     @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on discussion. Requires authentication."""
         discussion = self.get_object()
-        like, created = DiscussionLike.objects.get_or_create(user=request.user, discussion=discussion)
-        if not created:
-            like.delete()
-            Discussion.objects.filter(pk=discussion.pk).update(like_count=F('like_count') - 1)
-            is_liked = False
-        else:
-            Discussion.objects.filter(pk=discussion.pk).update(like_count=F('like_count') + 1)
-            is_liked = True
-        discussion.refresh_from_db()
+        new_count, is_liked = _atomic_toggle_like(
+            Discussion, DiscussionLike,
+            {'user': request.user, 'discussion': discussion}, discussion,
+        )
         return Response({
-            'like_count': discussion.like_count,
+            'like_count': new_count,
             'is_liked': is_liked,
         })
 
@@ -4007,6 +4520,22 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Comment too short (min 2 characters).'}, status=status.HTTP_400_BAD_REQUEST)
         if len(content) > 5000:
             return Response({'detail': 'Comment too long (max 5000 characters).'}, status=status.HTTP_400_BAD_REQUEST)
+        from .validators import check_profanity, check_comment_ban, record_profanity_strike
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned, ban_reason = check_comment_ban(request.user, device_id)
+        if is_banned:
+            return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+        is_clean, bad_word = check_profanity(content)
+        if not is_clean:
+            strike_count, is_now_banned = record_profanity_strike(
+                request.user, device_id,
+                flagged_content=content, matched_word=bad_word, content_type='discussion_comment',
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            )
+            if is_now_banned:
+                return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_403_FORBIDDEN)
+            remaining = 5 - strike_count
+            return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=status.HTTP_400_BAD_REQUEST)
         reply.content = escape(content)
         reply.updated_at = timezone.now()
         reply.save(update_fields=['content', 'updated_at'])
@@ -4252,7 +4781,7 @@ def check_app_update(request):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('audit_log')])
 def admin_audit_log(request):
     """Get admin audit trail entries."""
     logs = AuditLogEntry.objects.select_related('user').order_by('-created_at')
@@ -4277,7 +4806,7 @@ def admin_audit_log(request):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('translation_manager')])
 def translation_entries(request):
     """List or create translation entries."""
     if request.method == 'GET':
@@ -4295,7 +4824,7 @@ def translation_entries(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('translation_manager')])
 def translation_entry_detail(request, pk):
     """Update or delete a translation entry."""
     entry = get_object_or_404(TranslationEntry, pk=pk)
@@ -4310,7 +4839,7 @@ def translation_entry_detail(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('translation_manager')])
 def auto_translate(request):
     """Auto-translate text using Google Gemini API."""
     text = request.data.get('text', '')
@@ -4500,18 +5029,25 @@ def unlink_account(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('users_list')])
 def merge_accounts(request):
     """Merge another user's data into the current user's account.
 
     Admin-only: Moves all linked accounts, bookmarks, reactions, comments, etc.
     from the source account to the target user, then deactivates the source.
 
-    Expects: source_user_id (the account to absorb)
+    Safety: requires the source account to share a verified email with the
+    requesting admin — this proves both accounts belong to the same person
+    (e.g. one via email sign-up, another via social login with the same email).
+
+    Expects: source_user_id, reason
     """
     source_user_id = request.data.get('source_user_id')
+    reason = (request.data.get('reason') or '').strip()
     if not source_user_id:
         return Response({'error': 'source_user_id is required'}, status=400)
+    if not reason:
+        return Response({'error': 'reason is required'}, status=400)
 
     try:
         source_user = User.objects.get(id=source_user_id)
@@ -4522,6 +5058,33 @@ def merge_accounts(request):
         return Response({'error': 'Cannot merge with yourself'}, status=400)
 
     target_user = request.user
+
+    # ── Ownership proof: both accounts must share the same verified email ──
+    target_email = target_user.email.lower().strip() if target_user.email else ''
+    source_email = source_user.email.lower().strip() if source_user.email else ''
+
+    if not target_email or not source_email:
+        return Response(
+            {'error': 'Both accounts must have an email address to merge.'},
+            status=400,
+        )
+
+    if target_email != source_email:
+        return Response(
+            {'error': 'Accounts can only be merged when they share the same '
+                      'verified email address. This proves both accounts '
+                      'belong to the same person.'},
+            status=403,
+        )
+
+    # Verify at least one account has a confirmed email
+    target_verified = getattr(getattr(target_user, 'profile', None), 'is_email_verified', False)
+    source_verified = getattr(getattr(source_user, 'profile', None), 'is_email_verified', False)
+    if not target_verified and not source_verified:
+        return Response(
+            {'error': 'At least one account must have a verified email before merging.'},
+            status=403,
+        )
 
     # Transfer linked accounts (skip duplicates)
     for la in LinkedAccount.objects.filter(user=source_user):
@@ -4581,12 +5144,21 @@ def merge_accounts(request):
     except UserProfile.DoesNotExist:
         pass
 
-    # Record the merge
+    # Record the merge with audit trail
     AccountMergeRequest.objects.create(
         primary_user=target_user,
         secondary_user=source_user,
         status='approved',
+        reason=reason,
+        reviewed_by=target_user,
         resolved_at=timezone.now(),
+    )
+
+    logger.info(
+        'Account merge: admin %s (id=%d) absorbed user %s (id=%d). Reason: %s',
+        target_user.email, target_user.id,
+        source_user.email, source_user.id,
+        reason,
     )
 
     return Response({
@@ -4600,7 +5172,7 @@ def merge_accounts(request):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('articles_list')])
 def article_drafts(request):
     """List or create article drafts."""
     if request.method == 'GET':
@@ -4617,7 +5189,7 @@ def article_drafts(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('articles_list')])
 def article_draft_detail(request, pk):
     """Get, update, or delete a specific draft."""
     draft = get_object_or_404(ArticleDraft, pk=pk, author=request.user)
@@ -4638,7 +5210,7 @@ def article_draft_detail(request, pk):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('articles_list')])
 def content_versions(request):
     """Get version history for a content item."""
     content_type = request.query_params.get('content_type')
@@ -4787,6 +5359,26 @@ def event_comments(request, event_id):
     content = request.data.get('content', '').strip()
     if not content:
         return Response({'error': 'Content is required'}, status=400)
+    if len(content) > 5000:
+        return Response({'detail': 'Comment too long (max 5000 characters).'}, status=400)
+    if len(content) < 2:
+        return Response({'detail': 'Comment too short (min 2 characters).'}, status=400)
+    from .validators import check_profanity, check_comment_ban, record_profanity_strike
+    device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+    is_banned, ban_reason = check_comment_ban(request.user, device_id)
+    if is_banned:
+        return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
+    is_clean, bad_word = check_profanity(content)
+    if not is_clean:
+        strike_count, is_now_banned = record_profanity_strike(
+            request.user, device_id,
+            flagged_content=content, matched_word=bad_word, content_type='event_comment',
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        )
+        if is_now_banned:
+            return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
+        remaining = 5 - strike_count
+        return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=400)
 
     parent_id = request.data.get('parent')
     parent = None
@@ -4824,10 +5416,13 @@ def event_comments(request, event_id):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def event_comment_delete(request, event_id, comment_id):
-    """Delete own comment on an event."""
+    """Delete own comment on an event. Users can only delete within 2 minutes; admins anytime."""
     comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
     if comment.user != request.user and not request.user.is_staff:
         return Response({'error': 'Permission denied'}, status=403)
+    if comment.user == request.user and not request.user.is_staff:
+        if (timezone.now() - comment.created_at).total_seconds() > 120:
+            return Response({'detail': 'Delete window has expired (2 minutes). Contact admin to remove.'}, status=403)
     comment.delete()
     return Response({'message': 'Comment deleted'}, status=204)
 
@@ -4847,6 +5442,22 @@ def event_comment_edit(request, event_id, comment_id):
         return Response({'detail': 'Comment too short (min 2 characters).'}, status=400)
     if len(content) > 5000:
         return Response({'detail': 'Comment too long (max 5000 characters).'}, status=400)
+    from .validators import check_profanity, check_comment_ban, record_profanity_strike
+    device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+    is_banned, ban_reason = check_comment_ban(request.user, device_id)
+    if is_banned:
+        return Response({'detail': ban_reason, 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
+    is_clean, bad_word = check_profanity(content)
+    if not is_clean:
+        strike_count, is_now_banned = record_profanity_strike(
+            request.user, device_id,
+            flagged_content=content, matched_word=bad_word, content_type='event_comment',
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+        )
+        if is_now_banned:
+            return Response({'detail': 'You have been permanently banned from commenting due to repeated profanity violations.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=403)
+        remaining = 5 - strike_count
+        return Response({'detail': f'Your comment contains inappropriate language. Please keep the conversation respectful. Warning: {remaining} strike(s) remaining before permanent ban.', 'reference_id': getattr(getattr(request.user, 'profile', None), 'reference_id', f'B{request.user.pk:06d}')}, status=400)
     comment.content = escape(content)
     comment.updated_at = timezone.now()
     comment.save(update_fields=['content', 'updated_at'])
@@ -4877,7 +5488,7 @@ def event_attendees(request, event_id):
     """List attendees for event networking (name, badge, nationality only - no email/phone)."""
     event = get_object_or_404(Event, pk=event_id)
     submissions = EventSubmission.objects.filter(
-        registration__event=event,
+        event_registration__event=event,
         status__in=['pending', 'approved'],
     )
     attendee_users = User.objects.filter(
@@ -4993,7 +5604,7 @@ def newsletter_unsubscribe(request, token):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('analytics')])
 def generate_weekly_report(request):
     """Generate a weekly analytics report."""
     from django.contrib.auth import get_user_model
@@ -5148,7 +5759,7 @@ def article_share_card(request, pk):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('articles_list')])
 def article_revisions(request, pk):
     """List all revisions for an article."""
     article = get_object_or_404(Article, pk=pk)
@@ -5158,7 +5769,7 @@ def article_revisions(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('articles_list')])
 def article_revision_restore(request, pk, revision_id):
     """Restore an article to a specific revision."""
     article = get_object_or_404(Article, pk=pk)
@@ -5193,7 +5804,7 @@ def article_revision_restore(request, pk, revision_id):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('translation_manager')])
 def translation_queue(request):
     """List all translation requests or create a new one."""
     if request.method == 'GET':
@@ -5212,7 +5823,7 @@ def translation_queue(request):
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('translation_manager')])
 def translation_queue_detail(request, pk):
     """Get or update a specific translation request."""
     tr = get_object_or_404(TranslationRequest, pk=pk)
@@ -5287,30 +5898,447 @@ def _send_yd_admin_notification(application):
         pass
 
 
-def _send_yd_applicant_email(application, subject, heading, badge_color, body_html):
-    """Send branded email to Youth Dialogue applicant."""
+def _get_yd_user_lang(application):
+    """Return 'fr' or 'en' based on the applicant's preferred language."""
+    try:
+        profile = application.user.profile
+        if profile.preferred_language == 'fr':
+            return 'fr'
+    except Exception:
+        pass
+    return 'en'
+
+
+def _notify_yd(application, event_key):
+    """Unified Youth Dialogue notification: email + push + in-app Notification record.
+
+    Event keys and their semantics:
+      submitted            — applicant confirmation on submission
+      accepted             — application accepted, upload docs next
+      rejected             — application not accepted
+      documents_submitted  — docs received, under verification
+      documents_rejected   — lists rejected docs with reasons
+      documents_resubmitted — resubmitted docs received
+      credential_issued    — credential ready
+      credential_revoked   — credential revoked
+    """
+    lang = _get_yd_user_lang(application)
+    is_fr = lang == 'fr'
+
+    EVENT_CONFIG = {
+        'submitted': {
+            'subject': 'Dialogue des Jeunes — Candidature reçue avec succès' if is_fr else 'Youth Dialogue — Application Successfully Received',
+            'heading': 'Candidature reçue avec succès' if is_fr else 'Application Successfully Received',
+            'badge_color': '#38a169',
+            'body_html': '',  # Built dynamically below
+            'push_title': 'Candidature reçue !' if is_fr else 'Application Received!',
+            'push_body': 'Votre candidature au Dialogue des Jeunes a été soumise avec succès.' if is_fr else 'Your Youth Dialogue application has been submitted successfully. Check your email for confirmation details.',
+            'push_route': '/youth-dialogue',
+        },
+        'accepted': {
+            'subject': 'Dialogue des Jeunes — Candidature acceptée' if is_fr else 'Youth Dialogue — Application Accepted',
+            'heading': 'Candidature acceptée' if is_fr else 'Application Accepted',
+            'badge_color': '#38a169',
+            'body_html': ('''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Nous avons le plaisir de vous informer que votre candidature au <strong>Programme Dialogue des Jeunes</strong>
+              a été acceptée.
+            </p>
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              La prochaine étape consiste à télécharger vos documents requis via l'application Be 4 Africa.
+              Veuillez soumettre vos documents dans les plus brefs délais.
+            </p>''' if is_fr else '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              We are pleased to inform you that your application for the <strong>Youth Dialogue Programme</strong>
+              has been accepted.
+            </p>
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              The next step is to upload your required documents through the Be 4 Africa app.
+              Please submit your documents at your earliest convenience.
+            </p>'''),
+            'push_title': 'Candidature acceptée !' if is_fr else 'Application Accepted!',
+            'push_body': 'Félicitations ! Votre candidature a été acceptée. Veuillez télécharger vos documents.' if is_fr else 'Congratulations! Your Youth Dialogue application has been accepted. Please upload your documents.',
+            'push_route': '/youth-dialogue',
+        },
+        'rejected': {
+            'subject': 'Dialogue des Jeunes — Mise à jour de la candidature' if is_fr else 'Youth Dialogue — Application Update',
+            'heading': 'Candidature non retenue' if is_fr else 'Application Not Accepted',
+            'badge_color': '#e53e3e',
+            'push_title': 'Mise à jour de la candidature' if is_fr else 'Application Update',
+            'push_body': 'Le statut de votre candidature au Dialogue des Jeunes a été mis à jour.' if is_fr else 'Your Youth Dialogue application status has been updated.',
+            'push_route': '/youth-dialogue',
+        },
+        'documents_submitted': {
+            'subject': 'Dialogue des Jeunes — Documents reçus' if is_fr else 'Youth Dialogue — Documents Received',
+            'heading': 'Documents reçus' if is_fr else 'Documents Received',
+            'badge_color': '#3182ce',
+            'body_html': ('''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Vos documents ont été reçus et sont en cours de vérification.
+              Nous vous informerons une fois l'examen terminé.
+            </p>''' if is_fr else '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Your documents have been received and are now under verification.
+              We will notify you once the review is complete.
+            </p>'''),
+            'push_title': 'Documents reçus' if is_fr else 'Documents Received',
+            'push_body': 'Vos documents du Dialogue des Jeunes sont en cours de vérification.' if is_fr else 'Your Youth Dialogue documents are now under verification.',
+            'push_route': '/youth-dialogue',
+        },
+        'documents_rejected': {
+            'subject': 'Dialogue des Jeunes — Documents à corriger' if is_fr else 'Youth Dialogue — Documents Need Attention',
+            'heading': 'Documents à corriger' if is_fr else 'Documents Need Attention',
+            'badge_color': '#e53e3e',
+            'push_title': 'Documents à corriger' if is_fr else 'Documents Need Attention',
+            'push_body': 'Certains de vos documents du Dialogue des Jeunes doivent être rechargés.' if is_fr else 'Some of your Youth Dialogue documents need to be re-uploaded.',
+            'push_route': '/youth-dialogue-documents',
+        },
+        'documents_resubmitted': {
+            'subject': 'Dialogue des Jeunes — Documents resoumis' if is_fr else 'Youth Dialogue — Documents Resubmitted',
+            'heading': 'Documents resoumis' if is_fr else 'Documents Resubmitted',
+            'badge_color': '#3182ce',
+            'body_html': ('''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Vos documents resoumis ont été reçus et sont en cours d'examen.
+              Nous vous informerons une fois la vérification terminée.
+            </p>''' if is_fr else '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Your resubmitted documents have been received and are now under review.
+              We will notify you once verification is complete.
+            </p>'''),
+            'push_title': 'Documents resoumis' if is_fr else 'Documents Resubmitted',
+            'push_body': 'Vos documents resoumis sont en cours d\'examen.' if is_fr else 'Your resubmitted documents are now under review.',
+            'push_route': '/youth-dialogue',
+        },
+        'credential_issued': {
+            'subject': 'Dialogue des Jeunes — Votre accréditation a été émise' if is_fr else 'Youth Dialogue — Your Credential Has Been Issued',
+            'heading': 'Accréditation émise' if is_fr else 'Credential Issued',
+            'badge_color': '#5a67d8',
+            'push_title': 'Accréditation émise !' if is_fr else 'Credential Issued!',
+            'push_body': 'Votre accréditation de participant est prête. Consultez votre ID numérique dans l\'application.' if is_fr else 'Your Youth Dialogue participant credential is ready. View your digital ID in the app.',
+            'push_route': '/youth-dialogue-credential',
+        },
+        'credential_revoked': {
+            'subject': 'Dialogue des Jeunes — Accréditation révoquée' if is_fr else 'Youth Dialogue — Credential Revoked',
+            'heading': 'Accréditation révoquée' if is_fr else 'Credential Revoked',
+            'badge_color': '#e53e3e',
+            'push_title': 'Accréditation révoquée' if is_fr else 'Credential Revoked',
+            'push_body': 'Votre accréditation a été révoquée. Contactez le support pour plus de détails.' if is_fr else 'Your Youth Dialogue credential has been revoked. Contact support for details.',
+            'push_route': '/youth-dialogue',
+        },
+    }
+
+    config = EVENT_CONFIG.get(event_key)
+    if not config:
+        return
+
+    # Build body_html for events with dynamic content
+    body_html = config.get('body_html', '')
+    if event_key == 'submitted':
+        # Build rich confirmation email with applicant details
+        event = application.event
+        event_name = (event.programme_title_fr if is_fr and event and event.programme_title_fr else event.programme_title) if event else ('Programme Dialogue des Jeunes' if is_fr else 'Youth Dialogue Programme')
+        event_dates = ''
+        if event and event.start_date and event.end_date:
+            if is_fr:
+                event_dates = f'{event.start_date.strftime("%d %B")} – {event.end_date.strftime("%d %B %Y")}'
+            else:
+                event_dates = f'{event.start_date.strftime("%B %d")} – {event.end_date.strftime("%B %d, %Y")}'
+        elif event and event.start_date:
+            event_dates = event.start_date.strftime('%d %B %Y' if is_fr else '%B %d, %Y')
+        event_location = (event.location or '') if event else ''
+
+        # Application details table (labels in user's language)
+        detail_rows = ''
+        details = [
+            ('Numéro de référence' if is_fr else 'Reference ID', application.reference_id or f'YD-{application.id:05d}'),
+            ('Nom' if is_fr else 'Name', f'{application.first_name} {application.last_name}'.strip()),
+            ('Email' if is_fr else 'Email', application.email or ''),
+            ('Nationalité' if is_fr else 'Nationality', application.get_nationality_display() if application.nationality else ''),
+            ('Organisation' if is_fr else 'Organization', application.organization or ''),
+            ('Poste' if is_fr else 'Position', application.position or ''),
+        ]
+        for label, value in details:
+            if value:
+                detail_rows += f'<tr><td style="padding:8px 12px;color:#718096;font-size:13px;border-bottom:1px solid #edf2f7;width:140px;">{label}</td><td style="padding:8px 12px;color:#2d3748;font-size:13px;font-weight:500;border-bottom:1px solid #edf2f7;">{value}</td></tr>'
+
+        event_info = ''
+        if event_dates or event_location:
+            event_details_label = 'Détails de l\'événement' if is_fr else 'Event Details'
+            event_info = f'''<div style="background:#ebf8ff;border-radius:10px;padding:16px 20px;margin:0 0 24px;">
+              <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">{event_details_label}</p>
+              {'<p style="color:#2d3748;font-size:14px;margin:0 0 4px;">\U0001f4c5 ' + event_dates + '</p>' if event_dates else ''}
+              {'<p style="color:#2d3748;font-size:14px;margin:0;">\U0001f4cd ' + event_location + '</p>' if event_location else ''}
+            </div>'''
+
+        support_email = event.support_email or 'youth@burundiauchairmanship.org' if event else 'youth@burundiauchairmanship.org'
+        if is_fr:
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                  Merci d'avoir soumis votre candidature pour le <strong>{event_name}</strong>.
+                  Votre candidature a été reçue avec succès et est maintenant en cours d'examen.
+                </p>
+
+                {event_info}
+
+                <div style="background:#f7fafc;border-radius:10px;padding:4px 0;margin:0 0 24px;">
+                  <table style="width:100%;border-collapse:collapse;">
+                    {detail_rows}
+                  </table>
+                </div>
+
+                <div style="background:#f0fff4;border-left:4px solid #38a169;padding:16px 20px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+                  <p style="color:#22543d;font-size:14px;font-weight:600;margin:0 0 8px;">Prochaines étapes</p>
+                  <ol style="color:#2f855a;font-size:13px;line-height:1.8;margin:0;padding:0 0 0 18px;">
+                    <li>Notre équipe examinera votre candidature</li>
+                    <li>Vous recevrez une notification une fois la décision prise</li>
+                    <li>Si accepté(e), il vous sera demandé de télécharger les documents requis</li>
+                  </ol>
+                </div>
+
+                <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 8px;">
+                  Vous pouvez vérifier le statut de votre candidature à tout moment via l'application <strong>Be 4 Africa</strong>.
+                </p>
+                <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+                  Si vous avez des questions, contactez-nous à <a href="mailto:{support_email}" style="color:#3182ce;">{support_email}</a>
+                </p>'''
+        else:
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                  Thank you for submitting your application for the <strong>{event_name}</strong>.
+                  Your application has been successfully received and is now under review.
+                </p>
+
+                {event_info}
+
+                <div style="background:#f7fafc;border-radius:10px;padding:4px 0;margin:0 0 24px;">
+                  <table style="width:100%;border-collapse:collapse;">
+                    {detail_rows}
+                  </table>
+                </div>
+
+                <div style="background:#f0fff4;border-left:4px solid #38a169;padding:16px 20px;border-radius:0 10px 10px 0;margin:0 0 24px;">
+                  <p style="color:#22543d;font-size:14px;font-weight:600;margin:0 0 8px;">What happens next?</p>
+                  <ol style="color:#2f855a;font-size:13px;line-height:1.8;margin:0;padding:0 0 0 18px;">
+                    <li>Our team will review your application</li>
+                    <li>You will receive a notification once a decision is made</li>
+                    <li>If accepted, you will be asked to upload required documents</li>
+                  </ol>
+                </div>
+
+                <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 8px;">
+                  You can check your application status at any time through the <strong>Be 4 Africa</strong> app.
+                </p>
+                <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
+                  If you have any questions, please contact us at <a href="mailto:{support_email}" style="color:#3182ce;">{support_email}</a>
+                </p>'''
+    elif event_key == 'rejected':
+        reason = application.rejection_reason or ''
+        if is_fr:
+            reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Motif :</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Nous avons le regret de vous informer que votre candidature au Programme Dialogue des Jeunes
+              n'a pas été retenue.
+            </p>{reason_html}
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+              Si vous avez des questions, contactez-nous à info@burundi4africa.com
+            </p>'''
+        else:
+            reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              We regret to inform you that your application for the Youth Dialogue Programme
+              has not been accepted at this time.
+            </p>{reason_html}
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+              If you have questions, please contact us at info@burundi4africa.com
+            </p>'''
+    elif event_key == 'documents_rejected':
+        rejected_docs = application.documents.filter(status='rejected')
+        docs_html = ''.join([
+            f'<div style="margin:0 0 8px;padding:8px 12px;background:#fff5f5;border-left:3px solid #e53e3e;border-radius:0 6px 6px 0;">'
+            f'<strong style="color:#742a2a;font-size:13px;">{doc.get_document_type_display()}</strong>'
+            f'<p style="color:#742a2a;font-size:13px;margin:4px 0 0;">{doc.rejection_reason or ("À recharger" if is_fr else "Needs re-upload")}</p></div>'
+            for doc in rejected_docs
+        ])
+        if is_fr:
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Certains de vos documents nécessitent une attention particulière. Veuillez consulter les détails
+              ci-dessous et recharger les documents nécessaires via l'application Be 4 Africa.
+            </p>
+            <p style="color:#4a5568;font-size:13px;font-weight:600;margin:0 0 12px;">Documents à corriger :</p>
+            {docs_html}'''
+        else:
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Some of your uploaded documents require attention. Please review the details
+              below and re-upload the necessary documents through the Be 4 Africa app.
+            </p>
+            <p style="color:#4a5568;font-size:13px;font-weight:600;margin:0 0 12px;">Documents to fix:</p>
+            {docs_html}'''
+    elif event_key == 'credential_issued':
+        if is_fr:
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Félicitations ! Votre accréditation de participant au Programme Dialogue des Jeunes a été émise.
+            </p>
+            <div style="background:#ebf4ff;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
+              <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">Code Participant</p>
+              <p style="color:#2b6cb0;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{application.participant_code}</p>
+            </div>
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+              Vous pouvez consulter votre carte d'identité numérique et votre QR code dans l'application Be 4 Africa.
+            </p>'''
+        else:
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Congratulations! Your participant credential for the Youth Dialogue Programme has been issued.
+            </p>
+            <div style="background:#ebf4ff;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
+              <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">Participant Code</p>
+              <p style="color:#2b6cb0;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{application.participant_code}</p>
+            </div>
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+              You can view your digital ID card and QR code in the Be 4 Africa app.
+            </p>'''
+    elif event_key == 'credential_revoked':
+        reason = application.revoked_reason or ''
+        if is_fr:
+            reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Motif :</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Votre accréditation de participant au Programme Dialogue des Jeunes a été révoquée.
+            </p>{reason_html}
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+              Si vous pensez qu'il s'agit d'une erreur, contactez-nous à info@burundi4africa.com
+            </p>'''
+        else:
+            reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
+            body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
+              Your participant credential for the Youth Dialogue Programme has been revoked.
+            </p>{reason_html}
+            <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
+              If you believe this was done in error, please contact us at info@burundi4africa.com
+            </p>'''
+
+    # 1. Send email (best-effort, threaded)
+    try:
+        _send_yd_applicant_email(
+            application,
+            config['subject'],
+            config['heading'],
+            config['badge_color'],
+            body_html,
+            lang=lang,
+        )
+    except Exception:
+        pass
+
+    # 2. Send push notification via Celery (best-effort, non-blocking)
+    def _send_push():
+        try:
+            from core.tasks import send_push_notification_async
+            push_data = {
+                'type': 'youth_dialogue',
+                'action_type': 'route',
+                'action_value': config.get('push_route', '/youth-dialogue'),
+            }
+            send_push_notification_async.delay(
+                [application.user_id],
+                config['push_title'],
+                config['push_body'],
+                push_data,
+            )
+        except Exception:
+            pass
+    threading.Thread(target=_send_push, daemon=True).start()
+
+    # 3. Create in-app Notification record (bilingual)
+    try:
+        # For FR notifications, use the FR text; for EN notifications provide both
+        en_config = EVENT_CONFIG.get(event_key, config)
+        notif = Notification.objects.create(
+            title=config['push_title'],
+            title_fr=config['push_title'] if is_fr else config['push_title'],
+            message=config['push_body'],
+            message_fr=config['push_body'] if is_fr else config['push_body'],
+            notification_type='system',
+            is_global=False,
+            action_type='route',
+            action_value=config.get('push_route', '/youth-dialogue'),
+        )
+        notif.target_users.add(application.user)
+    except Exception:
+        pass
+
+
+def _yd_logo_absolute_url(image_field):
+    """Convert an ImageField to an absolute URL for emails."""
+    if not image_field:
+        return ''
+    try:
+        url = image_field.url
+        if url.startswith('http'):
+            return url
+        # Make relative URL absolute
+        from django.contrib.sites.models import Site
+        try:
+            domain = Site.objects.get_current().domain
+            return f'https://{domain}{url}'
+        except Exception:
+            return f'https://burundi4africa.com{url}'
+    except Exception:
+        return ''
+
+
+def _send_yd_applicant_email(application, subject, heading, badge_color, body_html, lang='en'):
+    """Send branded email to Youth Dialogue applicant with both logos."""
     try:
         if not application.email:
             return
+
+        is_fr = lang == 'fr'
+        event = application.event
+
+        # Build logo HTML — programme logo (language-specific) + secondary logo (B4 Africa)
+        logo_html = ''
+        if event:
+            # Pick the correct language logo
+            if is_fr:
+                primary_url = _yd_logo_absolute_url(event.logo_light_fr) or _yd_logo_absolute_url(event.logo_light)
+            else:
+                primary_url = _yd_logo_absolute_url(event.logo_light)
+
+            secondary_url = _yd_logo_absolute_url(event.secondary_logo)
+
+            logos = []
+            if primary_url:
+                logos.append(
+                    f'<img src="{primary_url}" alt="Youth Dialogue" '
+                    f'style="height:50px;width:auto;display:inline-block;vertical-align:middle;">'
+                )
+            if secondary_url:
+                logos.append(
+                    f'<img src="{secondary_url}" alt="B4 Africa" '
+                    f'style="height:50px;width:auto;display:inline-block;vertical-align:middle;">'
+                )
+
+            if logos:
+                separator = '<span style="display:inline-block;width:20px;"></span>'
+                logo_html = f'<div style="text-align:center;margin-bottom:16px;">{separator.join(logos)}</div>'
+
+        greeting = f'Cher(e) <strong>{application.first_name}</strong>,' if is_fr else f'Dear <strong>{application.first_name}</strong>,'
+        programme_label = 'Programme Dialogue des Jeunes' if is_fr else 'Youth Dialogue Programme'
+        footer_text = 'Be 4 Africa 2026'
+
+        fallback_logo = ('<div style="width:60px;height:60px;background:white;border-radius:12px;'
+                         'margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">'
+                         '<span style="font-size:28px;font-weight:900;color:#101c2e;">B</span></div>')
+
         html_message = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
   <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
     <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
-      <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
-        <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
-      </div>
-      <h1 style="color:white;font-size:22px;margin:0 0 8px;">{heading}</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Youth Dialogue Programme</p>
+      {logo_html if logo_html else fallback_logo}
+      <h1 style="color:white;font-size:22px;margin:16px 0 8px;">{heading}</h1>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">{programme_label}</p>
     </div>
     <div style="padding:32px;">
       <div style="display:inline-block;background:{badge_color};color:white;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;margin:0 0 20px;">{application.get_status_display().upper()}</div>
-      <p style="color:#2d3748;font-size:16px;margin:0 0 20px;">Dear <strong>{application.first_name}</strong>,</p>
+      <p style="color:#2d3748;font-size:16px;margin:0 0 20px;">{greeting}</p>
       {body_html}
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Be 4 Africa 2026</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">{footer_text}</p>
     </div>
   </div>
 </div>
@@ -5331,15 +6359,17 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'], url_path='settings', permission_classes=[AllowAny])
-    def settings(self, request):
-        """Return Youth Dialogue branding, texts, and support contact info."""
+    def yd_settings(self, request):
+        """Return Youth Dialogue branding, texts, and support contact info for the active event."""
         from core.serializers import YouthDialogueSettingsSerializer
-        settings = YouthDialogueSettings.load()
-        return Response(YouthDialogueSettingsSerializer(settings, context={'request': request}).data)
+        active_event = YouthDialogueEvent.get_active()
+        if not active_event:
+            active_event = YouthDialogueEvent.load()
+        return Response(YouthDialogueSettingsSerializer(active_event, context={'request': request}).data)
 
     # Known field names that map directly to YouthDialogueApplication model columns
     _KNOWN_FIELD_NAMES = {
-        'title', 'first_name', 'last_name', 'email', 'phone_number',
+        'title', 'first_name', 'last_name', 'name', 'email', 'phone_number',
         'country_code', 'nationality', 'date_of_birth', 'gender',
         'organization', 'position', 'motivation',
     }
@@ -5365,36 +6395,96 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             else:
                 additional_data[key] = value
 
+        # ── Normalize form field names to model columns ──
+        # Split single 'name' into first_name + last_name if needed
+        if 'name' in model_data and 'first_name' not in model_data:
+            parts = str(model_data.pop('name', '')).strip().split(None, 1)
+            model_data['first_name'] = parts[0] if parts else ''
+            model_data['last_name'] = parts[1] if len(parts) > 1 else ''
+
+        # Lowercase gender to match model choices ('male', 'female')
+        if 'gender' in model_data and model_data['gender']:
+            model_data['gender'] = str(model_data['gender']).lower()
+
+        # Auto-fill email from authenticated user if not provided
+        if not model_data.get('email') and request.user.email:
+            model_data['email'] = request.user.email
+
+        # Ensure first_name/last_name have defaults from user profile
+        if not model_data.get('first_name') and request.user.first_name:
+            model_data['first_name'] = request.user.first_name
+        if not model_data.get('last_name') and request.user.last_name:
+            model_data['last_name'] = request.user.last_name
+
         serializer = YouthDialogueApplicationCreateSerializer(
             data=model_data, context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
+        active_event = YouthDialogueEvent.get_active()
         app = serializer.save(
             user=request.user, status='submitted',
             additional_data=additional_data,
+            event=active_event,
         )
 
         # Log activity
         YouthDialogueActivityLog.objects.create(
-            user=request.user, application=app, action='form_submitted',
-            screen_name='youth_dialogue_apply',
+            user=request.user, event=active_event, application=app,
+            action='form_submitted', screen_name='youth_dialogue_apply',
             ip_address=request.META.get('REMOTE_ADDR', ''),
             user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
         )
 
         # Notify admins
         _send_yd_admin_notification(app)
+        # Confirm to applicant
+        _notify_yd(app, 'submitted')
 
         return Response(
-            {'detail': 'Application submitted successfully.', 'id': app.id},
+            {'detail': 'Application submitted successfully.', 'id': app.id, 'reference_id': app.reference_id or ''},
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=False, methods=['post'], url_path='send-email-otp')
+    @throttle_classes([OTPRateThrottle])
+    def send_yd_email_otp(self, request):
+        """Send OTP to the email provided in the application form for verification."""
+        from .otp_utils import send_email_otp
+
+        email = request.data.get('email', '').strip()
+        if not email:
+            return Response({'detail': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        success, message, otp_id = send_email_otp(request.user, email)
+        if success:
+            return Response({'message': message, 'otp_id': otp_id, 'email': email})
+        return Response({'detail': message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='verify-email-otp')
+    @throttle_classes([OTPVerifyThrottle])
+    def verify_yd_email_otp(self, request):
+        """Verify OTP code sent to the applicant's email."""
+        from .otp_utils import verify_email_otp
+
+        email = request.data.get('email', '').strip()
+        otp_code = request.data.get('otp_code', '').strip()
+        if not email or not otp_code:
+            return Response({'detail': 'Email and OTP code are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        success, message = verify_email_otp(request.user, email, otp_code)
+        if success:
+            return Response({'message': message, 'verified': True})
+        return Response({'detail': message, 'verified': False}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['get'], url_path='status')
     def get_status(self, request):
-        """Return the user's application status, documents, and credential availability."""
+        """Return the user's application status for the active event."""
+        active_event = YouthDialogueEvent.get_active()
         try:
-            app = YouthDialogueApplication.objects.prefetch_related('documents').get(user=request.user)
+            lookup = {'user': request.user}
+            if active_event:
+                lookup['event'] = active_event
+            app = YouthDialogueApplication.objects.prefetch_related('documents').get(**lookup)
         except YouthDialogueApplication.DoesNotExist:
             return Response({'has_application': False})
 
@@ -5406,8 +6496,12 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             parser_classes=[MultiPartParser, FormParser])
     def upload_document(self, request):
         """Upload a document for the user's Youth Dialogue application."""
+        active_event = YouthDialogueEvent.get_active()
         try:
-            app = YouthDialogueApplication.objects.get(user=request.user)
+            lookup = {'user': request.user}
+            if active_event:
+                lookup['event'] = active_event
+            app = YouthDialogueApplication.objects.get(**lookup)
         except YouthDialogueApplication.DoesNotExist:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -5425,9 +6519,23 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         if not uploaded_file:
             return Response({'detail': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate file size (10MB max)
-        if uploaded_file.size > 10 * 1024 * 1024:
-            return Response({'detail': 'File too large. Maximum 10MB.'}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate file size (5MB max per file)
+        max_size = 5 * 1024 * 1024
+        if uploaded_file.size > max_size:
+            return Response(
+                {'detail': f'File too large ({uploaded_file.size / (1024*1024):.1f}MB). Maximum is 5MB.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate file extension (PDF, JPG, PNG only)
+        import os
+        ext = os.path.splitext(uploaded_file.name)[1].lower().lstrip('.')
+        allowed_extensions = {'pdf', 'jpg', 'jpeg', 'png'}
+        if ext not in allowed_extensions:
+            return Response(
+                {'detail': f'Invalid file format (.{ext}). Allowed: PDF, JPG, PNG.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         doc = YouthDialogueDocument(
             application=app,
@@ -5440,6 +6548,12 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         if replaces_id:
             try:
                 old_doc = YouthDialogueDocument.objects.get(id=replaces_id, application=app)
+                # Block replacement of approved documents
+                if old_doc.status == 'approved':
+                    return Response(
+                        {'detail': 'Cannot replace an approved document.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 doc.is_resubmission = True
                 doc.replaces = old_doc
             except YouthDialogueDocument.DoesNotExist:
@@ -5452,10 +6566,32 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             app.status = 'documents_pending'
             app.save(update_fields=['status', 'updated_at'])
 
+        # Auto-flip: if all previously-rejected doc types now have a newer pending replacement,
+        # auto-transition to documents_submitted
+        if app.status == 'documents_pending' and doc.is_resubmission:
+            rejected_types = set(
+                app.documents.filter(status='rejected')
+                .values_list('document_type', flat=True)
+            )
+            if rejected_types:
+                # For each rejected doc type, check if a newer pending doc exists
+                all_covered = True
+                for rtype in rejected_types:
+                    has_pending_replacement = app.documents.filter(
+                        document_type=rtype, status='pending', is_resubmission=True
+                    ).exists()
+                    if not has_pending_replacement:
+                        all_covered = False
+                        break
+                if all_covered:
+                    app.status = 'documents_submitted'
+                    app.save(update_fields=['status', 'updated_at'])
+                    _notify_yd(app, 'documents_resubmitted')
+
         # Log activity
         YouthDialogueActivityLog.objects.create(
-            user=request.user, application=app, action='document_uploaded',
-            screen_name='youth_dialogue_documents',
+            user=request.user, event=active_event, application=app,
+            action='document_uploaded', screen_name='youth_dialogue_documents',
             metadata={'document_type': doc_type, 'filename': uploaded_file.name},
             ip_address=request.META.get('REMOTE_ADDR', ''),
             user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
@@ -5469,8 +6605,12 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'], url_path='submit-documents')
     def submit_documents(self, request):
         """Mark documents as submitted for review."""
+        active_event = YouthDialogueEvent.get_active()
         try:
-            app = YouthDialogueApplication.objects.get(user=request.user)
+            lookup = {'user': request.user}
+            if active_event:
+                lookup['event'] = active_event
+            app = YouthDialogueApplication.objects.get(**lookup)
         except YouthDialogueApplication.DoesNotExist:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -5497,14 +6637,19 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
         app.status = 'documents_submitted'
         app.save(update_fields=['status', 'updated_at'])
+        _notify_yd(app, 'documents_submitted')
 
         return Response({'detail': 'Documents submitted for review.'})
 
     @action(detail=False, methods=['get'], url_path='credential')
     def credential(self, request):
         """Return credential data for the user's issued ID card."""
+        active_event = YouthDialogueEvent.get_active()
         try:
-            app = YouthDialogueApplication.objects.get(user=request.user)
+            lookup = {'user': request.user}
+            if active_event:
+                lookup['event'] = active_event
+            app = YouthDialogueApplication.objects.get(**lookup)
         except YouthDialogueApplication.DoesNotExist:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -5518,11 +6663,36 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             YouthDialogueCredentialSerializer(app, context={'request': request}).data
         )
 
+    @action(detail=False, methods=['get'], url_path='credential-pdf')
+    def credential_pdf(self, request):
+        """Generate and return a PDF ID card for the authenticated user's credential."""
+        active_event = YouthDialogueEvent.get_active()
+        try:
+            lookup = {'user': request.user}
+            if active_event:
+                lookup['event'] = active_event
+            app = YouthDialogueApplication.objects.get(**lookup)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if app.status != 'credential_issued' or not app.participant_code:
+            return Response({'detail': 'Credential not yet issued.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.http import HttpResponse as DjangoHttpResponse
+        buf = _generate_yd_id_card_pdf(app, request)
+        response = DjangoHttpResponse(buf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="YD-IDCard-{app.participant_code}.pdf"'
+        return response
+
     @action(detail=False, methods=['get'], url_path='eligibility')
     def eligibility(self, request):
         """Check if the user is eligible for Youth Dialogue features (Quick Access filtering)."""
+        active_event = YouthDialogueEvent.get_active()
         try:
-            app = YouthDialogueApplication.objects.get(user=request.user)
+            lookup = {'user': request.user}
+            if active_event:
+                lookup['event'] = active_event
+            app = YouthDialogueApplication.objects.get(**lookup)
             eligible_statuses = (
                 'accepted', 'documents_pending', 'documents_submitted',
                 'documents_under_review', 'documents_rejected', 'credential_issued',
@@ -5539,6 +6709,51 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
                 'has_credential': False,
             })
 
+    @action(detail=False, methods=['get'], url_path='verify-qr', permission_classes=[AllowAny])
+    def verify_qr(self, request):
+        """Verify a Youth Dialogue QR code. Public endpoint for check-in staff."""
+        code = request.query_params.get('code', '').strip()
+        qr_hash = request.query_params.get('hash', '').strip()
+
+        if not code or not qr_hash:
+            return Response({'status': 'NOT_FOUND', 'detail': 'Missing code or hash parameter.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            app = YouthDialogueApplication.objects.get(participant_code=code, qr_hash=qr_hash)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'status': 'NOT_FOUND', 'detail': 'No matching credential found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        photo_url = ''
+        if app.id_photo:
+            photo_url = request.build_absolute_uri(app.id_photo.url)
+
+        if app.is_revoked:
+            return Response({
+                'status': 'REVOKED',
+                'detail': 'This credential has been revoked.',
+                'participant_code': app.participant_code,
+                'name': f'{app.first_name} {app.last_name}',
+                'nationality': app.get_nationality_display(),
+                'nationality_flag': app.nationality_flag,
+                'organization': app.organization,
+                'photo_url': photo_url,
+                'revoked_at': app.revoked_at.isoformat() if app.revoked_at else None,
+                'revoked_reason': app.revoked_reason,
+            })
+
+        return Response({
+            'status': 'VALID',
+            'detail': 'Credential is valid.',
+            'participant_code': app.participant_code,
+            'name': f'{app.first_name} {app.last_name}',
+            'nationality': app.get_nationality_display(),
+            'nationality_flag': app.nationality_flag,
+            'organization': app.organization,
+            'position': app.position,
+            'photo_url': photo_url,
+            'credential_issued_at': app.credential_issued_at.isoformat() if app.credential_issued_at else None,
+        })
+
     @action(detail=False, methods=['post'], url_path='log-activity')
     def log_activity(self, request):
         """Log a Youth Dialogue activity entry."""
@@ -5550,10 +6765,15 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         if action_name not in valid_actions:
             return Response({'detail': 'Invalid action.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        app = YouthDialogueApplication.objects.filter(user=request.user).first()
+        active_event = YouthDialogueEvent.get_active()
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        app = YouthDialogueApplication.objects.filter(**lookup).first()
 
         YouthDialogueActivityLog.objects.create(
             user=request.user,
+            event=active_event,
             application=app,
             action=action_name,
             screen_name=screen_name,
@@ -5565,8 +6785,205 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         return Response({'detail': 'Activity logged.'})
 
 
+def _generate_yd_id_card_pdf(app, request=None):
+    """Generate a professional Youth Dialogue PDF ID card with QR code and logos.
+
+    Returns a BytesIO buffer containing the PDF.
+    Used by both the user-facing credential_pdf endpoint and the admin yd_id_card_pdf view.
+    """
+    import io as _io
+    from reportlab.lib.pagesizes import A4, inch
+    from reportlab.lib import colors as rl_colors
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib.utils import ImageReader
+    import qrcode
+
+    buf = _io.BytesIO()
+    page_w, page_h = A4
+    c = rl_canvas.Canvas(buf, pagesize=A4)
+
+    # Card dimensions (centred on A4)
+    card_w = 3.5 * inch
+    card_h = 5.0 * inch
+    card_x = (page_w - card_w) / 2
+    card_y = (page_h - card_h) / 2
+
+    GREEN = '#409843'
+    DARK_GREEN = '#2D6E31'
+    GOLD = '#D4A843'
+    DARK = '#1a1a1a'
+
+    # ── Card background with rounded corners ──
+    c.setFillColor(rl_colors.white)
+    c.setStrokeColor(rl_colors.HexColor('#e0e0e0'))
+    c.setLineWidth(0.5)
+    c.roundRect(card_x, card_y, card_w, card_h, 12, fill=1, stroke=1)
+
+    # ── Green header band ──
+    header_h = 1.1 * inch
+    header_y = card_y + card_h - header_h
+    c.saveState()
+    p = c.beginPath()
+    p.roundRect(card_x, header_y, card_w, header_h, 12)
+    c.clipPath(p, stroke=0)
+    c.setFillColor(rl_colors.HexColor(GREEN))
+    c.rect(card_x, header_y, card_w, header_h, fill=1, stroke=0)
+    # Darker bottom strip of header (below the rounded top)
+    c.setFillColor(rl_colors.HexColor(DARK_GREEN))
+    c.rect(card_x, header_y, card_w, 0.25 * inch, fill=1, stroke=0)
+    c.restoreState()
+
+    # ── Gold accent line below header ──
+    c.setStrokeColor(rl_colors.HexColor(GOLD))
+    c.setLineWidth(2)
+    c.line(card_x + 0.3 * inch, header_y, card_x + card_w - 0.3 * inch, header_y)
+
+    # ── Header text ──
+    cx = card_x + card_w / 2
+    c.setFillColor(rl_colors.white)
+    c.setFont('Helvetica-Bold', 10)
+    c.drawCentredString(cx, header_y + 0.72 * inch, 'YOUTH DIALOGUE')
+    c.setFont('Helvetica-Bold', 8)
+    c.drawCentredString(cx, header_y + 0.55 * inch, 'PARTICIPANT')
+    c.setFont('Helvetica', 7)
+    c.drawCentredString(cx, header_y + 0.35 * inch, 'Burundi AU Chairmanship 2025-2026')
+    c.setFont('Helvetica', 6)
+    c.setFillColor(rl_colors.HexColor('#D4E8D5'))
+    c.drawCentredString(cx, header_y + 0.12 * inch, 'Be 4 Africa')
+
+    # ── Event logos in header ──
+    event = app.event
+    if event:
+        # Left logo
+        for logo_field in [event.logo_left, event.logo_right]:
+            if logo_field:
+                try:
+                    logo_img = ImageReader(logo_field.path)
+                    logo_size = 0.45 * inch
+                    if logo_field == event.logo_left:
+                        c.drawImage(logo_img, card_x + 0.15 * inch, header_y + 0.5 * inch,
+                                    logo_size, logo_size, preserveAspectRatio=True, mask='auto')
+                    else:
+                        c.drawImage(logo_img, card_x + card_w - 0.15 * inch - logo_size,
+                                    header_y + 0.5 * inch, logo_size, logo_size,
+                                    preserveAspectRatio=True, mask='auto')
+                except Exception:
+                    pass
+
+    # ── Participant photo ──
+    photo_size = 1.0 * inch
+    photo_x = cx - photo_size / 2
+    photo_y = header_y - photo_size - 0.15 * inch
+
+    # Photo border (gold ring)
+    c.setStrokeColor(rl_colors.HexColor(GOLD))
+    c.setLineWidth(2)
+    c.circle(cx, photo_y + photo_size / 2, photo_size / 2 + 3, fill=0, stroke=1)
+
+    if app.id_photo:
+        try:
+            img = ImageReader(app.id_photo.path)
+            # Clip to circle
+            c.saveState()
+            p = c.beginPath()
+            p.circle(cx, photo_y + photo_size / 2, photo_size / 2)
+            c.clipPath(p, stroke=0)
+            c.drawImage(img, photo_x, photo_y, photo_size, photo_size,
+                        preserveAspectRatio=True, mask='auto')
+            c.restoreState()
+        except Exception:
+            c.setFillColor(rl_colors.HexColor('#e8e8e8'))
+            c.circle(cx, photo_y + photo_size / 2, photo_size / 2, fill=1, stroke=0)
+    else:
+        c.setFillColor(rl_colors.HexColor('#e8e8e8'))
+        c.circle(cx, photo_y + photo_size / 2, photo_size / 2, fill=1, stroke=0)
+
+    # ── Name ──
+    name_y = photo_y - 0.25 * inch
+    c.setFillColor(rl_colors.HexColor(DARK))
+    c.setFont('Helvetica-Bold', 14)
+    full_name = f'{app.first_name} {app.last_name}'
+    # Truncate if too long
+    if len(full_name) > 28:
+        c.setFont('Helvetica-Bold', 11)
+    c.drawCentredString(cx, name_y, full_name)
+
+    # ── Organization ──
+    info_y = name_y - 0.2 * inch
+    if app.organization:
+        c.setFillColor(rl_colors.HexColor('#666666'))
+        c.setFont('Helvetica', 8)
+        org_text = app.organization[:40]
+        c.drawCentredString(cx, info_y, org_text)
+        info_y -= 0.18 * inch
+
+    # ── Nationality ──
+    if app.nationality:
+        c.setFillColor(rl_colors.HexColor('#888888'))
+        c.setFont('Helvetica', 8)
+        c.drawCentredString(cx, info_y, app.get_nationality_display())
+        info_y -= 0.18 * inch
+
+    # ── Thin separator ──
+    info_y -= 0.05 * inch
+    c.setStrokeColor(rl_colors.HexColor('#e0e0e0'))
+    c.setLineWidth(0.5)
+    c.line(card_x + 0.5 * inch, info_y, card_x + card_w - 0.5 * inch, info_y)
+
+    # ── Participant code ──
+    info_y -= 0.25 * inch
+    c.setFillColor(rl_colors.HexColor(GREEN))
+    c.setFont('Courier-Bold', 16)
+    c.drawCentredString(cx, info_y, app.participant_code)
+
+    # ── QR Code (actual image) ──
+    qr_data = f'YD:{app.participant_code}:{app.qr_hash}'
+    # Build URL format if settings say so
+    try:
+        settings_obj = AppSettings.load()
+        if settings_obj.qr_code_mode == 'url' and request:
+            base = request.build_absolute_uri('/').rstrip('/')
+            qr_data = f'{base}/verify?code={qr_data}'
+    except Exception:
+        pass
+
+    qr_img_buf = _io.BytesIO()
+    qr_obj = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=1)
+    qr_obj.add_data(qr_data)
+    qr_obj.make(fit=True)
+    qr_pil = qr_obj.make_image(fill_color='black', back_color='white')
+    qr_pil.save(qr_img_buf, format='PNG')
+    qr_img_buf.seek(0)
+
+    qr_size = 0.9 * inch
+    qr_x = cx - qr_size / 2
+    qr_y = info_y - qr_size - 0.2 * inch
+
+    qr_reader = ImageReader(qr_img_buf)
+    c.drawImage(qr_reader, qr_x, qr_y, qr_size, qr_size)
+
+    # "Scan to verify" label
+    c.setFillColor(rl_colors.HexColor('#999999'))
+    c.setFont('Helvetica', 5)
+    c.drawCentredString(cx, qr_y - 0.12 * inch, 'SCAN TO VERIFY')
+
+    # ── Footer ──
+    footer_y = card_y + 0.15 * inch
+    c.setFillColor(rl_colors.HexColor('#cccccc'))
+    c.setFont('Helvetica', 5)
+    c.drawCentredString(cx, footer_y, 'Burundi Be 4 Africa 2026')
+    if app.credential_issued_at:
+        c.drawCentredString(cx, footer_y - 0.12 * inch,
+                            f'Issued {app.credential_issued_at.strftime("%d/%m/%Y")}')
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
+
+
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([HasAdminSection.for_section('youth_dialogue_list')])
 def yd_id_card_pdf(request, app_id):
     """Generate a printable PDF ID card for a Youth Dialogue participant."""
     from django.http import HttpResponse as DjangoHttpResponse
@@ -5575,85 +6992,7 @@ def yd_id_card_pdf(request, app_id):
     if app.status != 'credential_issued' or not app.participant_code:
         return DjangoHttpResponse('Credential not issued yet.', status=400)
 
-    try:
-        from reportlab.lib.pagesizes import inch
-        from reportlab.lib import colors as rl_colors
-        from reportlab.pdfgen import canvas as rl_canvas
-        from reportlab.lib.utils import ImageReader
-    except ImportError:
-        return DjangoHttpResponse('reportlab is not installed.', status=500)
-
-    import io as _io
-
-    # Credit-card size: 3.375 x 2.125 inches
-    card_w = 3.375 * inch
-    card_h = 2.125 * inch
-
-    buf = _io.BytesIO()
-    c = rl_canvas.Canvas(buf, pagesize=(card_w, card_h))
-
-    # Background gradient (green header)
-    header_h = 0.65 * inch
-    c.setFillColor(rl_colors.HexColor('#409843'))
-    c.rect(0, card_h - header_h, card_w, header_h, fill=1, stroke=0)
-
-    # Header text
-    c.setFillColor(rl_colors.white)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawCentredString(card_w / 2, card_h - 0.25 * inch, 'YOUTH DIALOGUE PARTICIPANT')
-    c.setFont('Helvetica', 6)
-    c.drawCentredString(card_w / 2, card_h - 0.40 * inch, 'Be 4 Africa 2026')
-
-    # Participant photo (if available)
-    photo_x = 0.15 * inch
-    photo_y = card_h - header_h - 0.85 * inch
-    photo_size = 0.7 * inch
-    if app.id_photo:
-        try:
-            img = ImageReader(app.id_photo.path)
-            c.drawImage(img, photo_x, photo_y, photo_size, photo_size, preserveAspectRatio=True, mask='auto')
-        except Exception:
-            c.setFillColor(rl_colors.HexColor('#e0e0e0'))
-            c.rect(photo_x, photo_y, photo_size, photo_size, fill=1, stroke=0)
-    else:
-        c.setFillColor(rl_colors.HexColor('#e0e0e0'))
-        c.rect(photo_x, photo_y, photo_size, photo_size, fill=1, stroke=0)
-
-    # Name & details
-    text_x = photo_x + photo_size + 0.15 * inch
-    text_y = card_h - header_h - 0.2 * inch
-    c.setFillColor(rl_colors.black)
-    c.setFont('Helvetica-Bold', 9)
-    c.drawString(text_x, text_y, f'{app.first_name} {app.last_name}')
-    c.setFont('Helvetica', 7)
-    text_y -= 0.15 * inch
-    if app.organization:
-        c.drawString(text_x, text_y, app.organization)
-        text_y -= 0.13 * inch
-    if app.nationality:
-        c.drawString(text_x, text_y, f'Nationality: {app.get_nationality_display()}')
-        text_y -= 0.13 * inch
-
-    # Participant code
-    c.setFont('Courier-Bold', 10)
-    c.setFillColor(rl_colors.HexColor('#409843'))
-    c.drawString(text_x, text_y - 0.05 * inch, app.participant_code)
-
-    # QR data as text (bottom)
-    c.setFillColor(rl_colors.HexColor('#888888'))
-    c.setFont('Helvetica', 5)
-    qr_data = f'{app.participant_code}:{app.qr_hash}'
-    c.drawCentredString(card_w / 2, 0.1 * inch, qr_data)
-
-    # Footer line
-    c.setStrokeColor(rl_colors.HexColor('#409843'))
-    c.setLineWidth(1)
-    c.line(0, 0.25 * inch, card_w, 0.25 * inch)
-
-    c.showPage()
-    c.save()
-    buf.seek(0)
-
+    buf = _generate_yd_id_card_pdf(app, request)
     response = DjangoHttpResponse(buf, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="YD-IDCard-{app.participant_code}.pdf"'
     return response
@@ -5686,3 +7025,279 @@ def track_promotional_splash_click(request, pk):
     splash = get_object_or_404(PromotionalSplash, pk=pk)
     PromotionalSplash.objects.filter(pk=splash.pk).update(click_count=F('click_count') + 1)
     return Response({'success': True})
+
+
+# ═══════════════════════════════════════════════════════════
+#  QR CODE VERIFICATION
+# ═══════════════════════════════════════════════════════════
+
+def _parse_qr_code(raw_data):
+    """Parse QR data string and return (qr_type, ref_id, qr_hash) or None.
+
+    Handles both raw format (EVT:123:abc) and URL format (...?code=EVT:123:abc).
+    """
+    data = raw_data.strip()
+
+    # Handle URL format: extract the 'code' query param
+    if '?' in data and 'code=' in data:
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(data)
+        code_values = parse_qs(parsed.query).get('code', [])
+        if code_values:
+            data = code_values[0]
+
+    parts = data.split(':')
+    if len(parts) != 3:
+        return None
+
+    prefix, ref_id, qr_hash = parts
+    if prefix == 'EVT':
+        return ('event', ref_id, qr_hash)
+    elif prefix == 'YD':
+        return ('youth_dialogue', ref_id, qr_hash)
+    return None
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_qr(request):
+    """Unified QR code verification endpoint.
+
+    Accepts {"qr_data": "EVT:123:abc..."} or {"qr_data": "YD:CODE:hash..."}.
+    Also handles URL-encoded variants.
+    Returns verification result and logs the scan.
+    """
+    qr_data = request.data.get('qr_data', '').strip()
+    if not qr_data:
+        return Response({'valid': False, 'detail': 'qr_data is required.'}, status=400)
+
+    parsed = _parse_qr_code(qr_data)
+    if not parsed:
+        return Response({'valid': False, 'detail': 'Invalid QR code format.'}, status=400)
+
+    qr_type, ref_id, qr_hash = parsed
+    ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
+    if ip_address and ',' in ip_address:
+        ip_address = ip_address.split(',')[0].strip()
+    scanned_by = request.user if request.user.is_authenticated else None
+    is_staff = scanned_by and scanned_by.is_staff
+
+    # Check for duplicate scans
+    scan_count = QRScanLog.objects.filter(qr_type=qr_type, reference_id=ref_id).count()
+    is_duplicate = scan_count > 0
+
+    # Log the scan
+    QRScanLog.objects.create(
+        qr_type=qr_type,
+        reference_id=ref_id,
+        scanned_by=scanned_by,
+        ip_address=ip_address,
+        is_duplicate=is_duplicate,
+    )
+    scan_count += 1  # include current scan
+
+    if qr_type == 'event':
+        try:
+            sub_id = int(ref_id)
+        except (ValueError, TypeError):
+            return Response({'valid': False, 'type': 'event', 'detail': 'Invalid reference.'}, status=404)
+
+        try:
+            submission = EventSubmission.objects.select_related('event_registration', 'user').get(pk=sub_id)
+        except EventSubmission.DoesNotExist:
+            return Response({'valid': False, 'type': 'event', 'detail': 'Ticket not found.'}, status=404)
+
+        if submission.qr_ticket_hash != qr_hash:
+            return Response({'valid': False, 'type': 'event', 'detail': 'QR code validation failed.'}, status=400)
+
+        attendee_name = submission.proxy_name if submission.is_proxy else (
+            submission.user.first_name or submission.user.username
+        )
+        result = {
+            'valid': True,
+            'type': 'event',
+            'person_name': attendee_name,
+            'event_title': submission.event_registration.event_title,
+            'status': submission.status,
+            'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
+            'is_duplicate': is_duplicate,
+            'scan_count': scan_count,
+        }
+        if is_staff:
+            result['details'] = {
+                'email': submission.proxy_email if submission.is_proxy else submission.user.email,
+                'is_proxy': submission.is_proxy,
+                'is_waitlisted': submission.is_waitlisted,
+                'submission_id': submission.id,
+            }
+        return Response(result)
+
+    elif qr_type == 'youth_dialogue':
+        try:
+            app = YouthDialogueApplication.objects.select_related('event').get(participant_code=ref_id, qr_hash=qr_hash)
+        except YouthDialogueApplication.DoesNotExist:
+            return Response({'valid': False, 'type': 'youth_dialogue', 'detail': 'Credential not found.'}, status=404)
+
+        # Look up role color from backend-configurable roles
+        _role_color = '#4CAF50'
+        _position = app.position or 'Participant'
+        try:
+            _role_obj = YouthDialogueRole.objects.get(event=app.event, name__iexact=_position, is_active=True)
+            _role_color = _role_obj.color
+        except YouthDialogueRole.DoesNotExist:
+            pass
+
+        if app.is_revoked:
+            result = {
+                'valid': False,
+                'type': 'youth_dialogue',
+                'person_name': f'{app.first_name} {app.last_name}',
+                'status': 'revoked',
+                'detail': 'This credential has been revoked.',
+                'is_duplicate': is_duplicate,
+                'scan_count': scan_count,
+            }
+            if is_staff:
+                id_photo_url = ''
+                if app.id_photo:
+                    try:
+                        id_photo_url = request.build_absolute_uri(app.id_photo.url)
+                    except Exception:
+                        id_photo_url = ''
+                result['details'] = {
+                    'revoked_at': app.revoked_at.isoformat() if app.revoked_at else None,
+                    'revoked_reason': app.revoked_reason,
+                    'organization': app.organization,
+                    'id_photo_url': id_photo_url,
+                    'email': app.email,
+                    'role': app.position or 'Participant',
+                    'role_color': _role_color,
+                    'event_start_date': app.event.start_date.isoformat() if app.event and app.event.start_date else None,
+                    'event_end_date': app.event.end_date.isoformat() if app.event and app.event.end_date else None,
+                    'event_location': app.event.location if app.event else '',
+                    'reference_id': app.reference_id or '',
+                    'participant_code': app.participant_code,
+                    'nationality': app.get_nationality_display(),
+                    'nationality_flag': app.nationality_flag,
+                    'credential_issued_at': app.credential_issued_at.isoformat() if app.credential_issued_at else None,
+                }
+            return Response(result)
+
+        result = {
+            'valid': True,
+            'type': 'youth_dialogue',
+            'person_name': f'{app.first_name} {app.last_name}',
+            'programme': 'Youth Dialogue',
+            'status': 'valid',
+            'is_duplicate': is_duplicate,
+            'scan_count': scan_count,
+        }
+        if is_staff:
+            id_photo_url = ''
+            if app.id_photo:
+                try:
+                    id_photo_url = request.build_absolute_uri(app.id_photo.url)
+                except Exception:
+                    id_photo_url = ''
+            result['details'] = {
+                'participant_code': app.participant_code,
+                'nationality': app.get_nationality_display(),
+                'nationality_flag': app.nationality_flag,
+                'organization': app.organization,
+                'position': app.position,
+                'credential_issued_at': app.credential_issued_at.isoformat() if app.credential_issued_at else None,
+                'id_photo_url': id_photo_url,
+                'email': app.email,
+                'role': app.position or 'Participant',
+                'role_color': _role_color,
+                'event_start_date': app.event.start_date.isoformat() if app.event and app.event.start_date else None,
+                'event_end_date': app.event.end_date.isoformat() if app.event and app.event.end_date else None,
+                'event_location': app.event.location if app.event else '',
+                'reference_id': app.reference_id or '',
+            }
+        return Response(result)
+
+    return Response({'valid': False, 'detail': 'Unknown QR type.'}, status=400)
+
+
+def verify_qr_web(request):
+    """Public web verification page — renders HTML showing QR verification result."""
+    from django.http import HttpResponse as DjangoHttpResponse
+
+    code = request.GET.get('code', '').strip()
+    context = {
+        'valid': False,
+        'error': None,
+        'person_name': '',
+        'event_title': '',
+        'programme': '',
+        'status_display': '',
+        'status_class': '',
+        'is_duplicate': False,
+        'scan_count': 0,
+        'qr_type': '',
+    }
+
+    if not code:
+        context['error'] = 'No verification code provided.'
+    else:
+        parsed = _parse_qr_code(code)
+        if not parsed:
+            context['error'] = 'Invalid verification code format.'
+        else:
+            qr_type, ref_id, qr_hash = parsed
+            context['qr_type'] = qr_type
+
+            # Log the web scan
+            ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
+            if ip_address and ',' in ip_address:
+                ip_address = ip_address.split(',')[0].strip()
+            scan_count = QRScanLog.objects.filter(qr_type=qr_type, reference_id=ref_id).count()
+            is_duplicate = scan_count > 0
+            QRScanLog.objects.create(
+                qr_type=qr_type,
+                reference_id=ref_id,
+                scanned_by=None,
+                ip_address=ip_address,
+                is_duplicate=is_duplicate,
+            )
+            context['scan_count'] = scan_count + 1
+            context['is_duplicate'] = is_duplicate
+
+            if qr_type == 'event':
+                try:
+                    sub_id = int(ref_id)
+                    submission = EventSubmission.objects.select_related('event_registration', 'user').get(pk=sub_id)
+                    if submission.qr_ticket_hash != qr_hash:
+                        context['error'] = 'Verification failed — invalid code.'
+                    else:
+                        context['valid'] = True
+                        context['person_name'] = submission.proxy_name if submission.is_proxy else (
+                            submission.user.first_name or submission.user.username
+                        )
+                        context['event_title'] = submission.event_registration.event_title
+                        context['status_display'] = submission.get_status_display()
+                        context['status_class'] = 'valid' if submission.status == 'approved' else 'pending'
+                except (ValueError, EventSubmission.DoesNotExist):
+                    context['error'] = 'Ticket not found.'
+
+            elif qr_type == 'youth_dialogue':
+                try:
+                    app = YouthDialogueApplication.objects.get(participant_code=ref_id, qr_hash=qr_hash)
+                    context['person_name'] = f'{app.first_name} {app.last_name}'
+                    context['programme'] = 'Youth Dialogue'
+                    if app.is_revoked:
+                        context['valid'] = False
+                        context['status_display'] = 'Revoked'
+                        context['status_class'] = 'revoked'
+                    else:
+                        context['valid'] = True
+                        context['status_display'] = 'Valid Credential'
+                        context['status_class'] = 'valid'
+                except YouthDialogueApplication.DoesNotExist:
+                    context['error'] = 'Credential not found.'
+            else:
+                context['error'] = 'Unknown verification type.'
+
+    html = render_to_string('core/verify_qr.html', context)
+    return DjangoHttpResponse(html)

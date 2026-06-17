@@ -30,10 +30,13 @@ class AppColors {
   static const Color darkTextSecondary = Color(0xFFB3B3B3);
   static const Color darkDivider = Color(0xFF2C2C2C);
 
-  // Semantic Colors (Burundi palette only - Green, Gold, Red)
+  // Semantic Colors
+  // Note: success (green) and error (red) can be hard to distinguish for
+  // colorblind users — always pair them with icons (e.g. check / X) so
+  // meaning is never conveyed by color alone.
   static const Color success = Color(0xFF409843); // Burundi Green
-  static const Color warning = Color(0xFFFCD116); // AU Gold
+  static const Color warning = Color(0xFFB8860B); // DarkGoldenrod (4.96:1 on white)
   static const Color error = Color(0xFFE11C23); // Burundi Red
-  static const Color info = Color(0xFFFCD116); // AU Gold instead of blue
+  static const Color info = Color(0xFF996515); // Deep gold (5.74:1 on white)
 
 }

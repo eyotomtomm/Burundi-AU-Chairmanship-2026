@@ -49,14 +49,5 @@ def get_country_from_ip(ip_address):
 
 
 def get_client_ip(request):
-    """Get real client IP using django-ipware for proxy-aware detection."""
-    try:
-        from ipware import get_client_ip as ipware_get_ip
-        ip, is_routable = ipware_get_ip(request)
-        return ip or ''
-    except ImportError:
-        # Fallback if django-ipware not installed
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR', '')
+    """Extract the real client IP (REMOTE_ADDR, already set by CloudflareProxyMiddleware)."""
+    return request.META.get('REMOTE_ADDR', '')

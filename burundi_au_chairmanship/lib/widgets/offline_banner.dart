@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
+import '../services/api_service.dart';
+import '../services/data_saver_service.dart';
 
 /// A persistent banner that monitors connectivity and shows online/offline status.
+/// Also listens to [ApiService.authDegraded] to show a "Reconnecting..." banner
+/// when Firebase token fetch fails but the device is online.
 ///
 /// Place this at the top of a page (e.g. inside a Column or Stack).
 /// It performs periodic DNS lookups to detect connectivity changes.
@@ -17,19 +21,32 @@ class OfflineBanner extends StatefulWidget {
 class _OfflineBannerState extends State<OfflineBanner> {
   bool _isOffline = false;
   bool _showReconnected = false;
+  bool _authDegraded = false;
   Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _checkConnectivity();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _checkConnectivity());
+    _pollTimer = Timer.periodic(
+      Duration(seconds: 10 * DataSaverService().pollingMultiplier),
+      (_) => _checkConnectivity(),
+    );
+    ApiService().authDegraded.addListener(_onAuthDegradedChanged);
+    _authDegraded = ApiService().authDegraded.value;
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    ApiService().authDegraded.removeListener(_onAuthDegradedChanged);
     super.dispose();
+  }
+
+  void _onAuthDegradedChanged() {
+    if (mounted) {
+      setState(() => _authDegraded = ApiService().authDegraded.value);
+    }
   }
 
   Future<void> _checkConnectivity() async {
@@ -64,28 +81,66 @@ class _OfflineBannerState extends State<OfflineBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isOffline && !_showReconnected) return const SizedBox.shrink();
+    // Offline banner takes priority over auth degradation banner
+    if (_isOffline) {
+      return _buildBanner(
+        color: AppColors.burundiRed,
+        icon: Icons.wifi_off,
+        text: 'No internet connection',
+      );
+    }
 
-    final isReconnected = _showReconnected && !_isOffline;
+    if (_showReconnected) {
+      return _buildBanner(
+        color: AppColors.burundiGreen,
+        icon: Icons.wifi,
+        text: 'Back online',
+      );
+    }
 
+    // Auth degraded: Firebase token failed but device is online
+    if (_authDegraded) {
+      return _buildBanner(
+        color: const Color(0xFFD4A017), // gold
+        icon: null, // use spinner instead
+        text: 'Reconnecting...',
+        showSpinner: true,
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildBanner({
+    required Color color,
+    IconData? icon,
+    required String text,
+    bool showSpinner = false,
+  }) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: double.infinity,
-      color: isReconnected ? AppColors.burundiGreen : AppColors.burundiRed,
+      color: color,
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: SafeArea(
         bottom: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isReconnected ? Icons.wifi : Icons.wifi_off,
-              color: Colors.white,
-              size: 16,
-            ),
+            if (showSpinner)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            else if (icon != null)
+              Icon(icon, color: Colors.white, size: 16),
             const SizedBox(width: 8),
             Text(
-              isReconnected ? 'Back online' : 'No internet connection',
+              text,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,

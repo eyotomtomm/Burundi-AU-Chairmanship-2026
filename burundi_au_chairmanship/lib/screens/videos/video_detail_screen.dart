@@ -12,13 +12,17 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../services/like_service.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
+import '../../widgets/fullscreen_back_button.dart';
 
 class VideoDetailScreen extends StatefulWidget {
   final Map<String, dynamic> video;
+  final bool scrollToComments;
 
   const VideoDetailScreen({
     super.key,
     required this.video,
+    this.scrollToComments = false,
   });
 
   @override
@@ -48,8 +52,12 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   bool _loadingComments = true;
   bool _postingComment = false;
   final _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   int? _replyingToId;
   String? _replyingToName;
+
+  // Scroll to comments
+  final GlobalKey _commentsSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -82,6 +90,26 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     _initPlayer();
     _recordView();
     _loadComments();
+    if (widget.scrollToComments) {
+      _scheduleScrollToComments();
+    }
+  }
+
+  void _scheduleScrollToComments() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
+      return _loadingComments && mounted;
+    }).then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _commentsSectionKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic).then((_) {
+            if (mounted) _commentFocusNode.requestFocus();
+          });
+        }
+      });
+    });
   }
 
   Future<void> _recordView() async {
@@ -113,6 +141,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       _replyingToId = null;
       _replyingToName = null;
       await _loadComments();
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (_) {}
     if (mounted) setState(() => _postingComment = false);
   }
@@ -216,6 +246,25 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           DeviceOrientation.portraitUp,
           DeviceOrientation.portraitDown,
         ],
+        routePageBuilder: (context, animation, secondAnimation, controllerProvider) {
+          return AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) => Scaffold(
+              resizeToAvoidBottomInset: false,
+              body: Container(
+                color: Colors.black,
+                child: Stack(
+                  children: [
+                    controllerProvider,
+                    FullscreenBackButton(
+                      onBack: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
         materialProgressColors: ChewieProgressColors(
           playedColor: AppColors.burundiGreen,
           handleColor: AppColors.auGold,
@@ -391,6 +440,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     _videoController?.dispose();
     _youtubeController?.dispose();
     _commentController.dispose();
+    _commentFocusNode.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -425,12 +475,19 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           ),
         ),
         builder: (context, player) {
-          // In landscape (fullscreen), show only the player without AppBar
+          // In landscape (fullscreen), show only the player with a close button
           final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
           if (isLandscape) {
             return Scaffold(
               backgroundColor: Colors.black,
-              body: Center(child: player),
+              body: Stack(
+                children: [
+                  Center(child: player),
+                  FullscreenBackButton(
+                    onBack: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
             );
           }
           return _buildScaffold(title, description, isDark, theme, playerWidget: player);
@@ -514,13 +571,22 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                           child: Row(
                             children: [
                               Icon(
-                                likeState.isLiked ? Icons.favorite : Icons.favorite_border,
-                                size: 16,
+                                likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                size: 22,
                                 color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${likeState.likeCount}',
+                                style: TextStyle(
+                                  color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${likeState.likeCount}',
+                                'Like',
                                 style: TextStyle(
                                   color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                                   fontSize: 14,
@@ -619,6 +685,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                     // Comments section
                     const SizedBox(height: 24),
                     const Divider(),
+                    SizedBox(key: _commentsSectionKey, height: 0),
                     const SizedBox(height: 16),
                     Text(
                       'Comments (${_comments.fold<int>(0, (sum, c) => sum + 1 + ((c['replies'] as List?)?.length ?? 0))})',
@@ -631,6 +698,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         Expanded(
                           child: TextField(
                             controller: _commentController,
+                            focusNode: _commentFocusNode,
                             decoration: InputDecoration(
                               hintText: _replyingToName != null
                                   ? 'Reply to $_replyingToName...'
@@ -665,16 +733,22 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         final videoId = widget.video['id'].toString();
                         return CommentTile.fromMap(
                           comment,
+                          key: ValueKey(comment['id']),
                           isAuthenticated: auth.isAuthenticated,
                           onReply: () => setState(() {
                             _replyingToId = comment['id'];
                             _replyingToName = comment['user_name'];
                           }),
+                          onPostReply: (content, parentId) async {
+                            await ApiService().postVideoComment(videoId, content, parentId: parentId);
+                            await _loadComments();
+                          },
                           onDelete: () => _deleteComment(comment['id']),
                           onToggleLike: () => ApiService().toggleVideoCommentLike(videoId, comment['id']),
                           onEdit: (content) => ApiService().editVideoComment(videoId, comment['id'], content),
                           replyBuilder: (reply) => CommentTile.fromMap(
                             reply,
+                            key: ValueKey(reply['id']),
                             isReply: true,
                             isAuthenticated: auth.isAuthenticated,
                             onDelete: () => _deleteComment(reply['id']),

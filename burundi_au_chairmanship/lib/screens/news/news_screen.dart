@@ -7,11 +7,14 @@ import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
 import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
+import '../../services/content_cache_service.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/async_content_view.dart';
+import '../../widgets/sliver_async_content_view.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/liked_by_avatars.dart';
 import 'article_detail_screen.dart';
@@ -26,7 +29,9 @@ class NewsScreen extends StatefulWidget {
 }
 
 class _NewsScreenState extends State<NewsScreen> {
-  late Future<List<Article>> _articlesFuture;
+  List<Article>? _articles;
+  bool _isLoading = true;
+  bool _hasError = false;
   int? _selectedCategoryId; // null = all
   int _featuredPage = 0;
   final _featuredController = PageController(viewportFraction: 0.92);
@@ -39,7 +44,7 @@ class _NewsScreenState extends State<NewsScreen> {
   @override
   void initState() {
     super.initState();
-    _articlesFuture = _loadArticles();
+    _loadArticles();
     _loadCategories();
   }
 
@@ -62,11 +67,32 @@ class _NewsScreenState extends State<NewsScreen> {
     }
   }
 
-  Future<List<Article>> _loadArticles() async {
+  Future<void> _loadArticles() async {
     try {
-      return await ApiService().getNews();
+      final articles = await ApiService().getNews();
+      if (!mounted) return;
+      ContentCacheService().cacheArticles(ContentCacheService.keyNews, articles);
+      setState(() {
+        _articles = articles;
+        _isLoading = false;
+        _hasError = false;
+      });
     } catch (_) {
-      return MagazineData.getMockArticles();
+      if (!mounted) return;
+      // Fall back to cache
+      final cached = ContentCacheService().getArticles(ContentCacheService.keyNews);
+      if (cached != null && cached.isNotEmpty) {
+        setState(() {
+          _articles = cached;
+          _isLoading = false;
+          _hasError = false;
+        });
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
 
@@ -82,126 +108,132 @@ class _NewsScreenState extends State<NewsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
+    // Determine content state
+    final AsyncContentState contentState;
+    if (_isLoading) {
+      contentState = AsyncContentState.loading;
+    } else if (_hasError) {
+      contentState = AsyncContentState.error;
+    } else if ((_articles ?? []).isEmpty) {
+      contentState = AsyncContentState.empty;
+    } else {
+      contentState = AsyncContentState.content;
+    }
+
+    final allArticles = _articles ?? [];
+    final filtered = _filterArticles(allArticles);
+    final featured = allArticles.where((a) => a.isFeatured).toList();
+
     return Scaffold(
-      body: FutureBuilder<List<Article>>(
-        future: _articlesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return CustomScrollView(
+      body: contentState != AsyncContentState.content
+          ? CustomScrollView(
               slivers: [
                 _buildSliverAppBar(l10n),
-                const SliverToBoxAdapter(
-                  child: ShimmerArticleListSkeleton(),
+                SliverAsyncContentView(
+                  state: contentState,
+                  loadingWidget: const ShimmerArticleListSkeleton(),
+                  emptyIcon: Icons.article_outlined,
+                  emptyMessage: langCode == 'fr' ? 'Les articles arrivent bientôt' : 'Articles coming soon',
+                  onRetry: () {
+                    setState(() {
+                      _isLoading = true;
+                      _hasError = false;
+                    });
+                    _loadArticles();
+                  },
+                  child: const SliverToBoxAdapter(child: SizedBox.shrink()),
                 ),
               ],
-            );
-          }
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                setState(() {
+                  _isLoading = true;
+                  _hasError = false;
+                });
+                await _loadArticles();
+                _loadCategories();
+              },
+              child: CustomScrollView(
+                slivers: [
+                  _buildSliverAppBar(l10n),
 
-          final allArticles = snapshot.data ?? MagazineData.getMockArticles();
-          final filtered = _filterArticles(allArticles);
-          final featured = allArticles.where((a) => a.isFeatured).toList();
+                  // Featured articles carousel (multiple)
+                  if (featured.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildFeaturedCarousel(featured, langCode, isDark, l10n, isAuth),
+                    ),
 
-          return RefreshIndicator(
-            onRefresh: () async {
-              HapticFeedback.mediumImpact();
-              setState(() {
-                _articlesFuture = _loadArticles();
-              });
-              _loadCategories();
-            },
-            child: CustomScrollView(
-              slivers: [
-                _buildSliverAppBar(l10n),
-
-                // Featured articles carousel (multiple)
-                if (featured.isNotEmpty)
+                  // Category filter chips
                   SliverToBoxAdapter(
-                    child: _buildFeaturedCarousel(featured, langCode, isDark, l10n, isAuth),
+                    child: _buildCategoryChips(l10n, langCode),
                   ),
 
-                // Category filter chips
-                SliverToBoxAdapter(
-                  child: _buildCategoryChips(l10n, langCode),
-                ),
-
-                // Article list
-                filtered.isEmpty
-                    ? SliverFillRemaining(
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.article_outlined, size: 56, color: isDark ? Colors.white24 : Colors.grey[300]),
-                                const SizedBox(height: 16),
-                                Text(
-                                  langCode == 'fr' ? 'Les articles arrivent bientôt' : 'Articles coming soon',
-                                  style: TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  // Article list
+                  filtered.isEmpty
+                      ? SliverFillRemaining(
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.article_outlined, size: 56, color: isDark ? Colors.white24 : Colors.grey[300]),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    langCode == 'fr' ? 'Les articles arrivent bientôt' : 'Articles coming soon',
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  langCode == 'fr'
-                                      ? 'De nouveaux articles seront publiés ici.\nRevenez bientôt !'
-                                      : 'New articles will be published here.\nStay tuned!',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? Colors.white38 : Colors.grey[500],
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      )
-                    : SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final slot = LoginGate.slotFor(
-                                index: index,
+                        )
+                      : SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final slot = LoginGate.slotFor(
+                                  index: index,
+                                  actualCount: filtered.length,
+                                  isAuthenticated: isAuth,
+                                );
+                                switch (slot) {
+                                  case LoginGateSlot.free:
+                                    return _buildArticleCard(context, filtered[index], langCode, isDark, l10n, isAuth);
+                                  case LoginGateSlot.banner:
+                                    return const LoginGateBanner(
+                                      margin: EdgeInsets.only(bottom: 12),
+                                    );
+                                  case LoginGateSlot.blurred:
+                                    final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                                    if (dataIndex == null || dataIndex >= filtered.length) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return LockedContentWrap(
+                                      locked: true,
+                                      child: _buildArticleCard(context, filtered[dataIndex], langCode, isDark, l10n, isAuth),
+                                    );
+                                  case LoginGateSlot.hidden:
+                                    return const SizedBox.shrink();
+                                }
+                              },
+                              childCount: LoginGate.itemCountFor(
                                 actualCount: filtered.length,
                                 isAuthenticated: isAuth,
-                              );
-                              switch (slot) {
-                                case LoginGateSlot.free:
-                                  return _buildArticleCard(context, filtered[index], langCode, isDark, l10n, isAuth);
-                                case LoginGateSlot.banner:
-                                  return const LoginGateBanner(
-                                    margin: EdgeInsets.only(bottom: 12),
-                                  );
-                                case LoginGateSlot.blurred:
-                                  final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
-                                  if (dataIndex == null || dataIndex >= filtered.length) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return LockedContentWrap(
-                                    locked: true,
-                                    child: _buildArticleCard(context, filtered[dataIndex], langCode, isDark, l10n, isAuth),
-                                  );
-                                case LoginGateSlot.hidden:
-                                  return const SizedBox.shrink();
-                              }
-                            },
-                            childCount: LoginGate.itemCountFor(
-                              actualCount: filtered.length,
-                              isAuthenticated: isAuth,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-              ],
+                ],
+              ),
             ),
-          );
-        },
-      ),
     );
   }
 
@@ -301,7 +333,8 @@ class _NewsScreenState extends State<NewsScreen> {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
-              imageUrl: article.imageUrl,
+              imageUrl: article.mediumUrl.isNotEmpty ? article.mediumUrl : article.imageUrl,
+              memCacheWidth: 800,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
               errorWidget: (_, _, _) => Container(
@@ -483,7 +516,8 @@ class _NewsScreenState extends State<NewsScreen> {
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(
-                    imageUrl: article.imageUrl,
+                    imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                    memCacheWidth: 400,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(
                       color: AppColors.burundiGreen.withValues(alpha: 0.1),
@@ -654,7 +688,10 @@ class _NewsScreenState extends State<NewsScreen> {
     Navigator.push(
       context,
       CupertinoPageRoute(
-        builder: (_) => ArticleDetailScreen(article: article),
+        builder: (_) => ArticleDetailScreen(
+          article: article,
+          scrollToComments: context.read<AuthProvider>().isAuthenticated,
+        ),
       ),
     );
   }

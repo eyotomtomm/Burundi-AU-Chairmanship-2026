@@ -26,6 +26,14 @@ class MagazineImage {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'image': imageUrl,
+        'caption': caption,
+        'caption_fr': captionFr,
+        'order': order,
+      };
+
   String getCaption(String langCode) {
     if (langCode == 'fr' && captionFr.isNotEmpty) return captionFr;
     return caption;
@@ -39,6 +47,8 @@ class MagazineEdition {
   final String description;
   final String descriptionFr;
   final String coverImageUrl;
+  final String thumbnailUrl;
+  final String mediumUrl;
   final String pdfUrl;
   final String externalUrl;
   final String effectivePdfUrl;
@@ -59,6 +69,8 @@ class MagazineEdition {
     required this.description,
     required this.descriptionFr,
     required this.coverImageUrl,
+    this.thumbnailUrl = '',
+    this.mediumUrl = '',
     required this.pdfUrl,
     this.externalUrl = '',
     this.effectivePdfUrl = '',
@@ -95,6 +107,8 @@ class MagazineEdition {
       description: json['description'] ?? '',
       descriptionFr: json['description_fr'] ?? '',
       coverImageUrl: json['cover_image'] ?? '',
+      thumbnailUrl: json['thumbnail_url'] ?? '',
+      mediumUrl: json['medium_url'] ?? '',
       pdfUrl: json['pdf_file'] ?? '',
       externalUrl: json['external_url'] ?? '',
       effectivePdfUrl: json['effective_pdf_url'] ?? json['pdf_file'] ?? '',
@@ -110,6 +124,27 @@ class MagazineEdition {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': int.tryParse(id) ?? id,
+        'title': title,
+        'title_fr': titleFr,
+        'description': description,
+        'description_fr': descriptionFr,
+        'cover_image': coverImageUrl,
+        'pdf_file': pdfUrl,
+        'external_url': externalUrl,
+        'effective_pdf_url': effectivePdfUrl,
+        'publish_date': publishDate.toIso8601String(),
+        'is_featured': isFeatured,
+        'view_count': viewCount,
+        'like_count': likeCount,
+        'page_count': pageCount,
+        'file_size': fileSize,
+        'images': images.map((i) => i.toJson()).toList(),
+        'is_liked': isLiked,
+        'recent_likers': recentLikers.map((l) => l.toJson()).toList(),
+      };
+
   MagazineEdition copyWith({int? likeCount, bool? isLiked, List<Liker>? recentLikers}) {
     return MagazineEdition(
       id: id,
@@ -118,6 +153,8 @@ class MagazineEdition {
       description: description,
       descriptionFr: descriptionFr,
       coverImageUrl: coverImageUrl,
+      thumbnailUrl: thumbnailUrl,
+      mediumUrl: mediumUrl,
       pdfUrl: pdfUrl,
       externalUrl: externalUrl,
       effectivePdfUrl: effectivePdfUrl,
@@ -178,6 +215,14 @@ class Category {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'name_fr': nameFr,
+        'color': color,
+        'order': order,
+      };
+
   Color get parsedColor {
     String hex = color.replaceFirst('#', '');
     if (hex.length == 6) hex = 'FF$hex';
@@ -221,6 +266,16 @@ class ArticleMedia {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'media_type': mediaType,
+        'image': imageUrl,
+        'video_url': videoUrl,
+        'caption': caption,
+        'caption_fr': captionFr,
+        'order': order,
+      };
+
   bool get isImage => mediaType == 'image';
   bool get isVideo => mediaType == 'video';
 
@@ -237,6 +292,8 @@ class Article {
   final String content;
   final String contentFr;
   final String imageUrl;
+  final String thumbnailUrl;
+  final String mediumUrl;
   final String author;
   final DateTime publishDate;
   final Category? category;
@@ -256,6 +313,8 @@ class Article {
     required this.content,
     required this.contentFr,
     required this.imageUrl,
+    this.thumbnailUrl = '',
+    this.mediumUrl = '',
     required this.author,
     required this.publishDate,
     this.category,
@@ -297,6 +356,8 @@ class Article {
       content: json['content'] ?? '',
       contentFr: json['content_fr'] ?? '',
       imageUrl: json['image'] ?? '',
+      thumbnailUrl: json['thumbnail_url'] ?? '',
+      mediumUrl: json['medium_url'] ?? '',
       author: json['author'] ?? '',
       publishDate: DateTime.tryParse(json['publish_date'] ?? '') ?? DateTime.now(),
       category: cat,
@@ -310,6 +371,26 @@ class Article {
       recentLikers: likerList,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': int.tryParse(id) ?? id,
+        'title': title,
+        'title_fr': titleFr,
+        'content': content,
+        'content_fr': contentFr,
+        'image': imageUrl,
+        'author': author,
+        'publish_date': publishDate.toIso8601String(),
+        'category': category?.toJson(),
+        'content_type': contentType,
+        'is_featured': isFeatured,
+        'view_count': viewCount,
+        'comment_count': commentCount,
+        'like_count': likeCount,
+        'is_liked': isLiked,
+        'media': media.map((m) => m.toJson()).toList(),
+        'recent_likers': recentLikers.map((l) => l.toJson()).toList(),
+      };
 
   /// Lowercase slug for backward-compat filtering
   String get categorySlug => category?.name.toLowerCase() ?? '';

@@ -161,17 +161,8 @@ def compute_model_diff(instance, new_values, fields=None):
 
 
 def _get_client_ip(request):
-    """
-    Extract the real client IP address from the request.
-    Respects X-Forwarded-For (set by Cloudflare middleware) or REMOTE_ADDR.
-    """
-    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    if forwarded_for:
-        # Take the first IP in the chain (the real client)
-        ip = forwarded_for.split(',')[0].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR', '127.0.0.1')
-    return ip
+    """Extract the real client IP (REMOTE_ADDR, already set by CloudflareProxyMiddleware)."""
+    return request.META.get('REMOTE_ADDR', '127.0.0.1')
 
 
 def send_sms(phone_number, message):

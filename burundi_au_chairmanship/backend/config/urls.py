@@ -1,26 +1,14 @@
-import sys
-import traceback
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView, RedirectView
 from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-from graphene_django.views import GraphQLView
+from core.views import verify_qr_web
 
 
 def handler500_view(request):
-    """Show actual error details for staff users, generic message for others."""
-    from django.utils.html import escape as html_escape
-    exc_type, exc_value, exc_tb = sys.exc_info()
-    if request.user.is_authenticated and request.user.is_staff:
-        tb = traceback.format_exception(exc_type, exc_value, exc_tb)
-        return HttpResponse(
-            '<h1>Server Error (500)</h1><pre>' + html_escape(''.join(tb)) + '</pre>',
-            status=500,
-            content_type='text/html',
-        )
+    """Generic 500 error page. Detailed tracebacks are handled by Sentry."""
     return HttpResponse('<h1>Server Error (500)</h1>', status=500)
 
 
@@ -38,13 +26,24 @@ urlpatterns = [
     path('terms-of-service/', TemplateView.as_view(template_name='legal/terms_of_service.html'), name='terms-of-service'),
     path('support/', TemplateView.as_view(template_name='legal/support.html'), name='support'),
     path('delete-account/', TemplateView.as_view(template_name='legal/delete_account.html'), name='delete-account'),
-    # OpenAPI schema & documentation
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
-    # GraphQL API (graphiql only in DEBUG; auth required via DRF LoginRequiredMiddleware)
-    path('api/graphql/', csrf_exempt(GraphQLView.as_view(graphiql=settings.DEBUG)), name='graphql'),
+    # Public QR verification page (scanned by any phone camera)
+    path('verify', verify_qr_web, name='verify-qr-web'),
 ]
+
+# OpenAPI schema & documentation — staff-only in production, open in DEBUG
+if settings.DEBUG:
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+        path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    ]
+else:
+    from rest_framework.permissions import IsAdminUser
+    urlpatterns += [
+        path('api/schema/', SpectacularAPIView.as_view(permission_classes=[IsAdminUser]), name='schema'),
+        path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema', permission_classes=[IsAdminUser]), name='swagger-ui'),
+        path('api/redoc/', SpectacularRedocView.as_view(url_name='schema', permission_classes=[IsAdminUser]), name='redoc'),
+    ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

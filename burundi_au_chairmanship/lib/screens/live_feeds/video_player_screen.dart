@@ -12,11 +12,14 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../services/like_service.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
+import '../../widgets/fullscreen_back_button.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   final ApiLiveFeed feed;
+  final bool scrollToComments;
 
-  const VideoPlayerScreen({super.key, required this.feed});
+  const VideoPlayerScreen({super.key, required this.feed, this.scrollToComments = false});
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -37,8 +40,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _loadingComments = true;
   bool _postingComment = false;
   final _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   int? _replyingToId;
   String? _replyingToName;
+
+  // Scroll to comments
+  final GlobalKey _commentsSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -59,6 +66,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
     _recordView();
     _loadComments();
+    if (widget.scrollToComments) {
+      _scheduleScrollToComments();
+    }
+  }
+
+  void _scheduleScrollToComments() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
+      return _loadingComments && mounted;
+    }).then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _commentsSectionKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic).then((_) {
+            if (mounted) _commentFocusNode.requestFocus();
+          });
+        }
+      });
+    });
   }
 
   Future<void> _recordView() async {
@@ -90,6 +117,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _replyingToId = null;
       _replyingToName = null;
       await _loadComments();
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (_) {}
     if (mounted) setState(() => _postingComment = false);
   }
@@ -134,6 +163,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           DeviceOrientation.portraitUp,
           DeviceOrientation.portraitDown,
         ],
+        routePageBuilder: (context, animation, secondAnimation, controllerProvider) {
+          final langCode = Localizations.localeOf(context).languageCode;
+          return AnimatedBuilder(
+            animation: animation,
+            builder: (context, _) => Stack(
+              children: [
+                Scaffold(
+                  resizeToAvoidBottomInset: false,
+                  body: Container(
+                    alignment: Alignment.center,
+                    color: Colors.black,
+                    child: controllerProvider,
+                  ),
+                ),
+                FullscreenBackButton(
+                  title: widget.feed.getTitle(langCode),
+                  onBack: () {
+                    // Pop the fullscreen route on the root navigator
+                    // (Chewie pushes fullscreen with rootNavigator: true)
+                    Navigator.of(context, rootNavigator: true).pop();
+                  },
+                ),
+              ],
+            ),
+          );
+        },
         materialProgressColors: ChewieProgressColors(
           playedColor: AppColors.burundiGreen,
           handleColor: AppColors.auGold,
@@ -206,6 +261,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _chewieController?.dispose();
     _videoController.dispose();
     _commentController.dispose();
+    _commentFocusNode.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -329,13 +385,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           child: Row(
                             children: [
                               Icon(
-                                likeState.isLiked ? Icons.favorite : Icons.favorite_border,
-                                size: 16,
+                                likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                size: 22,
                                 color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                '${likeState.likeCount}',
+                                style: TextStyle(
+                                  color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${likeState.likeCount}',
+                                'Like',
                                 style: TextStyle(
                                   color: likeState.isLiked ? Colors.red : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                                   fontSize: 14,
@@ -375,6 +440,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     // Comments section
                     const SizedBox(height: 24),
                     const Divider(),
+                    SizedBox(key: _commentsSectionKey, height: 0),
                     const SizedBox(height: 16),
                     Text(
                       'Comments (${_comments.fold<int>(0, (sum, c) => sum + 1 + ((c['replies'] as List?)?.length ?? 0))})',
@@ -386,6 +452,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         Expanded(
                           child: TextField(
                             controller: _commentController,
+                            focusNode: _commentFocusNode,
                             decoration: InputDecoration(
                               hintText: _replyingToName != null
                                   ? 'Reply to $_replyingToName...'
@@ -420,16 +487,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         final feedId = widget.feed.id;
                         return CommentTile.fromMap(
                           comment,
+                          key: ValueKey(comment['id']),
                           isAuthenticated: auth.isAuthenticated,
                           onReply: () => setState(() {
                             _replyingToId = comment['id'];
                             _replyingToName = comment['user_name'];
                           }),
+                          onPostReply: (content, parentId) async {
+                            await ApiService().postLiveFeedComment(feedId, content, parentId: parentId);
+                            await _loadComments();
+                          },
                           onDelete: () => _deleteComment(comment['id']),
                           onToggleLike: () => ApiService().toggleLiveFeedCommentLike(feedId, comment['id']),
                           onEdit: (content) => ApiService().editLiveFeedComment(feedId, comment['id'], content),
                           replyBuilder: (reply) => CommentTile.fromMap(
                             reply,
+                            key: ValueKey(reply['id']),
                             isReply: true,
                             isAuthenticated: auth.isAuthenticated,
                             onDelete: () => _deleteComment(reply['id']),

@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
 
@@ -131,9 +132,11 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
         'Hello,\n\nI need assistance while the app is under maintenance.\n\n');
     final uri = Uri.parse('mailto:$email?subject=$subject&body=$body');
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        _copyEmail(email);
+      }
     } catch (_) {
-      // Fallback: copy the email and tell the user
       if (mounted) {
         _copyEmail(email);
       }
@@ -156,12 +159,20 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
     );
   }
 
+  /// Navigate to the correct screen after maintenance ends.
+  /// If the user was already authenticated, go home; otherwise go to auth.
+  void _navigateAfterMaintenance() {
+    if (!mounted) return;
+    final isAuth = context.read<AuthProvider>().isAuthenticated;
+    Navigator.of(context).pushReplacementNamed(isAuth ? '/home' : '/auth');
+  }
+
   Future<void> _silentRetry() async {
     try {
       final status = await ApiService().getMaintenanceStatus();
       if (!mounted) return;
       if (status['in_maintenance'] != true) {
-        Navigator.of(context).pushReplacementNamed('/auth');
+        _navigateAfterMaintenance();
       }
     } catch (_) {}
   }
@@ -172,7 +183,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       final status = await ApiService().getMaintenanceStatus();
       if (!mounted) return;
       if (status['in_maintenance'] != true) {
-        Navigator.of(context).pushReplacementNamed('/auth');
+        _navigateAfterMaintenance();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -185,7 +196,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
       }
     } catch (_) {
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/auth');
+        _navigateAfterMaintenance();
       }
     } finally {
       if (mounted) setState(() => _isRetrying = false);
@@ -219,6 +230,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
             if (hasImage)
               CachedNetworkImage(
                 imageUrl: _imageUrl!,
+                memCacheWidth: 800,
                 fit: BoxFit.cover,
                 width: screenSize.width,
                 height: screenSize.height,

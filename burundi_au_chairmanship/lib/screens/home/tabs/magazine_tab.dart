@@ -6,17 +6,19 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../../config/app_colors.dart';
+import '../../../config/app_spacing.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/language_provider.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/api_service.dart';
+import '../../../services/content_cache_service.dart';
 import '../../../widgets/login_gate.dart';
 import '../../../widgets/shimmer_loading.dart';
+import '../../../widgets/async_content_view.dart';
 import '../../../widgets/liked_by_avatars.dart';
 import '../../../services/like_service.dart';
-import '../../magazine/pdf_viewer_screen.dart';
-import '../../news/article_detail_screen.dart';
+import '../../magazine/magazine_detail_screen.dart';
 
 class MagazineTab extends StatefulWidget {
   final VoidCallback? onBackToHome;
@@ -29,8 +31,8 @@ class MagazineTab extends StatefulWidget {
 class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<MagazineEdition>? _editions;
-  List<Article>? _articles;
   bool _isLoading = true;
+  bool _hasError = false;
   final LikeService _likeService = LikeService();
   VoidCallback? _removeLikeListener;
 
@@ -48,15 +50,11 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   String _searchQuery = '';
   int? _selectedYear;
   int? _selectedMonth;
-  String? _selectedCategory;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) setState(() {});
-    });
+    _tabController = TabController(length: 1, vsync: this);
     _magazinePageController = PageController();
     _featuredPageController = PageController();
     _removeLikeListener = _likeService.addListener((key, state) {
@@ -93,19 +91,31 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
   Future<void> _loadData() async {
     try {
       final api = ApiService();
-      final results = await Future.wait([
-        api.getMagazines(),
-        api.getArticles(),
-      ]);
+      final editions = await api.getMagazines();
       if (!mounted) return;
+      // Cache on success
+      ContentCacheService().cacheMagazines(editions);
       setState(() {
-        _editions = results[0] as List<MagazineEdition>;
-        _articles = results[1] as List<Article>;
+        _editions = editions;
         _isLoading = false;
+        _hasError = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isLoading = false);
+      // Fall back to cache
+      final cached = ContentCacheService().getMagazines();
+      if (cached != null && cached.isNotEmpty) {
+        setState(() {
+          _editions = cached;
+          _isLoading = false;
+          _hasError = false;
+        });
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
     }
   }
 
@@ -127,25 +137,13 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     _likeService.toggle(EntityType.magazine, edition.id);
   }
 
-  void _openPdf(BuildContext context, MagazineEdition edition) {
-    final langCode = context.read<LanguageProvider>().languageCode;
-    final url = edition.openablePdfUrl;
-    if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PDF not available yet. Please check back later.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
+  void _openMagazineDetail(BuildContext context, MagazineEdition edition) {
     Navigator.push(
       context,
       CupertinoPageRoute(
-        builder: (_) => PdfViewerScreen(
-          pdfUrl: url,
-          title: edition.getTitle(langCode),
-          magazineId: edition.id,
+        builder: (_) => MagazineDetailScreen(
+          magazine: edition,
+          scrollToComments: false,
         ),
       ),
     );
@@ -168,29 +166,8 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     return list;
   }
 
-  List<Article> get _filteredArticles {
-    var list = _articles ?? [];
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
-      list = list.where((a) =>
-          a.title.toLowerCase().contains(q) ||
-          a.titleFr.toLowerCase().contains(q)).toList();
-    }
-    if (_selectedCategory != null) {
-      list = list.where((a) => a.category?.name == _selectedCategory).toList();
-    }
-    return list;
-  }
-
   Set<int> get _availableYears {
     return (_editions ?? []).map((e) => e.publishDate.year).toSet();
-  }
-
-  Set<String> get _availableCategories {
-    return (_articles ?? [])
-        .where((a) => a.category != null)
-        .map((a) => a.category!.name)
-        .toSet();
   }
 
   @override
@@ -200,34 +177,22 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    if (_isLoading) return const ShimmerMagazineGridSkeleton();
-
-    final editions = _editions ?? [];
-    if (editions.isEmpty && (_articles ?? []).isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.auto_stories, size: 64, color: AppColors.burundiGreen.withValues(alpha: 0.4)),
-            const SizedBox(height: 16),
-            Text(l10n.noData, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            TextButton(onPressed: _loadData, child: Text(l10n.retry)),
-          ],
-        ),
-      );
+    // Determine state for AsyncContentView
+    final AsyncContentState contentState;
+    if (_isLoading) {
+      contentState = AsyncContentState.loading;
+    } else if (_hasError) {
+      contentState = AsyncContentState.error;
+    } else if ((_editions ?? []).isEmpty) {
+      contentState = AsyncContentState.empty;
+    } else {
+      contentState = AsyncContentState.content;
     }
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () async {
-          HapticFeedback.mediumImpact();
-          await _loadData();
-        },
-        color: AppColors.burundiGreen,
-        child: NestedScrollView(
+      body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          // Gradient app bar
+          // Gradient app bar — always visible
           SliverAppBar(
             expandedHeight: 120,
             pinned: true,
@@ -278,82 +243,90 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                         ],
                       ),
                     ),
-                    Tab(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.article_outlined, size: 18),
-                          const SizedBox(width: 6),
-                          Text(l10n.translate('articles')),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
           ),
         ],
-        body: Column(
-          children: [
-            // Search bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val),
-                decoration: InputDecoration(
-                  hintText: l10n.translate('search'),
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  isDense: true,
-                  filled: true,
-                  fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: BorderSide.none,
-                  ),
+        body: contentState != AsyncContentState.content
+            ? AsyncContentView(
+                state: contentState,
+                loadingWidget: const ShimmerMagazineGridSkeleton(),
+                emptyIcon: Icons.auto_stories,
+                emptyMessage: l10n.noData,
+                onRetry: () {
+                  setState(() { _isLoading = true; _hasError = false; });
+                  _loadData();
+                },
+                onRefresh: () async {
+                  setState(() { _isLoading = true; _hasError = false; });
+                  await _loadData();
+                },
+                child: const SizedBox.shrink(),
+              )
+            : RefreshIndicator(
+                onRefresh: () async {
+                  HapticFeedback.mediumImpact();
+                  await _loadData();
+                },
+                color: AppColors.burundiGreen,
+                child: Column(
+                  children: [
+                    // Search bar
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.md, AppSpacing.pagePadding, 0),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                        decoration: InputDecoration(
+                          hintText: l10n.translate('search'),
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          isDense: true,
+                          filled: true,
+                          fillColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Filter chips
+                    _buildFilterChips(langCode, isDark),
+                    // Tab content
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildMagazinesGrid(context, langCode, isDark),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            // Filter chips
-            _buildFilterChips(langCode, isDark),
-            // Tab content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildMagazinesGrid(context, langCode, isDark),
-                  _buildArticlesList(context, langCode, isDark, theme),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
       ),
     );
   }
 
   Widget _buildFilterChips(String langCode, bool isDark) {
-    final isMagazineTab = _tabController.index == 0;
     return SizedBox(
       height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        children: isMagazineTab
-            ? _buildMagazineFilters(isDark)
-            : _buildArticleFilters(langCode, isDark),
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        children: _buildMagazineFilters(isDark),
       ),
     );
   }
@@ -407,60 +380,6 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
           side: BorderSide(
             color: selected ? AppColors.auGold : Colors.transparent,
           ),
-          visualDensity: VisualDensity.compact,
-        ),
-      ));
-    }
-    return chips;
-  }
-
-  List<Widget> _buildArticleFilters(String langCode, bool isDark) {
-    final cats = _availableCategories.toList()..sort();
-    // "All" chip
-    final allSelected = _selectedCategory == null;
-    final chips = <Widget>[
-      Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: FilterChip(
-          label: const Text('All'),
-          selected: allSelected,
-          onSelected: (_) => setState(() => _selectedCategory = null),
-          selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
-          checkmarkColor: AppColors.burundiGreen,
-          labelStyle: TextStyle(
-            fontSize: 12,
-            fontWeight: allSelected ? FontWeight.bold : FontWeight.normal,
-            color: allSelected ? AppColors.burundiGreen : (isDark ? Colors.grey[300] : Colors.grey[700]),
-          ),
-          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
-          side: BorderSide(color: allSelected ? AppColors.burundiGreen : Colors.transparent),
-          visualDensity: VisualDensity.compact,
-        ),
-      ),
-    ];
-    for (final cat in cats) {
-      final selected = _selectedCategory == cat;
-      // Find matching category to get color
-      final catObj = (_articles ?? [])
-          .where((a) => a.category?.name == cat)
-          .map((a) => a.category)
-          .first;
-      final catColor = catObj?.parsedColor ?? AppColors.burundiGreen;
-      chips.add(Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: FilterChip(
-          label: Text(catObj?.getDisplayName(langCode) ?? cat),
-          selected: selected,
-          onSelected: (val) => setState(() => _selectedCategory = val ? cat : null),
-          selectedColor: catColor.withValues(alpha: 0.2),
-          checkmarkColor: catColor,
-          labelStyle: TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            color: selected ? catColor : (isDark ? Colors.grey[300] : Colors.grey[700]),
-          ),
-          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100],
-          side: BorderSide(color: selected ? catColor : Colors.transparent),
           visualDensity: VisualDensity.compact,
         ),
       ));
@@ -522,12 +441,12 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                 final endIdx = (startIdx + 2).clamp(0, rest.length);
                 final pageMags = rest.sublist(startIdx, endIdx);
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                   child: Row(
                     children: pageMags.map((mag) {
                       return Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                           child: _buildMagazineCard(context, mag, langCode, isDark),
                         ),
                       );
@@ -616,9 +535,9 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     _likeService.seed(EntityType.magazine, magazine.id, isLiked: magazine.isLiked, likeCount: magazine.likeCount, recentLikers: magazine.recentLikers);
     final mLikeState = _likeService.getState(EntityType.magazine, magazine.id);
     return GestureDetector(
-      onTap: () => _openPdf(context, magazine),
+      onTap: () => _openMagazineDetail(context, magazine),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        margin: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.sm, AppSpacing.pagePadding, 0),
         height: 220,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
@@ -636,7 +555,8 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             fit: StackFit.expand,
             children: [
               CachedNetworkImage(
-                imageUrl: magazine.coverImageUrl,
+                imageUrl: magazine.mediumUrl.isNotEmpty ? magazine.mediumUrl : magazine.coverImageUrl,
+                memCacheWidth: 800,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
                   color: AppColors.burundiGreen.withValues(alpha: 0.2),
@@ -713,9 +633,10 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                           GestureDetector(
                             onTap: () => _toggleLike(magazine),
                             child: _flipCardStat(
-                              mLikeState.isLiked ? Icons.favorite : Icons.favorite_border,
+                              mLikeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                               '${mLikeState.likeCount}',
                               iconColor: mLikeState.isLiked ? Colors.red : null,
+                              label: 'Like',
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -760,11 +681,11 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     _likeService.seed(EntityType.magazine, magazine.id, isLiked: magazine.isLiked, likeCount: magazine.likeCount, recentLikers: magazine.recentLikers);
     final mLikeState = _likeService.getState(EntityType.magazine, magazine.id);
     return GestureDetector(
-      onTap: () => _openPdf(context, magazine),
+      onTap: () => _openMagazineDetail(context, magazine),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.1),
@@ -785,7 +706,8 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: CachedNetworkImage(
-                      imageUrl: magazine.coverImageUrl,
+                      imageUrl: magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl,
+                      memCacheWidth: 400,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(
                         color: AppColors.burundiGreen.withValues(alpha: 0.1),
@@ -797,11 +719,11 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                       ),
                     ),
                   ),
-                  // Info button
+                  // Info button — navigates to detail screen
                   Positioned(
                     top: 6, right: 6,
                     child: GestureDetector(
-                      onTap: () => _showMagInfo(context, magazine, langCode),
+                      onTap: () => _openMagazineDetail(context, magazine),
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -831,7 +753,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             Expanded(
               flex: 3,
               child: Padding(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(AppSpacing.sm),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -853,13 +775,26 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                       children: [
                         GestureDetector(
                           onTap: () => _toggleLike(magazine),
-                          child: Icon(
-                            mLikeState.isLiked ? Icons.favorite : Icons.favorite_border,
-                            size: 14, color: mLikeState.isLiked ? Colors.red : Colors.grey,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                mLikeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                size: 16, color: mLikeState.isLiked ? Colors.red : Colors.grey,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${mLikeState.likeCount}',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: mLikeState.isLiked ? Colors.red : Colors.grey[600]),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Like',
+                                style: TextStyle(fontSize: 10, color: mLikeState.isLiked ? Colors.red : Colors.grey[600]),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 3),
-                        Text('${mLikeState.likeCount}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
                         const SizedBox(width: 6),
                         Expanded(
                           child: LikedByAvatars(
@@ -881,340 +816,33 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     );
   }
 
-  Widget _flipCardStat(IconData icon, String value, {Color? iconColor}) {
+  Widget _flipCardStat(IconData icon, String value, {Color? iconColor, String? label}) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: iconColor ?? Colors.white70),
+        Icon(icon, size: 18, color: iconColor ?? Colors.white70),
         const SizedBox(width: 4),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+          style: TextStyle(
+            color: iconColor ?? Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
-      ],
-    );
-  }
-
-  void _showMagInfo(BuildContext context, MagazineEdition magazine, String langCode) {
-    _likeService.seed(EntityType.magazine, magazine.id, isLiked: magazine.isLiked, likeCount: magazine.likeCount, recentLikers: magazine.recentLikers);
-    final mLikeState = _likeService.getState(EntityType.magazine, magazine.id);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.8,
-        expand: false,
-        builder: (_, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // Portrait image gallery (cover + additional images)
-              if (magazine.coverImageUrl.isNotEmpty || magazine.images.isNotEmpty)
-                SizedBox(
-                  height: 280,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 1 + magazine.images.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      final imageUrl = index == 0
-                          ? magazine.coverImageUrl
-                          : magazine.images[index - 1].imageUrl;
-                      final caption = index == 0
-                          ? null
-                          : magazine.images[index - 1].getCaption(langCode);
-                      return Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              height: caption != null && caption.isNotEmpty ? 250 : 280,
-                              width: 190,
-                              fit: BoxFit.cover,
-                              placeholder: (_, _) => Container(
-                                width: 190,
-                                height: caption != null && caption.isNotEmpty ? 250 : 280,
-                                decoration: BoxDecoration(
-                                  color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                              ),
-                              errorWidget: (_, _, _) => Container(
-                                width: 190,
-                                height: caption != null && caption.isNotEmpty ? 250 : 280,
-                                decoration: BoxDecoration(
-                                  color: AppColors.burundiGreen.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.auto_stories, size: 40, color: AppColors.burundiGreen),
-                                    SizedBox(height: 8),
-                                    Text('Magazine', style: TextStyle(color: AppColors.burundiGreen)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (caption != null && caption.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: SizedBox(
-                                width: 190,
-                                child: Text(
-                                  caption,
-                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              const SizedBox(height: 16),
-              Text(
-                magazine.getTitle(langCode),
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'HeatherGreen'),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                DateFormat('MMMM dd, yyyy').format(magazine.publishDate),
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              // Stats row
-              Row(
-                children: [
-                  _infoStat(Icons.visibility, '${magazine.viewCount}', 'Views'),
-                  const SizedBox(width: 16),
-                  _infoStat(Icons.favorite, '${mLikeState.likeCount}', 'Likes'),
-                  if (magazine.pageCount > 0) ...[
-                    const SizedBox(width: 16),
-                    _infoStat(Icons.description, '${magazine.pageCount}', 'Pages'),
-                  ],
-                  if (magazine.fileSize.isNotEmpty) ...[
-                    const SizedBox(width: 16),
-                    _infoStat(Icons.storage, magazine.fileSize, 'Size'),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                magazine.getDescription(langCode),
-                style: const TextStyle(fontSize: 15, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _openPdf(context, magazine);
-                  },
-                  icon: const Icon(Icons.menu_book),
-                  label: Text(magazine.hasPdf ? 'Read Magazine' : 'PDF Not Available'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.burundiGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _infoStat(IconData icon, String value, String label) {
-    return Column(
-      children: [
-        Icon(icon, size: 18, color: AppColors.burundiGreen),
-        const SizedBox(height: 3),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-      ],
-    );
-  }
-
-  Widget _buildArticlesList(BuildContext context, String langCode, bool isDark, ThemeData theme) {
-    final filtered = _filteredArticles;
-    if (filtered.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
-            const SizedBox(height: 12),
-            Text('No articles found', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
-          ],
-        ),
-      );
-    }
-    final isAuth = context.watch<AuthProvider>().isAuthenticated;
-
-    Widget buildArticleTile(Article article) {
-      final catColor = article.category?.parsedColor ?? AppColors.info;
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            CupertinoPageRoute(
-              builder: (_) => ArticleDetailScreen(article: article),
+        if (label != null) ...[
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: iconColor ?? Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
-          );
-        },
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkSurface : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Row(
-            children: [
-              // Image / category color
-              Container(
-                width: 100,
-                height: 110,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [catColor, catColor.withValues(alpha: 0.6)]),
-                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
-                ),
-                child: Center(
-                  child: Icon(Icons.article, color: Colors.white.withValues(alpha: 0.6), size: 32),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: catColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              article.category?.getDisplayName(langCode) ?? '',
-                              style: TextStyle(color: catColor, fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            DateFormat('d/M/yyyy').format(article.publishDate),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        article.getTitle(langCode),
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        article.getContent(langCode),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        HapticFeedback.mediumImpact();
-        setState(() => _isLoading = true);
-        await _loadData();
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-        itemCount: LoginGate.itemCountFor(
-          actualCount: filtered.length,
-          isAuthenticated: isAuth,
-        ),
-        itemBuilder: (context, index) {
-          final slot = LoginGate.slotFor(
-            index: index,
-            actualCount: filtered.length,
-            isAuthenticated: isAuth,
-          );
-          switch (slot) {
-            case LoginGateSlot.free:
-              return buildArticleTile(filtered[index]);
-            case LoginGateSlot.banner:
-              return const LoginGateBanner(
-                margin: EdgeInsets.only(bottom: 12),
-              );
-            case LoginGateSlot.blurred:
-              final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
-              if (dataIndex == null || dataIndex >= filtered.length) {
-                return const SizedBox.shrink();
-              }
-              return LockedContentWrap(
-                locked: true,
-                child: buildArticleTile(filtered[dataIndex]),
-              );
-            case LoginGateSlot.hidden:
-              return const SizedBox.shrink();
-          }
-        },
-      ),
+        ],
+      ],
     );
   }
+
 }

@@ -233,6 +233,7 @@ class _BannerWidgetState extends State<_BannerWidget>
                                 borderRadius: BorderRadius.circular(8),
                                 child: CachedNetworkImage(
                                   imageUrl: widget.request.imageUrl!,
+                                  memCacheWidth: 400,
                                   width: 44,
                                   height: 44,
                                   fit: BoxFit.cover,

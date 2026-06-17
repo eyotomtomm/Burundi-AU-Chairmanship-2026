@@ -26,6 +26,138 @@ from ._helpers import is_staff
 
 
 # ═══════════════════════════════════════════════════════════════
+#  CAMPAIGN SMTP CONNECTION (newsletter@burundichairship.africa)
+# ═══════════════════════════════════════════════════════════════
+
+def _get_campaign_smtp_connection():
+    """Return a dedicated SMTP connection for campaign emails.
+
+    Uses CAMPAIGN_EMAIL_* settings so campaigns go through
+    newsletter@burundichairship.africa while OTP / system emails
+    continue using the default info@burundi4africa.com account.
+    """
+    from django.core.mail import get_connection
+    return get_connection(
+        host=settings.CAMPAIGN_EMAIL_HOST,
+        port=settings.CAMPAIGN_EMAIL_PORT,
+        username=settings.CAMPAIGN_EMAIL_HOST_USER,
+        password=settings.CAMPAIGN_EMAIL_HOST_PASSWORD,
+        use_tls=settings.CAMPAIGN_EMAIL_USE_TLS,
+        use_ssl=settings.CAMPAIGN_EMAIL_USE_SSL,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  BRANDED EMAIL WRAPPER
+# ═══════════════════════════════════════════════════════════════
+
+def _wrap_campaign_html(body_html, user_name=''):
+    """Wrap raw campaign body HTML in a branded, responsive email template.
+
+    Uses only inline CSS for maximum email-client compatibility (Gmail,
+    Outlook, Apple Mail, Yahoo, etc.).  No JavaScript — email clients
+    strip it.
+    """
+    greeting = ''
+    if user_name:
+        greeting = (
+            f'<tr><td style="padding:0 40px 0 40px;font-size:16px;'
+            f'line-height:1.6;color:#334155;">'
+            f'Hello <strong>{user_name}</strong>,</td></tr>'
+            f'<tr><td style="height:16px;"></td></tr>'
+        )
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Be 4 Africa</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+
+<!-- Outer wrapper -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+<tr><td align="center">
+
+<!-- Inner card -->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:linear-gradient(135deg,#166534 0%,#15803d 50%,#1d8348 100%);padding:32px 40px;text-align:center;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td align="center">
+            <div style="width:56px;height:56px;background-color:rgba(255,255,255,0.2);border-radius:50%;display:inline-block;line-height:56px;text-align:center;font-size:28px;margin-bottom:12px;">
+              &#127757;
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:24px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;padding-top:8px;">
+            Be 4 Africa
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:13px;color:rgba(255,255,255,0.8);padding-top:4px;letter-spacing:1px;text-transform:uppercase;">
+            Burundi AU Chairmanship 2025-2026
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Spacer -->
+  <tr><td style="height:32px;"></td></tr>
+
+  <!-- Greeting -->
+  {greeting}
+
+  <!-- Body content -->
+  <tr>
+    <td style="padding:0 40px;font-size:15px;line-height:1.7;color:#334155;">
+      {body_html}
+    </td>
+  </tr>
+
+  <!-- Spacer -->
+  <tr><td style="height:32px;"></td></tr>
+
+  <!-- Divider -->
+  <tr>
+    <td style="padding:0 40px;">
+      <div style="border-top:1px solid #e2e8f0;"></div>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="padding:24px 40px 32px 40px;text-align:center;">
+      <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">
+        Sent by <strong style="color:#166534;">Be 4 Africa</strong> &mdash; Burundi AU Chairmanship
+      </p>
+      <p style="margin:0 0 8px 0;font-size:12px;color:#94a3b8;">
+        newsletter@burundichairship.africa
+      </p>
+      <p style="margin:0;font-size:11px;color:#cbd5e1;">
+        &copy; 2025-2026 Be 4 Africa. All rights reserved.
+      </p>
+    </td>
+  </tr>
+
+</table>
+<!-- /Inner card -->
+
+</td></tr>
+</table>
+<!-- /Outer wrapper -->
+
+</body>
+</html>'''
+
+
+# ═══════════════════════════════════════════════════════════════
 #  EMAIL TEMPLATES
 # ═══════════════════════════════════════════════════════════════
 
@@ -235,6 +367,11 @@ def email_campaign_create(request):
         campaign.recipient_count = len(_campaign_audience_queryset(campaign))
         campaign.save(update_fields=['recipient_count'])
         log_admin_action(request, 'create', 'EmailCampaign', object_id=campaign.pk, object_repr=campaign.name)
+
+        # If "Save & Send" was clicked, redirect to send immediately
+        if request.POST.get('_action') == 'send':
+            return redirect('custom_admin:email_campaign_send_confirm', pk=campaign.pk)
+
         messages.success(request, f'Campaign "{campaign.name}" saved as draft.')
         return redirect('custom_admin:email_campaigns_list')
     return render(request, 'custom_admin/email_campaigns/form.html', {'action': 'Create'})
@@ -257,6 +394,10 @@ def email_campaign_edit(request, pk):
         campaign.recipient_count = len(_campaign_audience_queryset(campaign))
         campaign.save()
         log_admin_action(request, 'update', 'EmailCampaign', object_id=campaign.pk, object_repr=campaign.name)
+
+        if request.POST.get('_action') == 'send':
+            return redirect('custom_admin:email_campaign_send_confirm', pk=campaign.pk)
+
         messages.success(request, f'Campaign "{campaign.name}" updated.')
         return redirect('custom_admin:email_campaigns_list')
     return render(request, 'custom_admin/email_campaigns/form.html', {
@@ -267,11 +408,43 @@ def email_campaign_edit(request, pk):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+def email_campaign_send_confirm(request, pk):
+    """Show a confirmation page with preview before sending."""
+    import re as _re
+    campaign = get_object_or_404(EmailCampaign, pk=pk)
+    recipients = _campaign_audience_queryset(campaign)
+
+    # Build a sample preview with the first recipient or the logged-in admin
+    sample_name = 'John Doe'
+    sample_email = 'john@example.com'
+    if recipients:
+        sample_email, sample_name = recipients[0]
+        sample_name = sample_name or sample_email.split('@')[0]
+
+    ctx = {
+        'user_name': sample_name,
+        'user_email': sample_email,
+        'app_name': 'Be 4 Africa',
+    }
+    preview_body = campaign.body_html
+    for k, v in ctx.items():
+        preview_body = _re.sub(r'\{\{\s*' + k + r'\s*\}\}', str(v), preview_body)
+    preview_html = _wrap_campaign_html(preview_body, user_name=sample_name)
+
+    return render(request, 'custom_admin/email_campaigns/send_confirm.html', {
+        'campaign': campaign,
+        'recipient_count': len(recipients),
+        'preview_html': preview_html,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def email_campaign_send(request, pk):
     """Send the campaign to its resolved audience. Inline / synchronous —
     fine for audiences up to a few thousand. Each message is logged via
-    LoggingEmailBackend (EmailLog rows)."""
+    LoggingEmailBackend (EmailLog rows). Wraps body in branded template."""
     campaign = get_object_or_404(EmailCampaign, pk=pk)
 
     if campaign.status == 'sending':
@@ -299,42 +472,59 @@ def email_campaign_send(request, pk):
             out = _re.sub(r'\{\{\s*' + k + r'\s*\}\}', str(v), out)
         return out
 
+    # Use dedicated newsletter SMTP connection
+    campaign_from = settings.CAMPAIGN_FROM_EMAIL
+    connection = _get_campaign_smtp_connection()
+
     sent_ok = 0
     sent_fail = 0
     last_error = ''
 
-    for email, name in recipients:
-        ctx = {
-            'user_name': name or email.split('@')[0],
-            'user_email': email,
-            'app_name': 'Be 4 Africa',
-        }
-        subject = _render(campaign.subject, ctx)
-        body = _render(campaign.body_html, ctx)
-        try:
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body='',  # plain text fallback (empty)
-                from_email=None,
-                to=[email],
-            )
-            msg.attach_alternative(body, 'text/html')
-            msg.send(fail_silently=False)
-            sent_ok += 1
-            # Tag the most-recent EmailLog row with this campaign for drilldown.
+    try:
+        connection.open()
+        for email, name in recipients:
+            user_name = name or email.split('@')[0]
+            ctx = {
+                'user_name': user_name,
+                'user_email': email,
+                'app_name': 'Be 4 Africa',
+            }
+            subject = _render(campaign.subject, ctx)
+            raw_body = _render(campaign.body_html, ctx)
+            # Wrap in branded template with personalised greeting
+            full_html = _wrap_campaign_html(raw_body, user_name=user_name)
             try:
-                latest = EmailLog.objects.filter(
-                    recipients=email
-                ).order_by('-created_at').first()
-                if latest and latest.campaign_id is None:
-                    latest.campaign = campaign
-                    latest.category = 'campaign'
-                    latest.save(update_fields=['campaign', 'category'])
-            except Exception:
-                pass
-        except Exception as e:
-            sent_fail += 1
-            last_error = str(e)[:2000]
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=f'Hello {user_name},\n\n'
+                         f'{raw_body[:500]}\n\n'
+                         f'-- Be 4 Africa | Burundi AU Chairmanship',
+                    from_email=campaign_from,
+                    to=[email],
+                    connection=connection,
+                )
+                msg.attach_alternative(full_html, 'text/html')
+                msg.send(fail_silently=False)
+                sent_ok += 1
+                # Tag the most-recent EmailLog row with this campaign.
+                try:
+                    latest = EmailLog.objects.filter(
+                        recipients=email
+                    ).order_by('-created_at').first()
+                    if latest and latest.campaign_id is None:
+                        latest.campaign = campaign
+                        latest.category = 'campaign'
+                        latest.save(update_fields=['campaign', 'category'])
+                except Exception:
+                    pass
+            except Exception as e:
+                sent_fail += 1
+                last_error = str(e)[:2000]
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
 
     campaign.status = 'sent' if sent_fail == 0 else ('failed' if sent_ok == 0 else 'sent')
     campaign.sent_count = sent_ok

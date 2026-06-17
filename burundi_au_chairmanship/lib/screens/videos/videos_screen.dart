@@ -138,7 +138,10 @@ class _VideosScreenState extends State<VideosScreen> {
     Navigator.push(
       context,
       CupertinoPageRoute(
-        builder: (context) => VideoDetailScreen(video: video),
+        builder: (context) => VideoDetailScreen(
+          video: video,
+          scrollToComments: context.read<AuthProvider>().isAuthenticated,
+        ),
       ),
     );
   }
@@ -423,6 +426,7 @@ class _VideosScreenState extends State<VideosScreen> {
                     child: thumbnailUrl != null && thumbnailUrl.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: Environment.fixMediaUrl(thumbnailUrl),
+                            memCacheWidth: 800,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => _videoThumbnailPlaceholder(),
                             errorWidget: (context, url, error) => _videoThumbnailPlaceholder(),

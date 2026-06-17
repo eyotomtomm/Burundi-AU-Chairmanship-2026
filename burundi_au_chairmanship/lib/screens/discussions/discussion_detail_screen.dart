@@ -8,10 +8,12 @@ import '../../services/like_service.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
 
 class DiscussionDetailScreen extends StatefulWidget {
   final int discussionId;
-  const DiscussionDetailScreen({super.key, required this.discussionId});
+  final bool scrollToComments;
+  const DiscussionDetailScreen({super.key, required this.discussionId, this.scrollToComments = false});
 
   @override
   State<DiscussionDetailScreen> createState() => _DiscussionDetailScreenState();
@@ -20,11 +22,15 @@ class DiscussionDetailScreen extends StatefulWidget {
 class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
   final ApiService _api = ApiService();
   final TextEditingController _replyCtrl = TextEditingController();
+  final FocusNode _replyFocusNode = FocusNode();
   Map<String, dynamic>? _discussion;
   List<Map<String, dynamic>> _replies = [];
   bool _loading = true;
   final LikeService _likeService = LikeService();
   VoidCallback? _removeLikeListener;
+
+  // Scroll to comments (replies)
+  final GlobalKey _commentsSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -34,6 +40,26 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
     });
     _loadData();
     _recordView();
+    if (widget.scrollToComments) {
+      _scheduleScrollToComments();
+    }
+  }
+
+  void _scheduleScrollToComments() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
+      return _loading && mounted;
+    }).then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _commentsSectionKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic).then((_) {
+            if (mounted) _replyFocusNode.requestFocus();
+          });
+        }
+      });
+    });
   }
 
   Future<void> _recordView() async {
@@ -82,6 +108,8 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
       _replyCtrl.clear();
       FocusScope.of(context).unfocus();
       _loadData();
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (_) {}
   }
 
@@ -89,6 +117,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
   void dispose() {
     _removeLikeListener?.call();
     _replyCtrl.dispose();
+    _replyFocusNode.dispose();
     super.dispose();
   }
 
@@ -177,16 +206,24 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                         child: Row(
                                           children: [
                                             Icon(
-                                              _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Icons.favorite : Icons.favorite_border,
-                                              size: 20,
+                                              _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                              size: 22,
                                               color: _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Colors.redAccent : Colors.grey,
                                             ),
-                                            const SizedBox(width: 4),
+                                            const SizedBox(width: 5),
                                             Text(
                                               '${_likeService.getState(EntityType.discussion, widget.discussionId).likeCount}',
                                               style: TextStyle(
-                                                fontSize: 13,
+                                                fontSize: 14,
                                                 fontWeight: FontWeight.w600,
+                                                color: _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Colors.redAccent : Colors.grey,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Like',
+                                              style: TextStyle(
+                                                fontSize: 14,
                                                 color: _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Colors.redAccent : Colors.grey,
                                               ),
                                             ),
@@ -207,6 +244,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                               ),
                             ),
                             const SizedBox(height: 20),
+                            SizedBox(key: _commentsSectionKey, height: 0),
                             Text('Replies (${_replies.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
                             ..._replies.map((reply) {
@@ -214,6 +252,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                               final discussionId = widget.discussionId;
                               return CommentTile.fromMap(
                                 reply,
+                                key: ValueKey(reply['id']),
                                 userNameKey: 'author_name',
                                 isAuthenticated: auth.isAuthenticated,
                                 onDelete: () async {
@@ -250,6 +289,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                             Expanded(
                               child: TextField(
                                 controller: _replyCtrl,
+                                focusNode: _replyFocusNode,
                                 decoration: InputDecoration(
                                   hintText: 'Write a reply...',
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),

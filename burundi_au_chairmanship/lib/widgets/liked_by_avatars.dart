@@ -16,6 +16,12 @@ class Liker {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'user_id': userId,
+        'name': name,
+        'profile_picture': profilePicture,
+      };
+
   String get initials {
     final parts = name.trim().split(' ');
     if (parts.length >= 2) {
@@ -78,7 +84,7 @@ class LikedByAvatars extends StatelessWidget {
                         ? Colors.grey[700]
                         : Colors.grey[300],
                     backgroundImage: liker.profilePicture != null
-                        ? CachedNetworkImageProvider(liker.profilePicture!)
+                        ? CachedNetworkImageProvider(liker.profilePicture!, maxWidth: 100)
                         : null,
                     child: liker.profilePicture == null
                         ? Text(

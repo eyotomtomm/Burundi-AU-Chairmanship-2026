@@ -482,6 +482,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
           child: CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.contain,
+            memCacheWidth: 1200,
             placeholder: (_, _) => const Center(
               child: SizedBox(
                 width: 40,

@@ -54,13 +54,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third party
+    'axes',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
     'drf_spectacular',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # For token revocation
     'corsheaders',
     'storages',
-    'graphene_django',
+    # 'graphene_django',  # Removed: GraphQL endpoint was unused by Flutter app (security audit)
     'channels',
     # Local
     'core.apps.CoreConfig',
@@ -77,7 +80,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'core.middleware.firebase_auth.FirebaseAuthenticationMiddleware',  # Firebase auth
+    'django_otp.middleware.OTPMiddleware',
+    'axes.middleware.AxesMiddleware',
     'core.middleware.maintenance.MaintenanceMiddleware',  # 503 on API during maintenance
     'core.middleware.session_tracking.SessionTrackingMiddleware',  # Analytics session tracking
     'core.middleware.last_active.LastActiveMiddleware',  # "Users online now" heartbeat (throttled 60s)
@@ -85,6 +89,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.rate_limit_logger.RateLimitLoggingMiddleware',  # Log 429 throttled requests
     'custom_admin.middleware.activity_logger.AdminActivityLoggerMiddleware',  # Log admin staff actions
+    'custom_admin.middleware.staff_session.StaffSessionLifetimeMiddleware',  # Hard cap on staff session lifetime
     'custom_admin.permissions.AdminSectionPermissionMiddleware',  # Per-section access control for staff
     'custom_admin.middleware.s3_error_handler.S3UploadErrorMiddleware',  # Catch S3 credential errors on uploads
 ]
@@ -148,6 +153,15 @@ if REDIS_URL:
     SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
     SESSION_CACHE_ALIAS = 'default'
 else:
+    # WARNING: LocMemCache is per-process.  With multiple gunicorn workers,
+    # DRF throttle counters are NOT shared — each worker tracks its own
+    # counts, effectively multiplying the allowed rate by the worker count.
+    # Redis MUST be available in production for throttles to be accurate.
+    import logging as _logging
+    _logging.getLogger('django').warning(
+        'REDIS_URL not set — using LocMemCache. '
+        'DRF throttles will be per-process and weaker than configured.'
+    )
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -174,6 +188,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# ─── django-axes: brute-force lockout ─────────────────────────
+AXES_FAILURE_LIMIT = 5              # Lock after 5 failed attempts
+AXES_COOLOFF_TIME = 0.5             # 30-minute cooloff (hours)
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]  # Lock per user+IP pair
+AXES_RESET_ON_SUCCESS = True        # Reset counter on successful login
+AXES_LOCKOUT_CALLABLE = 'custom_admin.views.axes_lockout_response'
+AXES_ENABLED = True
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Bujumbura'
@@ -248,9 +275,12 @@ LOGGING = {
 }
 
 # ─── File Upload Settings ──────────────────────────────────────
-# Maximum file sizes
+# Maximum POST body size accepted by Django
 DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50 MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50 MB
+# Uploads larger than this are streamed to a temp file on disk instead of
+# being held entirely in RAM.  Django default is 2.5 MB.  Keeping this low
+# prevents 3 concurrent 50 MB uploads from exhausting a 1 GB worker.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440  # 2.5 MB (Django default)
 
 # Allowed file types for uploads
 ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
@@ -297,6 +327,7 @@ REST_FRAMEWORK = {
         'otp_verify': '10/min',  # 10 verify attempts per minute before lockout
         'support': '5/hour',  # 5 support tickets per hour per user
         'search': '30/min',  # 30 search requests per minute per user/IP
+        'proxy_registration': '5/hour',  # 5 proxy registrations per hour per user
     },
     # Use real client IP behind Cloudflare / reverse proxies
     'NUM_PROXIES': 1,
@@ -327,12 +358,14 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
+
 # ─── Admin Session Settings ──────────────────────────────────
-# Default: 30 days. The admin login view explicitly calls set_expiry() based
-# on the "Remember me for 30 days" checkbox, so this is only the fallback for
-# sessions where set_expiry was never called.
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days in seconds
-SESSION_SAVE_EVERY_REQUEST = True  # Refresh cookie Max-Age on every request
+# Cookie-level expiry: 24 hours.  StaffSessionLifetimeMiddleware enforces
+# a hard *absolute* lifetime cap so an active user can't ride the sliding
+# window forever (SESSION_SAVE_EVERY_REQUEST refreshes Max-Age each hit).
+SESSION_COOKIE_AGE = 60 * 60 * 24          # 24 hours (cookie level)
+SESSION_SAVE_EVERY_REQUEST = True           # Refresh cookie Max-Age on every request
+STAFF_SESSION_MAX_AGE = 60 * 60 * 24       # 24 hours — hard cap enforced by middleware
 # Note: SESSION_EXPIRE_AT_BROWSER_CLOSE intentionally NOT set (defaults to False).
 # Setting it to True caused "Remember me" to be ignored in some edge cases.
 
@@ -388,6 +421,19 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1'
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
     'Be 4 Africa <info@burundi4africa.com>'
+)
+
+# ─── Campaign / Newsletter SMTP (separate account) ──────────
+# Used only by email campaigns. OTP & system emails use the defaults above.
+CAMPAIGN_EMAIL_HOST = os.environ.get('CAMPAIGN_EMAIL_HOST', 'smtp.burundichairship.africa')
+CAMPAIGN_EMAIL_PORT = int(os.environ.get('CAMPAIGN_EMAIL_PORT', '465'))
+CAMPAIGN_EMAIL_USE_TLS = os.environ.get('CAMPAIGN_EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
+CAMPAIGN_EMAIL_USE_SSL = os.environ.get('CAMPAIGN_EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
+CAMPAIGN_EMAIL_HOST_USER = os.environ.get('CAMPAIGN_EMAIL_HOST_USER', 'newsletter@burundichairship.africa')
+CAMPAIGN_EMAIL_HOST_PASSWORD = os.environ.get('CAMPAIGN_EMAIL_HOST_PASSWORD', 'Bdi->AU(2026)')
+CAMPAIGN_FROM_EMAIL = os.environ.get(
+    'CAMPAIGN_FROM_EMAIL',
+    'Be 4 Africa <newsletter@burundichairship.africa>'
 )
 
 # ─── IMAP Inbox (admin "Email Inbox" viewer) ─────────────────
@@ -508,10 +554,9 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# ─── GraphQL (graphene-django) ────────────────────────────────
-GRAPHENE = {
-    'SCHEMA': 'core.schema.schema',
-}
+# ─── GraphQL (graphene-django) — REMOVED ─────────────────────
+# GraphQL endpoint removed: Flutter app uses REST exclusively.
+# Endpoint was csrf_exempt, unauthenticated, and had no depth limiting.
 
 # ─── ASGI / Django Channels (WebSocket support) ──────────────
 ASGI_APPLICATION = 'config.asgi.application'

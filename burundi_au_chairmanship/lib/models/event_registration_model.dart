@@ -35,6 +35,7 @@ class EventRegistrationModel {
   final int currentRegistrationCount;
   final int? spotsRemaining;
   final int? userSubmissionId;
+  final bool isYouthDialogue;
   final bool isLiked;
   final int likeCount;
   final List<Map<String, dynamic>> recentLikers;
@@ -76,6 +77,7 @@ class EventRegistrationModel {
     this.isRegistrationOpen = true,
     this.currentRegistrationCount = 0,
     this.spotsRemaining,
+    this.isYouthDialogue = false,
     this.isLiked = false,
     this.likeCount = 0,
     this.recentLikers = const [],
@@ -122,6 +124,7 @@ class EventRegistrationModel {
       isRegistrationOpen: json['is_registration_open'] as bool? ?? true,
       currentRegistrationCount: json['current_registration_count'] as int? ?? 0,
       spotsRemaining: json['spots_remaining'] as int?,
+      isYouthDialogue: json['is_youth_dialogue'] == true,
       isLiked: json['is_liked'] == true,
       likeCount: json['like_count'] as int? ?? 0,
       recentLikers: (json['recent_likers'] as List?)
@@ -130,6 +133,48 @@ class EventRegistrationModel {
           const [],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'card_type': cardType,
+        'event_type': eventType,
+        'category_data': categoryName != null
+            ? {'name': categoryName, 'name_fr': categoryNameFr, 'color': categoryColor}
+            : null,
+        'event_title': eventTitle,
+        'event_title_fr': eventTitleFr,
+        'event_description': eventDescription,
+        'event_description_fr': eventDescriptionFr,
+        'event_poster': eventPoster,
+        'event_date': eventDate?.toIso8601String(),
+        'event_end_date': eventEndDate?.toIso8601String(),
+        'venue': venue,
+        'venue_fr': venueFr,
+        'venue_address': venueAddress,
+        'contact_email': contactEmail,
+        'contact_phone': contactPhone,
+        'is_registration_enabled': isRegistrationEnabled,
+        'registration_deadline': registrationDeadline?.toIso8601String(),
+        'max_registrations': maxRegistrations,
+        'allow_proxy_registration': allowProxyRegistration,
+        'confirmation_message': confirmationMessage,
+        'confirmation_message_fr': confirmationMessageFr,
+        'show_photos': showPhotos,
+        'show_attendees': showAttendees,
+        'show_comments': showComments,
+        'is_active': isActive,
+        'order': order,
+        'form_fields': formFields.map((f) => f.toJson()).toList(),
+        'has_registered': hasRegistered,
+        'user_submission_status': userSubmissionStatus,
+        'user_submission_id': userSubmissionId,
+        'is_registration_open': isRegistrationOpen,
+        'current_registration_count': currentRegistrationCount,
+        'spots_remaining': spotsRemaining,
+        'is_liked': isLiked,
+        'like_count': likeCount,
+        'recent_likers': recentLikers,
+      };
 
   String getTitle(String langCode) =>
       langCode == 'fr' && eventTitleFr.isNotEmpty ? eventTitleFr : eventTitle;
@@ -235,6 +280,25 @@ class RegistrationFormField {
       order: json['order'] as int? ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'field_type': fieldType,
+        'field_label': fieldLabel,
+        'field_label_fr': fieldLabelFr,
+        'field_name': fieldName,
+        'placeholder': placeholder,
+        'placeholder_fr': placeholderFr,
+        'is_required': isRequired,
+        'is_active': isActive,
+        'options': options,
+        'validation_regex': validationRegex,
+        'help_text': helpText,
+        'help_text_fr': helpTextFr,
+        'max_length': maxLength,
+        'min_length': minLength,
+        'order': order,
+      };
 
   String getLabel(String langCode) =>
       langCode == 'fr' && fieldLabelFr.isNotEmpty ? fieldLabelFr : fieldLabel;

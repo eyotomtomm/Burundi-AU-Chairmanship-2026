@@ -13,7 +13,12 @@ class TranslateButton extends StatelessWidget {
     final langProvider = context.watch<LanguageProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
+    return Semantics(
+      button: true,
+      label: langProvider.isEnglish
+          ? 'Switch to French'
+          : 'Passer en anglais',
+      child: Padding(
       padding: const EdgeInsets.only(right: 4),
       child: InkWell(
         onTap: () => langProvider.toggleLanguage(),
@@ -53,6 +58,7 @@ class TranslateButton extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

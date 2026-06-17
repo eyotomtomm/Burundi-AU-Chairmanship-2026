@@ -114,6 +114,7 @@ class _PromotionalSplashOverlayState extends State<PromotionalSplashOverlay> {
           if (_imageUrl.isNotEmpty)
             CachedNetworkImage(
               imageUrl: _imageUrl,
+              memCacheWidth: 800,
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,

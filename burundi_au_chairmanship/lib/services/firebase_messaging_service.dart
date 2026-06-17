@@ -270,18 +270,23 @@ class FirebaseMessagingService {
           'Default Notifications',
           description: 'Default notification channel for general updates',
           importance: Importance.max,
+          enableVibration: true,
+          playSound: true,
+          showBadge: true,
         ),
       );
+      // Request notification permission explicitly on Android 13+
+      await androidPlugin.requestNotificationsPermission();
     }
   }
 
   /// Handle foreground messages
   ///
-  /// Shows a Firebase-style slide-down in-app banner while the app is
-  /// foregrounded. Records ``delivered`` + ``displayed`` engagement events
-  /// so the admin dashboard can compute real CTR.
+  /// Shows a native system notification while the app is foregrounded.
+  /// Records ``delivered`` + ``displayed`` engagement events so the admin
+  /// dashboard can compute real CTR.
   /// Includes deduplication to prevent showing the same notification multiple times.
-  void _handleForegroundMessage(RemoteMessage message) {
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
     if (kDebugMode) {
       print('Foreground message received: ${message.messageId}');
     }
@@ -307,41 +312,44 @@ class FirebaseMessagingService {
       _processedMessageIds.remove(_processedMessageIds.first);
     }
 
+    // Extract title/body from notification payload or data payload as fallback
     final notification = message.notification;
-    if (notification == null) return;
+    final title = notification?.title ?? message.data['title'] as String? ?? '';
+    final body = notification?.body ?? message.data['body'] as String?;
 
-    final title = notification.title ?? '';
-    final body = notification.body;
-    final imageUrl = notification.android?.imageUrl ??
-        notification.apple?.imageUrl ??
-        message.data['image'] as String?;
+    // Skip if there's nothing to display
+    if (title.isEmpty && (body == null || body.isEmpty)) return;
 
-    // Always show a native system notification (visible in notification
-    // shade and as a heads-up banner whether the app is open or not).
-    final notificationId = messageId.hashCode.abs() % 2147483647;
-    _localNotifications.show(
-      id: notificationId,
-      title: title,
-      body: body,
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          'default_channel',
-          'Default Notifications',
-          channelDescription: 'Default notification channel for general updates',
-          importance: Importance.max,
-          priority: Priority.max,
-          icon: '@mipmap/ic_launcher',
+    try {
+      final notificationId = messageId.hashCode.abs() % 2147483647;
+      await _localNotifications.show(
+        id: notificationId,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            'default_channel',
+            'Default Notifications',
+            channelDescription: 'Default notification channel for general updates',
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: '@mipmap/ic_launcher',
+            enableVibration: true,
+            playSound: true,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
         ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      payload: _buildPayload(message),
-    );
-    if (nid != null && nid.isNotEmpty && nid != '0') {
-      _trackEvent(nid, 'displayed');
+        payload: _buildPayload(message),
+      );
+      if (nid != null && nid.isNotEmpty && nid != '0') {
+        _trackEvent(nid, 'displayed');
+      }
+    } catch (e) {
+      if (kDebugMode) print('Failed to show local notification: $e');
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../widgets/translate_button.dart';
 import '../news/article_detail_screen.dart';
@@ -57,7 +58,7 @@ class _TrendingScreenState extends State<TrendingScreen> {
         Navigator.push(
           context,
           CupertinoPageRoute(
-            builder: (_) => ArticleDetailScreen(article: match.first),
+            builder: (_) => ArticleDetailScreen(article: match.first, scrollToComments: context.read<AuthProvider>().isAuthenticated),
           ),
         );
       }

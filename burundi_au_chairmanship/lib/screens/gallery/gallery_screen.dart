@@ -9,8 +9,10 @@ import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/content_cache_service.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/translate_button.dart';
 import 'album_detail_screen.dart';
 
@@ -24,6 +26,7 @@ class GalleryScreen extends StatefulWidget {
 class _GalleryScreenState extends State<GalleryScreen> {
   List<Map<String, dynamic>> albums = [];
   bool _isLoading = true;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -60,17 +63,30 @@ class _GalleryScreenState extends State<GalleryScreen> {
     try {
       final data = await ApiService().getGalleryAlbums();
       if (mounted) {
+        ContentCacheService().cacheMapList(ContentCacheService.keyGallery, data);
         setState(() {
           albums = data;
           _isLoading = false;
+          _hasError = false;
         });
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to load gallery albums: $e');
       if (mounted) {
+        // Fall back to cache
+        final cached = ContentCacheService().getMapList(ContentCacheService.keyGallery);
+        if (cached != null && cached.isNotEmpty) {
+          setState(() {
+            albums = cached;
+            _isLoading = false;
+            _hasError = false;
+          });
+          return;
+        }
         setState(() {
           albums = [];
           _isLoading = false;
+          _hasError = true;
         });
       }
     }
@@ -81,12 +97,37 @@ class _GalleryScreenState extends State<GalleryScreen> {
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
     final featuredAlbums = albums.where((a) => a['is_featured'] == true).toList();
 
-    if (_isLoading) {
-      return const Scaffold(body: ShimmerVideoGridSkeleton());
-    }
-
-    if (albums.isEmpty) {
-      return Scaffold(body: _buildEmptyState(context));
+    if (_isLoading || _hasError || albums.isEmpty) {
+      final AsyncContentState state;
+      if (_isLoading) {
+        state = AsyncContentState.loading;
+      } else if (_hasError) {
+        state = AsyncContentState.error;
+      } else {
+        state = AsyncContentState.empty;
+      }
+      return Scaffold(
+        body: AsyncContentView(
+          state: state,
+          loadingWidget: const ShimmerVideoGridSkeleton(),
+          emptyIcon: Icons.photo_library_outlined,
+          onRetry: () {
+            setState(() {
+              _isLoading = true;
+              _hasError = false;
+            });
+            _loadAlbums();
+          },
+          onRefresh: () async {
+            setState(() {
+              _isLoading = true;
+              _hasError = false;
+            });
+            await _loadAlbums();
+          },
+          child: const SizedBox.shrink(),
+        ),
+      );
     }
 
     return Scaffold(
@@ -281,74 +322,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    final langCode = Localizations.localeOf(context).languageCode;
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 120,
-          pinned: true,
-          backgroundColor: AppColors.burundiGreen,
-          actions: const [TranslateButton()],
-          flexibleSpace: FlexibleSpaceBar(
-            title: const Text(
-              'Photo Gallery',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            background: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.burundiGreen,
-                    AppColors.burundiGreen.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        SliverFillRemaining(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.photo_library_outlined, size: 56, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    langCode == 'fr' ? 'Galerie en préparation' : 'Gallery being prepared',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    langCode == 'fr'
-                        ? 'Les photos du sommet seront publiées ici prochainement.'
-                        : 'Summit photos will be published here soon.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildCoverImage(String? coverUrl, {double iconSize = 50}) {
     if (coverUrl != null && coverUrl.isNotEmpty) {
       final fixedUrl = Environment.fixMediaUrl(coverUrl);
       return CachedNetworkImage(
         imageUrl: fixedUrl,
         fit: BoxFit.cover,
-        memCacheWidth: 600,
+        memCacheWidth: 400,
         placeholder: (context, url) => Container(
           color: Colors.grey[300],
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
@@ -386,7 +366,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               Navigator.push(
                 context,
                 CupertinoPageRoute(
-                  builder: (context) => AlbumDetailScreen(album: album),
+                  builder: (context) => AlbumDetailScreen(album: album, scrollToComments: context.read<AuthProvider>().isAuthenticated),
                 ),
               );
             },

@@ -1,10 +1,11 @@
-import 'dart:ui' as ui;
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../config/app_colors.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
@@ -18,9 +19,9 @@ class YouthDialogueCredentialScreen extends StatefulWidget {
 
 class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialScreen> {
   bool _isLoading = true;
+  bool _isDownloading = false;
   String? _error;
   YouthDialogueCredential? _credential;
-  final GlobalKey _cardKey = GlobalKey();
 
   @override
   void initState() {
@@ -30,48 +31,66 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
   }
 
   Future<void> _loadCredential() async {
+    // Try cached data first for instant display
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('yd_credential_cache');
+      if (cached != null && _credential == null) {
+        final cachedData = jsonDecode(cached) as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _credential = YouthDialogueCredential.fromJson(cachedData);
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (_) {}
+
+    // Fetch fresh data
     try {
       final data = await ApiService().youthDialogueCredential();
       if (!mounted) return;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('yd_credential_cache', jsonEncode(data));
+      } catch (_) {}
       setState(() {
         _credential = YouthDialogueCredential.fromJson(data);
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = 'Failed to load credential.';
-        _isLoading = false;
-      });
+      if (_credential == null) {
+        setState(() {
+          _error = 'Failed to load credential.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _shareCredential() async {
+  Future<void> _downloadPdf() async {
+    if (_isDownloading) return;
+    setState(() => _isDownloading = true);
     try {
-      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return;
-
-      final image = await boundary.toImage(pixelRatio: 3.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return;
-
-      final pngBytes = byteData.buffer.asUint8List();
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/yd_credential.png');
-      await file.writeAsBytes(pngBytes);
-
+      final bytes = await ApiService().downloadCredentialPdf();
+      final dir = await getTemporaryDirectory();
+      final code = _credential?.participantCode ?? 'credential';
+      final file = File('${dir.path}/YD-IDCard-$code.pdf');
+      await file.writeAsBytes(bytes);
+      if (!mounted) return;
       await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'My Youth Dialogue Participant ID - ${_credential?.participantCode ?? ""}',
+        [XFile(file.path, mimeType: 'application/pdf')],
+        text: 'Youth Dialogue ID Card - $code',
       );
-
-      ApiService().youthDialogueLogActivity('credential_shared', 'youth_dialogue_credential');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to share credential.')),
+          SnackBar(content: Text('Failed to download PDF: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
@@ -80,20 +99,12 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF0F2F5),
       appBar: AppBar(
-        title: const Text('Participant ID Card'),
+        title: const Text('Digital ID Card'),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          if (_credential != null)
-            IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: _shareCredential,
-              tooltip: 'Share ID Card',
-            ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
@@ -122,152 +133,307 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     );
   }
 
+  String _formatEventDates(YouthDialogueCredential cred) {
+    final start = cred.eventStartDate;
+    final end = cred.eventEndDate;
+    if (start == null && end == null) return '';
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (start != null && end != null) {
+      if (start.month == end.month && start.year == end.year) {
+        return '${start.day} – ${end.day} ${months[start.month]} ${start.year}';
+      }
+      return '${start.day} ${months[start.month]} – ${end.day} ${months[end.month]} ${end.year}';
+    }
+    final d = start ?? end!;
+    return '${d.day} ${months[d.month]} ${d.year}';
+  }
+
+  Color _parseHexColor(String hex) {
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return Color(int.parse(hex, radix: 16));
+  }
+
   Widget _buildCredential(bool isDark) {
     final cred = _credential!;
     final qrData = cred.qrData;
+    final eventDates = _formatEventDates(cred);
+    final roleColor = _parseHexColor(cred.roleColor);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Column(
         children: [
-          RepaintBoundary(
-            key: _cardKey,
-            child: Container(
+          // Revoked banner
+          if (cred.isRevoked)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.shade200),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  // Green header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
-                      ),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
-                      ),
-                    ),
+                  Icon(Icons.block, color: Colors.red.shade700, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'YOUTH DIALOGUE PARTICIPANT',
-                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Burundi Be 4 Africa 2026',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
+                        Text('Credential Revoked',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade800, fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text('This credential is no longer valid.',
+                          style: TextStyle(color: Colors.red.shade700, fontSize: 12)),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
 
-                  // Photo + info
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        // Participant photo
-                        Container(
-                          width: 100,
-                          height: 100,
+          // ── The ID Card ──────────────────────────────────
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: roleColor.withValues(alpha: 0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 12),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // ── Header with gradient + logos ──
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        HSLColor.fromColor(roleColor).withLightness((HSLColor.fromColor(roleColor).lightness * 0.6).clamp(0.0, 1.0)).toColor(),
+                        roleColor,
+                        HSLColor.fromColor(roleColor).withLightness((HSLColor.fromColor(roleColor).lightness * 1.15).clamp(0.0, 1.0)).toColor(),
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Logos row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(
+                              'assets/images/youth_dialogue/dialogue_logo_en.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(Icons.groups, color: AppColors.burundiGreen, size: 32),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(
+                              'assets/images/youth_dialogue/b4_africa_logo.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Icon(Icons.public, color: AppColors.burundiGreen, size: 32),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      // Badge label
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+                        ),
+                        child: const Text(
+                          'YOUTH DIALOGUE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Burundi AU Chairmanship 2025-2026',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Gold accent line ──
+                Container(
+                  height: 3,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.auGold, Color(0xFFFFD54F), AppColors.auGold],
+                    ),
+                  ),
+                ),
+
+                // ── Photo + Name + Role + Event Date ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+                  child: Column(
+                    children: [
+                      // Photo
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.auGold, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: roleColor.withValues(alpha: 0.2),
+                              blurRadius: 16,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Container(
+                          width: 110,
+                          height: 110,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.burundiGreen, width: 3),
+                            border: Border.all(color: roleColor, width: 3),
                           ),
                           child: ClipOval(
                             child: cred.idPhotoUrl.isNotEmpty
                                 ? CachedNetworkImage(
                                     imageUrl: cred.idPhotoUrl,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
-                                      child: const Icon(Icons.person, size: 48, color: Colors.grey),
-                                    ),
-                                    errorWidget: (context, url, error) => Container(
-                                      color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
-                                      child: const Icon(Icons.person, size: 48, color: Colors.grey),
-                                    ),
+                                    memCacheWidth: 400,
+                                    placeholder: (_, __) => _photoPlaceholder(isDark),
+                                    errorWidget: (_, __, ___) => _photoPlaceholder(isDark),
                                   )
-                                : Container(
-                                    color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
-                                    child: const Icon(Icons.person, size: 48, color: Colors.grey),
-                                  ),
+                                : _photoPlaceholder(isDark),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                      ),
+                      const SizedBox(height: 18),
+                      // Name
+                      Text(
+                        '${cred.firstName} ${cred.lastName}',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF1a1a1a),
+                          letterSpacing: 0.3,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
 
-                        // Name
+                // ── Info fields: Role + Event Date ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF222222) : const Color(0xFFF8F9FA),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      children: [
+                        _detailRow(Icons.badge_rounded, 'Role', cred.role, isDark, accentColor: roleColor),
+                        if (eventDates.isNotEmpty) ...[
+                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                          _detailRow(Icons.calendar_today_rounded, 'Event Date', eventDates, isDark, accentColor: roleColor),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
+                // ── QR Code section ──
+                if (qrData.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                    child: Column(
+                      children: [
                         Text(
-                          '${cred.firstName} ${cred.lastName}',
+                          'SCAN TO VERIFY',
                           style: TextStyle(
-                            fontSize: 22, fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                            color: isDark ? Colors.white30 : Colors.black26,
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                        if (cred.organization.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(cred.organization,
-                            style: TextStyle(fontSize: 14, color: isDark ? Colors.white60 : Colors.black54),
-                            textAlign: TextAlign.center),
-                        ],
-                        const SizedBox(height: 20),
-
-                        // Details
-                        _infoRow('Nationality', cred.nationality, isDark),
-                        if (cred.position.isNotEmpty)
-                          _infoRow('Position', cred.position, isDark),
-                        _infoRow('Email', cred.email, isDark),
-
-                        const SizedBox(height: 20),
-
-                        // Divider
-                        Divider(color: isDark ? Colors.white12 : Colors.black12),
-                        const SizedBox(height: 16),
-
-                        // QR Code
-                        if (qrData.isNotEmpty) ...[
-                          _buildQrCodeWidget(qrData),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // Participant code
+                        const SizedBox(height: 12),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: roleColor.withValues(alpha: 0.2), width: 2),
                           ),
-                          child: Text(
-                            cred.participantCode,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
-                              color: AppColors.burundiGreen,
-                              letterSpacing: 3,
+                          child: QrImageView(
+                            data: qrData,
+                            version: QrVersions.auto,
+                            size: 150,
+                            backgroundColor: Colors.white,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Color(0xFF1a1a1a),
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Color(0xFF1a1a1a),
                             ),
                           ),
                         ),
@@ -275,43 +441,89 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     ),
                   ),
 
-                  // Footer
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                // ── Participant code badge ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF161616) : const Color(0xFFF8F8F8),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(20),
-                        bottomRight: Radius.circular(20),
+                      gradient: LinearGradient(
+                        colors: [
+                          roleColor.withValues(alpha: 0.1),
+                          roleColor.withValues(alpha: 0.05),
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: roleColor.withValues(alpha: 0.2)),
                     ),
                     child: Text(
-                      'Burundi Be 4 Africa 2026',
-                      textAlign: TextAlign.center,
+                      cred.participantCode,
                       style: TextStyle(
-                        fontSize: 11, color: isDark ? Colors.white38 : Colors.black38,
-                        letterSpacing: 0.5,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'monospace',
+                        color: roleColor,
+                        letterSpacing: 4,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+
+                // ── Footer ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                  child: Column(
+                    children: [
+                      Divider(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/images/b4africa_logo.png',
+                            width: 20,
+                            height: 20,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Burundi Be 4 Africa 2026',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white30 : Colors.black26,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 20),
 
-          // Share button
+          const SizedBox(height: 24),
+
+          // ── Download PDF button ──
           SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton.icon(
-              onPressed: _shareCredential,
-              icon: const Icon(Icons.share, color: Colors.white),
-              label: const Text('Share ID Card', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              onPressed: _isDownloading ? null : _downloadPdf,
+              icon: _isDownloading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 22),
+              label: Text(
+                _isDownloading ? 'Downloading...' : 'Download PDF',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.burundiGreen,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                disabledBackgroundColor: AppColors.burundiGreen.withValues(alpha: 0.7),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 2,
               ),
             ),
           ),
@@ -321,79 +533,26 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     );
   }
 
-  Widget _infoRow(String label, String value, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontSize: 13, color: isDark ? Colors.white38 : Colors.black45)),
-          Flexible(
-            child: Text(value, textAlign: TextAlign.end,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87)),
-          ),
-        ],
-      ),
+  Widget _photoPlaceholder(bool isDark) {
+    return Container(
+      color: isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0),
+      child: const Icon(Icons.person, size: 48, color: Colors.grey),
     );
   }
 
-  /// Builds a QR-code-like pattern (same approach as event_ticket_screen.dart)
-  Widget _buildQrCodeWidget(String qrData) {
-    final hash = qrData.hashCode;
-    final cells = <List<bool>>[];
-    for (int row = 0; row < 15; row++) {
-      final rowCells = <bool>[];
-      for (int col = 0; col < 15; col++) {
-        final mirrorCol = col < 8 ? col : 14 - col;
-        final seed = (hash + row * 17 + mirrorCol * 31) % 97;
-        rowCells.add(seed > 40);
-      }
-      cells.add(rowCells);
-    }
-
-    // Add finder patterns
-    for (int i = 0; i < 5; i++) {
-      for (int j = 0; j < 5; j++) {
-        final isBorder = i == 0 || i == 4 || j == 0 || j == 4;
-        final isCenter = i == 2 && j == 2;
-        cells[i][j] = isBorder || isCenter;
-        cells[i][14 - j] = isBorder || isCenter;
-        cells[14 - i][j] = isBorder || isCenter;
-      }
-    }
-
-    return SizedBox(
-      width: 160,
-      height: 160,
-      child: CustomPaint(painter: _QrPatternPainter(cells)),
+  Widget _detailRow(IconData icon, String label, String value, bool isDark, {Color? accentColor}) {
+    final accent = accentColor ?? AppColors.burundiGreen;
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: accent.withValues(alpha: 0.7)),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38, fontWeight: FontWeight.w500)),
+        const Spacer(),
+        Flexible(
+          child: Text(value, textAlign: TextAlign.end,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        ),
+      ],
     );
   }
-}
-
-class _QrPatternPainter extends CustomPainter {
-  final List<List<bool>> cells;
-  _QrPatternPainter(this.cells);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cellSize = size.width / cells.length;
-    final paint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.fill;
-
-    for (int row = 0; row < cells.length; row++) {
-      for (int col = 0; col < cells[row].length; col++) {
-        if (cells[row][col]) {
-          canvas.drawRect(
-            Rect.fromLTWH(col * cellSize, row * cellSize, cellSize, cellSize),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

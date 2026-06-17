@@ -338,6 +338,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               return null;
             },
             suffixIcon: IconButton(
+              tooltip: _obscureSignInPassword ? 'Show password' : 'Hide password',
               icon: Icon(
                 _obscureSignInPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -527,6 +528,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isDark: isDark,
             onChanged: (value) => setState(() => _signUpPassword = value),
             suffixIcon: IconButton(
+              tooltip: _obscureSignUpPassword ? 'Show password' : 'Hide password',
               icon: Icon(
                 _obscureSignUpPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -553,6 +555,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             obscureText: _obscureConfirmPassword,
             isDark: isDark,
             suffixIcon: IconButton(
+              tooltip: _obscureConfirmPassword ? 'Show password' : 'Hide password',
               icon: Icon(
                 _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -569,16 +572,19 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
           // Honeypot field — invisible to real users, bots auto-fill it.
           // Positioned off-screen with zero height so it's hidden from view.
-          SizedBox(
-            height: 0,
-            child: Opacity(
-              opacity: 0,
-              child: TextFormField(
-                controller: _honeypotController,
-                autocorrect: false,
-                enableSuggestions: false,
-                decoration: const InputDecoration(
-                  labelText: 'Leave this field empty',
+          // ExcludeSemantics prevents screen readers from announcing it.
+          ExcludeSemantics(
+            child: SizedBox(
+              height: 0,
+              child: Opacity(
+                opacity: 0,
+                child: TextFormField(
+                  controller: _honeypotController,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Leave this field empty',
+                  ),
                 ),
               ),
             ),
@@ -784,36 +790,42 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     required Color borderColor,
     required bool isLoading,
   }) {
-    return SizedBox(
-      height: 50,
-      child: OutlinedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: textColor,
-          side: BorderSide(color: borderColor),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (iconPath != null)
-              Image.asset(iconPath, width: 20, height: 20, errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.image_not_supported, size: 20);
-              })
-            else if (icon != null)
-              Icon(icon, size: 20),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
+    return Semantics(
+      button: true,
+      label: 'Sign in with $label',
+      child: SizedBox(
+        height: 50,
+        child: OutlinedButton(
+          onPressed: isLoading ? null : onPressed,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: textColor,
+            side: BorderSide(color: borderColor),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (iconPath != null)
+                ExcludeSemantics(
+                  child: Image.asset(iconPath, width: 20, height: 20, errorBuilder: (context, error, stackTrace) {
+                    return const Icon(Icons.image_not_supported, size: 20);
+                  }),
+                )
+              else if (icon != null)
+                Icon(icon, size: 20, semanticLabel: '$label icon'),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -834,10 +846,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         return;
       }
 
-      // Check if profile is incomplete
+      // Check if profile is incomplete (name, gender, nationality are required)
       final isProfileIncomplete = (authProvider.userName?.isEmpty ?? true) ||
-          (authProvider.phoneNumber?.isEmpty ?? true) ||
-          (authProvider.gender?.isEmpty ?? true);
+          (authProvider.gender?.isEmpty ?? true) ||
+          (authProvider.nationality?.isEmpty ?? true);
 
       if (isProfileIncomplete) {
         // Show complete profile dialog

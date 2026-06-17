@@ -15,7 +15,25 @@ from .models import (
     AuditLogEntry, AdminRole, SupportTicket, TicketMessage, Popup,
     UserSession, LinkedAccount,
     YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
+    DeviceBan, ProfanityStrikeLog,
 )
+
+
+def _sanitize_csv_value(value):
+    """Neutralize CSV formula injection.
+
+    Any cell whose string representation starts with a formula-trigger
+    character (= + - @ TAB CR LF) is prefixed with an apostrophe so
+    spreadsheet applications treat it as a literal text value.
+    """
+    if isinstance(value, str) and value and value[0] in ('=', '+', '-', '@', '\t', '\r', '\n'):
+        return "'" + value
+    return value
+
+
+def _sanitize_csv_row(row):
+    """Apply formula-injection sanitization to every cell in a CSV row."""
+    return [_sanitize_csv_value(v) for v in row]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -44,8 +62,11 @@ class UserProfileInline(admin.StackedInline):
         'profile_picture',
         ('is_deactivated', 'deactivated_at'),
         ('is_scheduled_for_deletion', 'deletion_requested_at', 'deletion_scheduled_for'),
+        ('profanity_strikes', 'is_comment_banned', 'comment_banned_at'),
+        'device_id',
     ]
-    readonly_fields = ['firebase_uid', 'deactivated_at', 'deletion_requested_at', 'deletion_scheduled_for']
+    readonly_fields = ['firebase_uid', 'deactivated_at', 'deletion_requested_at', 'deletion_scheduled_for',
+                        'profanity_strikes', 'comment_banned_at', 'device_id']
 
 
 class CustomUserAdmin(BaseUserAdmin):
@@ -695,7 +716,7 @@ class EventSubmissionAdmin(admin.ModelAdmin):
                 if isinstance(value, list):
                     value = ', '.join(str(v) for v in value)
                 row.append(value)
-            writer.writerow(row)
+            writer.writerow(_sanitize_csv_row(row))
 
         return response
     export_csv.short_description = 'Export to CSV'
@@ -2028,13 +2049,13 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                 f'{d.get_document_type_display()}: {d.get_status_display()}'
                 for d in app.documents.all()
             )
-            writer.writerow([
+            writer.writerow(_sanitize_csv_row([
                 app.id, app.first_name, app.last_name, app.email, app.phone_number,
                 app.get_nationality_display(), app.get_gender_display(),
                 app.organization, app.position, app.get_status_display(),
                 app.participant_code or '', app.created_at.strftime('%Y-%m-%d %H:%M'),
                 doc_summary,
-            ])
+            ]))
         return response
 
 
@@ -2046,6 +2067,37 @@ class YouthDialogueActivityLogAdmin(admin.ModelAdmin):
     readonly_fields = ['user', 'application', 'action', 'screen_name', 'metadata',
                        'ip_address', 'user_agent', 'timestamp']
     date_hierarchy = 'timestamp'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DeviceBan)
+class DeviceBanAdmin(admin.ModelAdmin):
+    list_display = ['device_id_short', 'user', 'reason', 'banned_at', 'is_active', 'unbanned_at', 'unbanned_by']
+    list_filter = ['is_active', 'banned_at']
+    search_fields = ['device_id', 'user__username', 'user__email', 'reason']
+    readonly_fields = ['device_id', 'user', 'reason', 'banned_at', 'unbanned_at', 'unbanned_by']
+    date_hierarchy = 'banned_at'
+
+    def device_id_short(self, obj):
+        return f"{obj.device_id[:12]}..." if len(obj.device_id) > 12 else obj.device_id
+    device_id_short.short_description = 'Device ID'
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(ProfanityStrikeLog)
+class ProfanityStrikeLogAdmin(admin.ModelAdmin):
+    list_display = ['user', 'strike_number', 'matched_word', 'content_type', 'resulted_in_ban', 'created_at']
+    list_filter = ['resulted_in_ban', 'content_type', 'created_at']
+    search_fields = ['user__username', 'user__email', 'device_id', 'flagged_content', 'matched_word']
+    readonly_fields = ['user', 'device_id', 'user_agent', 'flagged_content', 'matched_word', 'content_type', 'strike_number', 'resulted_in_ban', 'created_at']
+    date_hierarchy = 'created_at'
 
     def has_add_permission(self, request):
         return False

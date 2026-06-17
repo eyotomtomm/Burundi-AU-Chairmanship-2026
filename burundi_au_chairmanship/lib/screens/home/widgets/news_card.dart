@@ -54,7 +54,8 @@ class NewsCard extends StatelessWidget {
                   children: [
                     if (article.imageUrl.isNotEmpty)
                       CachedNetworkImage(
-                        imageUrl: article.imageUrl,
+                        imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                        memCacheWidth: 400,
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(
                           decoration: BoxDecoration(
@@ -202,7 +203,7 @@ class NewsCard extends StatelessWidget {
                         const SizedBox(width: 10),
                         Icon(
                           article.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                          size: 13,
+                          size: 16,
                           color: article.isLiked
                               ? AppColors.burundiRed
                               : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
@@ -210,6 +211,17 @@ class NewsCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           '${article.likeCount}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: article.isLiked
+                                ? AppColors.burundiRed
+                                : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Like',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 11,
                             color: article.isLiked

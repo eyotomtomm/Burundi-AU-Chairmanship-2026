@@ -154,10 +154,22 @@ input#remember_me {
         <p class="text-on-surface-variant font-body leading-relaxed">Welcome to the Be 4 Africa admin portal. Please sign in to manage content and services.</p>
       </header>
 
+      {% if is_locked %}
+      <div class="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-red-600 dark:text-red-400 mt-0.5">lock</span>
+          <div>
+            <p class="text-sm font-bold text-red-700 dark:text-red-300">Account Temporarily Locked</p>
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">Too many failed login attempts. Please wait 30 minutes before trying again, or contact a system administrator.</p>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       {% if messages %}
       <div class="mb-6 space-y-2">
         {% for message in messages %}
-        <div class="flex items-center gap-2 p-3 rounded-lg {% if message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
+        <div class="flex items-center gap-2 p-3 rounded-lg {% if message.tags == 'error' %}bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400{% else %}bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400{% endif %}">
           <span class="material-symbols-outlined text-sm">{% if message.tags == 'error' %}error{% else %}check_circle{% endif %}</span>
           <span class="text-sm font-medium">{{ message }}</span>
         </div>
@@ -186,7 +198,7 @@ input#remember_me {
 
         <div class="flex items-center gap-3">
           <input type="checkbox" id="remember_me" name="remember_me" value="1" checked class="w-4 h-4 rounded border-outline-variant text-secondary focus:ring-secondary cursor-pointer" />
-          <label for="remember_me" class="font-label text-sm text-on-surface-variant cursor-pointer select-none">Remember me for 30 days</label>
+          <label for="remember_me" class="font-label text-sm text-on-surface-variant cursor-pointer select-none">Remember me for 24 hours</label>
         </div>
 
         <button class="w-full py-5 bg-primary-container text-white font-headline font-bold rounded-lg shadow-lg shadow-primary-container/20 hover:bg-primary transition-all active:scale-[0.98] flex items-center justify-center gap-3" type="submit">

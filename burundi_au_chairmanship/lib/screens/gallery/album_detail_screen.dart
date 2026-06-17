@@ -11,14 +11,17 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
+import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
+  final bool scrollToComments;
 
   const AlbumDetailScreen({
     super.key,
     required this.album,
+    this.scrollToComments = false,
   });
 
   @override
@@ -58,6 +61,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     _enableScreenProtection();
     _recordView();
     _loadComments();
+    if (widget.scrollToComments) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted) _showCommentsSheet();
+        });
+      });
+    }
   }
 
   Future<void> _loadComments() async {
@@ -89,6 +99,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       _replyingToId = null;
       _replyingToName = null;
       await _loadComments();
+    } on ApiException catch (e) {
+      if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);
     } catch (_) {}
     if (mounted) setState(() => _postingComment = false);
   }
@@ -142,16 +154,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               final auth = Provider.of<AuthProvider>(context, listen: false);
                               return CommentTile.fromMap(
                                 comment,
+                                key: ValueKey(comment['id']),
                                 isAuthenticated: auth.isAuthenticated,
                                 onReply: () => setState(() {
                                   _replyingToId = comment['id'];
                                   _replyingToName = comment['user_name'];
                                 }),
+                                onPostReply: (content, parentId) async {
+                                  await ApiService().postGalleryComment(albumId, content, parentId: parentId);
+                                  await _loadComments();
+                                },
                                 onDelete: () => _deleteComment(comment['id']),
                                 onToggleLike: () => ApiService().toggleGalleryCommentLike(albumId, comment['id']),
                                 onEdit: (content) => ApiService().editGalleryComment(albumId, comment['id'], content),
                                 replyBuilder: (reply) => CommentTile.fromMap(
                                   reply,
+                                  key: ValueKey(reply['id']),
                                   isReply: true,
                                   isAuthenticated: auth.isAuthenticated,
                                   onDelete: () => _deleteComment(reply['id']),
@@ -311,8 +329,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           // Like button
           IconButton(
             icon: Icon(
-              likeState.isLiked ? Icons.favorite : Icons.favorite_border,
+              likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
               color: likeState.isLiked ? Colors.red : Colors.white,
+              size: 26,
             ),
             tooltip: likeState.isLiked ? 'Unlike' : 'Like',
             onPressed: _toggleLike,

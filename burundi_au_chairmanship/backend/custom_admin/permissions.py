@@ -92,6 +92,9 @@ ADMIN_MENU_GROUPS = [
         ('maintenance_list',          'Maintenance Windows',    'engineering'),
         ('promotional_splash_list',   'Promotional Splashes',   'ad'),
     ]),
+    ('Webhooks', [
+        ('webhook_list',              'Webhooks',               'webhook'),
+    ]),
     ('Settings', [
         ('app_settings',              'App Settings',           'settings'),
         ('translation_manager',       'Translation Manager',    'translate'),
@@ -118,14 +121,13 @@ ADMIN_SECTIONS = [(k, l, i, '') for (k, l, i) in ADMIN_MENUS]
 SECTION_KEYS = MENU_KEYS
 
 
-# URLs that never require a section check (auth, profile, shared utilities,
-# the admin_management page itself which is already gated by superuser-only).
+# URLs that never require a section check (auth flow, bell notifications,
+# and admin_management which is superuser-only via its own decorator).
+# IMPORTANT: do NOT add data-bearing or write-capable endpoints here.
+# global_search, widget_data, image_editor, etc. are now section-gated.
 UNRESTRICTED_URLS = {
-    'login', 'logout',
+    'login', 'logout', '2fa_verify', '2fa_setup',
     'admin_notifications_api', 'admin_notification_mark_read', 'admin_notifications_page',
-    'global_search', 'global_search_api', 'admin_global_search', 'admin_global_search_api',
-    'widget_data',
-    'image_editor', 'image_crop_save',
     # Admin management is superuser-only (enforced by the view decorator)
     'admin_management', 'admin_invite', 'admin_edit_access',
 }
@@ -145,6 +147,35 @@ def get_required_section(url_name):
     # Exact match — the menu key is the URL name itself
     if url_name in MENU_KEYS:
         return url_name
+
+    # Dashboard utilities — accessible to any staff (dashboard is always allowed)
+    if url_name in {'widget_data', 'global_search', 'global_search_api',
+                    'admin_global_search', 'admin_global_search_api'}:
+        return 'dashboard'
+
+    # Image editor is a shared tool but requires at least content access
+    if url_name in {'image_editor', 'image_crop_save'}:
+        return 'articles_list'
+
+    # Media library browser
+    if url_name == 'media_library_api':
+        return 'gallery_list'
+
+    # A/B tests — analytics-adjacent feature
+    if url_name.startswith('ab_test'):
+        return 'analytics'
+
+    # Auto-translate — settings/translation feature
+    if url_name == 'auto_translate':
+        return 'translation_manager'
+
+    # Export user data — requires user management access
+    if url_name == 'export_users_csv':
+        return 'users_list'
+
+    # Newsletter subscribers — part of newsletter management
+    if url_name == 'newsletter_subscribers_list':
+        return 'newsletter_editions_list'
 
     # Dashboard & analytics extras
     if url_name in {'analytics_export_pdf', 'nationality_map', 'export_analytics_csv'}:
@@ -272,6 +303,10 @@ def get_required_section(url_name):
     if url_name.startswith('maintenance'):
         return 'maintenance_list'
 
+    # Webhooks
+    if 'webhook' in url_name:
+        return 'webhook_list'
+
     # Settings
     if 'app_settings' in url_name:
         return 'app_settings'
@@ -280,8 +315,14 @@ def get_required_section(url_name):
     if 'reorder' in url_name or 'bulk_content' in url_name:
         return 'reorder'
 
-    # Unknown → allow (safe default; new URLs are visible until mapped)
-    return None
+    # Unknown → deny (fail-secure). Log so developers notice new URLs
+    # that need mapping. Superusers bypass this entirely.
+    import logging
+    logging.getLogger(__name__).warning(
+        'Unmapped custom_admin URL %r — access denied for non-superuser staff',
+        url_name,
+    )
+    return '__unmapped__'
 
 
 def user_can_access(user, section_key):

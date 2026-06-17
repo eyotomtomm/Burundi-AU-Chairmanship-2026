@@ -1,6 +1,8 @@
 class HeroSlide {
   final int id;
   final String image;
+  final String thumbnailUrl;
+  final String mediumUrl;
   final String label;
   final String labelFr;
   final int order;
@@ -8,6 +10,8 @@ class HeroSlide {
   HeroSlide({
     required this.id,
     required this.image,
+    this.thumbnailUrl = '',
+    this.mediumUrl = '',
     required this.label,
     required this.labelFr,
     required this.order,
@@ -17,11 +21,23 @@ class HeroSlide {
     return HeroSlide(
       id: json['id'] ?? 0,
       image: json['image'] ?? '',
+      thumbnailUrl: json['thumbnail_url'] ?? '',
+      mediumUrl: json['medium_url'] ?? '',
       label: json['label'] ?? '',
       labelFr: json['label_fr'] ?? '',
       order: json['order'] ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'image': image,
+        'thumbnail_url': thumbnailUrl,
+        'medium_url': mediumUrl,
+        'label': label,
+        'label_fr': labelFr,
+        'order': order,
+      };
 
   String getLabel(String langCode) {
     if (langCode == 'fr') return labelFr.isNotEmpty ? labelFr : label;
@@ -41,7 +57,7 @@ class ApiLiveFeed {
   final String passcode;
   final String thumbnail;
   final String status;
-  final int viewerCount;
+  int viewerCount;
   final String duration;
   final DateTime? scheduledTime;
   final int? eventId;

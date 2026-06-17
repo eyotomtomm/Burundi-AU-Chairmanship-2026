@@ -6,11 +6,25 @@ from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.utils import timezone
 from PIL import Image as PILImage
 
 from .validators import validate_image_file, validate_document_file, validate_fcm_token, validate_professional_email
 
 logger = logging.getLogger(__name__)
+
+
+def _private_storage():
+    """Return the private storage backend for user-submitted files.
+    In production this uses PrivateSpacesMediaStorage (private ACL, signed URLs).
+    In development it falls back to the default local file storage.
+    """
+    from django.conf import settings
+    if not settings.DEBUG:
+        from config.storage_backends import PrivateSpacesMediaStorage
+        return PrivateSpacesMediaStorage()
+    from django.core.files.storage import default_storage
+    return default_storage
 
 # Content status choices used across multiple content models
 CONTENT_STATUS_CHOICES = [
@@ -105,6 +119,12 @@ class UserProfile(models.Model):
         help_text='Enable SMS notifications for VIP/Government users'
     )
 
+    # Force password change on next admin login (set by admin_invite)
+    force_password_change = models.BooleanField(
+        default=False,
+        help_text='Require this user to change their password on next admin login'
+    )
+
     # Account status fields
     is_deactivated = models.BooleanField(
         default=False,
@@ -131,6 +151,21 @@ class UserProfile(models.Model):
         help_text='List of admin section keys this staff user can access. Ignored for superusers.'
     )
 
+    # Usher — can scan YD credentials at events (not necessarily staff)
+    is_usher = models.BooleanField(default=False, help_text='User can scan YD credentials at events')
+
+    # Profanity / comment ban
+    profanity_strikes = models.PositiveIntegerField(default=0, help_text='Number of profanity violations')
+    is_comment_banned = models.BooleanField(default=False, help_text='Permanently banned from commenting')
+    comment_banned_at = models.DateTimeField(null=True, blank=True, help_text='When the comment ban was applied')
+    device_id = models.CharField(max_length=255, blank=True, db_index=True, help_text='Persistent device UUID from client')
+
+    # Unique reference number (shown to user in ban dialog, admin panel, etc.)
+    reference_id = models.CharField(
+        max_length=10, unique=True, db_index=True, blank=True,
+        help_text='Unique reference number shown to user (e.g. B000001)'
+    )
+
     # Device tracking
     device_type = models.CharField(max_length=50, blank=True, help_text='e.g. iPhone 15, Samsung Galaxy S24')
     device_os = models.CharField(max_length=50, blank=True, help_text='e.g. iOS 17.4, Android 14')
@@ -144,6 +179,11 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = 'User Profile'
         verbose_name_plural = 'User Profiles'
+
+    def save(self, *args, **kwargs):
+        if not self.reference_id:
+            self.reference_id = f'B{self.user_id:06d}'
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.username}'s Profile"
@@ -263,6 +303,16 @@ class MagazineEdition(models.Model):
             logger.warning("PyMuPDF not installed – skipping cover generation")
         except Exception as e:
             logger.error("Failed to generate cover from PDF for '%s': %s", self.title, e)
+
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.cover_image, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.cover_image, 'medium')
 
     @property
     def effective_pdf_url(self):
@@ -585,6 +635,16 @@ class Event(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'medium')
+
 
 class LiveFeed(models.Model):
     STATUS_CHOICES = [
@@ -632,6 +692,7 @@ class LiveFeed(models.Model):
         null=True, blank=True,
         help_text='When to auto-publish this live feed (used when content_status=scheduled)'
     )
+    like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -660,6 +721,53 @@ class LiveFeed(models.Model):
         else:
             self.stream_type = 'video'
         super().save(*args, **kwargs)
+
+
+class LiveFeedLike(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='livefeed_likes')
+    feed = models.ForeignKey(LiveFeed, on_delete=models.CASCADE, related_name='likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'feed')
+
+    def __str__(self):
+        return f"{self.user.username} likes {self.feed.title[:30]}"
+
+
+class LiveFeedComment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='livefeed_comments')
+    feed = models.ForeignKey(LiveFeed, on_delete=models.CASCADE, related_name='comments')
+    parent = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies',
+        help_text='Parent comment for threaded replies (1 level deep).'
+    )
+    content = models.TextField()
+    like_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['feed', '-created_at']),
+            models.Index(fields=['parent']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} on {self.feed.title[:30]}"
+
+
+class LiveFeedCommentLike(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='livefeed_comment_likes')
+    comment = models.ForeignKey(LiveFeedComment, on_delete=models.CASCADE, related_name='comment_likes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
+
+    def __str__(self):
+        return f"{self.user.username} likes live feed comment #{self.comment_id}"
 
 
 class Resource(models.Model):
@@ -706,6 +814,11 @@ class FeatureCard(models.Model):
         ('none', 'No Action'),
         ('url', 'External URL'),
         ('route', 'App Route'),
+        ('article', 'Article'),
+        ('event', 'Event'),
+        ('magazine', 'Magazine'),
+        ('youth_dialogue', 'Youth Dialogue'),
+        ('video', 'Video'),
     ]
 
     ICON_CHOICES = [
@@ -745,7 +858,7 @@ class FeatureCard(models.Model):
     icon_name = models.CharField(max_length=50, blank=True, choices=ICON_CHOICES, help_text='Fallback icon if no image is uploaded')
     icon_image = models.ImageField(upload_to='feature_cards/icons/', blank=True, validators=[validate_image_file],
                                    help_text='Upload a custom icon image (PNG/SVG recommended). Overrides icon_name.')
-    action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES, default='none', help_text='Leave as "No Action" to open detail page. Use URL/Route only for special redirects.')
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES, default='none', help_text='Leave as "No Action" to open detail page. Use URL/Route only for special redirects.')
     action_value = models.CharField(max_length=500, blank=True, help_text='Only needed for URL or Route overrides. Leave blank for normal cards.')
 
     # Rich content fields for detail page
@@ -780,6 +893,16 @@ class FeatureCard(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.image, 'medium')
 
 
 class FeatureCardKeyPoint(models.Model):
@@ -952,11 +1075,11 @@ class EventRegistration(models.Model):
         return f"{self.event_title} - {self.get_card_type_display()}"
 
     class Meta:
-        ordering = ['order', '-created_at']
+        ordering = ['order', 'event_date', '-created_at']
         verbose_name = 'Event Registration'
         verbose_name_plural = 'Event Registrations'
         indexes = [
-            models.Index(fields=['is_active', 'order', '-created_at']),
+            models.Index(fields=['is_active', 'order', 'event_date', '-created_at']),
         ]
 
 
@@ -1032,6 +1155,10 @@ class EventSubmission(models.Model):
     is_proxy = models.BooleanField(default=False, help_text='Submitted on behalf of someone else')
     proxy_name = models.CharField(max_length=200, blank=True)
     proxy_email = models.EmailField(blank=True)
+    proxy_email_verified = models.BooleanField(
+        default=False,
+        help_text='Whether the proxy email owner has acknowledged the registration',
+    )
     proxy_phone = models.CharField(max_length=50, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -1059,10 +1186,9 @@ class EventSubmission(models.Model):
         return f"{self.user.username} - {self.event_registration.event_title}"
 
     def generate_qr_hash(self):
-        """Generate a unique hash for QR ticket validation."""
-        import hashlib
-        raw = f"{self.id}:{self.user_id}:{self.event_registration_id}:{self.submitted_at}"
-        self.qr_ticket_hash = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        """Generate a cryptographically random token for QR ticket validation."""
+        import secrets
+        self.qr_ticket_hash = secrets.token_hex(16)
         return self.qr_ticket_hash
 
     def save(self, *args, **kwargs):
@@ -1418,7 +1544,7 @@ class TicketMessage(models.Model):
     message = models.TextField()
     is_admin_reply = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)
-    attachment = models.ImageField(upload_to='support/attachments/', blank=True, null=True, validators=[validate_image_file])
+    attachment = models.ImageField(upload_to='support/attachments/', storage=_private_storage, blank=True, null=True, validators=[validate_image_file])
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1463,6 +1589,24 @@ class AppSettings(models.Model):
     discussions_enabled = models.BooleanField(default=True, help_text='Show Discussions feature in the app')
     polls_enabled = models.BooleanField(default=True, help_text='Show Polls feature in the app')
     newsletter_enabled = models.BooleanField(default=True, help_text='Show Weekly Newsletter toggle in the app')
+
+    # Home countdown (shown next to greeting)
+    countdown_target_date = models.DateTimeField(null=True, blank=True, help_text='Target date/time for the home screen countdown')
+    countdown_label = models.CharField(max_length=100, blank=True, help_text='Countdown label in English (e.g. "AU Summit")')
+    countdown_label_fr = models.CharField(max_length=100, blank=True, help_text='Countdown label in French')
+    countdown_enabled = models.BooleanField(default=False, help_text='Show countdown on the home screen')
+
+    # QR code configuration
+    QR_CODE_MODE_CHOICES = [
+        ('url', 'URL (opens web verification page)'),
+        ('raw', 'Raw (in-app scanner only)'),
+    ]
+    qr_code_mode = models.CharField(
+        max_length=5,
+        choices=QR_CODE_MODE_CHOICES,
+        default='url',
+        help_text='How QR codes encode data: "url" embeds a web verification link; "raw" embeds just the token',
+    )
 
     class Meta:
         verbose_name = 'App Settings'
@@ -1701,6 +1845,16 @@ class Video(models.Model):
     def __str__(self):
         return self.title
 
+    @property
+    def thumbnail_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.thumbnail, 'thumb')
+
+    @property
+    def medium_url(self):
+        from .image_utils import get_variant_url
+        return get_variant_url(self.thumbnail, 'medium')
+
 
 class VideoLike(models.Model):
     """Tracks which users liked which videos."""
@@ -1855,7 +2009,7 @@ class OTPVerification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otp_verifications')
     type = models.CharField(max_length=10, choices=TYPE_CHOICES)
     contact = models.CharField(max_length=200, help_text='Email or phone number')
-    otp_code = models.CharField(max_length=20)
+    otp_code = models.CharField(max_length=64, help_text='SHA-256 hash of the OTP code')
     is_verified = models.BooleanField(default=False)
     attempts = models.IntegerField(default=0, help_text='Number of failed verification attempts')
     expires_at = models.DateTimeField()
@@ -1932,7 +2086,7 @@ class VerificationRequest(models.Model):
         blank=True,
         help_text='User explanation for why they deserve the verification badge'
     )
-    supporting_document = models.ImageField(upload_to='verification_documents/', blank=True, null=True, help_text='Optional supporting document or photo')
+    supporting_document = models.ImageField(upload_to='verification_documents/', storage=_private_storage, blank=True, null=True, help_text='Optional supporting document or photo')
 
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -4384,17 +4538,30 @@ class NewsletterSubscriber(models.Model):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  YOUTH DIALOGUE SETTINGS (Singleton)
+#  YOUTH DIALOGUE EVENT (multi-event, replaces singleton Settings)
 # ═══════════════════════════════════════════════════════════════
 
-class YouthDialogueSettings(models.Model):
-    """Admin-configurable branding and support info for the Youth Dialogue section."""
+class YouthDialogueEvent(models.Model):
+    """Admin-configurable branding and support info for a Youth Dialogue event."""
+
+    # Event identity
+    slug = models.SlugField(max_length=120, unique=True, help_text='URL-friendly identifier (e.g. yd-bujumbura-june-2026)')
+    is_active = models.BooleanField(default=False, help_text='Only one event can be active at a time — the Flutter app serves the active event')
+    location = models.CharField(max_length=200, blank=True, default='', help_text='Event location (e.g. Bujumbura, Burundi)')
+    start_date = models.DateField(null=True, blank=True, help_text='Event start date')
+    end_date = models.DateField(null=True, blank=True, help_text='Event end date')
 
     # Branding
     logo_light = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
-                                   help_text='Horizontal logo for light mode')
+                                   help_text='Programme logo — English (light mode)')
+    logo_light_fr = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
+                                      help_text='Programme logo — French (light mode)')
     logo_dark = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
-                                  help_text='Horizontal logo for dark mode')
+                                  help_text='Programme logo — English (dark mode)')
+    logo_dark_fr = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
+                                     help_text='Programme logo — French (dark mode)')
+    secondary_logo = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
+                                       help_text='Secondary logo (e.g. B4 Africa) — shown alongside programme logo')
     programme_title = models.CharField(max_length=200, default='Youth Dialogue Programme')
     programme_title_fr = models.CharField(max_length=200, blank=True, default='Programme du Dialogue de la Jeunesse')
     description = models.TextField(default='Join the African Union Youth Dialogue and contribute to shaping the continent\'s future. Apply now to participate in this prestigious programme.')
@@ -4422,24 +4589,112 @@ class YouthDialogueSettings(models.Model):
                                     help_text='Text shown above contact options')
     support_note_fr = models.TextField(blank=True, default='Besoin d\'aide ? Contactez notre équipe de support pour obtenir de l\'aide avec votre candidature.')
 
+    # Landing page content
+    banner_image = models.ImageField(upload_to='youth_dialogue/banners/', blank=True, null=True,
+                                      validators=[validate_image_file],
+                                      help_text='Hero banner image for the landing page')
+    event_tagline = models.CharField(max_length=300, blank=True, default='',
+                                      help_text='Short tagline shown below title')
+    event_tagline_fr = models.CharField(max_length=300, blank=True, default='')
+    venue_name = models.CharField(max_length=200, blank=True, default='',
+                                   help_text='Venue name (e.g. Palais des Congrès)')
+    venue_name_fr = models.CharField(max_length=200, blank=True, default='')
+    venue_address = models.TextField(blank=True, default='',
+                                      help_text='Full venue address')
+    venue_address_fr = models.TextField(blank=True, default='')
+    key_highlights = models.TextField(blank=True, default='',
+                                       help_text='One highlight per line (EN)')
+    key_highlights_fr = models.TextField(blank=True, default='')
+    eligibility_criteria = models.TextField(blank=True, default='',
+                                             help_text='One criterion per line (EN)')
+    eligibility_criteria_fr = models.TextField(blank=True, default='')
+    side_events_info = models.TextField(blank=True, default='',
+                                         help_text='One side event per line (EN) — format: Title | Description')
+    side_events_info_fr = models.TextField(blank=True, default='')
+    privacy_policy = models.TextField(blank=True, default='',
+                                       help_text='Privacy policy text shown before application (EN)')
+    privacy_policy_fr = models.TextField(blank=True, default='')
+
+    # Configurable required documents for applicants
+    required_documents = models.JSONField(
+        blank=True,
+        default=list,
+        help_text='List of required document types. Each item: {"key": "passport", "label": "Passport Copy", "label_fr": "Copie du Passeport"}',
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Youth Dialogue Settings'
-        verbose_name_plural = 'Youth Dialogue Settings'
+        db_table = 'core_youthdialoguesettings'
+        verbose_name = 'Youth Dialogue Event'
+        verbose_name_plural = 'Youth Dialogue Events'
+        ordering = ['-created_at']
 
     def __str__(self):
-        return 'Youth Dialogue Settings'
+        return self.programme_title
 
     def save(self, *args, **kwargs):
-        # Singleton: ensure only one instance
-        self.pk = 1
+        # Deactivate other events when this one is set active
+        if self.is_active:
+            YouthDialogueEvent.objects.filter(is_active=True).exclude(pk=self.pk).update(is_active=False)
         super().save(*args, **kwargs)
 
     @classmethod
+    def get_active(cls):
+        """Return the currently active event, or None."""
+        return cls.objects.filter(is_active=True).first()
+
+    @classmethod
     def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
+        """Backward-compat wrapper: return the active event, falling back to pk=1."""
+        active = cls.get_active()
+        if active:
+            return active
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={'slug': 'youth-dialogue-default', 'is_active': True})
         return obj
+
+
+# Backward-compat alias so existing imports keep working
+YouthDialogueSettings = YouthDialogueEvent
+
+
+class YouthDialogueMedia(models.Model):
+    """Photos and videos for the Youth Dialogue programme gallery and promotional content."""
+    MEDIA_TYPE_CHOICES = [
+        ('photo', 'Photo'),
+        ('video', 'Video'),
+    ]
+    settings = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='media_items')
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES, default='photo')
+    title = models.CharField(max_length=200, blank=True, default='')
+    title_fr = models.CharField(max_length=200, blank=True, default='')
+    caption = models.CharField(max_length=500, blank=True, default='')
+    caption_fr = models.CharField(max_length=500, blank=True, default='')
+    edition_tag = models.CharField(max_length=100, blank=True, default='', help_text='e.g. "4th Edition 2025"')
+    file = models.FileField(upload_to='youth_dialogue/media/', blank=True, null=True)
+    external_url = models.URLField(blank=True, default='', help_text='YouTube or Vimeo link for videos')
+    thumbnail = models.ImageField(upload_to='youth_dialogue/media/thumbnails/', blank=True, null=True)
+    is_promotional = models.BooleanField(default=False, help_text='Mark as main promotional video (only one allowed)')
+    is_published = models.BooleanField(default=True)
+    display_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['display_order', '-created_at']
+        verbose_name = 'Youth Dialogue Media'
+        verbose_name_plural = 'Youth Dialogue Media'
+
+    def __str__(self):
+        return f'{self.get_media_type_display()}: {self.title or "Untitled"}'
+
+    def save(self, *args, **kwargs):
+        # Enforce single promotional item
+        if self.is_promotional:
+            YouthDialogueMedia.objects.filter(
+                settings=self.settings, is_promotional=True
+            ).exclude(pk=self.pk).update(is_promotional=False)
+        super().save(*args, **kwargs)
 
 
 class YouthDialogueFormField(models.Model):
@@ -4464,7 +4719,7 @@ class YouthDialogueFormField(models.Model):
         ('url', 'URL / Website'),
     ]
 
-    settings = models.ForeignKey(YouthDialogueSettings, on_delete=models.CASCADE, related_name='form_fields')
+    settings = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='form_fields')
     field_type = models.CharField(max_length=20, choices=FIELD_TYPE_CHOICES)
     field_label = models.CharField(max_length=200, help_text='Label shown to user')
     field_label_fr = models.CharField(max_length=200, blank=True)
@@ -4492,12 +4747,31 @@ class YouthDialogueFormField(models.Model):
         return f"{self.field_label} ({self.get_field_type_display()})"
 
 
+class YouthDialogueRole(models.Model):
+    """Backend-configurable roles for Youth Dialogue credentials (e.g. Participant, Moderator)."""
+    event = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='roles')
+    name = models.CharField(max_length=100, help_text='Role name in English (e.g. Participant)')
+    name_fr = models.CharField(max_length=100, blank=True, help_text='Role name in French')
+    color = models.CharField(max_length=7, default='#4CAF50', help_text='Hex colour for credential card header')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order']
+        unique_together = ['event', 'name']
+        verbose_name = 'Youth Dialogue Role'
+        verbose_name_plural = 'Youth Dialogue Roles'
+
+    def __str__(self):
+        return f"{self.name} ({self.event.programme_title})"
+
+
 # ═══════════════════════════════════════════════════════════════
 #  YOUTH DIALOGUE APPLICATION SYSTEM
 # ═══════════════════════════════════════════════════════════════
 
 class YouthDialogueApplication(models.Model):
-    """Youth Dialogue application — one per user, with multi-step status pipeline."""
+    """Youth Dialogue application — one per user per event, with multi-step status pipeline."""
 
     STATUS_CHOICES = [
         ('submitted', 'Submitted'),
@@ -4522,7 +4796,8 @@ class YouthDialogueApplication(models.Model):
         ('female', 'Female'),
     ]
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='youth_dialogue_application')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='youth_dialogue_applications')
+    event = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='applications')
 
     # Step 1 form fields
     title = models.CharField(max_length=10, choices=TITLE_CHOICES, blank=True)
@@ -4556,7 +4831,16 @@ class YouthDialogueApplication(models.Model):
     participant_code = models.CharField(max_length=20, unique=True, blank=True, null=True, help_text='Format: YD-2026-0001')
     qr_hash = models.CharField(max_length=64, blank=True, db_index=True)
     credential_issued_at = models.DateTimeField(null=True, blank=True)
-    id_photo = models.ImageField(upload_to='youth_dialogue/id_photos/', blank=True, null=True, help_text='Passport photo for ID card')
+    id_photo = models.ImageField(upload_to='youth_dialogue/id_photos/', storage=_private_storage, blank=True, null=True, help_text='Passport photo for ID card')
+
+    # Revocation
+    is_revoked = models.BooleanField(default=False)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.TextField(blank=True, default='')
+
+    admin_notes = models.TextField(blank=True, default='', help_text='Internal admin notes (not visible to applicant)')
+    reference_id = models.CharField(max_length=20, unique=True, blank=True, null=True, db_index=True,
+                                     help_text='Auto-generated application reference (e.g. YD-2026-00042)')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -4569,26 +4853,45 @@ class YouthDialogueApplication(models.Model):
             models.Index(fields=['status', '-created_at']),
             models.Index(fields=['email']),
         ]
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'event'], name='unique_user_event_application'),
+        ]
+
+    def save(self, *args, **kwargs):
+        generating_ref = not self.reference_id and not self.pk
+        super().save(*args, **kwargs)
+        if generating_ref:
+            import datetime
+            self.reference_id = f'YD-{datetime.date.today().year}-{self.pk:05d}'
+            super().save(update_fields=['reference_id'])
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.get_status_display()})"
 
+    @property
+    def nationality_flag(self):
+        """Return flag emoji for the nationality ISO code."""
+        code = self.nationality
+        if not code or len(code) != 2:
+            return ''
+        return ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in code.upper())
+
     def generate_participant_code(self):
-        """Generate sequential participant code: YD-YYYY-NNNN"""
+        """Generate sequential participant code scoped to event: YD-YYYY-NNNN"""
         from django.utils import timezone as tz
         year = tz.now().year
         prefix = f'YD-{year}-'
-        existing = YouthDialogueApplication.objects.filter(
-            participant_code__startswith=prefix
-        ).count()
+        qs = YouthDialogueApplication.objects.filter(participant_code__startswith=prefix)
+        if self.event_id:
+            qs = qs.filter(event=self.event)
+        existing = qs.count()
         self.participant_code = f'{prefix}{existing + 1:04d}'
         return self.participant_code
 
     def generate_qr_hash(self):
-        """Generate a unique hash for QR code validation."""
-        import hashlib
-        raw = f"{self.id}:{self.user_id}:{self.participant_code}:{self.created_at}"
-        self.qr_hash = hashlib.sha256(raw.encode()).hexdigest()[:32]
+        """Generate a cryptographically random token for QR code validation."""
+        import secrets
+        self.qr_hash = secrets.token_hex(16)
         return self.qr_hash
 
 
@@ -4612,7 +4915,7 @@ class YouthDialogueDocument(models.Model):
 
     application = models.ForeignKey(YouthDialogueApplication, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
-    file = models.FileField(upload_to='youth_dialogue/documents/')
+    file = models.FileField(upload_to='youth_dialogue/documents/', storage=_private_storage)
     original_filename = models.CharField(max_length=255, blank=True)
     file_size = models.PositiveIntegerField(default=0, help_text='File size in bytes')
 
@@ -4653,6 +4956,7 @@ class YouthDialogueActivityLog(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='yd_activity_logs')
+    event = models.ForeignKey(YouthDialogueEvent, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs')
     application = models.ForeignKey(YouthDialogueApplication, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs')
     action = models.CharField(max_length=30, choices=ACTION_CHOICES)
     screen_name = models.CharField(max_length=100, blank=True)
@@ -4672,6 +4976,87 @@ class YouthDialogueActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.get_action_display()} at {self.timestamp}"
+
+
+class QRScanLog(models.Model):
+    """Log every QR code scan for audit and duplicate detection."""
+    QR_TYPE_CHOICES = [
+        ('event', 'Event Ticket'),
+        ('youth_dialogue', 'Youth Dialogue Credential'),
+    ]
+
+    qr_type = models.CharField(max_length=20, choices=QR_TYPE_CHOICES)
+    reference_id = models.CharField(max_length=100, db_index=True, help_text='Submission ID or participant code')
+    scanned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='qr_scans')
+    scanned_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    is_duplicate = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-scanned_at']
+        verbose_name = 'QR Scan Log'
+        verbose_name_plural = 'QR Scan Logs'
+        indexes = [
+            models.Index(fields=['qr_type', 'reference_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_qr_type_display()} scan: {self.reference_id} at {self.scanned_at}"
+
+
+class DeviceBan(models.Model):
+    """Tracks device-level comment bans that persist across accounts."""
+    device_id = models.CharField(max_length=255, unique=True, db_index=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='device_bans',
+        help_text='The user whose profanity violations triggered this device ban'
+    )
+    reason = models.CharField(max_length=255, default='Exceeded profanity strike limit')
+    banned_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    unbanned_at = models.DateTimeField(null=True, blank=True)
+    unbanned_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='device_unbans'
+    )
+
+    class Meta:
+        ordering = ['-banned_at']
+        verbose_name = 'Device Ban'
+        verbose_name_plural = 'Device Bans'
+
+    def __str__(self):
+        status = 'Active' if self.is_active else 'Lifted'
+        return f"Device {self.device_id[:12]}… — {status}"
+
+
+class ProfanityStrikeLog(models.Model):
+    """Logs every profanity violation so admins can review what was written before deciding to unban."""
+    CONTENT_TYPE_CHOICES = [
+        ('article_comment', 'Article Comment'),
+        ('discussion_comment', 'Discussion Comment'),
+        ('event_comment', 'Event Comment'),
+        ('gallery_comment', 'Gallery Comment'),
+        ('livefeed_comment', 'Live Feed Comment'),
+        ('magazine_comment', 'Magazine Comment'),
+        ('video_comment', 'Video Comment'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='profanity_strike_logs')
+    device_id = models.CharField(max_length=255, blank=True, db_index=True)
+    user_agent = models.TextField(blank=True, help_text='Browser/app user-agent string at time of violation')
+    flagged_content = models.TextField(help_text='Full text the user attempted to post')
+    matched_word = models.CharField(max_length=100, blank=True)
+    content_type = models.CharField(max_length=30, choices=CONTENT_TYPE_CHOICES, blank=True)
+    strike_number = models.PositiveIntegerField()
+    resulted_in_ban = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Strike #{self.strike_number} by {self.user} — {'BAN' if self.resulted_in_ban else 'warning'}"
 
 
 # Connect to all core models with image fields

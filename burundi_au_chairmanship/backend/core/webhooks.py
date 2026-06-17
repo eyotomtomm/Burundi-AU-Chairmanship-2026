@@ -6,14 +6,60 @@ Usage:
     send_webhook('user.registered', {'user_id': 123, 'username': 'john'})
 """
 
+import ipaddress
 import json
 import logging
+import socket
 import time
+from urllib.parse import urlparse
 
 import requests
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_webhook_url(url):
+    """Validate that a webhook URL does not target private/internal networks.
+
+    Blocks:
+    - Private IPv4 ranges (10/8, 172.16/12, 192.168/16)
+    - Loopback (127.0.0.0/8, ::1)
+    - Link-local (169.254.0.0/16, fe80::/10) — includes cloud metadata IPs
+    - IPv6 mapped/translated IPv4 addresses wrapping blocked ranges
+    - Non-HTTP(S) schemes
+
+    Raises ValueError with a descriptive message on failure.
+    """
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError(f'Unsupported URL scheme: {parsed.scheme}')
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError('URL has no hostname')
+
+    # Resolve hostname to IP(s) — catches DNS rebinding to private IPs
+    try:
+        addrinfos = socket.getaddrinfo(hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise ValueError(f'Cannot resolve hostname: {hostname}')
+
+    for family, _, _, _, sockaddr in addrinfos:
+        ip = ipaddress.ip_address(sockaddr[0])
+
+        # Unwrap IPv4-mapped IPv6 (e.g. ::ffff:169.254.169.254)
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(
+                f'Webhook URL resolves to blocked address {ip} '
+                f'(private/loopback/link-local/reserved)'
+            )
+
+    return True
 
 
 def _format_slack_payload(event_type, data):
@@ -166,6 +212,22 @@ def send_webhook(event_type, data):
         response_body = ''
         duration_ms = None
 
+        # SSRF guard: block requests to private/link-local/metadata IPs
+        try:
+            _validate_webhook_url(webhook.url)
+        except ValueError as e:
+            response_body = f'Blocked: {e}'
+            webhook.failure_count += 1
+            logger.warning("Webhook SSRF blocked: %s (%s) — %s", webhook.name, webhook.url, e)
+            webhook.last_triggered_at = timezone.now()
+            webhook.save(update_fields=['last_triggered_at', 'failure_count'])
+            WebhookLog.objects.create(
+                webhook=webhook, event=event_type, payload=payload,
+                response_status=None, response_body=response_body, success=False,
+            )
+            results.append((webhook.id, False, None))
+            continue
+
         try:
             start_time = time.time()
             response = requests.post(
@@ -250,6 +312,12 @@ def send_test_webhook(webhook):
 
     if isinstance(webhook.custom_headers, dict):
         headers.update(webhook.custom_headers)
+
+    # SSRF guard: block requests to private/link-local/metadata IPs
+    try:
+        _validate_webhook_url(webhook.url)
+    except ValueError as e:
+        return False, None, f'Blocked: {e}'
 
     try:
         start_time = time.time()

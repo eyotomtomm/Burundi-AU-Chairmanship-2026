@@ -70,6 +70,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
                   if (hasHeroImage)
                     CachedNetworkImage(
                       imageUrl: Environment.fixMediaUrl(heroImage.toString()),
+                      memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         decoration: BoxDecoration(

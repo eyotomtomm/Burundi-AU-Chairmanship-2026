@@ -17,9 +17,21 @@
 #
 # AFTER SCRAPING:
 #   python manage.py import_x_posts   — imports into Django DB
+#
+# ⚠ SECURITY: This script reads your personal browser cookies to
+#   authenticate with X.  NEVER run it in CI, Docker, or on a shared
+#   machine — the cookies grant full access to your X account.
+#   Run only on your local workstation.
 # ─────────────────────────────────────────────────────────────
 
 set -e
+
+# Refuse to run in CI or containerised environments
+if [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ] || [ -f /.dockerenv ]; then
+  echo "ERROR: This script reads your personal browser cookies."
+  echo "       Never run it in CI, Docker, or shared environments."
+  exit 1
+fi
 cd "$(dirname "$0")"
 
 BROWSER="${1:-firefox}"

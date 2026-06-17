@@ -13,7 +13,12 @@
 
   <form method="post" class="space-y-6">
     {% csrf_token %}
+
+    <!-- Content -->
     <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">edit_note</span> Content
+      </h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Title (EN) <span class="text-red-500">*</span></label>
@@ -34,29 +39,129 @@
           <textarea name="message_fr" rows="3" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">{{ banner.message_fr|default:'' }}</textarea>
         </div>
       </div>
+    </div>
+
+    <!-- Appearance & Type -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">palette</span> Appearance
+      </h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Banner Type</label>
-          <select name="banner_type" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
-            <option value="info" {% if banner.banner_type == 'info' %}selected{% endif %}>Info</option>
-            <option value="warning" {% if banner.banner_type == 'warning' %}selected{% endif %}>Warning</option>
-            <option value="success" {% if banner.banner_type == 'success' %}selected{% endif %}>Success</option>
-            <option value="error" {% if banner.banner_type == 'error' %}selected{% endif %}>Error</option>
+          <select name="banner_type" id="bannerTypeSelect" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <option value="info" {% if banner.banner_type == 'info' %}selected{% endif %}>&#x1f7e2; Info (Green)</option>
+            <option value="success" {% if banner.banner_type == 'success' %}selected{% endif %}>&#x1f7e2; Success (Green)</option>
+            <option value="warning" {% if banner.banner_type == 'warning' %}selected{% endif %}>&#x1f7e0; Warning (Orange)</option>
+            <option value="error" {% if banner.banner_type == 'error' %}selected{% endif %}>&#x1f534; Error (Red)</option>
+            <option value="urgent" {% if banner.banner_type == 'urgent' %}selected{% endif %}>&#x1f534; Urgent (Red)</option>
           </select>
+          <p class="text-xs text-slate-400 mt-1">Controls the banner color in the app</p>
         </div>
         <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Link URL</label>
-          <input type="url" name="link_url" value="{{ banner.link_url|default:'' }}" placeholder="https://..." class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          <!-- Preview -->
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Preview</label>
+          <div id="bannerPreview" class="rounded-lg px-4 py-3 flex items-start gap-3" style="background: #409843;">
+            <span class="material-symbols-outlined text-white text-lg mt-0.5" id="previewIcon">info</span>
+            <div class="flex-1 min-w-0">
+              <p class="text-white text-sm font-bold truncate" id="previewTitle">Title preview</p>
+              <p class="text-white/90 text-xs mt-0.5 truncate" id="previewMessage">Message preview</p>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
+
+    <!-- Action / Link -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">link</span> Action (optional)
+      </h3>
+      <p class="text-xs text-slate-500 -mt-3">When set, tapping the banner opens this destination</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Action Type</label>
+          <select name="action_type_selector" id="actionTypeSelect" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <option value="none" {% if not banner.action_url and not banner.link_url %}selected{% endif %}>No action</option>
+            <option value="in_app" {% if banner.action_url and banner.action_url|first == '/' %}selected{% elif banner.link_url and banner.link_url|first == '/' %}selected{% endif %}>In-app route</option>
+            <option value="url" {% if banner.action_url and banner.action_url|slice:":4" == 'http' %}selected{% elif banner.link_url and banner.link_url|slice:":4" == 'http' %}selected{% endif %}>External URL</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- In-app route selector -->
+      <div id="inAppSection" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">App Screen</label>
+            <select name="in_app_route" id="inAppRoute" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+              <option value="">-- Select screen --</option>
+              <option value="/news">News</option>
+              <option value="/events">Events</option>
+              <option value="/live-feeds">Live Feeds</option>
+              <option value="/gallery">Gallery</option>
+              <option value="/videos">Videos</option>
+              <option value="/magazine">Magazine</option>
+              <option value="/youth-dialogue">Youth Dialogue</option>
+              <option value="/weather">Weather</option>
+              <option value="/translate">Phrasebook</option>
+              <option value="/resources">Resources</option>
+              <option value="/trending">Trending</option>
+              <option value="/notifications">Notifications</option>
+              <option value="/profile">Profile</option>
+              <option value="/verification-request">Verification</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Or enter a custom route</label>
+            <input type="text" id="customRoute" placeholder="/custom-route" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+            <p class="text-xs text-slate-400 mt-1">Must start with /</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- External URL input -->
+      <div id="urlSection" class="hidden">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">External URL</label>
+          <input type="url" id="externalUrl" placeholder="https://example.com" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <!-- Hidden fields that actually get submitted -->
+      <input type="hidden" name="action_url" id="actionUrlHidden" value="{{ banner.action_url|default:'' }}">
+      <input type="hidden" name="link_url" id="linkUrlHidden" value="{{ banner.link_url|default:'' }}">
+
+      <!-- Button text -->
+      <div id="actionTextSection" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Text (EN)</label>
+            <input type="text" name="action_text" value="{{ banner.action_text|default:'' }}" placeholder="e.g. View Events" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Text (FR)</label>
+            <input type="text" name="action_text_fr" value="{{ banner.action_text_fr|default:'' }}" placeholder="e.g. Voir les événements" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedule & Visibility -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-base">schedule</span> Schedule & Visibility
+      </h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Starts At</label>
           <input type="datetime-local" name="starts_at" value="{{ banner.starts_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          <p class="text-xs text-slate-400 mt-1">Leave empty to show immediately</p>
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Ends At</label>
           <input type="datetime-local" name="ends_at" value="{{ banner.ends_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent">
+          <p class="text-xs text-slate-400 mt-1">Leave empty for no expiry</p>
         </div>
       </div>
       <div class="flex gap-6">
@@ -70,10 +175,109 @@
         </label>
       </div>
     </div>
+
     <div class="flex gap-3">
       <a href="{% url 'custom_admin:announcements_list' %}" class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-6 text-sm hover:bg-slate-50">Cancel</a>
       <button type="submit" class="bg-amber-600 text-white font-semibold rounded-lg py-3 px-8 text-sm hover:bg-amber-700 transition-all shadow-sm">{{ action }} Announcement</button>
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  var typeSelect = document.getElementById('bannerTypeSelect');
+  var actionSelect = document.getElementById('actionTypeSelect');
+  var inAppSection = document.getElementById('inAppSection');
+  var urlSection = document.getElementById('urlSection');
+  var actionTextSection = document.getElementById('actionTextSection');
+  var inAppRoute = document.getElementById('inAppRoute');
+  var customRoute = document.getElementById('customRoute');
+  var externalUrl = document.getElementById('externalUrl');
+  var actionUrlHidden = document.getElementById('actionUrlHidden');
+  var linkUrlHidden = document.getElementById('linkUrlHidden');
+  var preview = document.getElementById('bannerPreview');
+  var previewIcon = document.getElementById('previewIcon');
+  var previewTitle = document.getElementById('previewTitle');
+  var previewMessage = document.getElementById('previewMessage');
+  var titleInput = document.querySelector('input[name="title"]');
+  var messageInput = document.querySelector('textarea[name="message"]');
+
+  var typeColors = {
+    info: '#409843', success: '#409843',
+    warning: '#E65100', error: '#C62828', urgent: '#B71C1C'
+  };
+  var typeIcons = {
+    info: 'info', success: 'check_circle',
+    warning: 'warning', error: 'error', urgent: 'notification_important'
+  };
+
+  // Populate existing values on edit
+  var existingUrl = actionUrlHidden.value || linkUrlHidden.value;
+  if (existingUrl && existingUrl.indexOf('/') === 0) {
+    // In-app route
+    var found = false;
+    for (var i = 0; i < inAppRoute.options.length; i++) {
+      if (inAppRoute.options[i].value === existingUrl) {
+        inAppRoute.value = existingUrl;
+        found = true;
+        break;
+      }
+    }
+    if (!found) customRoute.value = existingUrl;
+  } else if (existingUrl && existingUrl.indexOf('http') === 0) {
+    externalUrl.value = existingUrl;
+  }
+
+  function updatePreview() {
+    var t = typeSelect.value;
+    preview.style.background = typeColors[t] || '#409843';
+    previewIcon.textContent = typeIcons[t] || 'info';
+    previewTitle.textContent = titleInput.value || 'Title preview';
+    previewMessage.textContent = messageInput.value || 'Message preview';
+  }
+
+  function updateActionSections() {
+    var v = actionSelect.value;
+    inAppSection.style.display = v === 'in_app' ? '' : 'none';
+    urlSection.style.display = v === 'url' ? '' : 'none';
+    actionTextSection.style.display = v !== 'none' ? '' : 'none';
+    // Hide with class for initial load
+    inAppSection.classList.toggle('hidden', v !== 'in_app');
+    urlSection.classList.toggle('hidden', v !== 'url');
+    actionTextSection.classList.toggle('hidden', v === 'none');
+  }
+
+  function syncHiddenFields() {
+    var v = actionSelect.value;
+    if (v === 'in_app') {
+      var route = customRoute.value.trim() || inAppRoute.value;
+      actionUrlHidden.value = route;
+      linkUrlHidden.value = '';
+    } else if (v === 'url') {
+      actionUrlHidden.value = '';
+      linkUrlHidden.value = externalUrl.value.trim();
+    } else {
+      actionUrlHidden.value = '';
+      linkUrlHidden.value = '';
+    }
+  }
+
+  typeSelect.addEventListener('change', updatePreview);
+  titleInput.addEventListener('input', updatePreview);
+  messageInput.addEventListener('input', updatePreview);
+  actionSelect.addEventListener('change', function() { updateActionSections(); syncHiddenFields(); });
+  inAppRoute.addEventListener('change', syncHiddenFields);
+  customRoute.addEventListener('input', syncHiddenFields);
+  externalUrl.addEventListener('input', syncHiddenFields);
+
+  // Form submit — sync hidden fields before submit
+  document.querySelector('form').addEventListener('submit', syncHiddenFields);
+
+  // Initialize
+  updatePreview();
+  updateActionSections();
+})();
+</script>
 {% endblock %}

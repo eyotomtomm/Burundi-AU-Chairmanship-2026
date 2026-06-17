@@ -89,25 +89,21 @@ class AppTheme {
     textTheme: TextTheme(
       displayLarge: const TextStyle(
         fontSize: 32,
-        fontWeight: FontWeight.bold,
         fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       displayMedium: const TextStyle(
         fontSize: 28,
-        fontWeight: FontWeight.bold,
         fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       headlineLarge: const TextStyle(
         fontSize: 24,
-        fontWeight: FontWeight.w600,
         fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       headlineMedium: const TextStyle(
         fontSize: 20,
-        fontWeight: FontWeight.w600,
         fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
@@ -140,6 +136,12 @@ class AppTheme {
     dividerTheme: const DividerThemeData(
       color: AppColors.lightDivider,
       thickness: 1,
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: AppColors.lightSurface,
@@ -217,25 +219,21 @@ class AppTheme {
     textTheme: TextTheme(
       displayLarge: const TextStyle(
         fontSize: 32,
-        fontWeight: FontWeight.bold,
         fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       displayMedium: const TextStyle(
         fontSize: 28,
-        fontWeight: FontWeight.bold,
         fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       headlineLarge: const TextStyle(
         fontSize: 24,
-        fontWeight: FontWeight.w600,
         fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       headlineMedium: const TextStyle(
         fontSize: 20,
-        fontWeight: FontWeight.w600,
         fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
@@ -268,6 +266,12 @@ class AppTheme {
     dividerTheme: const DividerThemeData(
       color: AppColors.darkDivider,
       thickness: 1,
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: AppColors.darkSurface,

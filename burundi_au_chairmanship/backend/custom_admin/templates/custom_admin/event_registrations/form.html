@@ -236,6 +236,46 @@
         </div>
 
         <!-- ============================================================ -->
+        <!-- EVENT PHOTOS CARD                                             -->
+        <!-- ============================================================ -->
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600">photo_library</span>
+                    Event Photos
+                </h2>
+                <button type="button" onclick="addPhotoRow()"
+                        class="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-blue-700 transition-all shadow-sm">
+                    <span class="material-symbols-outlined text-sm">add_photo_alternate</span>
+                    Add Photo
+                </button>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Upload photos for this event. These will be displayed in the app's event detail page.</p>
+
+            <!-- Existing photos -->
+            {% if existing_photos %}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {% for photo in existing_photos %}
+                <div class="relative group" id="existing_photo_{{ photo.id }}">
+                    <img src="/media/{{ photo.image }}" alt="{{ photo.caption }}" class="w-full h-32 object-cover rounded-lg shadow-sm">
+                    {% if photo.caption %}
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{{ photo.caption }}</p>
+                    {% endif %}
+                    <button type="button" onclick="markPhotoForDeletion({{ photo.id }})"
+                            class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            title="Remove photo">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- New photo uploads -->
+            <div id="photoUploadsContainer" class="space-y-4"></div>
+        </div>
+
+        <!-- ============================================================ -->
         <!-- DYNAMIC FORM BUILDER CARD                                     -->
         <!-- ============================================================ -->
         <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 p-8">
@@ -577,6 +617,52 @@ function toggleOptionsField(selectElement) {
         optionsField.classList.remove('hidden');
     } else {
         optionsField.classList.add('hidden');
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*  Event Photos                                               */
+/* ---------------------------------------------------------- */
+let photoRowCounter = 0;
+
+function addPhotoRow() {
+    const idx = photoRowCounter++;
+    const container = document.getElementById('photoUploadsContainer');
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg relative';
+    row.innerHTML = `
+        <div class="flex-1 space-y-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Photo</label>
+                <input type="file" name="event_photo_${idx}" accept="image/*" required
+                       class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <p class="text-xs text-slate-400 mt-1">JPG, PNG, or WebP. Max: 10 MB</p>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Caption (optional)</label>
+                <input type="text" name="event_photo_caption_${idx}" maxlength="200" placeholder="Photo caption..."
+                       class="w-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-slate-800 dark:text-white">
+            </div>
+        </div>
+        <button type="button" onclick="this.closest('.flex').remove()"
+                class="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 mt-6" title="Remove">
+            <span class="material-symbols-outlined text-base">close</span>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+function markPhotoForDeletion(photoId) {
+    const el = document.getElementById('existing_photo_' + photoId);
+    if (el) {
+        el.style.opacity = '0.3';
+        el.style.pointerEvents = 'none';
+        // Add hidden input to mark for deletion
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'delete_photo';
+        input.value = photoId;
+        el.appendChild(input);
     }
 }
 

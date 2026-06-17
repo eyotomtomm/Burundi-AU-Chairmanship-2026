@@ -202,6 +202,7 @@ class _PeaceSecurityScreenState extends State<PeaceSecurityScreen> {
               CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(heroImage.toString()),
                 fit: BoxFit.cover,
+                memCacheWidth: 800,
                 placeholder: (_, _) => _buildGradientBackground(),
                 errorWidget: (_, _, _) => _buildGradientBackground(),
               )

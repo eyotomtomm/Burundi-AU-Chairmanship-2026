@@ -16,7 +16,8 @@ class AppConstants {
   static const String onboardingKey = 'onboarding_complete';
 
   // Animation Durations (build-time constants)
-  static const Duration splashDuration = Duration(seconds: 7);
+  static const Duration splashMinDuration = Duration(milliseconds: 1500);
+  static const Duration splashMaxDuration = Duration(seconds: 6);
   static const Duration animationDuration = Duration(milliseconds: 300);
   static const Duration longAnimationDuration = Duration(milliseconds: 500);
 

@@ -6059,10 +6059,12 @@ def _notify_yd(application, event_key):
         event_info = ''
         if event_dates or event_location:
             event_details_label = 'Détails de l\'événement' if is_fr else 'Event Details'
+            calendar_emoji = '\U0001f4c5'
+            pin_emoji = '\U0001f4cd'
             event_info = f'''<div style="background:#ebf8ff;border-radius:10px;padding:16px 20px;margin:0 0 24px;">
               <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">{event_details_label}</p>
-              {'<p style="color:#2d3748;font-size:14px;margin:0 0 4px;">\U0001f4c5 ' + event_dates + '</p>' if event_dates else ''}
-              {'<p style="color:#2d3748;font-size:14px;margin:0;">\U0001f4cd ' + event_location + '</p>' if event_location else ''}
+              {'<p style="color:#2d3748;font-size:14px;margin:0 0 4px;">' + calendar_emoji + ' ' + event_dates + '</p>' if event_dates else ''}
+              {'<p style="color:#2d3748;font-size:14px;margin:0;">' + pin_emoji + ' ' + event_location + '</p>' if event_location else ''}
             </div>'''
 
         support_email = event.support_email or 'youth@burundiauchairmanship.org' if event else 'youth@burundiauchairmanship.org'

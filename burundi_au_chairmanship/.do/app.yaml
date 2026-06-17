@@ -22,7 +22,7 @@ services:
     instance_size_slug: professional-xs  # $12/mo, 1 vCPU, 1GB RAM
     http_port: 8080
     # Web process only — migrate and collectstatic run once in the pre-deploy job below.
-    run_command: gunicorn config.wsgi --bind 0.0.0.0:8080 --workers 3 --timeout 120 --log-file -
+    run_command: gunicorn config.wsgi -c gunicorn.conf.py
     health_check:
       http_path: /api/health/
       initial_delay_seconds: 30

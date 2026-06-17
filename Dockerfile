@@ -26,4 +26,4 @@ EXPOSE 8080
 
 # Web process only — migrate and collectstatic run in the pre-deploy job
 # (see .do/app.yaml jobs section and Procfile).
-CMD ["gunicorn", "config.wsgi", "--bind", "0.0.0.0:8080", "--workers", "3", "--log-file", "-"]
+CMD ["gunicorn", "config.wsgi", "-c", "gunicorn.conf.py"]

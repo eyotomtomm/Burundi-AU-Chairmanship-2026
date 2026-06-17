@@ -10,7 +10,7 @@ from django.conf import settings as django_settings
 import hashlib
 from django.core.cache import cache
 from django.db import models, transaction
-from django.db.models import Count, Exists, OuterRef, F, Q
+from django.db.models import Count, Exists, OuterRef, F, Q, Subquery, Value, BooleanField
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -55,7 +55,7 @@ from .models import (
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
     YouthDialogueEvent, YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
-    YouthDialogueRole,
+    YouthDialogueRole, YouthDialogueMedia,
     QRScanLog,
 )
 from .serializers import (
@@ -1483,6 +1483,14 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CategorySerializer
     pagination_class = None
 
+    def list(self, request, *args, **kwargs):
+        cached = cache.get('categories:v1')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set('categories:v1', response.data, django_settings.CACHE_TTL_LONG)
+        return response
+
 
 class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can read articles, but authentication required to like/comment"""
@@ -1919,7 +1927,7 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['status']
 
     def get_queryset(self):
-        qs = LiveFeed.objects.filter(content_status='published').order_by('-created_at')
+        qs = LiveFeed.objects.select_related('event').filter(content_status='published').order_by('-created_at')
         if self.request.user.is_authenticated:
             qs = qs.annotate(
                 is_liked=Exists(LiveFeedLike.objects.filter(user=self.request.user, feed=OuterRef('pk')))
@@ -2703,10 +2711,15 @@ def notification_target_count(request):
 @permission_classes([AllowAny])
 def app_settings(request):
     """Public endpoint: Anyone can view app settings"""
+    cached = cache.get('app_settings:v1')
+    if cached is not None:
+        return Response(cached)
+
     settings = AppSettings.objects.first()
     if settings:
-        serializer = AppSettingsSerializer(settings)
-        return Response(serializer.data)
+        data = AppSettingsSerializer(settings).data
+        cache.set('app_settings:v1', data, django_settings.CACHE_TTL_LONG)
+        return Response(data)
     return Response({})
 
 
@@ -2804,10 +2817,47 @@ def health_check(request):
     }, status=response_status)
 
 
+def _annotated_event_registrations(request):
+    """Return EventRegistration queryset with DB-level annotations to avoid N+1 queries.
+
+    Annotates: _submission_count, _non_waitlisted_count,
+               _has_registered, _user_submission_status, _user_submission_id
+    """
+    qs = EventRegistration.objects.filter(
+        is_active=True,
+    ).select_related('category').prefetch_related('form_fields')
+
+    if request.user.is_authenticated:
+        user_sub = EventSubmission.objects.filter(
+            event_registration=OuterRef('pk'),
+            user=request.user,
+            is_proxy=False,
+        )
+        qs = qs.annotate(
+            _submission_count=Count('submissions'),
+            _non_waitlisted_count=Count('submissions', filter=Q(submissions__is_waitlisted=False)),
+            _has_registered=Exists(user_sub),
+            _user_submission_status=Subquery(user_sub.values('status')[:1]),
+            _user_submission_id=Subquery(user_sub.values('id')[:1]),
+        )
+    else:
+        qs = qs.annotate(
+            _submission_count=Count('submissions'),
+            _non_waitlisted_count=Count('submissions', filter=Q(submissions__is_waitlisted=False)),
+            _has_registered=Value(False, output_field=BooleanField()),
+        )
+    return qs
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def home_feed(request):
     """Combined endpoint for home screen — hero slides, featured articles, feature cards, categories, event cards, and settings."""
+    cache_key = f'home_feed:auth:{request.user.id}' if request.user.is_authenticated else 'home_feed:anon'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached)
+
     hero_slides = HeroSlide.objects.filter(is_active=True)
 
     now = timezone.now()
@@ -2839,10 +2889,8 @@ def home_feed(request):
     settings = AppSettings.objects.first()
 
     # Combine both event types: EventRegistration (with forms) and Event (informational)
-    # Get events with registration
-    event_registrations = EventRegistration.objects.filter(
-        is_active=True
-    ).prefetch_related('form_fields', 'submissions')
+    # Get events with registration (annotated to avoid N+1)
+    event_registrations = _annotated_event_registrations(request)
 
     # Get regular informational events (upcoming only)
     now = timezone.now()
@@ -2966,6 +3014,7 @@ def home_feed(request):
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
     }
+    cache.set(cache_key, data, django_settings.CACHE_TTL_SHORT)
     return Response(data)
 
 
@@ -3066,6 +3115,14 @@ class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = QuickAccessMenuItem.objects.filter(is_active=True)
     serializer_class = QuickAccessMenuItemSerializer
     permission_classes = [AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        cached = cache.get('quick_access_menu:v1')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set('quick_access_menu:v1', response.data, django_settings.CACHE_TTL_MEDIUM)
+        return response
 
 
 # ── Verification System ────────────────────────────────────────────
@@ -3225,9 +3282,7 @@ class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = EventRegistrationSerializer
 
     def get_queryset(self):
-        return EventRegistration.objects.filter(
-            is_active=True
-        ).prefetch_related('form_fields', 'submissions')
+        return _annotated_event_registrations(self.request)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -4226,9 +4281,16 @@ def trending_content(request):
     """Get currently trending content."""
     content_type = request.query_params.get('type', 'article')
     limit = min(int(request.query_params.get('limit', 10)), 50)
+
+    cache_key = f'trending:{content_type}:{limit}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached)
+
     items = TrendingContent.objects.filter(content_type=content_type)[:limit]
-    serializer = TrendingContentSerializer(items, many=True)
-    return Response(serializer.data)
+    data = TrendingContentSerializer(items, many=True).data
+    cache.set(cache_key, data, django_settings.CACHE_TTL_SHORT)
+    return Response(data)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -6363,11 +6425,26 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['get'], url_path='settings', permission_classes=[AllowAny])
     def yd_settings(self, request):
         """Return Youth Dialogue branding, texts, and support contact info for the active event."""
+        cached = cache.get('yd_settings:v1')
+        if cached is not None:
+            return Response(cached)
+
         from core.serializers import YouthDialogueSettingsSerializer
+        from django.db.models import Prefetch
         active_event = YouthDialogueEvent.get_active()
         if not active_event:
             active_event = YouthDialogueEvent.load()
-        return Response(YouthDialogueSettingsSerializer(active_event, context={'request': request}).data)
+        if active_event:
+            # Re-fetch with prefetch to avoid N+1 queries in serializer
+            active_event = YouthDialogueEvent.objects.prefetch_related(
+                'roles',
+                'form_fields',
+                Prefetch('media_items', queryset=YouthDialogueMedia.objects.filter(is_published=True).order_by('display_order', '-created_at')),
+            ).get(pk=active_event.pk)
+
+        data = YouthDialogueSettingsSerializer(active_event, context={'request': request}).data
+        cache.set('yd_settings:v1', data, django_settings.CACHE_TTL_MEDIUM)
+        return Response(data)
 
     # Known field names that map directly to YouthDialogueApplication model columns
     _KNOWN_FIELD_NAMES = {

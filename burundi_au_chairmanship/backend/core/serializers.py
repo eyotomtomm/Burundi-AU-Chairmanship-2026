@@ -1175,12 +1175,16 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
                   'spots_remaining']
 
     def get_has_registered(self, obj):
+        if hasattr(obj, '_has_registered'):
+            return bool(obj._has_registered)
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.submissions.filter(user=request.user, is_proxy=False).exists()
         return False
 
     def get_user_submission_status(self, obj):
+        if hasattr(obj, '_user_submission_status'):
+            return obj._user_submission_status
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             submission = obj.submissions.filter(user=request.user, is_proxy=False).first()
@@ -1196,14 +1200,21 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
             if timezone.now() > obj.registration_deadline:
                 return False
         if obj.max_registrations > 0:
-            if obj.submissions.count() >= obj.max_registrations:
+            count = getattr(obj, '_submission_count', None)
+            if count is None:
+                count = obj.submissions.count()
+            if count >= obj.max_registrations:
                 return False
         return True
 
     def get_current_registration_count(self, obj):
+        if hasattr(obj, '_submission_count'):
+            return obj._submission_count
         return obj.submissions.count()
 
     def get_user_submission_id(self, obj):
+        if hasattr(obj, '_user_submission_id'):
+            return obj._user_submission_id
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             submission = obj.submissions.filter(user=request.user, is_proxy=False).first()
@@ -1214,7 +1225,10 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
     def get_spots_remaining(self, obj):
         if obj.max_registrations <= 0:
             return None  # Unlimited
-        count = obj.submissions.filter(is_waitlisted=False).count()
+        if hasattr(obj, '_non_waitlisted_count'):
+            count = obj._non_waitlisted_count
+        else:
+            count = obj.submissions.filter(is_waitlisted=False).count()
         remaining = obj.max_registrations - count
         return max(0, remaining)
 
@@ -2150,14 +2164,29 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
         return self._build_url(obj.quick_access_icon)
 
     def get_roles(self, obj):
-        return YouthDialogueRoleSerializer(obj.roles.filter(is_active=True), many=True).data
+        # Use prefetch cache if available, otherwise query
+        try:
+            all_roles = obj.roles.all()
+            roles = [r for r in all_roles if r.is_active]
+        except Exception:
+            roles = obj.roles.filter(is_active=True)
+        return YouthDialogueRoleSerializer(roles, many=True).data
 
     def get_media(self, obj):
-        items = obj.media_items.filter(is_published=True).order_by('display_order', '-created_at')
+        # Use prefetch cache if available (already filtered & ordered)
+        try:
+            items = list(obj.media_items.all())
+            items = [i for i in items if i.is_published]
+        except Exception:
+            items = obj.media_items.filter(is_published=True).order_by('display_order', '-created_at')
         return YouthDialogueMediaSerializer(items, many=True, context=self.context).data
 
     def get_promotional_video(self, obj):
-        promo = obj.media_items.filter(is_published=True, is_promotional=True).first()
+        try:
+            items = list(obj.media_items.all())
+            promo = next((i for i in items if i.is_published and i.is_promotional), None)
+        except Exception:
+            promo = obj.media_items.filter(is_published=True, is_promotional=True).first()
         if promo:
             return YouthDialogueMediaSerializer(promo, context=self.context).data
         return None

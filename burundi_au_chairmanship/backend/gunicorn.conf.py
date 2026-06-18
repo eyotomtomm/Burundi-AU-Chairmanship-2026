@@ -1,13 +1,15 @@
 # Gunicorn production configuration
 # Usage: gunicorn config.wsgi -c gunicorn.conf.py
 
-import multiprocessing
+import os
 
 # Server socket
 bind = "0.0.0.0:8080"
 
-# Worker processes — (2 x CPU cores) + 1
-workers = multiprocessing.cpu_count() * 2 + 1
+# Worker processes — respect DO App Platform's WEB_CONCURRENCY env var,
+# fall back to 2 workers for 1GB containers (cpu_count() returns host
+# cores, not container vCPUs, causing OOM).
+workers = int(os.environ.get("WEB_CONCURRENCY", 2))
 worker_class = "gthread"
 threads = 2
 

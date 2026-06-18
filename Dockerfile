@@ -24,6 +24,6 @@ USER appuser
 
 EXPOSE 8080
 
-# Web process only — migrate and collectstatic run in the pre-deploy job
-# (see .do/app.yaml jobs section and Procfile).
-CMD ["gunicorn", "config.wsgi", "-c", "gunicorn.conf.py"]
+# Entrypoint runs migrate + collectstatic, then starts gunicorn.
+# entrypoint.sh is already in /app from the COPY above.
+CMD ["sh", "entrypoint.sh"]

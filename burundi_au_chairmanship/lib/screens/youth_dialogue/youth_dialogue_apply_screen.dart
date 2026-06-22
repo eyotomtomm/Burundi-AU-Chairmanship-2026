@@ -289,6 +289,14 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         }
       }
 
+      // Always include title and position even if not in backend form fields
+      if (!formData.containsKey('title') && _formValues.containsKey('title')) {
+        formData['title'] = _formValues['title'];
+      }
+      if (!formData.containsKey('position') && _formValues.containsKey('position')) {
+        formData['position'] = _formValues['position'];
+      }
+
       await ApiService().youthDialogueApply({'form_data': formData});
       if (!mounted) return;
       setState(() => _submitted = true);
@@ -487,6 +495,14 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           children: [
             _buildEmailVerificationBanner(isDark),
             const SizedBox(height: 16),
+
+            // Title dropdown (always shown)
+            if (!activeFields.any((f) => f.fieldName == 'title'))
+              _buildFixedDropdown('title', 'Title', 'Select title', _titleOptions, isDark, isRequired: true),
+
+            // Position dropdown (always shown)
+            if (!activeFields.any((f) => f.fieldName == 'position'))
+              _buildFixedDropdown('position', 'Position / Role', 'Select position', _positionOptions, isDark, isRequired: true),
 
             ...activeFields.map((field) => _buildFormField(field, langCode, isDark)),
 
@@ -1188,6 +1204,25 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildFixedDropdown(String fieldName, String label, String hint, List<String> options, bool isDark, {bool isRequired = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('fixed_$fieldName'),
+        value: _formValues[fieldName] as String?,
+        decoration: _inputDecoration(label, null, null, isDark, isRequired),
+        hint: Text(hint),
+        isExpanded: true,
+        menuMaxHeight: 300,
+        items: options
+            .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
+            .toList(),
+        onChanged: (val) => setState(() => _formValues[fieldName] = val),
+        validator: isRequired ? (v) => v == null ? 'Required' : null : null,
+      ),
     );
   }
 

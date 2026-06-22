@@ -164,7 +164,7 @@ class DeepLinkRouter {
         case 'articles':
           final article = await ApiService().getArticle(id);
           navigator.push(
-            CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: isAuth)),
+            CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: false)),
           );
           return true;
 
@@ -174,7 +174,7 @@ class DeepLinkRouter {
           if (eventId == null) return false;
           final event = await ApiService().getEventRegistration(eventId);
           navigator.push(
-            CupertinoPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: isAuth)),
+            CupertinoPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)),
           );
           return true;
 

@@ -570,7 +570,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                           if (event.isYouthDialogue) {
                             Navigator.push(context, CupertinoPageRoute(builder: (_) => const YouthDialogueMainScreen()));
                           } else {
-                            Navigator.push(context, CupertinoPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: isAuth)));
+                            Navigator.push(context, CupertinoPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)));
                           }
                         });
                     },
@@ -656,7 +656,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       if (!isAuth && index == freeShown) return const LoginGateCarouselCard(width: 280, height: 260);
                       final article = _newsItems[index];
                       return NewsCard(article: article, langCode: langCode,
-                        onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: isAuth))));
+                        onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: false))));
                     },
                   );
                 }),
@@ -689,7 +689,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       if (!isAuth && index == freeShown) return const LoginGateCarouselCard(width: 280, height: 260);
                       final article = _articles[index];
                       return NewsCard(article: article, langCode: langCode,
-                        onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: isAuth))));
+                        onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: false))));
                     },
                   );
                 }),

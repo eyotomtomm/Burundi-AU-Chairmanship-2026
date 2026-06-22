@@ -1049,7 +1049,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         Navigator.push(
           context,
           CupertinoPageRoute(
-            builder: (_) => ArticleDetailScreen(article: article, scrollToComments: context.read<AuthProvider>().isAuthenticated),
+            builder: (_) => ArticleDetailScreen(article: article, scrollToComments: false),
           ),
         );
       },

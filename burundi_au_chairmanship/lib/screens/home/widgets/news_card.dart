@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
 import '../../../models/magazine_model.dart';
+import '../../../services/like_service.dart';
 import '../../../widgets/liked_by_avatars.dart';
 
 class NewsCard extends StatelessWidget {
@@ -201,43 +202,34 @@ class NewsCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Icon(
-                          article.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                          size: 16,
-                          color: article.isLiked
+                        Builder(builder: (_) {
+                          final likeService = LikeService();
+                          likeService.seed(EntityType.article, article.id,
+                            isLiked: article.isLiked, likeCount: article.likeCount, recentLikers: article.recentLikers);
+                          final ls = likeService.getState(EntityType.article, article.id);
+                          final likeColor = ls.isLiked
                               ? AppColors.burundiRed
-                              : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${article.likeCount}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: article.isLiked
-                                ? AppColors.burundiRed
-                                : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Like',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 11,
-                            color: article.isLiked
-                                ? AppColors.burundiRed
-                                : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                          ),
-                        ),
-                        if (article.recentLikers.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          LikedByAvatars(
-                            likers: article.recentLikers,
-                            totalLikes: article.likeCount,
-                            avatarRadius: 8,
-                            overlap: 6,
-                          ),
-                        ],
+                              : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary);
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                ls.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                size: 16, color: likeColor,
+                              ),
+                              const SizedBox(width: 3),
+                              Text('${ls.likeCount}', style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 12, fontWeight: FontWeight.w600, color: likeColor)),
+                              const SizedBox(width: 3),
+                              Text('Like', style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11, color: likeColor)),
+                              if (ls.recentLikers.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                LikedByAvatars(likers: ls.recentLikers, totalLikes: ls.likeCount, avatarRadius: 8, overlap: 6),
+                              ],
+                            ],
+                          );
+                        }),
                         const Spacer(),
                         Flexible(
                           child: Text(

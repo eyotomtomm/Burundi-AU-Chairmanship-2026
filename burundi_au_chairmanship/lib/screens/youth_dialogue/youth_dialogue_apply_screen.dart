@@ -103,6 +103,31 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     {'code': '+1', 'flag': '🇺🇸', 'name': 'United States'},
   ];
 
+  // Title options for the title dropdown
+  static const List<String> _titleOptions = [
+    'Mr.',
+    'Mrs.',
+    'Ms.',
+    'Dr.',
+    'Prof.',
+    'H.E.',
+    'Hon.',
+    'Amb.',
+  ];
+
+  // Position options for the position dropdown
+  static const List<String> _positionOptions = [
+    'Moderator',
+    'Technician',
+    'Scientific Committee',
+    'Panelist',
+    'Partner',
+    'Participant',
+    'Guest of Honor',
+    'Security',
+    'Protocol',
+  ];
+
   // Country list for 'country' field type
   static const List<String> _countryList = [
     'Afghanistan', 'Albania', 'Algeria', 'Angola', 'Argentina', 'Australia',
@@ -181,6 +206,8 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     final authProvider = context.read<AuthProvider>();
     for (final field in widget.formFields) {
       if (!field.isActive) continue;
+      // Title & position fields always use dropdown (_formValues), never a text controller
+      if (field.fieldName == 'title' || field.fieldName == 'position') continue;
       // Create controllers for text-based fields
       switch (field.fieldType) {
         case 'text':
@@ -493,6 +520,46 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     final helpText = field.getHelpText(langCode);
     final textColor = isDark ? Colors.white70 : Colors.black87;
 
+    // Title field: always render as a dropdown with fixed options
+    if (field.fieldName == 'title') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: DropdownButtonFormField<String>(
+          key: ValueKey('title_${field.fieldName}'),
+          value: _formValues[field.fieldName] as String?,
+          decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
+          hint: Text(placeholder.isNotEmpty ? placeholder : 'Select title'),
+          isExpanded: true,
+          menuMaxHeight: 300,
+          items: _titleOptions
+              .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
+              .toList(),
+          onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
+          validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+        ),
+      );
+    }
+
+    // Position field: always render as a dropdown with fixed options
+    if (field.fieldName == 'position') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: DropdownButtonFormField<String>(
+          key: ValueKey('position_${field.fieldName}'),
+          value: _formValues[field.fieldName] as String?,
+          decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
+          hint: Text(placeholder.isNotEmpty ? placeholder : 'Select position'),
+          isExpanded: true,
+          menuMaxHeight: 300,
+          items: _positionOptions
+              .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
+              .toList(),
+          onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
+          validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+        ),
+      );
+    }
+
     switch (field.fieldType) {
       case 'textarea':
         return Padding(
@@ -515,6 +582,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         );
 
       case 'select':
+      case 'dropdown':
         final options = field.options.map((o) => o.toString()).toList();
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
@@ -888,21 +956,51 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         );
 
       case 'email':
+        final authProv = context.read<AuthProvider>();
+        final isVerified = authProv.isEmailVerified && authProv.userEmail != null && authProv.userEmail!.isNotEmpty;
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
-          child: TextFormField(
-            controller: _formControllers[field.fieldName],
-            keyboardType: TextInputType.emailAddress,
-            textCapitalization: TextCapitalization.none,
-            decoration: _inputDecoration(label, placeholder.isNotEmpty ? placeholder : 'your.email@example.com', helpText, isDark, field.isRequired),
-            validator: (v) {
-              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
-              if (v != null && v.isNotEmpty) {
-                final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
-              }
-              return null;
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _formControllers[field.fieldName],
+                keyboardType: TextInputType.emailAddress,
+                textCapitalization: TextCapitalization.none,
+                readOnly: isVerified,
+                enabled: !isVerified,
+                style: TextStyle(
+                  color: isVerified
+                      ? (isDark ? Colors.white38 : Colors.black38)
+                      : (isDark ? Colors.white : Colors.black87),
+                ),
+                decoration: _inputDecoration(label, placeholder.isNotEmpty ? placeholder : 'your.email@example.com', helpText, isDark, field.isRequired).copyWith(
+                  suffixIcon: isVerified
+                      ? const Icon(Icons.verified, color: AppColors.burundiGreen, size: 20)
+                      : null,
+                  filled: true,
+                  fillColor: isVerified
+                      ? (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF0F0F0))
+                      : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                ),
+                validator: (v) {
+                  if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+                  if (v != null && v.isNotEmpty) {
+                    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                    if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
+                  }
+                  return null;
+                },
+              ),
+              if (isVerified)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 4),
+                  child: Text(
+                    'Email verified',
+                    style: TextStyle(fontSize: 12, color: AppColors.burundiGreen, fontWeight: FontWeight.w500),
+                  ),
+                ),
+            ],
           ),
         );
 

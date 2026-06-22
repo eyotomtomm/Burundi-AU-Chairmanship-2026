@@ -81,7 +81,7 @@ class LikeService {
     });
   }
 
-  Future<void> _sendApiCall(EntityType type, dynamic id, String key) async {
+  Future<void> _sendApiCall(EntityType type, dynamic id, String key, {int attempt = 1}) async {
     final targetLiked = _pendingApiState.remove(key);
     if (targetLiked == null) return;
 
@@ -108,9 +108,26 @@ class LikeService {
       );
       _notify(key);
     } catch (e) {
-      if (kDebugMode) debugPrint('LikeService API error: $e');
-      // Don't revert — the optimistic state is fine for UX.
-      // Next time the screen opens, seed() will get fresh data from the server.
+      if (kDebugMode) debugPrint('LikeService API error (attempt $attempt): $e');
+
+      // Retry once before reverting
+      if (attempt < 2) {
+        _pendingApiState[key] = targetLiked;
+        await Future.delayed(const Duration(seconds: 1));
+        return _sendApiCall(type, id, key, attempt: attempt + 1);
+      }
+
+      // Revert the optimistic state so the UI stays honest
+      final cached = _cache[key];
+      if (cached != null) {
+        final revertedLiked = !cached.isLiked;
+        final revertedCount = cached.likeCount + (revertedLiked ? 1 : -1);
+        _cache[key] = cached.copyWith(
+          isLiked: revertedLiked,
+          likeCount: revertedCount < 0 ? 0 : revertedCount,
+        );
+        _notify(key);
+      }
     }
   }
 

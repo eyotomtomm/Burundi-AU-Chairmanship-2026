@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/live_feed_socket_service.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -1420,7 +1419,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       navigationResult = Navigator.push(
         context,
         CupertinoPageRoute(
-          builder: (_) => VideoPlayerScreen(feed: feed, scrollToComments: context.read<AuthProvider>().isAuthenticated),
+          builder: (_) => VideoPlayerScreen(feed: feed, scrollToComments: false),
         ),
       );
     }

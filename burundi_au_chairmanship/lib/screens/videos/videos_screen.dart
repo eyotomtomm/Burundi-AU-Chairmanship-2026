@@ -140,7 +140,7 @@ class _VideosScreenState extends State<VideosScreen> {
       CupertinoPageRoute(
         builder: (context) => VideoDetailScreen(
           video: video,
-          scrollToComments: context.read<AuthProvider>().isAuthenticated,
+          scrollToComments: false,
         ),
       ),
     );

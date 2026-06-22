@@ -6481,6 +6481,28 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             model_data['first_name'] = parts[0] if parts else ''
             model_data['last_name'] = parts[1] if len(parts) > 1 else ''
 
+        # Normalize title to match model TITLE_CHOICES codes
+        if 'title' in model_data and model_data['title']:
+            title_val = str(model_data['title']).strip()
+            title_map = {
+                'Mr.': 'mr', 'Mrs.': 'mrs', 'Ms.': 'ms', 'Dr.': 'dr',
+                'Prof.': 'prof', 'H.E.': 'he', 'H.E. (His/Her Excellency)': 'he',
+                'Ambassador': 'amb', 'Honorable': 'hon', 'Other': 'other',
+            }
+            model_data['title'] = title_map.get(title_val, title_val.lower())
+
+        # Normalize position to match model POSITION_CHOICES codes
+        if 'position' in model_data and model_data['position']:
+            pos_val = str(model_data['position']).strip()
+            position_map = {
+                'Moderator': 'moderator', 'Technician': 'technician',
+                'Scientific Committee': 'scientific_committee',
+                'Panelist': 'panelist', 'Partner': 'partner',
+                'Participant': 'participant', 'Guest of Honor': 'guest_of_honor',
+                'Security': 'security', 'Protocol': 'protocol',
+            }
+            model_data['position'] = position_map.get(pos_val, pos_val.lower().replace(' ', '_'))
+
         # Lowercase gender to match model choices ('male', 'female')
         if 'gender' in model_data and model_data['gender']:
             model_data['gender'] = str(model_data['gender']).lower()

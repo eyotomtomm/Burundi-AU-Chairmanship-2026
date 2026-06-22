@@ -28,7 +28,7 @@ STEP 4: CONFIGURE APPLE SETTINGS
 [ ] Copy the OAuth redirect URI shown (auto-generated)
     Example: https://b4africa-700f7.firebaseapp.com/__/auth/handler
 
-[ ] Enter Team ID: 5UL786DM5B
+[ ] Enter Team ID: 4P52QG4BDR
 
 [ ] (Optional) Enter Key ID: V78M5AW74C
 
@@ -42,7 +42,7 @@ STEP 5: UPDATE APPLE DEVELOPER
 [ ] Open: https://developer.apple.com/account
 [ ] Click "Certificates, Identifiers & Profiles"
 [ ] Click "Identifiers" in left sidebar
-[ ] Find: com.burundi.au.burundiAuChairmanship
+[ ] Find: com.b4africa.app
 [ ] Scroll to "Sign in with Apple"
 [ ] Click "Configure" or "Edit"
 [ ] Add Firebase redirect URI (copied from Step 4)
@@ -72,8 +72,8 @@ STEP 7: VERIFY IN FIREBASE
 
 YOUR CREDENTIALS (Copy these for reference):
 ───────────────────────────────────────────────────────────────────
-Team ID:      5UL786DM5B
-Bundle ID:    com.burundi.au.burundiAuChairmanship
+Team ID:      4P52QG4BDR
+Bundle ID:    com.b4africa.app
 Key ID:       V78M5AW74C
 .p8 File:     backend/credentials/AuthKey_V78M5AW74C.p8
 Firebase:     b4africa-700f7
@@ -83,7 +83,7 @@ Firebase:     b4africa-700f7
 TROUBLESHOOTING:
 ───────────────────────────────────────────────────────────────────
 "Invalid configuration"
-  → Double-check Team ID: 5UL786DM5B
+  → Double-check Team ID: 4P52QG4BDR
 
 "The operation couldn't be completed"
   → Wait 10 minutes after Apple Developer changes

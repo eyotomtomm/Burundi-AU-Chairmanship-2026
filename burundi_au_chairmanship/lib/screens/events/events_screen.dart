@@ -238,7 +238,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
         HapticService.light();
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: context.read<AuthProvider>().isAuthenticated)),
+          MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)),
         );
       },
       child: Opacity(

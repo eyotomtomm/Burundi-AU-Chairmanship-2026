@@ -366,7 +366,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               Navigator.push(
                 context,
                 CupertinoPageRoute(
-                  builder: (context) => AlbumDetailScreen(album: album, scrollToComments: context.read<AuthProvider>().isAuthenticated),
+                  builder: (context) => AlbumDetailScreen(album: album, scrollToComments: false),
                 ),
               );
             },

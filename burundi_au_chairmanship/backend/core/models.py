@@ -4796,6 +4796,18 @@ class YouthDialogueApplication(models.Model):
         ('female', 'Female'),
     ]
 
+    POSITION_CHOICES = [
+        ('moderator', 'Moderator'),
+        ('technician', 'Technician'),
+        ('scientific_committee', 'Scientific Committee'),
+        ('panelist', 'Panelist'),
+        ('partner', 'Partner'),
+        ('participant', 'Participant'),
+        ('guest_of_honor', 'Guest of Honor'),
+        ('security', 'Security'),
+        ('protocol', 'Protocol'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='youth_dialogue_applications')
     event = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='applications')
 
@@ -4810,7 +4822,7 @@ class YouthDialogueApplication(models.Model):
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
     organization = models.CharField(max_length=200, blank=True)
-    position = models.CharField(max_length=200, blank=True)
+    position = models.CharField(max_length=200, choices=POSITION_CHOICES, blank=True)
     motivation = models.TextField(blank=True, help_text='Why the applicant wants to participate')
     additional_data = models.JSONField(default=dict, blank=True, help_text='Flexible extra fields')
 

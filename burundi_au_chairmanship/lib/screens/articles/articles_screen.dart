@@ -17,6 +17,7 @@ import '../../widgets/async_content_view.dart';
 import '../../widgets/sliver_async_content_view.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/liked_by_avatars.dart';
+import '../../services/like_service.dart';
 import '../news/article_detail_screen.dart';
 
 class ArticlesScreen extends StatefulWidget {
@@ -33,6 +34,8 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   int? _selectedCategoryId;
   int _featuredPage = 0;
   final _featuredController = PageController(viewportFraction: 0.92);
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   static const _accent = AppColors.auGold;
   static const _accentDark = Color(0xFFB8960E);
@@ -42,12 +45,16 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   @override
   void initState() {
     super.initState();
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key.startsWith('article:') && mounted) setState(() {});
+    });
     _loadArticles();
     _loadCategories();
   }
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     _featuredController.dispose();
     super.dispose();
   }
@@ -382,16 +389,23 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                       const SizedBox(width: 12),
                       _buildStatChip(Icons.chat_bubble_outline_rounded, '${article.commentCount}', Colors.white70),
                       const SizedBox(width: 12),
-                      _buildStatChip(Icons.favorite_rounded, '${article.likeCount}', Colors.white70),
-                      if (article.recentLikers.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        LikedByAvatars(
-                          likers: article.recentLikers,
-                          totalLikes: article.likeCount,
-                          avatarRadius: 10,
-                          overlap: 7,
-                        ),
-                      ],
+                      Builder(builder: (_) {
+                        _likeService.seed(EntityType.article, article.id,
+                          isLiked: article.isLiked, likeCount: article.likeCount, recentLikers: article.recentLikers);
+                        final ls = _likeService.getState(EntityType.article, article.id);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildStatChip(
+                              ls.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              '${ls.likeCount}', Colors.white70),
+                            if (ls.recentLikers.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              LikedByAvatars(likers: ls.recentLikers, totalLikes: ls.likeCount, avatarRadius: 10, overlap: 7),
+                            ],
+                          ],
+                        );
+                      }),
                       const Spacer(),
                       Flexible(
                         child: Text(
@@ -613,22 +627,30 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                         isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       ),
                       const SizedBox(width: 14),
-                      _buildStatChip(
-                        article.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        '${article.likeCount}',
-                        article.isLiked ? AppColors.burundiRed : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                      ),
-                      if (article.recentLikers.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: LikedByAvatars(
-                            likers: article.recentLikers,
-                            totalLikes: article.likeCount,
-                            avatarRadius: 10,
-                            overlap: 7,
-                          ),
-                        ),
-                      ],
+                      Builder(builder: (_) {
+                        _likeService.seed(EntityType.article, article.id,
+                          isLiked: article.isLiked, likeCount: article.likeCount, recentLikers: article.recentLikers);
+                        final ls = _likeService.getState(EntityType.article, article.id);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildStatChip(
+                              ls.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              '${ls.likeCount}',
+                              ls.isLiked ? AppColors.burundiRed : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                            ),
+                            if (ls.recentLikers.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              LikedByAvatars(
+                                likers: ls.recentLikers,
+                                totalLikes: ls.likeCount,
+                                avatarRadius: 10,
+                                overlap: 7,
+                              ),
+                            ],
+                          ],
+                        );
+                      }),
                     ],
                   ),
                 ],
@@ -660,7 +682,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       CupertinoPageRoute(
         builder: (_) => ArticleDetailScreen(
           article: article,
-          scrollToComments: context.read<AuthProvider>().isAuthenticated,
+          scrollToComments: false,
         ),
       ),
     );

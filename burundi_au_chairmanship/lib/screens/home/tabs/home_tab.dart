@@ -20,6 +20,7 @@ import '../../../services/splash_preloader.dart';
 import '../../../services/firebase_messaging_service.dart';
 import '../../../services/content_cache_service.dart';
 import '../../../services/data_saver_service.dart';
+import '../../../services/like_service.dart';
 import '../../../utils/color_utils.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import '../../articles/articles_screen.dart';
@@ -90,6 +91,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   Map<String, dynamic>? _ydSettings;
   bool _showProfilePrompt = false;
   bool _profilePromptDismissed = false;
+  final LikeService _likeService = LikeService();
+  VoidCallback? _removeLikeListener;
 
   List<Map<String, dynamic>> get _heroSlides {
     if (_apiHeroSlides != null && _apiHeroSlides!.isNotEmpty) {
@@ -128,6 +131,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _removeLikeListener = _likeService.addListener((key, state) {
+      if (key.startsWith('article:') && mounted) setState(() {});
+    });
     // Defer _loadData to after the first frame so Localizations.localeOf(context)
     // is available (it depends on inherited widgets that aren't ready in initState).
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
@@ -151,6 +157,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _removeLikeListener?.call();
     WidgetsBinding.instance.removeObserver(this);
     _heroTimer?.cancel();
     _featureTimer?.cancel();

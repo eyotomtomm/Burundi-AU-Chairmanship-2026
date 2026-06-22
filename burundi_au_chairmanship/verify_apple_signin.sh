@@ -79,7 +79,7 @@ fi
 
 # 8. Check Bundle ID
 echo -n "8. Checking Bundle ID... "
-if grep -q "com.burundi.au.burundiAuChairmanship" ios/Runner.xcodeproj/project.pbxproj; then
+if grep -q "com.b4africa.app" ios/Runner.xcodeproj/project.pbxproj; then
     echo -e "${GREEN}✓${NC}"
     ((checks_passed++))
 else
@@ -95,7 +95,7 @@ if [ $checks_passed -eq $total_checks ]; then
     echo ""
     echo "Next steps:"
     echo "  1. Open Xcode: cd ios && open Runner.xcworkspace"
-    echo "  2. Sign the app with Team ID: 5UL786DM5B"
+    echo "  2. Sign the app with Team ID: 4P52QG4BDR"
     echo "  3. Run on device: flutter run --release"
     echo "  4. Test Apple Sign In button"
 else

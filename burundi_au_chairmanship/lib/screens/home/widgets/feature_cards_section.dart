@@ -266,7 +266,7 @@ class FeatureCardsSection extends StatelessWidget {
           Navigator.push(
             context,
             CupertinoPageRoute(
-              builder: (_) => EventDetailScreen(event: matchingEvent.first, scrollToComments: context.read<AuthProvider>().isAuthenticated),
+              builder: (_) => EventDetailScreen(event: matchingEvent.first, scrollToComments: false),
             ),
           );
           return;
@@ -313,7 +313,7 @@ class FeatureCardsSection extends StatelessWidget {
         CupertinoPageRoute(
           builder: (_) => ArticleDetailScreen(
             article: article,
-            scrollToComments: context.read<AuthProvider>().isAuthenticated,
+            scrollToComments: false,
           ),
         ),
       );
@@ -356,7 +356,7 @@ class FeatureCardsSection extends StatelessWidget {
           CupertinoPageRoute(
             builder: (_) => VideoDetailScreen(
             video: match.first,
-            scrollToComments: context.read<AuthProvider>().isAuthenticated,
+            scrollToComments: false,
           ),
           ),
         );

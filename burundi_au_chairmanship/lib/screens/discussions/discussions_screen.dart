@@ -164,7 +164,7 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => DiscussionDetailScreen(discussionId: d['id'], scrollToComments: context.read<AuthProvider>().isAuthenticated)),
+                                  MaterialPageRoute(builder: (_) => DiscussionDetailScreen(discussionId: d['id'], scrollToComments: false)),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),

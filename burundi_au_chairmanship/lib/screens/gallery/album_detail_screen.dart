@@ -13,6 +13,7 @@ import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
+import '../../services/data_saver_service.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -30,6 +31,7 @@ class AlbumDetailScreen extends StatefulWidget {
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   final LikeService _likeService = LikeService();
+  bool _descriptionExpanded = false;
   VoidCallback? _removeLikeListener;
 
   // Comments
@@ -309,10 +311,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final title = langCode == 'fr'
         ? (widget.album['title_fr'] ?? widget.album['title'])
         : widget.album['title'];
+    final description = langCode == 'fr'
+        ? (widget.album['description_fr'] ?? widget.album['description'])
+        : widget.album['description'];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title ?? 'Album'),
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text(title ?? 'Album'),
+        ),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         actions: [
@@ -365,6 +373,71 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     ],
                   ),
                 ),
+              // Album info section
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title ?? 'Album',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (description != null && description.toString().trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () => setState(() => _descriptionExpanded = !_descriptionExpanded),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              description.toString(),
+                              maxLines: _descriptionExpanded ? null : 3,
+                              overflow: _descriptionExpanded ? null : TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                                height: 1.4,
+                              ),
+                            ),
+                            if (!_descriptionExpanded && description.toString().length > 100)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  'Read more',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.burundiGreen,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${photos.length} photos',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.burundiGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: GridView.builder(
             padding: const EdgeInsets.all(8),
@@ -427,7 +500,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           child: CachedNetworkImage(
             imageUrl: imageUrl,
             fit: BoxFit.cover,
-            memCacheWidth: 400,
+            memCacheWidth: DataSaverService().thumbnailCacheWidth ?? 400,
             placeholder: (context, url) => Container(
               color: Colors.grey[300],
               child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),

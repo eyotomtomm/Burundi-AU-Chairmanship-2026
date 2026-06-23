@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -20,9 +17,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   final _subjectController = TextEditingController();
   final _messageController = TextEditingController();
   final _emailController = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
-
-  List<XFile> _screenshots = [];
   bool _isSubmitting = false;
 
   @override
@@ -47,36 +41,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     _messageController.dispose();
     _emailController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickScreenshots() async {
-    try {
-      final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isNotEmpty) {
-        setState(() {
-          _screenshots.addAll(images);
-          // Limit to 5 screenshots
-          if (_screenshots.length > 5) {
-            _screenshots = _screenshots.sublist(0, 5);
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick images: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  void _removeScreenshot(int index) {
-    setState(() {
-      _screenshots.removeAt(index);
-    });
   }
 
   Future<void> _submitSupport() async {
@@ -182,38 +146,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-
-            // Quick email option
-            OutlinedButton.icon(
-              onPressed: () async {
-                final uri = Uri(
-                  scheme: 'mailto',
-                  path: 'support@burundi4africa.com',
-                  queryParameters: {
-                    'subject': 'Support Request - Be 4 Africa App',
-                    'body': 'Hello Support Team,\n\n'
-                        'I need help with:\n\n'
-                        'Email: ${_emailController.text}\n',
-                  },
-                );
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                }
-              },
-              icon: const Icon(Icons.email_outlined, size: 18),
-              label: const Text('Or send us an email directly'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.burundiGreen,
-                side: BorderSide(
-                  color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
             const SizedBox(height: 24),
 
             // Email Field (auto-filled)
@@ -296,85 +228,6 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               },
             ),
             const SizedBox(height: 24),
-
-            // Screenshots Section
-            const Text(
-              'Attachments (Optional)',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add screenshots to help us understand your issue better',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.7)
-                    : Colors.black.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Screenshot thumbnails
-            if (_screenshots.isNotEmpty) ...[
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _screenshots.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  XFile file = entry.value;
-                  return Stack(
-                    children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                          ),
-                          image: DecorationImage(
-                            image: FileImage(File(file.path)),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: -8,
-                        right: -8,
-                        child: IconButton(
-                          icon: const Icon(Icons.cancel, color: AppColors.error),
-                          onPressed: () => _removeScreenshot(index),
-                          iconSize: 24,
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Add Screenshot Button
-            OutlinedButton.icon(
-              onPressed: _screenshots.length < 5 ? _pickScreenshots : null,
-              icon: const Icon(Icons.add_photo_alternate_outlined),
-              label: Text(_screenshots.isEmpty
-                  ? 'Add Screenshots'
-                  : 'Add More (${_screenshots.length}/5)'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(
-                  color: AppColors.burundiGreen.withValues(alpha: 0.5),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
 
             // Submit Button
             ElevatedButton(

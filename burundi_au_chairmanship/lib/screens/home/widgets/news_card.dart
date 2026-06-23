@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/like_service.dart';
+import '../../../services/data_saver_service.dart';
 import '../../../widgets/liked_by_avatars.dart';
 
 class NewsCard extends StatelessWidget {
@@ -56,7 +57,7 @@ class NewsCard extends StatelessWidget {
                     if (article.imageUrl.isNotEmpty)
                       CachedNetworkImage(
                         imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
-                        memCacheWidth: 400,
+                        memCacheWidth: DataSaverService().heroCacheWidth ?? 400,
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(
                           decoration: BoxDecoration(

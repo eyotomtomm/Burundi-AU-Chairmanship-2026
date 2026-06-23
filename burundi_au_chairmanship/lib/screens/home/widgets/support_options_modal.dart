@@ -60,10 +60,10 @@ Future<void> showSupportOptionsModal(BuildContext context, {String? prefilledSub
                 child: Icon(Icons.email_rounded, color: AppColors.burundiGreen, size: 28),
               ),
               title: Text(
-                langCode == 'fr' ? 'Support par email' : 'Email Support',
+                langCode == 'fr' ? 'Ticket de support' : 'Support Ticket',
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),
-              subtitle: Text(langCode == 'fr' ? 'Nous répondons sous 24 heures' : 'We respond within 24 hours'),
+              subtitle: Text(langCode == 'fr' ? 'Créez un ticket, nous répondons sous 24 heures' : 'Create a ticket, we respond within 24 hours'),
               trailing: const Icon(Icons.chevron_right),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               onTap: () {
@@ -123,7 +123,7 @@ Future<void> showSupportOptionsModal(BuildContext context, {String? prefilledSub
               ),
               subtitle: Text(
                 liveAgentOnline
-                    ? (langCode == 'fr' ? 'Discutez avec un agent maintenant' : 'Chat with a support agent now')
+                    ? (langCode == 'fr' ? 'Réponse rapide via le chat support' : 'Quick response via support chat')
                     : (langCode == 'fr' ? 'Aucun agent disponible pour le moment' : 'No agents available right now'),
                 style: TextStyle(color: liveAgentOnline ? null : Colors.grey),
               ),

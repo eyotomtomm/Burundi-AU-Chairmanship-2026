@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
 import '../../../providers/theme_provider.dart';
 import '../painters/zigzag_line_painter.dart';
+import '../../../services/data_saver_service.dart';
 
 class HeroSlideshow extends StatelessWidget {
   final PageController pageController;
@@ -50,7 +51,7 @@ class HeroSlideshow extends StatelessWidget {
                     CachedNetworkImage(
                       imageUrl: imagePath,
                       fit: BoxFit.cover,
-                      memCacheWidth: 800,
+                      memCacheWidth: DataSaverService().fullImageCacheWidth ?? 800,
                       width: screenWidth,
                       height: 400,
                       placeholder: (context, url) => Container(

@@ -703,22 +703,41 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             try {
                               if (await inAppReview.isAvailable()) {
                                 await inAppReview.requestReview();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Thank you for your support!'),
+                                      backgroundColor: const Color(0xFFFFB74D),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  );
+                                }
                               } else {
                                 await _openStoreListing();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Rating will be available once the app is on the App Store'),
+                                      backgroundColor: const Color(0xFFFFB74D),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  );
+                                }
                               }
                             } catch (_) {
                               await _openStoreListing();
-                            }
-
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Thank you for your support!'),
-                                  backgroundColor: const Color(0xFFFFB74D),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              );
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Rating will be available once the app is on the App Store'),
+                                    backgroundColor: const Color(0xFFFFB74D),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              }
                             }
                           },
                         ),
@@ -1154,8 +1173,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   ),
                   child: Icon(Icons.email_rounded, color: AppColors.burundiGreen, size: 28),
                 ),
-                title: const Text('Email Support', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                subtitle: const Text('We respond within 24 hours'),
+                title: const Text('Support Ticket', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                subtitle: const Text('Create a ticket, we respond within 24 hours'),
                 trailing: const Icon(Icons.chevron_right),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () {
@@ -1208,7 +1227,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   ],
                 ),
                 subtitle: Text(
-                  liveAgentOnline ? 'Chat with a support agent now' : 'No agents available right now',
+                  liveAgentOnline ? 'Quick response via support chat' : 'No agents available right now',
                   style: TextStyle(color: liveAgentOnline ? null : Colors.grey),
                 ),
                 trailing: liveAgentOnline ? const Icon(Icons.chevron_right) : null,
@@ -1254,6 +1273,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     required bool isDark,
     required AuthProvider authProvider,
   }) {
+    final isSubscribed = authProvider.receivesNewsletter;
     return Column(
       children: [
         Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
@@ -1277,20 +1297,73 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             ),
           ),
           subtitle: Text(
-            'Subscribe to receive our monthly digest',
+            isSubscribed ? 'Subscribed' : 'Subscribe to receive our monthly digest',
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.6),
+              color: isSubscribed
+                  ? AppColors.burundiGreen
+                  : (isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.6)),
             ),
           ),
-          trailing: Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 16,
-            color: isDark ? Colors.white30 : AppColors.burundiGreen.withValues(alpha: 0.4),
-          ),
-          onTap: () => _showNewsletterSubscriptionDialog(context, isDark, authProvider),
+          trailing: isSubscribed
+              ? Icon(Icons.check_circle_rounded, color: AppColors.burundiGreen, size: 24)
+              : Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: isDark ? Colors.white30 : AppColors.burundiGreen.withValues(alpha: 0.4),
+                ),
+          onTap: isSubscribed
+              ? () => _showUnsubscribeDialog(context, isDark, authProvider)
+              : () => _showNewsletterSubscriptionDialog(context, isDark, authProvider),
         ),
       ],
+    );
+  }
+
+  void _showUnsubscribeDialog(BuildContext context, bool isDark, AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Unsubscribe from newsletter?'),
+        content: const Text('You will no longer receive our monthly newsletter.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              try {
+                await authProvider.toggleNewsletter(false);
+                if (context.mounted) {
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Unsubscribed from newsletter'),
+                      backgroundColor: AppColors.burundiGreen,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to unsubscribe: $e'),
+                      backgroundColor: AppColors.burundiRed,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Unsubscribe'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1401,8 +1474,10 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     email: emailController.text.trim(),
                     phoneNumber: phoneController.text.trim(),
                   );
+                  await authProvider.toggleNewsletter(true);
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                   if (context.mounted) {
+                    setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: const Text('Subscribed to Monthly Newsletter!'),

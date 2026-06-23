@@ -212,16 +212,16 @@ class ApiService {
     throw ApiException('Retry logic error', 0);
   }
 
-  Future<dynamic> _get(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
+  Future<dynamic> _get(String endpoint, {bool auth = false, int timeoutSeconds = 20, Map<String, String>? queryParams}) async {
     // Deduplicate concurrent GET requests for the same endpoint
-    final key = '$endpoint|auth=$auth';
+    final key = '$endpoint|auth=$auth|${queryParams ?? {}}';
     if (_inflightGets.containsKey(key)) {
       return _inflightGets[key]!.future;
     }
     final completer = Completer<dynamic>();
     _inflightGets[key] = completer;
     try {
-      final result = await _doGet(endpoint, auth: auth, timeoutSeconds: timeoutSeconds);
+      final result = await _doGet(endpoint, auth: auth, timeoutSeconds: timeoutSeconds, queryParams: queryParams);
       completer.complete(result);
       return result;
     } catch (e) {
@@ -232,11 +232,18 @@ class ApiService {
     }
   }
 
-  Future<dynamic> _doGet(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
+  Future<dynamic> _doGet(String endpoint, {bool auth = false, int timeoutSeconds = 20, Map<String, String>? queryParams}) async {
     try {
+      var uri = Uri.parse('$_baseUrl/$endpoint');
+      if (queryParams != null && queryParams.isNotEmpty) {
+        uri = uri.replace(queryParameters: {
+          ...uri.queryParameters,
+          ...queryParams,
+        });
+      }
       final response = await _retryOnTransient(
         (headers) => _client
-            .get(Uri.parse('$_baseUrl/$endpoint'), headers: headers)
+            .get(uri, headers: headers)
             .timeout(Duration(seconds: timeoutSeconds)),
         () => _headers(auth: auth),
       );

@@ -1,14 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
+import '../../widgets/confetti_overlay.dart';
 
 class YouthDialogueCredentialScreen extends StatefulWidget {
   const YouthDialogueCredentialScreen({super.key});
@@ -22,12 +28,38 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
   bool _isDownloading = false;
   String? _error;
   YouthDialogueCredential? _credential;
+  bool _confettiShown = false;
 
   @override
   void initState() {
     super.initState();
+    _enableScreenProtection();
     _loadCredential();
     ApiService().youthDialogueLogActivity('credential_viewed', 'youth_dialogue_credential');
+  }
+
+  @override
+  void dispose() {
+    _disableScreenProtection();
+    super.dispose();
+  }
+
+  Future<void> _enableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOn();
+      await ScreenProtector.preventScreenshotOn();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection error: $e');
+    }
+  }
+
+  Future<void> _disableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOff();
+      await ScreenProtector.preventScreenshotOff();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection disable error: $e');
+    }
   }
 
   Future<void> _loadCredential() async {
@@ -58,6 +90,8 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
         _credential = YouthDialogueCredential.fromJson(data);
         _isLoading = false;
       });
+      // Show confetti on first credential view
+      _triggerConfetti();
     } catch (e) {
       if (!mounted) return;
       if (_credential == null) {
@@ -65,15 +99,32 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
           _error = 'Failed to load credential.';
           _isLoading = false;
         });
+      } else {
+        _triggerConfetti();
       }
     }
   }
 
+  void _triggerConfetti() {
+    if (_confettiShown || !mounted) return;
+    _confettiShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ConfettiOverlay.show(context);
+    });
+  }
+
   Future<void> _downloadPdf() async {
-    if (_isDownloading) return;
+    if (_isDownloading || _credential == null) return;
     setState(() => _isDownloading = true);
     try {
-      final bytes = await ApiService().downloadCredentialPdf();
+      // Try API download first
+      List<int> bytes;
+      try {
+        bytes = await ApiService().downloadCredentialPdf();
+      } catch (_) {
+        // Fallback: generate PDF client-side
+        bytes = await _generatePdfLocally();
+      }
       final dir = await getTemporaryDirectory();
       final code = _credential?.participantCode ?? 'credential';
       final file = File('${dir.path}/YD-IDCard-$code.pdf');
@@ -92,6 +143,147 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     } finally {
       if (mounted) setState(() => _isDownloading = false);
     }
+  }
+
+  /// Generates a PDF ID card locally from credential data
+  Future<List<int>> _generatePdfLocally() async {
+    final cred = _credential!;
+    final pdf = pw.Document();
+
+    // Try to load the photo as bytes for embedding
+    Uint8List? photoBytes;
+    if (cred.idPhotoUrl.isNotEmpty) {
+      try {
+        final httpClient = HttpClient();
+        final request = await httpClient.getUrl(Uri.parse(cred.idPhotoUrl));
+        final response = await request.close();
+        if (response.statusCode == 200) {
+          final bytes = await response.fold<List<int>>([], (prev, chunk) => prev..addAll(chunk));
+          photoBytes = Uint8List.fromList(bytes);
+        }
+        httpClient.close();
+      } catch (_) {}
+    }
+
+    final roleColor = _parseHexColor(cred.roleColor);
+    final pdfRoleColor = PdfColor.fromInt(roleColor.toARGB32());
+    final goldColor = const PdfColor.fromInt(0xFFD4AF37);
+
+    final eventDates = _formatEventDates(cred);
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              // Header
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(20),
+                decoration: pw.BoxDecoration(
+                  color: pdfRoleColor,
+                  borderRadius: pw.BorderRadius.circular(12),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Text('YOUTH DIALOGUE',
+                      style: pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        letterSpacing: 3,
+                      )),
+                    pw.SizedBox(height: 6),
+                    pw.Text('Burundi AU Chairmanship 2025-2026',
+                      style: const pw.TextStyle(color: PdfColors.white, fontSize: 12)),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 4),
+              // Gold accent
+              pw.Container(height: 3, color: goldColor),
+              pw.SizedBox(height: 24),
+
+              // Photo
+              if (photoBytes != null)
+                pw.ClipOval(
+                  child: pw.Image(pw.MemoryImage(photoBytes), width: 100, height: 100, fit: pw.BoxFit.cover),
+                ),
+              pw.SizedBox(height: 16),
+
+              // Name
+              pw.Text('${cred.firstName} ${cred.lastName}',
+                style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 12),
+
+              // Info table
+              _pdfInfoRow('Organization', cred.organization),
+              _pdfInfoRow('Role', cred.role),
+              _pdfInfoRow('Position', cred.position),
+              if (cred.nationalityDisplay.isNotEmpty)
+                _pdfInfoRow('Nationality', '${cred.nationalityFlag} ${cred.nationalityDisplay}'),
+              if (eventDates.isNotEmpty)
+                _pdfInfoRow('Event Date', eventDates),
+
+              // Extra fields from admin
+              ...cred.extraFields.map((f) => _pdfInfoRow(f['label']!, f['value']!)),
+
+              pw.SizedBox(height: 20),
+
+              // Participant code
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: pdfRoleColor, width: 2),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Text(cred.participantCode,
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 4,
+                    color: pdfRoleColor,
+                    font: pw.Font.courier(),
+                  )),
+              ),
+
+              pw.SizedBox(height: 20),
+
+              // Footer
+              pw.Divider(color: PdfColors.grey300),
+              pw.SizedBox(height: 8),
+              pw.Text('Burundi Be 4 Africa 2026',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+            ],
+          );
+        },
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  pw.Widget _pdfInfoRow(String label, String value) {
+    if (value.isEmpty) return pw.SizedBox.shrink();
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        children: [
+          pw.SizedBox(
+            width: 100,
+            child: pw.Text(label,
+              style: pw.TextStyle(fontSize: 11, color: PdfColors.grey600, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.Expanded(
+            child: pw.Text(value, style: const pw.TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -140,9 +332,9 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     if (start != null && end != null) {
       if (start.month == end.month && start.year == end.year) {
-        return '${start.day} – ${end.day} ${months[start.month]} ${start.year}';
+        return '${start.day} \u2013 ${end.day} ${months[start.month]} ${start.year}';
       }
-      return '${start.day} ${months[start.month]} – ${end.day} ${months[end.month]} ${end.year}';
+      return '${start.day} ${months[start.month]} \u2013 ${end.day} ${months[end.month]} ${end.year}';
     }
     final d = start ?? end!;
     return '${d.day} ${months[d.month]} ${d.year}';
@@ -195,7 +387,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
               ),
             ),
 
-          // ── The ID Card ──────────────────────────────────
+          // The ID Card
           Container(
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
@@ -216,7 +408,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
             ),
             child: Column(
               children: [
-                // ── Header with gradient + logos ──
+                // Header with gradient + logos
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
@@ -233,53 +425,38 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
                   child: Column(
                     children: [
-                      // Logos row
+                      // Multiple logos row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                          _buildHeaderLogo('assets/images/youth_dialogue/dialogue_logo_en.png', Icons.groups),
+                          const SizedBox(width: 12),
+                          _buildHeaderLogo('assets/images/youth_dialogue/b4_africa_logo.png', Icons.public),
+                          // Extra logos from admin
+                          ...cred.extraLogos.map((url) => Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(6),
+                              child: CachedNetworkImage(
+                                imageUrl: url,
+                                fit: BoxFit.contain,
+                                errorWidget: (_, __, ___) => Icon(Icons.image, color: AppColors.burundiGreen, size: 24),
+                              ),
                             ),
-                            padding: const EdgeInsets.all(8),
-                            child: Image.asset(
-                              'assets/images/youth_dialogue/dialogue_logo_en.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(Icons.groups, color: AppColors.burundiGreen, size: 32),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            child: Image.asset(
-                              'assets/images/youth_dialogue/b4_africa_logo.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(Icons.public, color: AppColors.burundiGreen, size: 32),
-                            ),
-                          ),
+                          )),
                         ],
                       ),
                       const SizedBox(height: 18),
@@ -314,7 +491,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
                 ),
 
-                // ── Gold accent line ──
+                // Gold accent line
                 Container(
                   height: 3,
                   decoration: const BoxDecoration(
@@ -324,7 +501,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
                 ),
 
-                // ── Photo + Name + Role + Event Date ──
+                // Photo + Name
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
                   child: Column(
@@ -378,7 +555,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
                 ),
 
-                // ── Info fields: Role + Event Date ──
+                // Info fields: Organization + Role + Event Date + extra fields
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                   child: Container(
@@ -389,17 +566,39 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     ),
                     child: Column(
                       children: [
+                        if (cred.organization.isNotEmpty)
+                          _detailRow(Icons.business_rounded, 'Organization', cred.organization, isDark, accentColor: roleColor),
+                        if (cred.organization.isNotEmpty)
+                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
                         _detailRow(Icons.badge_rounded, 'Role', cred.role, isDark, accentColor: roleColor),
+                        if (cred.position.isNotEmpty) ...[
+                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                          _detailRow(Icons.work_rounded, 'Position', cred.position, isDark, accentColor: roleColor),
+                        ],
+                        if (cred.nationalityDisplay.isNotEmpty) ...[
+                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                          _detailRow(Icons.flag_rounded, 'Nationality',
+                            '${cred.nationalityFlag} ${cred.nationalityDisplay}', isDark, accentColor: roleColor),
+                        ],
                         if (eventDates.isNotEmpty) ...[
                           Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
                           _detailRow(Icons.calendar_today_rounded, 'Event Date', eventDates, isDark, accentColor: roleColor),
                         ],
+                        // Extra fields from admin
+                        ...cred.extraFields.map((f) {
+                          return Column(
+                            children: [
+                              Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
+                              _detailRow(Icons.info_outline_rounded, f['label']!, f['value']!, isDark, accentColor: roleColor),
+                            ],
+                          );
+                        }),
                       ],
                     ),
                   ),
                 ),
 
-                // ── QR Code section ──
+                // QR Code section
                 if (qrData.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -441,7 +640,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     ),
                   ),
 
-                // ── Participant code badge ──
+                // Participant code badge
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
                   child: Container(
@@ -469,7 +668,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
                 ),
 
-                // ── Footer ──
+                // Footer with multiple logos
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
                   child: Column(
@@ -480,7 +679,14 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            'assets/images/b4africa_logo.png',
+                            'assets/images/youth_dialogue/dialogue_logo_en.png',
+                            width: 20,
+                            height: 20,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          ),
+                          const SizedBox(width: 6),
+                          Image.asset(
+                            'assets/images/youth_dialogue/b4_africa_logo.png',
                             width: 20,
                             height: 20,
                             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -506,29 +712,94 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
 
           const SizedBox(height: 24),
 
-          // ── Download PDF button ──
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _isDownloading ? null : _downloadPdf,
-              icon: _isDownloading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 22),
-              label: Text(
-                _isDownloading ? 'Downloading...' : 'Download PDF',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+          // Download PDF button (admin-controlled)
+          if (cred.allowPdfDownload)
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _isDownloading ? null : _downloadPdf,
+                icon: _isDownloading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 22),
+                label: Text(
+                  _isDownloading ? 'Downloading...' : 'Download PDF',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.burundiGreen,
+                  disabledBackgroundColor: AppColors.burundiGreen.withValues(alpha: 0.7),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
+                ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.burundiGreen,
-                disabledBackgroundColor: AppColors.burundiGreen.withValues(alpha: 0.7),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 2,
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF222222) : const Color(0xFFF0F0F0),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.picture_as_pdf_rounded, size: 18, color: isDark ? Colors.white30 : Colors.black26),
+                  const SizedBox(width: 8),
+                  Text(
+                    'PDF download is currently unavailable',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark ? Colors.white38 : Colors.black38,
+                    ),
+                  ),
+                ],
               ),
             ),
+
+          // Protected content badge
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.security, size: 14, color: isDark ? Colors.white24 : Colors.black26),
+              const SizedBox(width: 6),
+              Text(
+                'Protected content',
+                style: TextStyle(
+                  color: isDark ? Colors.white24 : Colors.black26,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderLogo(String assetPath, IconData fallbackIcon) {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(8),
+      child: Image.asset(
+        assetPath,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Icon(fallbackIcon, color: AppColors.burundiGreen, size: 28),
       ),
     );
   }

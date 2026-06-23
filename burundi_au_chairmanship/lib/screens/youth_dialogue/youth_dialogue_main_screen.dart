@@ -12,6 +12,7 @@ import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/confetti_overlay.dart';
 import 'youth_dialogue_apply_screen.dart';
 
 class YouthDialogueMainScreen extends StatefulWidget {
@@ -56,12 +57,20 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
 
       bool showBanner = false;
       bool showAcceptedDialog = false;
+      bool showCredentialIssuedDialog = false;
       if (app != null && app.status == 'accepted') {
         final prefs = await SharedPreferences.getInstance();
         final key = 'yd_approval_banner_seen_${app.id}';
         if (!prefs.containsKey(key)) {
           showBanner = true;
           showAcceptedDialog = true;
+        }
+      }
+      if (app != null && app.status == 'credential_issued') {
+        final prefs = await SharedPreferences.getInstance();
+        final key = 'yd_credential_issued_seen_${app.id}';
+        if (!prefs.containsKey(key)) {
+          showCredentialIssuedDialog = true;
         }
       }
 
@@ -80,10 +89,23 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         _isLoading = false;
       });
 
-      // Show congratulations dialog for first-time accepted users
+      // Show confetti + congratulations dialog for first-time accepted users
       if (showAcceptedDialog && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _showAcceptedDialog();
+          if (mounted) {
+            ConfettiOverlay.show(context);
+            _showAcceptedDialog();
+          }
+        });
+      }
+
+      // Show confetti + notification for first-time credential_issued users
+      if (showCredentialIssuedDialog && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ConfettiOverlay.show(context);
+            _showCredentialIssuedDialog();
+          }
         });
       }
     } catch (e) {
@@ -1124,6 +1146,118 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     );
   }
 
+  // ── Credential Issued Congratulations Dialog ──────────────────
+  Future<void> _dismissCredentialIssuedDialog() async {
+    if (_application == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('yd_credential_issued_seen_${_application!.id}', true);
+  }
+
+  void _showCredentialIssuedDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isFr = Localizations.localeOf(context).languageCode == 'fr';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Verified icon
+              Container(
+                width: 90, height: 90,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7B1FA2), Color(0xFF9C27B0)],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: Colors.purple.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: const Icon(Icons.verified_rounded, size: 44, color: Colors.white),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                isFr ? 'Félicitations !' : 'Congratulations!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isFr
+                    ? 'Vos documents ont été vérifiés et votre carte d\'identité numérique est prête !'
+                    : 'Your documents have been verified and your Digital ID is ready!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.5,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isFr
+                    ? 'Consultez votre email pour plus de détails sur vos accréditations.'
+                    : 'Check your email for more details about your credential.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: isDark ? Colors.white54 : Colors.black45,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _dismissCredentialIssuedDialog();
+                    if (!mounted) return;
+                    await Navigator.pushNamed(context, '/youth-dialogue-credential');
+                    _loadData();
+                  },
+                  icon: const Icon(Icons.badge_rounded, color: Colors.white),
+                  label: Text(
+                    isFr ? 'Voir la carte d\'identité' : 'View ID Card',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _dismissCredentialIssuedDialog();
+                },
+                child: Text(
+                  isFr ? 'Plus tard' : 'Later',
+                  style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Navigate to full status page ──────────────────────────────
   void _navigateToStatusPage(bool isFr) {
     Navigator.push(context, MaterialPageRoute(
@@ -1179,10 +1313,10 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         break;
       case 'accepted':
       case 'documents_pending':
-      case 'documents_submitted':
       case 'documents_rejected':
         currentStep = 2;
         break;
+      case 'documents_submitted':
       case 'documents_under_review':
         currentStep = 3;
         break;
@@ -2493,8 +2627,8 @@ class _YDStatusPage extends StatelessWidget {
         return 1;
       case 'accepted':
       case 'documents_pending':
-      case 'documents_submitted':
         return 2;
+      case 'documents_submitted':
       case 'documents_under_review':
         return 3;
       case 'documents_rejected':

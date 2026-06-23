@@ -173,41 +173,82 @@ class QrScanResultScreen extends StatelessWidget {
                 ),
             ],
 
-            // Duplicate warning
+            // Scan count badge
+            if (scanCount > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDuplicate
+                      ? (scanCount >= 3 ? Colors.red.shade50 : Colors.orange.shade50)
+                      : AppColors.burundiGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDuplicate
+                        ? (scanCount >= 3 ? Colors.red.shade300 : Colors.orange.shade300)
+                        : AppColors.burundiGreen.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  'Scanned $scanCount time${scanCount == 1 ? '' : 's'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDuplicate
+                        ? (scanCount >= 3 ? Colors.red.shade800 : Colors.orange.shade800)
+                        : AppColors.burundiGreen,
+                  ),
+                ),
+              ),
+            ],
+
+            // Duplicate warning (escalating severity)
             if (isDuplicate) ...[
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: scanCount >= 3 ? Colors.red.shade50 : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(
+                    color: scanCount >= 3 ? Colors.red.shade300 : Colors.orange.shade200,
+                    width: scanCount >= 3 ? 2 : 1,
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 24),
+                    Icon(
+                      scanCount >= 3 ? Icons.gpp_bad_rounded : Icons.warning_amber_rounded,
+                      color: scanCount >= 3 ? Colors.red.shade700 : Colors.orange.shade800,
+                      size: 28,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Duplicate Scan Detected',
+                            scanCount >= 3
+                                ? 'Multiple Duplicate Scans'
+                                : 'Duplicate Scan Detected',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Colors.orange.shade900,
+                              fontSize: 15,
+                              color: scanCount >= 3 ? Colors.red.shade900 : Colors.orange.shade900,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'This code has been scanned $scanCount time${scanCount == 1 ? '' : 's'}. '
-                            'It may have already been used for check-in.',
+                            scanCount >= 3
+                                ? 'This credential has been scanned $scanCount times. '
+                                  'This is unusual — please verify the person\'s identity manually.'
+                                : 'This code has been scanned $scanCount time${scanCount == 1 ? '' : 's'}. '
+                                  'It may have already been used for check-in.',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.orange.shade800,
+                              color: scanCount >= 3 ? Colors.red.shade800 : Colors.orange.shade800,
                             ),
                           ),
                         ],
@@ -220,14 +261,14 @@ class QrScanResultScreen extends StatelessWidget {
 
             const SizedBox(height: 32),
 
-            // Scan another button
+            // Reset & Scan Again button
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Scan Another', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                label: const Text('Reset & Scan Again', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.burundiGreen,
                   foregroundColor: Colors.white,

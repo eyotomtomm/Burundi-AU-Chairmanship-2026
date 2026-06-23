@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import 'qr_scan_result_screen.dart';
+import 'yd_scan_history_screen.dart';
 
 class QrScannerScreen extends StatefulWidget {
   final String? mode;
@@ -35,6 +36,10 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     if (rawValue == null || rawValue.isEmpty) return;
 
     setState(() => _isProcessing = true);
+
+    // Stop camera immediately after detecting a code (one-scan-at-a-time)
+    _controller.stop();
+
     _verifyCode(rawValue);
   }
 
@@ -63,7 +68,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isProcessing = false);
+      if (mounted) {
+        // Restart camera when returning from result screen
+        _controller.start();
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
@@ -79,9 +88,20 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          if (_isYdMode)
+            IconButton(
+              icon: const Icon(Icons.history_rounded),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const YdScanHistoryScreen()),
+                );
+              },
+              tooltip: 'Scan History',
+            ),
           ValueListenableBuilder<MobileScannerState>(
             valueListenable: _controller,
-            builder: (_, state, _) => IconButton(
+            builder: (_, state, __) => IconButton(
               icon: Icon(
                 state.torchState == TorchState.on ? Icons.flash_on : Icons.flash_off,
               ),

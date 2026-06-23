@@ -62,6 +62,7 @@ import 'screens/youth_dialogue/youth_dialogue_documents_screen.dart';
 import 'screens/youth_dialogue/youth_dialogue_credential_screen.dart';
 import 'screens/maintenance/maintenance_screen.dart';
 import 'screens/scanner/qr_scanner_screen.dart';
+import 'screens/scanner/yd_scan_history_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -389,6 +390,7 @@ class BurundiAUApp extends StatelessWidget {
                 '/youth-dialogue-documents': (context) => const YouthDialogueDocumentsScreen(),
                 '/youth-dialogue-credential': (context) => const YouthDialogueCredentialScreen(),
                 '/qr-scanner': (context) => const QrScannerScreen(),
+                '/yd-scan-history': (context) => const YdScanHistoryScreen(),
               };
 
               // Handle maintenance route with arguments

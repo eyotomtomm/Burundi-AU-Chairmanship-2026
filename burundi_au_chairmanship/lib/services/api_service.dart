@@ -1818,6 +1818,11 @@ class ApiService {
     }
   }
 
+  Future<List<dynamic>> youthDialogueScanHistory() async {
+    final data = await _get('youth-dialogue/scan-history/', auth: true);
+    return data['results'] as List<dynamic>? ?? [];
+  }
+
   // ── Upload Validation ────────────────────────────────────
   void _validateUploadFile(File file, {
     required List<String> allowedExtensions,

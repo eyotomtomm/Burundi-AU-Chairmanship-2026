@@ -189,6 +189,13 @@ class YouthDialogueCredential {
   final DateTime? eventStartDate;
   final DateTime? eventEndDate;
   final bool isRevoked;
+  final bool allowPdfDownload;
+
+  /// Extra fields from admin (list of {label, value} maps)
+  final List<Map<String, String>> extraFields;
+
+  /// Extra logo URLs from admin
+  final List<String> extraLogos;
 
   YouthDialogueCredential({
     this.firstName = '',
@@ -208,9 +215,32 @@ class YouthDialogueCredential {
     this.eventStartDate,
     this.eventEndDate,
     this.isRevoked = false,
+    this.allowPdfDownload = false,
+    this.extraFields = const [],
+    this.extraLogos = const [],
   });
 
   factory YouthDialogueCredential.fromJson(Map<String, dynamic> json) {
+    // Parse extra_fields: [{label, value}, ...]
+    final rawExtra = json['extra_fields'] as List<dynamic>?;
+    final extraFields = rawExtra
+        ?.map((e) {
+          final m = e as Map<String, dynamic>;
+          return {
+            'label': (m['label'] ?? '').toString(),
+            'value': (m['value'] ?? '').toString(),
+          };
+        })
+        .where((m) => m['label']!.isNotEmpty && m['value']!.isNotEmpty)
+        .toList() ?? [];
+
+    // Parse extra_logos: [url, ...]
+    final rawLogos = json['extra_logos'] as List<dynamic>?;
+    final extraLogos = rawLogos
+        ?.map((e) => e.toString())
+        .where((u) => u.isNotEmpty)
+        .toList() ?? [];
+
     return YouthDialogueCredential(
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
@@ -235,6 +265,9 @@ class YouthDialogueCredential {
           ? DateTime.tryParse(json['event_end_date'])
           : null,
       isRevoked: json['is_revoked'] ?? false,
+      allowPdfDownload: json['allow_pdf_download'] ?? false,
+      extraFields: extraFields,
+      extraLogos: extraLogos,
     );
   }
 }

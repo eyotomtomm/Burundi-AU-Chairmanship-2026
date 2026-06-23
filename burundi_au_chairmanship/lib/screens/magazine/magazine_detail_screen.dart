@@ -17,6 +17,7 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
+import '../../utils/input_sanitizer.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import 'pdf_viewer_screen.dart';
 
@@ -58,9 +59,9 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
   List<String> get _allImages {
     final images = <String>[];
     final cover = _magazine.coverImageUrl;
-    if (cover.isNotEmpty) images.add(cover);
+    if (cover.isNotEmpty) images.add(Environment.fixMediaUrl(cover));
     for (final img in _magazine.images) {
-      if (img.imageUrl.isNotEmpty) images.add(img.imageUrl);
+      if (img.imageUrl.isNotEmpty) images.add(Environment.fixMediaUrl(img.imageUrl));
     }
     return images;
   }
@@ -180,7 +181,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
   }
 
   Future<void> _postComment() async {
-    final text = _commentController.text.trim();
+    final text = InputSanitizer.sanitizeComment(_commentController.text);
     if (text.isEmpty) return;
     setState(() => _postingComment = true);
     try {

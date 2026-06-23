@@ -395,7 +395,13 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       _apiNewsItems = newsItems;
       _apiFeatureCards = featureCards;
       _apiPriorityAgendas = priorityAgendas;
-      _apiEventCards = eventCards;
+      _apiEventCards = eventCards
+        ..sort((a, b) {
+          if (a.isYouthDialogue != b.isYouthDialogue) {
+            return a.isYouthDialogue ? -1 : 1;
+          }
+          return (a.eventDate ?? DateTime(2099)).compareTo(b.eventDate ?? DateTime(2099));
+        });
       _apiMagazines = magazines;
       _heroTextContent = heroTextMap;
       _quickAccessItems = quickAccessMenu;

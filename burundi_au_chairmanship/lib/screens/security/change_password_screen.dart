@@ -4,6 +4,7 @@ import '../../services/haptic_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/password_strength_meter.dart';
+import '../../utils/input_sanitizer.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -117,11 +118,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return l10n.translate('field_required');
-                        if (v.length < 8) return l10n.translate('password_too_short');
-                        return null;
-                      },
+                      validator: InputSanitizer.validatePassword,
                     ),
                     PasswordStrengthMeter(password: _newPassword),
                     const SizedBox(height: 16),

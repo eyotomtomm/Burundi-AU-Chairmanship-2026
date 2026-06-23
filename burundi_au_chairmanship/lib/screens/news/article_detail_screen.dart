@@ -21,6 +21,7 @@ import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
+import '../../utils/input_sanitizer.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -274,8 +275,16 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   }
 
   Future<void> _postComment() async {
-    final text = _commentController.text.trim();
+    final text = InputSanitizer.sanitizeComment(_commentController.text);
     if (text.isEmpty) return;
+
+    final validationError = InputSanitizer.validateComment(text);
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(validationError)),
+      );
+      return;
+    }
 
     setState(() => _postingComment = true);
     try {
@@ -474,11 +483,11 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 onTap: () {
                   HapticService.light();
                   // Collect all images: hero image + media images
-                  final allImages = <String>[_article.imageUrl];
+                  final allImages = <String>[Environment.fixMediaUrl(_article.imageUrl)];
                   final allCaptions = <String>[_article.getTitle(langCode)];
                   for (final m in _article.media) {
                     if (m.isImage && m.imageUrl.isNotEmpty) {
-                      allImages.add(m.imageUrl);
+                      allImages.add(Environment.fixMediaUrl(m.imageUrl));
                       allCaptions.add(m.getCaption(langCode));
                     }
                   }
@@ -493,7 +502,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   fit: StackFit.expand,
                   children: [
                     CachedNetworkImage(
-                      imageUrl: _article.mediumUrl.isNotEmpty ? _article.mediumUrl : _article.imageUrl,
+                      imageUrl: Environment.fixMediaUrl(_article.mediumUrl.isNotEmpty ? _article.mediumUrl : _article.imageUrl),
                       memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
@@ -711,7 +720,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: CachedNetworkImage(
-                                    imageUrl: m.imageUrl,
+                                    imageUrl: Environment.fixMediaUrl(m.imageUrl),
                                     memCacheWidth: 800,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
@@ -906,11 +915,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                               child: TextField(
                                 controller: _commentController,
                                 focusNode: _commentFocusNode,
+                                maxLength: InputSanitizer.maxCommentLength,
                                 decoration: InputDecoration(
                                   hintText: _replyingToName != null
                                       ? 'Write a reply…'
                                       : l10n.translate('add_comment'),
                                   hintStyle: TextStyle(fontSize: 14),
+                                  counterText: '',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
@@ -1077,7 +1088,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: CachedNetworkImage(
-                imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                imageUrl: Environment.fixMediaUrl(article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl),
                 memCacheWidth: 400,
                 height: 110,
                 width: double.infinity,

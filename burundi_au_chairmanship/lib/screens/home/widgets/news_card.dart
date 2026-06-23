@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
+import '../../../config/environment.dart';
 import '../../../models/magazine_model.dart';
 import '../../../services/like_service.dart';
 import '../../../services/data_saver_service.dart';
@@ -56,7 +57,7 @@ class NewsCard extends StatelessWidget {
                   children: [
                     if (article.imageUrl.isNotEmpty)
                       CachedNetworkImage(
-                        imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                        imageUrl: Environment.fixMediaUrl(article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl),
                         memCacheWidth: DataSaverService().heroCacheWidth ?? 400,
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(

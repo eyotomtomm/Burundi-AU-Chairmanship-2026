@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
 import '../../services/content_cache_service.dart';
@@ -340,7 +341,7 @@ class _NewsScreenState extends State<NewsScreen> {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
-              imageUrl: article.mediumUrl.isNotEmpty ? article.mediumUrl : article.imageUrl,
+              imageUrl: Environment.fixMediaUrl(article.mediumUrl.isNotEmpty ? article.mediumUrl : article.imageUrl),
               memCacheWidth: 800,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
@@ -530,7 +531,7 @@ class _NewsScreenState extends State<NewsScreen> {
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(
-                    imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                    imageUrl: Environment.fixMediaUrl(article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl),
                     memCacheWidth: 400,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(

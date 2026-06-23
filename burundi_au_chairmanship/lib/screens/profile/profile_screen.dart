@@ -10,6 +10,7 @@ import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../config/app_spacing.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/verification_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/verified_badge.dart';
 import '../../services/api_service.dart';
@@ -171,8 +172,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                               if (authProvider.isVerified) ...[
-                                const SizedBox(width: 6),
-                                VerifiedBadge(badgeType: authProvider.badgeType, size: 24),
+                                // Don't show badge if there's a pending/rejected request
+                                // (cached isVerified may be stale)
+                                Builder(builder: (ctx) {
+                                  final vStatus = Provider.of<VerificationProvider>(ctx, listen: false).requestStatus;
+                                  if (vStatus == 'pending' || vStatus == 'rejected') return const SizedBox.shrink();
+                                  return Row(children: [
+                                    const SizedBox(width: 6),
+                                    VerifiedBadge(badgeType: authProvider.badgeType, size: 24),
+                                  ]);
+                                }),
                               ],
                             ],
                           ),

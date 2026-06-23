@@ -83,7 +83,12 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
 
   List<EventRegistrationModel> get _upcomingEvents =>
       _allEvents.where((e) => !e.isEventPast).toList()
-        ..sort((a, b) => (a.eventDate ?? DateTime(2099)).compareTo(b.eventDate ?? DateTime(2099)));
+        ..sort((a, b) {
+          if (a.isYouthDialogue != b.isYouthDialogue) {
+            return a.isYouthDialogue ? -1 : 1;
+          }
+          return (a.eventDate ?? DateTime(2099)).compareTo(b.eventDate ?? DateTime(2099));
+        });
 
   List<EventRegistrationModel> get _pastEvents =>
       _allEvents.where((e) => e.isEventPast).toList()

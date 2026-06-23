@@ -16,6 +16,7 @@ import '../../models/magazine_model.dart';
 import '../../services/like_service.dart';
 import '../../widgets/verified_badge.dart';
 import '../../widgets/comment_ban_dialog.dart';
+import '../../utils/input_sanitizer.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfUrl;
@@ -423,8 +424,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   Future<void> _postComment(String content, {int? parentId}) async {
     if (widget.magazineId == null) return;
+    final sanitized = InputSanitizer.sanitizeComment(content);
+    if (sanitized.isEmpty) return;
     try {
-      await ApiService().postMagazineComment(widget.magazineId!, content, parentId: parentId);
+      await ApiService().postMagazineComment(widget.magazineId!, sanitized, parentId: parentId);
       await _loadComments();
     } on ApiException catch (e) {
       if (mounted) showCommentErrorDialog(context, e.message, e.statusCode, referenceId: e.referenceId);

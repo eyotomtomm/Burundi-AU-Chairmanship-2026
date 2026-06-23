@@ -92,9 +92,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final status = verificationProvider.requestStatus;
 
-    // If verification was approved or admin verified directly, refresh auth profile
-    // to sync badge state. This ensures isVerified + badgeType are up to date.
-    if ((status == 'approved' || verificationProvider.isProfileVerified) && !authProvider.isVerified) {
+    // Sync badge state: refresh auth profile whenever the cached isVerified
+    // flag disagrees with the backend verification status.
+    // - User just got approved / admin-verified  → set badge to true
+    // - Cached isVerified is stale (e.g. pending) → correct badge to false
+    final backendVerified = status == 'approved' || verificationProvider.isProfileVerified;
+    if (backendVerified != authProvider.isVerified) {
       await authProvider.refreshProfile();
     }
 

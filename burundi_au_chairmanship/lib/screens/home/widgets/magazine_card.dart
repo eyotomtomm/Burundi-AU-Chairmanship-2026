@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../config/app_colors.dart';
+import '../../../config/environment.dart';
 import '../../../models/magazine_model.dart';
 import '../../magazine/magazine_detail_screen.dart';
 
@@ -37,7 +38,7 @@ class MagazineCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: magazine.coverImageUrl.isNotEmpty
                   ? CachedNetworkImage(
-                      imageUrl: magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl,
+                      imageUrl: Environment.fixMediaUrl(magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl),
                       memCacheWidth: 400,
                       width: 140,
                       height: 170,

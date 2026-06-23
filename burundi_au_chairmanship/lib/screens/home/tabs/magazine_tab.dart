@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_spacing.dart';
+import '../../../config/environment.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/language_provider.dart';
@@ -555,7 +556,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             fit: StackFit.expand,
             children: [
               CachedNetworkImage(
-                imageUrl: magazine.mediumUrl.isNotEmpty ? magazine.mediumUrl : magazine.coverImageUrl,
+                imageUrl: Environment.fixMediaUrl(magazine.mediumUrl.isNotEmpty ? magazine.mediumUrl : magazine.coverImageUrl),
                 memCacheWidth: 800,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
@@ -706,7 +707,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: CachedNetworkImage(
-                      imageUrl: magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl,
+                      imageUrl: Environment.fixMediaUrl(magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl),
                       memCacheWidth: 400,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(

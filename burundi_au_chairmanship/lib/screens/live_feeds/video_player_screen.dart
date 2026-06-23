@@ -13,6 +13,7 @@ import '../../widgets/liked_by_avatars.dart';
 import '../../services/like_service.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
+import '../../utils/input_sanitizer.dart';
 import '../../widgets/fullscreen_back_button.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -104,7 +105,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Future<void> _postComment() async {
-    final content = _commentController.text.trim();
+    final content = InputSanitizer.sanitizeComment(_commentController.text);
     if (content.isEmpty) return;
     setState(() => _postingComment = true);
     try {

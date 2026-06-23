@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../utils/input_sanitizer.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -52,10 +53,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     try {
       final api = ApiService();
 
-      // Create a real support ticket
+      // Create a real support ticket (sanitize before sending)
       await api.createTicket(
-        _subjectController.text.trim(),
-        _messageController.text.trim(),
+        InputSanitizer.sanitizeSubject(_subjectController.text),
+        InputSanitizer.sanitizeMessage(_messageController.text),
       );
 
       if (mounted) {
@@ -164,21 +165,14 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     : Colors.grey.withValues(alpha: 0.1),
               ),
               keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your email';
-                }
-                if (!value.contains('@')) {
-                  return 'Please enter a valid email';
-                }
-                return null;
-              },
+              validator: InputSanitizer.validateEmail,
             ),
             const SizedBox(height: 16),
 
             // Subject Field
             TextFormField(
               controller: _subjectController,
+              maxLength: InputSanitizer.maxSubjectLength,
               decoration: InputDecoration(
                 labelText: 'Subject',
                 hintText: 'Brief description of your issue',
@@ -194,6 +188,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a subject';
+                }
+                if (value.trim().length < 3) {
+                  return 'Subject must be at least 3 characters';
                 }
                 return null;
               },
@@ -217,6 +214,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     : Colors.grey.withValues(alpha: 0.1),
               ),
               maxLines: 6,
+              maxLength: InputSanitizer.maxMessageLength,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter your message';

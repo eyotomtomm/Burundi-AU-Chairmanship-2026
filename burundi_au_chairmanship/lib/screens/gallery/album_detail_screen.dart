@@ -14,6 +14,7 @@ import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 import '../../services/data_saver_service.dart';
+import '../../utils/input_sanitizer.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -88,7 +89,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   }
 
   Future<void> _postComment() async {
-    final content = _commentController.text.trim();
+    final content = InputSanitizer.sanitizeComment(_commentController.text);
     if (content.isEmpty) return;
     setState(() => _postingComment = true);
     try {

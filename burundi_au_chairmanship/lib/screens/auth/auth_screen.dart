@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/password_strength_meter.dart';
+import '../../utils/input_sanitizer.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -312,15 +313,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             isDark: isDark,
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Email is required';
-              }
-              if (!value.contains('@') || !value.contains('.')) {
-                return 'Enter a valid email address';
-              }
-              return null;
-            },
+            validator: InputSanitizer.validateEmail,
           ),
           const SizedBox(height: 16),
 
@@ -499,6 +492,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             hint: l10n.fullName,
             icon: Icons.person_outlined,
             isDark: isDark,
+            validator: InputSanitizer.validateName,
           ),
           const SizedBox(height: 14),
 
@@ -509,13 +503,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             isDark: isDark,
-            validator: (value) {
-              if (value?.isEmpty ?? true) return 'Email is required';
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
-                return 'Enter a valid email';
-              }
-              return null;
-            },
+            validator: InputSanitizer.validateEmail,
           ),
           const SizedBox(height: 14),
 
@@ -536,13 +524,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               ),
               onPressed: () => setState(() => _obscureSignUpPassword = !_obscureSignUpPassword),
             ),
-            validator: (value) {
-              if (value?.isEmpty ?? true) return 'Password is required';
-              if (value!.length < 6) return 'At least 6 characters';
-              if (!RegExp(r'[A-Z]').hasMatch(value)) return 'Need uppercase letter';
-              if (!RegExp(r'[0-9]').hasMatch(value)) return 'Need number';
-              return null;
-            },
+            validator: InputSanitizer.validatePassword,
           ),
           PasswordStrengthMeter(password: _signUpPassword),
           const SizedBox(height: 14),
@@ -871,8 +853,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signUp(
-      _signUpNameController.text,
-      _signUpEmailController.text,
+      InputSanitizer.sanitizeName(_signUpNameController.text),
+      _signUpEmailController.text.trim(),
       _signUpPasswordController.text,
       honeypot: _honeypotController.text,
     );

@@ -12,6 +12,7 @@ db.sqlite3-journal
 .env.*
 !.env.example
 !.env.local.example
+!.env.production.example
 
 # Media files (uploaded by users)
 media/

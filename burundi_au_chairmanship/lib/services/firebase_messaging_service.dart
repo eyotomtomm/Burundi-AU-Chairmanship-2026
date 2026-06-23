@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
 import '../services/api_service.dart';
 import '../services/deep_link_router.dart';
+import '../widgets/in_app_notification_banner.dart';
 
 /// Top-level function for handling background messages
 ///
@@ -320,6 +321,20 @@ class FirebaseMessagingService {
     // Skip if there's nothing to display
     if (title.isEmpty && (body == null || body.isEmpty)) return;
 
+    // Show in-app banner overlay when the app is in the foreground
+    final ctx = navigatorKey?.currentContext;
+    if (ctx != null) {
+      InAppBanner.show(
+        ctx,
+        title: title,
+        body: body,
+        imageUrl: message.data['image_url'] as String?,
+        notificationId: nid,
+        onTap: () => _navigateForMessage(message),
+      );
+    }
+
+    // Also show a system-level notification (appears in notification tray)
     try {
       final notificationId = messageId.hashCode.abs() % 2147483647;
       await _localNotifications.show(

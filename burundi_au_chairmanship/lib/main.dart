@@ -296,8 +296,8 @@ void main() async {
         options.tracesSampleRate = Environment.sentryTracesSampleRate;
         options.profilesSampleRate = Environment.sentryProfilesSampleRate;
         options.sendDefaultPii = false;
-        options.attachScreenshot = true;
-        options.attachViewHierarchy = true;
+        options.attachScreenshot = false;
+        options.attachViewHierarchy = false;
         // In debug mode, log Sentry events for visibility
         options.debug = kDebugMode;
       },

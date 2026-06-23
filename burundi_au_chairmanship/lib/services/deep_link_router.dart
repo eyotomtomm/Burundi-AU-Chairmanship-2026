@@ -121,6 +121,13 @@ class DeepLinkRouter {
       final section = segments[0]; // e.g. "news"
       final id = segments[1]; // e.g. "123"
 
+      // Validate ID: must be alphanumeric, max 64 chars, no path traversal
+      final validId = RegExp(r'^[a-zA-Z0-9_-]{1,64}$').hasMatch(id);
+      if (!validId) {
+        if (kDebugMode) print('DeepLinkRouter: invalid id format: $id');
+        return;
+      }
+
       final handled = await _navigateToDetail(navigator, section, id);
       if (handled) return;
     }

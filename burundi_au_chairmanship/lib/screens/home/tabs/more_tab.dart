@@ -278,7 +278,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                         maxLines: 1,
                                       ),
                                     ),
-                                    if (isLoggedIn && authProvider.isVerified) ...[
+                                    if (isLoggedIn && authProvider.isVerified && !_hasPendingOrRejectedRequest(context)) ...[
                                       const SizedBox(width: 6),
                                       VerifiedBadge(badgeType: authProvider.badgeType ?? Provider.of<VerificationProvider>(context, listen: false).badgeType, size: 18),
                                     ],
@@ -490,7 +490,10 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 child: Consumer2<AuthProvider, VerificationProvider>(
                   builder: (context, authProvider, verificationProvider, _) {
                     final isLoggedIn = authProvider.isAuthenticated;
-                    final isVerified = authProvider.isVerified || verificationProvider.isProfileVerified;
+                    // A pending or rejected request means the user is NOT yet verified,
+                    // even if authProvider.isVerified is stale-cached as true.
+                    final hasPendingRequest = verificationProvider.requestStatus == 'pending' || verificationProvider.requestStatus == 'rejected';
+                    final isVerified = !hasPendingRequest && (authProvider.isVerified || verificationProvider.isProfileVerified);
                     final showVerificationItem = isLoggedIn && !isVerified;
                     final verificationStatus = verificationProvider.requestStatus;
 
@@ -1023,6 +1026,11 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
         ],
       ),
     );
+  }
+
+  bool _hasPendingOrRejectedRequest(BuildContext context) {
+    final status = Provider.of<VerificationProvider>(context, listen: false).requestStatus;
+    return status == 'pending' || status == 'rejected';
   }
 
   Widget _buildVerificationMenuItem({

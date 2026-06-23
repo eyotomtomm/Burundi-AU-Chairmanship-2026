@@ -430,7 +430,15 @@ CAMPAIGN_EMAIL_PORT = int(os.environ.get('CAMPAIGN_EMAIL_PORT', '465'))
 CAMPAIGN_EMAIL_USE_TLS = os.environ.get('CAMPAIGN_EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
 CAMPAIGN_EMAIL_USE_SSL = os.environ.get('CAMPAIGN_EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
 CAMPAIGN_EMAIL_HOST_USER = os.environ.get('CAMPAIGN_EMAIL_HOST_USER', 'newsletter@burundichairship.africa')
-CAMPAIGN_EMAIL_HOST_PASSWORD = os.environ.get('CAMPAIGN_EMAIL_HOST_PASSWORD', 'Bdi->AU(2026)')
+try:
+    CAMPAIGN_EMAIL_HOST_PASSWORD = os.environ['CAMPAIGN_EMAIL_HOST_PASSWORD']
+except KeyError:
+    raise RuntimeError(
+        "CRITICAL: CAMPAIGN_EMAIL_HOST_PASSWORD environment variable is not set.\n"
+        "This is required for sending campaign/newsletter emails.\n\n"
+        "Set it in your .env or environment:\n"
+        "  export CAMPAIGN_EMAIL_HOST_PASSWORD='your-password-here'"
+    )
 CAMPAIGN_FROM_EMAIL = os.environ.get(
     'CAMPAIGN_FROM_EMAIL',
     'Be 4 Africa <newsletter@burundichairship.africa>'
@@ -527,6 +535,16 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 300  # 5 minutes max per task
 CELERY_TASK_SOFT_TIME_LIMIT = 240  # Soft limit at 4 minutes
+# Broker connection resilience — avoid flooding Sentry with 20 retry errors
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 5
+CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
+CELERY_RESULT_BACKEND_MAX_RETRIES = 5
+# When no Redis is available, run tasks synchronously in the calling process.
+# This allows .delay() calls to work without a broker connection.
+if not REDIS_URL and not os.environ.get('CELERY_BROKER_URL'):
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BEAT_SCHEDULE = {
     'cleanup-expired-otps': {
         'task': 'core.tasks.cleanup_expired_otps',

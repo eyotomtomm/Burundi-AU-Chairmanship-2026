@@ -13,6 +13,7 @@ import '../../widgets/comment_ban_dialog.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../services/like_service.dart';
 import 'in_app_webview_screen.dart';
+import '../../utils/input_sanitizer.dart';
 import '../../widgets/fullscreen_back_button.dart';
 
 class YouTubePlayerScreen extends StatefulWidget {
@@ -77,7 +78,7 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
   }
 
   Future<void> _postComment() async {
-    final content = _commentController.text.trim();
+    final content = InputSanitizer.sanitizeComment(_commentController.text);
     if (content.isEmpty) return;
     setState(() => _postingComment = true);
     try {

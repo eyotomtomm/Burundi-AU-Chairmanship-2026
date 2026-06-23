@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' hide Category;
@@ -13,6 +14,38 @@ import '../models/magazine_model.dart';
 import '../models/event_registration_model.dart';
 import '../models/location_model.dart';
 import 'pinned_http_client.dart';
+
+/// Wraps a single page of results from a paginated DRF response.
+class PaginatedResponse<T> {
+  final int count;
+  final String? next;
+  final String? previous;
+  final List<T> results;
+
+  PaginatedResponse({
+    required this.count,
+    this.next,
+    this.previous,
+    required this.results,
+  });
+
+  factory PaginatedResponse.fromJson(
+    Map<String, dynamic> json,
+    T Function(dynamic) fromItem,
+  ) {
+    return PaginatedResponse<T>(
+      count: json['count'] as int? ?? 0,
+      next: json['next'] as String?,
+      previous: json['previous'] as String?,
+      results: (json['results'] as List<dynamic>?)
+              ?.map((e) => fromItem(e))
+              .toList() ??
+          [],
+    );
+  }
+
+  bool get hasNext => next != null;
+}
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -102,20 +135,6 @@ class ApiService {
     if (authDegraded.value) authDegraded.value = false;
   }
 
-  /// Check if a response is a 503 maintenance response and redirect.
-  /// Returns true if the response was a maintenance 503 (caller should stop).
-  bool _checkMaintenance503(http.Response response) {
-    if (response.statusCode != 503) return false;
-    try {
-      final data = json.decode(response.body);
-      if (data is Map && data['code'] == 'maintenance_mode') {
-        _redirectToMaintenance();
-        return true;
-      }
-    } catch (_) {}
-    return false;
-  }
-
   void _redirectToMaintenance() {
     if (_redirectingToMaintenance) return;
     final nav = navigatorKey?.currentState;
@@ -133,17 +152,94 @@ class ApiService {
     });
   }
 
-  Future<dynamic> _get(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
-    try {
-      final response = await _client
-          .get(
-            Uri.parse('$_baseUrl/$endpoint'),
-            headers: await _headers(auth: auth),
-          )
-          .timeout(Duration(seconds: timeoutSeconds));
-      if (_checkMaintenance503(response)) {
-        throw ApiException('App is under maintenance', 503);
+  /// In-flight GET deduplication: callers for the same endpoint share one Future.
+  final Map<String, Completer<dynamic>> _inflightGets = {};
+
+  /// Wraps an HTTP call with automatic retry on transient server errors.
+  /// - 429: respects Retry-After header (capped at 30s)
+  /// - 500, 502, 504: retried with exponential backoff
+  /// - 503: retried only if NOT a maintenance_mode response
+  /// - 4xx client errors (400, 401, 403, 404, etc.): never retried
+  /// Max 2 retries with exponential backoff (1s, 2s).
+  /// [fetchHeaders] is called on each attempt so auth tokens are fresh.
+  Future<http.Response> _retryOnTransient(
+    Future<http.Response> Function(Map<String, String> headers) execute,
+    Future<Map<String, String>> Function() fetchHeaders,
+  ) async {
+    const maxRetries = 2;
+    const retryableStatuses = {429, 500, 502, 504};
+
+    for (int attempt = 0; attempt <= maxRetries; attempt++) {
+      final headers = await fetchHeaders();
+      final response = await execute(headers);
+      final status = response.statusCode;
+
+      // Maintenance 503 — redirect and stop, never retry
+      if (status == 503) {
+        try {
+          final data = json.decode(response.body);
+          if (data is Map && data['code'] == 'maintenance_mode') {
+            _redirectToMaintenance();
+            throw ApiException('App is under maintenance', 503);
+          }
+        } catch (e) {
+          if (e is ApiException) rethrow;
+        }
+        // Non-maintenance 503: fall through to retry logic
       }
+
+      // Success or non-retryable status — return immediately
+      if (status < 500 && status != 429) return response;
+      if (!retryableStatuses.contains(status) && status != 503) return response;
+
+      // Last attempt — return whatever we got
+      if (attempt == maxRetries) return response;
+
+      // Calculate backoff
+      Duration backoff;
+      if (status == 429) {
+        final retryAfter = response.headers['retry-after'];
+        final seconds = retryAfter != null ? int.tryParse(retryAfter) : null;
+        backoff = Duration(seconds: (seconds ?? 1).clamp(1, 30));
+      } else {
+        backoff = Duration(seconds: 1 << attempt); // 1s, 2s
+      }
+
+      await Future.delayed(backoff);
+    }
+
+    // Unreachable, but satisfies the type system
+    throw ApiException('Retry logic error', 0);
+  }
+
+  Future<dynamic> _get(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
+    // Deduplicate concurrent GET requests for the same endpoint
+    final key = '$endpoint|auth=$auth';
+    if (_inflightGets.containsKey(key)) {
+      return _inflightGets[key]!.future;
+    }
+    final completer = Completer<dynamic>();
+    _inflightGets[key] = completer;
+    try {
+      final result = await _doGet(endpoint, auth: auth, timeoutSeconds: timeoutSeconds);
+      completer.complete(result);
+      return result;
+    } catch (e) {
+      completer.completeError(e);
+      rethrow;
+    } finally {
+      _inflightGets.remove(key);
+    }
+  }
+
+  Future<dynamic> _doGet(String endpoint, {bool auth = false, int timeoutSeconds = 20}) async {
+    try {
+      final response = await _retryOnTransient(
+        (headers) => _client
+            .get(Uri.parse('$_baseUrl/$endpoint'), headers: headers)
+            .timeout(Duration(seconds: timeoutSeconds)),
+        () => _headers(auth: auth),
+      );
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -175,18 +271,20 @@ class ApiService {
     Map<String, String>? extraHeaders,
   }) async {
     try {
-      final headers = await _headers(auth: auth);
-      if (extraHeaders != null) headers.addAll(extraHeaders);
-      final response = await _client
-          .post(
-            Uri.parse('$_baseUrl/$endpoint'),
-            headers: headers,
-            body: json.encode(body),
-          )
-          .timeout(const Duration(seconds: 20));
-      if (_checkMaintenance503(response)) {
-        throw ApiException('App is under maintenance', 503);
-      }
+      final encodedBody = json.encode(body);
+      final response = await _retryOnTransient(
+        (headers) {
+          if (extraHeaders != null) headers.addAll(extraHeaders);
+          return _client
+              .post(
+                Uri.parse('$_baseUrl/$endpoint'),
+                headers: headers,
+                body: encodedBody,
+              )
+              .timeout(const Duration(seconds: 20));
+        },
+        () => _headers(auth: auth),
+      );
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
@@ -223,15 +321,12 @@ class ApiService {
 
   Future<dynamic> _delete(String endpoint, {bool auth = false}) async {
     try {
-      final response = await _client
-          .delete(
-            Uri.parse('$_baseUrl/$endpoint'),
-            headers: await _headers(auth: auth),
-          )
-          .timeout(const Duration(seconds: 20));
-      if (_checkMaintenance503(response)) {
-        throw ApiException('App is under maintenance', 503);
-      }
+      final response = await _retryOnTransient(
+        (headers) => _client
+            .delete(Uri.parse('$_baseUrl/$endpoint'), headers: headers)
+            .timeout(const Duration(seconds: 20)),
+        () => _headers(auth: auth),
+      );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         if (response.body.isEmpty) return {};
         return json.decode(response.body);
@@ -250,16 +345,17 @@ class ApiService {
     bool auth = false,
   }) async {
     try {
-      final response = await _client
-          .patch(
-            Uri.parse('$_baseUrl/$endpoint'),
-            headers: await _headers(auth: auth),
-            body: json.encode(body),
-          )
-          .timeout(const Duration(seconds: 20));
-      if (_checkMaintenance503(response)) {
-        throw ApiException('App is under maintenance', 503);
-      }
+      final encodedBody = json.encode(body);
+      final response = await _retryOnTransient(
+        (headers) => _client
+            .patch(
+              Uri.parse('$_baseUrl/$endpoint'),
+              headers: headers,
+              body: encodedBody,
+            )
+            .timeout(const Duration(seconds: 20)),
+        () => _headers(auth: auth),
+      );
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return data;
@@ -289,6 +385,53 @@ class ApiService {
       return data['results'] as List<dynamic>;
     }
     return [];
+  }
+
+  /// Fetch a single page with pagination metadata.
+  Future<PaginatedResponse<T>> _getPaginated<T>(
+    String endpoint,
+    T Function(dynamic) fromItem, {
+    bool auth = false,
+    Map<String, String>? queryParams,
+  }) async {
+    final data = await _get(endpoint, auth: auth, queryParams: queryParams);
+    if (data is Map<String, dynamic> && data.containsKey('results')) {
+      return PaginatedResponse.fromJson(data, fromItem);
+    }
+    // Non-paginated fallback (endpoint returns bare list)
+    final items = _extractResults(data);
+    return PaginatedResponse<T>(
+      count: items.length,
+      results: items.map((e) => fromItem(e)).toList(),
+    );
+  }
+
+  /// Fetch all pages of a paginated endpoint and combine results.
+  /// Safety cap at [maxPages] to prevent runaway requests.
+  Future<List<T>> _fetchAllPages<T>(
+    String endpoint,
+    T Function(dynamic) fromItem, {
+    bool auth = false,
+    Map<String, String>? queryParams,
+    int maxPages = 50,
+  }) async {
+    final allResults = <T>[];
+    var page = 1;
+    final params = Map<String, String>.from(queryParams ?? {});
+
+    while (page <= maxPages) {
+      params['page'] = page.toString();
+      final response = await _getPaginated<T>(
+        endpoint,
+        fromItem,
+        auth: auth,
+        queryParams: params,
+      );
+      allResults.addAll(response.results);
+      if (!response.hasNext) break;
+      page++;
+    }
+    return allResults;
   }
 
   // ── Auth ────────────────────────────────────────────────
@@ -443,6 +586,10 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> uploadProfilePicture(File imageFile) async {
+    _validateUploadFile(imageFile,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+      maxSizeBytes: 5 * 1024 * 1024,
+    );
     try {
       final uri = Uri.parse('$_baseUrl/auth/profile/update/');
       final request = http.MultipartRequest('PUT', uri);
@@ -866,6 +1013,10 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> uploadRegistrationFile(File file) async {
+    _validateUploadFile(file,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
+      maxSizeBytes: 10 * 1024 * 1024,
+    );
     try {
       final uri = Uri.parse('${_baseUrl}event-submissions/upload-file/');
       final request = http.MultipartRequest('POST', uri);
@@ -1442,6 +1593,10 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> uploadEventPhoto(int eventId, File imageFile, {String caption = ''}) async {
+    _validateUploadFile(imageFile,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+      maxSizeBytes: 10 * 1024 * 1024,
+    );
     try {
       final uri = Uri.parse('$_baseUrl/event-photos/');
       final request = http.MultipartRequest('POST', uri);
@@ -1579,6 +1734,10 @@ class ApiService {
     String docType, {
     int? replacesId,
   }) async {
+    _validateUploadFile(file,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
+      maxSizeBytes: 10 * 1024 * 1024,
+    );
     try {
       final uri = Uri.parse('$_baseUrl/youth-dialogue/upload-document/');
       final request = http.MultipartRequest('POST', uri);
@@ -1649,6 +1808,25 @@ class ApiService {
       }, auth: true);
     } catch (_) {
       // Silent fail — activity logging is non-critical
+    }
+  }
+
+  // ── Upload Validation ────────────────────────────────────
+  void _validateUploadFile(File file, {
+    required List<String> allowedExtensions,
+    required int maxSizeBytes,
+  }) {
+    final ext = file.path.split('.').last.toLowerCase();
+    if (!allowedExtensions.contains(ext)) {
+      throw ApiException(
+        'Invalid file type. Allowed: ${allowedExtensions.join(", ")}',
+        0,
+      );
+    }
+    final size = file.lengthSync();
+    if (size > maxSizeBytes) {
+      final maxMB = (maxSizeBytes / (1024 * 1024)).toStringAsFixed(0);
+      throw ApiException('File too large. Maximum size: ${maxMB}MB', 0);
     }
   }
 }

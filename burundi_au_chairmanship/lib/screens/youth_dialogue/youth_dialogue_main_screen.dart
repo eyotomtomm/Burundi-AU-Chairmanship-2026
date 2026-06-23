@@ -30,6 +30,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   List<RegistrationFormField> _formFields = [];
   bool _showApprovalBanner = false;
   DateTime? _lastChecked;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -92,6 +93,12 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshStatus() async {
+    setState(() => _isRefreshing = true);
+    await _loadData();
+    if (mounted) setState(() => _isRefreshing = false);
   }
 
   Future<void> _dismissApprovalBanner() async {
@@ -1167,8 +1174,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     int currentStep;
     switch (status) {
       case 'submitted':
-        currentStep = 0;
-        break;
       case 'under_review':
         currentStep = 1;
         break;
@@ -1611,9 +1616,17 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               style: TextStyle(fontSize: 11, color: isDark ? Colors.white30 : Colors.black26)),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: _loadData,
-            icon: Icon(Icons.refresh, size: 18, color: color),
-            label: Text('Check Status', style: TextStyle(color: color)),
+            onPressed: _isRefreshing ? null : _refreshStatus,
+            icon: _isRefreshing
+                ? SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: color),
+                  )
+                : Icon(Icons.refresh, size: 18, color: color),
+            label: Text(
+              _isRefreshing ? 'Checking...' : 'Check Status',
+              style: TextStyle(color: _isRefreshing ? color.withValues(alpha: 0.5) : color),
+            ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: color.withValues(alpha: 0.4)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -2476,7 +2489,6 @@ class _YDStatusPage extends StatelessWidget {
   int _currentStep() {
     switch (application.status) {
       case 'submitted':
-        return 0;
       case 'under_review':
         return 1;
       case 'accepted':

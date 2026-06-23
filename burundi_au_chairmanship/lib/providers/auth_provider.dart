@@ -146,21 +146,12 @@ class AuthProvider extends ChangeNotifier {
   /// Load cached user profile data locally so app does not block on startup
   Future<void> _loadLocalUserData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Non-PII fields stay in SharedPreferences
     _userId = prefs.getInt('user_id');
-    _userName = prefs.getString('user_name');
-    _userEmail = prefs.getString('user_email');
-    _phoneNumber = prefs.getString('user_phone');
-    _gender = prefs.getString('user_gender');
-    _nationality = prefs.getString('user_nationality');
-    _dateOfBirth = prefs.getString('user_date_of_birth');
     _isEmailVerified = prefs.getBool('user_email_verified') ?? false;
     _isGovernmentOfficial = prefs.getBool('user_is_official') ?? false;
     _isVerified = prefs.getBool('user_is_verified') ?? false;
-    _badgeType = prefs.getString('user_badge_type');
-    _profilePictureUrl = prefs.getString('user_profile_picture');
-    _verificationTitle = prefs.getString('user_verification_title');
-    _verificationRole = prefs.getString('user_verification_role');
-    _verificationName = prefs.getString('user_verification_name');
     _receivesNewsletter = prefs.getBool('user_receives_newsletter') ?? false;
     _isStaff = prefs.getBool('user_is_staff') ?? false;
     _isUsher = prefs.getBool('user_is_usher') ?? false;
@@ -170,6 +161,19 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _adminSections = [];
     }
+
+    // PII fields loaded from encrypted secure storage
+    _userName = await _secureStorage.read(key: 'user_name');
+    _userEmail = await _secureStorage.read(key: 'user_email');
+    _phoneNumber = await _secureStorage.read(key: 'user_phone');
+    _gender = await _secureStorage.read(key: 'user_gender');
+    _nationality = await _secureStorage.read(key: 'user_nationality');
+    _dateOfBirth = await _secureStorage.read(key: 'user_date_of_birth');
+    _badgeType = await _secureStorage.read(key: 'user_badge_type');
+    _profilePictureUrl = await _secureStorage.read(key: 'user_profile_picture');
+    _verificationTitle = await _secureStorage.read(key: 'user_verification_title');
+    _verificationRole = await _secureStorage.read(key: 'user_verification_role');
+    _verificationName = await _secureStorage.read(key: 'user_verification_name');
   }
 
   /// Check if user is already authenticated.
@@ -869,40 +873,43 @@ class AuthProvider extends ChangeNotifier {
       profilePic = user['profile']['profile_picture'] as String?;
     }
 
+    // Non-PII fields in SharedPreferences
     if (uid != null) await prefs.setInt('user_id', uid);
-    await prefs.setString('user_name', name);
-    await prefs.setString('user_email', email);
-    await prefs.setString('user_phone', phone);
-    await prefs.setString('user_gender', gender);
-    await prefs.setString('user_nationality', nationality);
-    await prefs.setString('user_date_of_birth', dateOfBirth);
     await prefs.setBool('user_email_verified', emailVerified);
     await prefs.setBool('user_is_official', isOfficial);
     await prefs.setBool('user_is_verified', isVerified);
+
+    // PII fields in encrypted secure storage
+    await _secureStorage.write(key: 'user_name', value: name);
+    await _secureStorage.write(key: 'user_email', value: email);
+    await _secureStorage.write(key: 'user_phone', value: phone);
+    await _secureStorage.write(key: 'user_gender', value: gender);
+    await _secureStorage.write(key: 'user_nationality', value: nationality);
+    await _secureStorage.write(key: 'user_date_of_birth', value: dateOfBirth);
     if (badgeType != null) {
-      await prefs.setString('user_badge_type', badgeType);
+      await _secureStorage.write(key: 'user_badge_type', value: badgeType);
     } else {
-      await prefs.remove('user_badge_type');
+      await _secureStorage.delete(key: 'user_badge_type');
     }
     if (profilePic != null && profilePic.isNotEmpty) {
-      await prefs.setString('user_profile_picture', profilePic);
+      await _secureStorage.write(key: 'user_profile_picture', value: profilePic);
     } else {
-      await prefs.remove('user_profile_picture');
+      await _secureStorage.delete(key: 'user_profile_picture');
     }
     if (verificationTitle != null) {
-      await prefs.setString('user_verification_title', verificationTitle);
+      await _secureStorage.write(key: 'user_verification_title', value: verificationTitle);
     } else {
-      await prefs.remove('user_verification_title');
+      await _secureStorage.delete(key: 'user_verification_title');
     }
     if (verificationRole != null) {
-      await prefs.setString('user_verification_role', verificationRole);
+      await _secureStorage.write(key: 'user_verification_role', value: verificationRole);
     } else {
-      await prefs.remove('user_verification_role');
+      await _secureStorage.delete(key: 'user_verification_role');
     }
     if (verificationName != null) {
-      await prefs.setString('user_verification_name', verificationName);
+      await _secureStorage.write(key: 'user_verification_name', value: verificationName);
     } else {
-      await prefs.remove('user_verification_name');
+      await _secureStorage.delete(key: 'user_verification_name');
     }
 
     _userId = uid;
@@ -965,28 +972,32 @@ class AuthProvider extends ChangeNotifier {
     // Clear tokens from secure storage
     await _secureStorage.delete(key: AppConstants.userTokenKey);
     await _secureStorage.delete(key: 'refresh_token');
-    // Clear profile data from SharedPreferences
+
+    // Clear PII from secure storage
+    await _secureStorage.delete(key: 'user_name');
+    await _secureStorage.delete(key: 'user_email');
+    await _secureStorage.delete(key: 'user_phone');
+    await _secureStorage.delete(key: 'user_gender');
+    await _secureStorage.delete(key: 'user_nationality');
+    await _secureStorage.delete(key: 'user_date_of_birth');
+    await _secureStorage.delete(key: 'user_badge_type');
+    await _secureStorage.delete(key: 'user_profile_picture');
+    await _secureStorage.delete(key: 'user_verification_title');
+    await _secureStorage.delete(key: 'user_verification_role');
+    await _secureStorage.delete(key: 'user_verification_name');
+
+    // Clear non-PII from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.userTokenKey); // Remove legacy if exists
     await prefs.remove('refresh_token'); // Remove legacy if exists
     await prefs.remove('user_id');
-    await prefs.remove('user_name');
-    await prefs.remove('user_email');
-    await prefs.remove('user_phone');
-    await prefs.remove('user_gender');
-    await prefs.remove('user_nationality');
-    await prefs.remove('user_date_of_birth');
     await prefs.remove('user_email_verified');
     await prefs.remove('user_is_official');
     await prefs.remove('user_is_verified');
-    await prefs.remove('user_badge_type');
-    await prefs.remove('user_profile_picture');
-    await prefs.remove('user_verification_title');
-    await prefs.remove('user_verification_role');
-    await prefs.remove('user_verification_name');
     await prefs.remove('user_receives_newsletter');
     await prefs.remove('user_admin_sections');
     await prefs.remove('user_is_usher');
+    await prefs.remove('user_is_staff');
     // Clear verification cache to prevent data leaking between accounts
     await prefs.remove('cached_is_verified');
     await prefs.remove('cached_verification_status');

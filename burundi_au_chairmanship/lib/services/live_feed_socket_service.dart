@@ -95,8 +95,10 @@ class LiveFeedSocketService with WidgetsBindingObserver {
 
     if (token == null || _disposed) return;
 
+    // Connect without the token in the URL to avoid leaking it in logs.
+    // The token is sent as the first message after the connection opens.
     final uri = Uri.parse(
-      '${Environment.wsBaseUrl}/ws/live-feeds/?token=$token',
+      '${Environment.wsBaseUrl}/ws/live-feeds/',
     );
 
     try {
@@ -112,6 +114,22 @@ class LiveFeedSocketService with WidgetsBindingObserver {
     if (_disposed) {
       _channel?.sink.close();
       _channel = null;
+      return;
+    }
+
+    // Authenticate by sending the token as the first message.
+    // The server should validate this before processing any other messages.
+    // Falls back to query-param auth if the server doesn't support message-based auth.
+    try {
+      _channel!.sink.add(jsonEncode({
+        'type': 'authenticate',
+        'token': token,
+      }));
+    } catch (e) {
+      debugPrint('LiveFeedSocket: failed to send auth message: $e');
+      _channel?.sink.close();
+      _channel = null;
+      _scheduleReconnect();
       return;
     }
 

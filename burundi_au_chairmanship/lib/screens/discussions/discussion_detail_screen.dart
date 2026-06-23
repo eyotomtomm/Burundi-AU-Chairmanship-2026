@@ -9,6 +9,7 @@ import '../../widgets/liked_by_avatars.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
+import '../../utils/input_sanitizer.dart';
 
 class DiscussionDetailScreen extends StatefulWidget {
   final int discussionId;
@@ -102,9 +103,21 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
   }
 
   Future<void> _postReply() async {
-    if (_replyCtrl.text.isEmpty) return;
+    final text = InputSanitizer.sanitizeComment(_replyCtrl.text);
+    if (text.isEmpty) return;
+
+    final validationError = InputSanitizer.validateComment(text);
+    if (validationError != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(validationError)),
+        );
+      }
+      return;
+    }
+
     try {
-      await _api.postDiscussionReply(widget.discussionId, _replyCtrl.text);
+      await _api.postDiscussionReply(widget.discussionId, text);
       _replyCtrl.clear();
       FocusScope.of(context).unfocus();
       _loadData();
@@ -290,8 +303,10 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                               child: TextField(
                                 controller: _replyCtrl,
                                 focusNode: _replyFocusNode,
+                                maxLength: InputSanitizer.maxCommentLength,
                                 decoration: InputDecoration(
                                   hintText: 'Write a reply...',
+                                  counterText: '',
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                                   filled: true,
                                   fillColor: isDark ? Colors.grey[800] : Colors.grey[100],

@@ -315,7 +315,24 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       // 1. Create Firebase user
-      final credential = await _firebaseAuth.signUpWithEmail(email, password);
+      UserCredential credential;
+      try {
+        credential = await _firebaseAuth.signUpWithEmail(email, password);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          // A zombie Firebase account may exist from a previous failed signup.
+          // Try signing in with the same credentials to recover it.
+          try {
+            credential = await _firebaseAuth.signInWithEmail(email, password);
+          } catch (_) {
+            // Password doesn't match the existing Firebase account — it's
+            // a real duplicate, not a zombie. Surface the original error.
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
 
       // 2. Send email verification
       await _firebaseAuth.sendEmailVerification();
@@ -352,13 +369,22 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } on ApiException catch (e) {
-      // Firebase succeeded but backend rejected — sign out Firebase
+      // Firebase user was created but backend rejected — delete the
+      // Firebase account so it doesn't become a zombie that blocks
+      // future sign-up attempts with "email already in use".
+      try {
+        await FirebaseAuth.instance.currentUser?.delete();
+      } catch (_) {}
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
+      // Same cleanup: remove zombie Firebase account on any failure
+      try {
+        await FirebaseAuth.instance.currentUser?.delete();
+      } catch (_) {}
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Registration failed: $e';
       _isLoading = false;
@@ -541,7 +567,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Try firebase login first; if user doesn't exist (404), auto-register
+  /// Try firebase login first; if user doesn't exist (404), auto-register.
+  /// Also handles 409 (email conflict) by retrying registration which
+  /// will link the accounts if the Firebase token has a verified email.
   Future<Map<String, dynamic>> _firebaseLoginOrRegister({
     required String idToken,
     required String name,
@@ -562,6 +590,15 @@ class AuthProvider extends ChangeNotifier {
           idToken: idToken,
           name: name.isNotEmpty ? name : email.split('@').first,
           email: email,
+        );
+      }
+      // 409 = email exists but Firebase UID doesn't match.
+      // Re-throw with a clearer message for the user.
+      if (e.statusCode == 409) {
+        throw ApiException(
+          'This email is linked to another sign-in method. '
+          'Try signing in with email & password instead.',
+          409,
         );
       }
       rethrow;

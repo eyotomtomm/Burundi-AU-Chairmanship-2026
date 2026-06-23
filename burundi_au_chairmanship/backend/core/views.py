@@ -717,7 +717,7 @@ def firebase_register(request):
             sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
             trusted_provider = sign_in_provider in ('google.com', 'apple.com')
 
-            if email and email_verified and trusted_provider:
+            if email and email_verified:
                 try:
                     existing_user = User.objects.get(email=email)
                 except User.DoesNotExist:
@@ -847,7 +847,7 @@ def firebase_login(request):
             sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
             trusted_provider = sign_in_provider in ('google.com', 'apple.com')
 
-            if email and email_verified and trusted_provider:
+            if email and email_verified:
                 try:
                     user = User.objects.get(email=email)
                     profile = user.profile

@@ -753,12 +753,16 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         'title': ydTitle,
         'icon': Icons.groups_rounded,
         'iconImageUrl': ydIconUrl.isNotEmpty ? Environment.fixMediaUrl(ydIconUrl) : '',
-        'hasLiveDot': false, 'badgeText': '', 'badgeColor': '',
-        'locked': !ydIsOpen,
-        'onTap': ydIsOpen
-            ? () => Navigator.pushNamed(context, '/youth-dialogue')
-            : () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ydClosedMsg), backgroundColor: AppColors.auGold)),
+        'hasLiveDot': false,
+        'badgeText': !isLoggedIn ? (langCode == 'fr' ? 'Connexion' : 'Sign in') : '',
+        'badgeColor': !isLoggedIn ? '#9E9E9E' : '',
+        'locked': !isLoggedIn || !ydIsOpen,
+        'onTap': !isLoggedIn
+            ? () => Navigator.pushNamed(context, '/auth')
+            : ydIsOpen
+                ? () => Navigator.pushNamed(context, '/youth-dialogue')
+                : () => ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(ydClosedMsg), backgroundColor: AppColors.auGold)),
       });
     }
 

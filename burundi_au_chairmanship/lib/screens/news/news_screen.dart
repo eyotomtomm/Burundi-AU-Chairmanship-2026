@@ -341,7 +341,7 @@ class _NewsScreenState extends State<NewsScreen> {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
-              imageUrl: Environment.fixMediaUrl(article.mediumUrl.isNotEmpty ? article.mediumUrl : article.imageUrl),
+              imageUrl: Environment.fixMediaUrl(article.imageUrl),
               memCacheWidth: 800,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
@@ -531,7 +531,7 @@ class _NewsScreenState extends State<NewsScreen> {
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(
-                    imageUrl: Environment.fixMediaUrl(article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl),
+                    imageUrl: Environment.fixMediaUrl(article.imageUrl),
                     memCacheWidth: 400,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(

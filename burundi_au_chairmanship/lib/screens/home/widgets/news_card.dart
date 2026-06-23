@@ -57,7 +57,7 @@ class NewsCard extends StatelessWidget {
                   children: [
                     if (article.imageUrl.isNotEmpty)
                       CachedNetworkImage(
-                        imageUrl: Environment.fixMediaUrl(article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl),
+                        imageUrl: Environment.fixMediaUrl(article.imageUrl),
                         memCacheWidth: DataSaverService().heroCacheWidth ?? 400,
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(

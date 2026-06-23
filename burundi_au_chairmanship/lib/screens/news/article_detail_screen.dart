@@ -502,7 +502,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   fit: StackFit.expand,
                   children: [
                     CachedNetworkImage(
-                      imageUrl: Environment.fixMediaUrl(_article.mediumUrl.isNotEmpty ? _article.mediumUrl : _article.imageUrl),
+                      imageUrl: Environment.fixMediaUrl(_article.imageUrl),
                       memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
@@ -1088,7 +1088,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: CachedNetworkImage(
-                imageUrl: Environment.fixMediaUrl(article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl),
+                imageUrl: Environment.fixMediaUrl(article.imageUrl),
                 memCacheWidth: 400,
                 height: 110,
                 width: double.infinity,

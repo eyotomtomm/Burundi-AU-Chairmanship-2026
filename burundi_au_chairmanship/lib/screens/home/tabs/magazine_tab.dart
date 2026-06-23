@@ -556,7 +556,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             fit: StackFit.expand,
             children: [
               CachedNetworkImage(
-                imageUrl: Environment.fixMediaUrl(magazine.mediumUrl.isNotEmpty ? magazine.mediumUrl : magazine.coverImageUrl),
+                imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
                 memCacheWidth: 800,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
@@ -707,7 +707,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: CachedNetworkImage(
-                      imageUrl: Environment.fixMediaUrl(magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl),
+                      imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
                       memCacheWidth: 400,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(

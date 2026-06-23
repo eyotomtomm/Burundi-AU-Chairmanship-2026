@@ -38,7 +38,7 @@ class MagazineCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: magazine.coverImageUrl.isNotEmpty
                   ? CachedNetworkImage(
-                      imageUrl: Environment.fixMediaUrl(magazine.thumbnailUrl.isNotEmpty ? magazine.thumbnailUrl : magazine.coverImageUrl),
+                      imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
                       memCacheWidth: 400,
                       width: 140,
                       height: 170,

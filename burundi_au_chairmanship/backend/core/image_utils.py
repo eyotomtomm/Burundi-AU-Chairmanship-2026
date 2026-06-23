@@ -225,10 +225,22 @@ def generate_thumbnails_to_storage(image_field):
             buf.seek(0)
 
             variant_name = f"{base}_{size_name}.webp"
+            content = ContentFile(buf.read())
+
             # Overwrite if the variant already exists.
             if storage.exists(variant_name):
                 storage.delete(variant_name)
-            saved_name = storage.save(variant_name, ContentFile(buf.read()))
+
+            # Explicitly set public-read ACL for S3-based storage backends
+            # to ensure variants are accessible like their originals.
+            original_acl = getattr(storage, 'default_acl', None)
+            try:
+                storage.default_acl = 'public-read'
+                saved_name = storage.save(variant_name, content)
+            finally:
+                if original_acl is not None:
+                    storage.default_acl = original_acl
+
             generated[size_name] = saved_name
             logger.info("Generated %s variant (remote): %s", size_name, saved_name)
 

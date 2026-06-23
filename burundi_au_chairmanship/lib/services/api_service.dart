@@ -496,9 +496,9 @@ class ApiService {
   }) async {
     return await _post('auth/firebase-login/', {
       'firebase_token': idToken,
-      'device_name': ?deviceName,
-      'device_type': ?deviceType,
-      'app_version': ?appVersion,
+      if (deviceName != null) 'device_name': deviceName,
+      if (deviceType != null) 'device_type': deviceType,
+      if (appVersion != null) 'app_version': appVersion,
     });
   }
 
@@ -522,7 +522,7 @@ class ApiService {
   Future<void> updateFCMToken(String fcmToken, {String? preferredLanguage}) async {
     await _post('auth/update-fcm-token/', {
       'fcm_token': fcmToken,
-      'preferred_language': ?preferredLanguage,
+      if (preferredLanguage != null) 'preferred_language': preferredLanguage,
     }, auth: true);
   }
 
@@ -538,9 +538,9 @@ class ApiService {
   }) async {
     await _post('register-fcm-token/', {
       'fcm_token': fcmToken,
-      'device_type': ?deviceType,
-      'device_os': ?deviceOs,
-      'preferred_language': ?preferredLanguage,
+      if (deviceType != null) 'device_type': deviceType,
+      if (deviceOs != null) 'device_os': deviceOs,
+      if (preferredLanguage != null) 'preferred_language': preferredLanguage,
     }, auth: false);
   }
 
@@ -720,7 +720,7 @@ class ApiService {
   }) async {
     final body = <String, dynamic>{
       'content': content,
-      'parent': ?parentId,
+      if (parentId != null) 'parent': parentId,
     };
     final data = await _post('articles/$articleId/comments/', body, auth: true);
     return ArticleComment.fromJson(data);
@@ -789,7 +789,7 @@ class ApiService {
   }) async {
     final body = <String, dynamic>{
       'content': content,
-      'parent': ?parentId,
+      if (parentId != null) 'parent': parentId,
     };
     final data = await _post('magazines/$magazineId/comments/', body, auth: true);
     return ArticleComment.fromJson(data);

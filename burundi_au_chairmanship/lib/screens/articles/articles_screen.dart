@@ -323,7 +323,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
-              imageUrl: article.mediumUrl.isNotEmpty ? article.mediumUrl : article.imageUrl,
+              imageUrl: article.imageUrl,
               memCacheWidth: 800,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
@@ -507,7 +507,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(
-                    imageUrl: article.thumbnailUrl.isNotEmpty ? article.thumbnailUrl : article.imageUrl,
+                    imageUrl: article.imageUrl,
                     memCacheWidth: 400,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(

@@ -6346,13 +6346,26 @@ def _notify_yd(application, event_key):
         except Exception:
             # Celery/Redis unavailable — send synchronously as fallback
             try:
-                from core.models import UserProfile
+                from core.models import UserProfile, DeviceToken
+                from config.firebase import initialize_firebase
+                initialize_firebase()
                 import firebase_admin.messaging as messaging
-                profiles = UserProfile.objects.filter(
-                    user_id=application.user_id,
-                    fcm_token__isnull=False,
-                ).exclude(fcm_token='')
-                tokens = list(profiles.values_list('fcm_token', flat=True))
+
+                # Collect tokens from both DeviceToken and legacy UserProfile
+                device_tokens = list(
+                    DeviceToken.objects.filter(
+                        user_id=application.user_id,
+                        is_active=True,
+                    ).values_list('token', flat=True).distinct()
+                )
+                legacy_tokens = list(
+                    UserProfile.objects.filter(
+                        user_id=application.user_id,
+                        fcm_token__isnull=False,
+                    ).exclude(fcm_token='').values_list('fcm_token', flat=True)
+                )
+                tokens = list(set(device_tokens + [t for t in legacy_tokens if t]))
+
                 if tokens:
                     msg = messaging.MulticastMessage(
                         tokens=tokens,
@@ -6361,6 +6374,25 @@ def _notify_yd(application, event_key):
                             body=config['push_body'],
                         ),
                         data=push_data,
+                        android=messaging.AndroidConfig(
+                            priority='high',
+                            notification=messaging.AndroidNotification(
+                                channel_id='default_channel',
+                                priority='max',
+                                default_sound=True,
+                                default_vibrate_timings=True,
+                            ),
+                        ),
+                        apns=messaging.APNSConfig(
+                            headers={'apns-priority': '10'},
+                            payload=messaging.APNSPayload(
+                                aps=messaging.Aps(
+                                    sound='default',
+                                    badge=1,
+                                    content_available=True,
+                                ),
+                            ),
+                        ),
                     )
                     messaging.send_each_for_multicast(msg)
             except Exception:

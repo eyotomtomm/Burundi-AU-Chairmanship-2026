@@ -1544,8 +1544,13 @@ def notification_estimate_audience(request):
     """Return estimated audience count based on targeting filters.
     Includes anonymous device tokens for global notifications."""
     from core.models import UserProfile
+    from django.db.models import Q
 
-    profiles = UserProfile.objects.exclude(fcm_token='').exclude(fcm_token__isnull=True)
+    # Include profiles with either a legacy fcm_token or active DeviceTokens
+    profiles = UserProfile.objects.filter(
+        Q(fcm_token__isnull=False) & ~Q(fcm_token='')
+        | Q(user__device_tokens__is_active=True)
+    ).distinct()
 
     is_global = request.GET.get('is_global') == 'true'
     if not is_global:
@@ -1578,7 +1583,10 @@ def notification_estimate_audience(request):
         ).count()
         count += anonymous_count
 
-    total = UserProfile.objects.exclude(fcm_token='').exclude(fcm_token__isnull=True).count()
+    total = UserProfile.objects.filter(
+        Q(fcm_token__isnull=False) & ~Q(fcm_token='')
+        | Q(user__device_tokens__is_active=True)
+    ).distinct().count()
     # Add anonymous device count to total as well
     total += DeviceToken.objects.filter(user__isnull=True, is_active=True).count()
 
@@ -2687,6 +2695,8 @@ def event_submission_review(request, pk):
             # Send push notification to the user's device(s)
             try:
                 import firebase_admin.messaging as fcm_messaging
+                from config.firebase import initialize_firebase
+                initialize_firebase()
                 event_title = submission.event_registration.event_title
                 tokens = set(
                     DeviceToken.objects.filter(
@@ -2710,6 +2720,25 @@ def event_submission_review(request, pk):
                             'action_value': '/events',
                             'type': 'event',
                         },
+                        android=fcm_messaging.AndroidConfig(
+                            priority='high',
+                            notification=fcm_messaging.AndroidNotification(
+                                channel_id='default_channel',
+                                priority='max',
+                                default_sound=True,
+                                default_vibrate_timings=True,
+                            ),
+                        ),
+                        apns=fcm_messaging.APNSConfig(
+                            headers={'apns-priority': '10'},
+                            payload=fcm_messaging.APNSPayload(
+                                aps=fcm_messaging.Aps(
+                                    sound='default',
+                                    badge=1,
+                                    content_available=True,
+                                ),
+                            ),
+                        ),
                     ))
             except Exception:
                 pass  # Push is best-effort — don't fail the review
@@ -2793,6 +2822,8 @@ def event_submission_review(request, pk):
             # Send push notification to the user's device(s)
             try:
                 import firebase_admin.messaging as fcm_messaging
+                from config.firebase import initialize_firebase
+                initialize_firebase()
                 event_title = submission.event_registration.event_title
                 tokens = set(
                     DeviceToken.objects.filter(
@@ -2816,6 +2847,25 @@ def event_submission_review(request, pk):
                             'action_value': '/events',
                             'type': 'event',
                         },
+                        android=fcm_messaging.AndroidConfig(
+                            priority='high',
+                            notification=fcm_messaging.AndroidNotification(
+                                channel_id='default_channel',
+                                priority='max',
+                                default_sound=True,
+                                default_vibrate_timings=True,
+                            ),
+                        ),
+                        apns=fcm_messaging.APNSConfig(
+                            headers={'apns-priority': '10'},
+                            payload=fcm_messaging.APNSPayload(
+                                aps=fcm_messaging.Aps(
+                                    sound='default',
+                                    badge=1,
+                                    content_available=True,
+                                ),
+                            ),
+                        ),
                     ))
             except Exception:
                 pass  # Push is best-effort — don't fail the review

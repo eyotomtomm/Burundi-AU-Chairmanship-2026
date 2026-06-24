@@ -28,12 +28,18 @@ def get_target_profiles(notification):
 
     Returns a filtered queryset of UserProfile objects (not just tokens).
     This allows language-specific message dispatch.
+
+    Includes profiles that have EITHER a legacy fcm_token OR active entries
+    in the DeviceToken model, so users who registered tokens via the
+    ``register_fcm_token`` endpoint (which only creates DeviceToken rows)
+    are not silently excluded.
     """
-    profiles = UserProfile.objects.exclude(
-        fcm_token=''
-    ).exclude(
-        fcm_token__isnull=True
-    ).select_related('user')
+    from django.db.models import Q
+
+    profiles = UserProfile.objects.filter(
+        Q(fcm_token__isnull=False) & ~Q(fcm_token='')
+        | Q(user__device_tokens__is_active=True)
+    ).select_related('user').distinct()
 
     if notification.is_global:
         # Apply language filter even for global notifications

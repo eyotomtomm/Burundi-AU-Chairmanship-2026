@@ -104,6 +104,7 @@ dependencies:
   # Error Tracking & Performance Monitoring
   sentry_flutter: ^8.3.0
   image_cropper: ^12.2.0
+  play_in_app_update: ^1.0.1
 
 dev_dependencies:
   flutter_test:

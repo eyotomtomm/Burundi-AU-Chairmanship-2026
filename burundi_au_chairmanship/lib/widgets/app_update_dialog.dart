@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:play_in_app_update/play_in_app_update.dart';
 import '../config/app_colors.dart';
 import '../services/remote_config_service.dart';
 
@@ -26,6 +27,9 @@ class AppUpdateDialog {
 
   /// Check for updates via Remote Config and show the appropriate dialog.
   ///
+  /// On Android, uses the native Google Play in-app update flow.
+  /// On iOS, shows a custom dialog linking to the App Store.
+  ///
   /// [context] - the BuildContext to show the dialog in.
   /// [currentVersion] - the current app version string (e.g. "1.0.0").
   /// [langCode] - "en" or "fr" for bilingual support.
@@ -35,6 +39,12 @@ class AppUpdateDialog {
     String langCode = 'en',
   }) async {
     try {
+      // On Android, try native Play in-app update first
+      if (Platform.isAndroid) {
+        final handled = await _tryPlayInAppUpdate(context, currentVersion);
+        if (handled) return;
+      }
+
       final remoteConfig = RemoteConfigService();
 
       final minVersion = remoteConfig.minAppVersion;
@@ -72,6 +82,45 @@ class AppUpdateDialog {
       // Otherwise: app is up to date, do nothing
     } catch (_) {
       // Silently fail - update check is non-critical
+    }
+  }
+
+  /// Attempt native Google Play in-app update.
+  /// Returns true if an update was triggered, false to fall back to dialog.
+  static Future<bool> _tryPlayInAppUpdate(
+    BuildContext context,
+    String currentVersion,
+  ) async {
+    try {
+      final updateInfo = await PlayInAppUpdate.checkForUpdate();
+      if (updateInfo.updateAvailability != UpdateAvailability.updateAvailable) {
+        return false;
+      }
+
+      // Use Remote Config to decide if this should be an immediate (forced) update
+      final remoteConfig = RemoteConfigService();
+      final minVersion = remoteConfig.minAppVersion;
+      final current = _parseVersion(currentVersion);
+      final min = _parseVersion(minVersion);
+      final forceUpdate = current < min;
+
+      if (forceUpdate &&
+          updateInfo.isImmediateUpdateAllowed) {
+        await PlayInAppUpdate.performImmediateUpdate();
+        return true;
+      }
+
+      if (updateInfo.isFlexibleUpdateAllowed) {
+        await PlayInAppUpdate.startFlexibleUpdate();
+        await PlayInAppUpdate.completeFlexibleUpdate();
+        return true;
+      }
+
+      // Native update not allowed for this type, fall back to dialog
+      return false;
+    } catch (_) {
+      // Play in-app update failed, fall back to Remote Config dialog
+      return false;
     }
   }
 

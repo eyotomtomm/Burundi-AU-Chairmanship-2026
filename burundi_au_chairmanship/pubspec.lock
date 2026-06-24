@@ -933,6 +933,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.20.2"
+  jni:
+    dependency: transitive
+    description:
+      name: jni
+      sha256: "8706a77e94c76fe9ec9315e18949cc9479cc03af97085ca9c1077b61323ea12d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.15.2"
   js:
     dependency: transitive
     description:
@@ -1069,6 +1077,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.7.0"
+  package_config:
+    dependency: transitive
+    description:
+      name: package_config
+      sha256: f096c55ebb7deb7e384101542bfba8c52696c1b56fca2eb62827989ef2353bbc
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   package_info_plus:
     dependency: transitive
     description:
@@ -1173,6 +1189,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.6"
+  play_in_app_update:
+    dependency: "direct main"
+    description:
+      name: play_in_app_update
+      sha256: "9fc15a66fef4651cc8c7c3508f38117fdf7f5822c90e00e0351af09d621dca53"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   plugin_platform_interface:
     dependency: transitive
     description:

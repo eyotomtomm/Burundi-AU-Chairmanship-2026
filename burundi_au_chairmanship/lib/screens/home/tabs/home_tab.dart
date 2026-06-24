@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -307,12 +308,33 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     }
   }
 
+  static const _ydSettingsCacheKey = 'yd_settings_cache';
+
   void _fetchYouthDialogueData() {
     final api = ApiService();
     final isAuth = context.read<AuthProvider>().isAuthenticated;
+
+    // Load cached YD settings first so YD appears instantly
+    if (_ydSettings == null) {
+      SharedPreferences.getInstance().then((prefs) {
+        final cached = prefs.getString(_ydSettingsCacheKey);
+        if (cached != null && mounted && _ydSettings == null) {
+          try {
+            setState(() => _ydSettings = jsonDecode(cached) as Map<String, dynamic>);
+          } catch (_) {}
+        }
+      });
+    }
+
+    // Fetch fresh settings from API, then cache
     api.youthDialogueSettings().then((data) {
       if (mounted) setState(() => _ydSettings = data);
+      // Cache for next time
+      SharedPreferences.getInstance().then((prefs) {
+        try { prefs.setString(_ydSettingsCacheKey, jsonEncode(data)); } catch (_) {}
+      });
     }).catchError((_) {});
+
     if (isAuth) {
       api.youthDialogueEligibility().then((data) {
         if (mounted) setState(() => _ydEligible = data['eligible'] == true);

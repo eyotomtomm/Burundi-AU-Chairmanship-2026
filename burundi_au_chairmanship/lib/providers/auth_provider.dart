@@ -283,15 +283,24 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     } on ApiException catch (e) {
       if (kDebugMode) print('Backend sync rejected: ${e.statusCode} ${e.message}');
-      // If backend explicitly rejects (401/403 = account deactivated/deleted),
-      // sign out completely so the user isn't stuck as "authenticated"
-      if (e.statusCode == 401 || e.statusCode == 403) {
+      // 404/401 during active sign-in/sign-up is expected (user not yet
+      // registered on backend). Never sign out while another auth flow is
+      // in progress — that would kill the ongoing operation.
+      if (_isSigningIn) {
+        if (kDebugMode) print('Backend sync skipped — sign-in in progress');
+        return;
+      }
+      // If backend explicitly rejects (403 = account deactivated/deleted),
+      // sign out completely so the user isn't stuck as "authenticated".
+      // 401 with an existing cached session means the account was likely
+      // removed server-side. 404 = user not found (new social sign-in).
+      if (e.statusCode == 403 || (e.statusCode == 401 && _isAuthenticated)) {
         await _firebaseAuth.signOut();
         await _clearUserData();
         _isAuthenticated = false;
         notifyListeners();
       } else {
-        // Other errors (500, timeout) — keep cached data, stay authenticated
+        // Other errors (404, 500, timeout) — keep cached data, stay authenticated
         _isAuthenticated = true;
         notifyListeners();
       }
@@ -311,6 +320,7 @@ class AuthProvider extends ChangeNotifier {
       {String? phoneNumber, String? gender, String? honeypot}) async {
     _isLoading = true;
     _errorMessage = null;
+    _isSigningIn = true; // Prevent auth listener from racing with this method
     notifyListeners();
 
     try {
@@ -361,11 +371,13 @@ class AuthProvider extends ChangeNotifier {
 
       _isAuthenticated = true;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _firebaseAuth.getErrorMessage(e);
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } on ApiException catch (e) {
@@ -378,6 +390,7 @@ class AuthProvider extends ChangeNotifier {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } catch (e) {
@@ -388,6 +401,7 @@ class AuthProvider extends ChangeNotifier {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Registration failed: $e';
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     }
@@ -397,6 +411,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signIn(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
+    _isSigningIn = true; // Prevent auth listener from racing with this method
     notifyListeners();
 
     try {
@@ -427,11 +442,13 @@ class AuthProvider extends ChangeNotifier {
 
       _isAuthenticated = true;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _firebaseAuth.getErrorMessage(e);
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } on ApiException catch (e) {
@@ -439,12 +456,14 @@ class AuthProvider extends ChangeNotifier {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = e.message;
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     } catch (e) {
       try { await _firebaseAuth.signOut(); } catch (_) {}
       _errorMessage = 'Login failed: $e';
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     }

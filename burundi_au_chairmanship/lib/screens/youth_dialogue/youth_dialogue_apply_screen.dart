@@ -32,8 +32,9 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   String _phoneCountryCode = '+257'; // Default Burundi
   String _phoneCountryFlag = '🇧🇮';
 
-  // Common African + international country codes
+  // International country codes — Africa first, then alphabetical by continent
   static const List<Map<String, String>> _phoneCodes = [
+    // ── Africa ──
     {'code': '+257', 'flag': '🇧🇮', 'name': 'Burundi'},
     {'code': '+213', 'flag': '🇩🇿', 'name': 'Algeria'},
     {'code': '+244', 'flag': '🇦🇴', 'name': 'Angola'},
@@ -88,19 +89,90 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     {'code': '+256', 'flag': '🇺🇬', 'name': 'Uganda'},
     {'code': '+260', 'flag': '🇿🇲', 'name': 'Zambia'},
     {'code': '+263', 'flag': '🇿🇼', 'name': 'Zimbabwe'},
-    {'code': '+32', 'flag': '🇧🇪', 'name': 'Belgium'},
+    // ── Americas ──
+    {'code': '+54', 'flag': '🇦🇷', 'name': 'Argentina'},
+    {'code': '+591', 'flag': '🇧🇴', 'name': 'Bolivia'},
     {'code': '+55', 'flag': '🇧🇷', 'name': 'Brazil'},
     {'code': '+1', 'flag': '🇨🇦', 'name': 'Canada'},
-    {'code': '+86', 'flag': '🇨🇳', 'name': 'China'},
+    {'code': '+56', 'flag': '🇨🇱', 'name': 'Chile'},
+    {'code': '+57', 'flag': '🇨🇴', 'name': 'Colombia'},
+    {'code': '+506', 'flag': '🇨🇷', 'name': 'Costa Rica'},
+    {'code': '+53', 'flag': '🇨🇺', 'name': 'Cuba'},
+    {'code': '+593', 'flag': '🇪🇨', 'name': 'Ecuador'},
+    {'code': '+502', 'flag': '🇬🇹', 'name': 'Guatemala'},
+    {'code': '+509', 'flag': '🇭🇹', 'name': 'Haiti'},
+    {'code': '+504', 'flag': '🇭🇳', 'name': 'Honduras'},
+    {'code': '+876', 'flag': '🇯🇲', 'name': 'Jamaica'},
+    {'code': '+52', 'flag': '🇲🇽', 'name': 'Mexico'},
+    {'code': '+507', 'flag': '🇵🇦', 'name': 'Panama'},
+    {'code': '+595', 'flag': '🇵🇾', 'name': 'Paraguay'},
+    {'code': '+51', 'flag': '🇵🇪', 'name': 'Peru'},
+    {'code': '+1', 'flag': '🇺🇸', 'name': 'United States'},
+    {'code': '+598', 'flag': '🇺🇾', 'name': 'Uruguay'},
+    {'code': '+58', 'flag': '🇻🇪', 'name': 'Venezuela'},
+    // ── Europe ──
+    {'code': '+43', 'flag': '🇦🇹', 'name': 'Austria'},
+    {'code': '+32', 'flag': '🇧🇪', 'name': 'Belgium'},
+    {'code': '+359', 'flag': '🇧🇬', 'name': 'Bulgaria'},
+    {'code': '+385', 'flag': '🇭🇷', 'name': 'Croatia'},
+    {'code': '+420', 'flag': '🇨🇿', 'name': 'Czech Republic'},
+    {'code': '+45', 'flag': '🇩🇰', 'name': 'Denmark'},
+    {'code': '+358', 'flag': '🇫🇮', 'name': 'Finland'},
     {'code': '+33', 'flag': '🇫🇷', 'name': 'France'},
     {'code': '+49', 'flag': '🇩🇪', 'name': 'Germany'},
+    {'code': '+30', 'flag': '🇬🇷', 'name': 'Greece'},
+    {'code': '+36', 'flag': '🇭🇺', 'name': 'Hungary'},
+    {'code': '+353', 'flag': '🇮🇪', 'name': 'Ireland'},
+    {'code': '+39', 'flag': '🇮🇹', 'name': 'Italy'},
+    {'code': '+31', 'flag': '🇳🇱', 'name': 'Netherlands'},
+    {'code': '+47', 'flag': '🇳🇴', 'name': 'Norway'},
+    {'code': '+48', 'flag': '🇵🇱', 'name': 'Poland'},
+    {'code': '+351', 'flag': '🇵🇹', 'name': 'Portugal'},
+    {'code': '+40', 'flag': '🇷🇴', 'name': 'Romania'},
+    {'code': '+7', 'flag': '🇷🇺', 'name': 'Russia'},
+    {'code': '+381', 'flag': '🇷🇸', 'name': 'Serbia'},
+    {'code': '+34', 'flag': '🇪🇸', 'name': 'Spain'},
+    {'code': '+46', 'flag': '🇸🇪', 'name': 'Sweden'},
+    {'code': '+41', 'flag': '🇨🇭', 'name': 'Switzerland'},
+    {'code': '+380', 'flag': '🇺🇦', 'name': 'Ukraine'},
+    {'code': '+44', 'flag': '🇬🇧', 'name': 'United Kingdom'},
+    // ── Asia ──
+    {'code': '+93', 'flag': '🇦🇫', 'name': 'Afghanistan'},
+    {'code': '+880', 'flag': '🇧🇩', 'name': 'Bangladesh'},
+    {'code': '+855', 'flag': '🇰🇭', 'name': 'Cambodia'},
+    {'code': '+86', 'flag': '🇨🇳', 'name': 'China'},
+    {'code': '+852', 'flag': '🇭🇰', 'name': 'Hong Kong'},
     {'code': '+91', 'flag': '🇮🇳', 'name': 'India'},
+    {'code': '+62', 'flag': '🇮🇩', 'name': 'Indonesia'},
+    {'code': '+98', 'flag': '🇮🇷', 'name': 'Iran'},
+    {'code': '+964', 'flag': '🇮🇶', 'name': 'Iraq'},
+    {'code': '+972', 'flag': '🇮🇱', 'name': 'Israel'},
     {'code': '+81', 'flag': '🇯🇵', 'name': 'Japan'},
+    {'code': '+962', 'flag': '🇯🇴', 'name': 'Jordan'},
+    {'code': '+7', 'flag': '🇰🇿', 'name': 'Kazakhstan'},
+    {'code': '+965', 'flag': '🇰🇼', 'name': 'Kuwait'},
+    {'code': '+961', 'flag': '🇱🇧', 'name': 'Lebanon'},
+    {'code': '+60', 'flag': '🇲🇾', 'name': 'Malaysia'},
+    {'code': '+95', 'flag': '🇲🇲', 'name': 'Myanmar'},
+    {'code': '+977', 'flag': '🇳🇵', 'name': 'Nepal'},
+    {'code': '+968', 'flag': '🇴🇲', 'name': 'Oman'},
+    {'code': '+92', 'flag': '🇵🇰', 'name': 'Pakistan'},
+    {'code': '+63', 'flag': '🇵🇭', 'name': 'Philippines'},
+    {'code': '+974', 'flag': '🇶🇦', 'name': 'Qatar'},
     {'code': '+966', 'flag': '🇸🇦', 'name': 'Saudi Arabia'},
+    {'code': '+65', 'flag': '🇸🇬', 'name': 'Singapore'},
+    {'code': '+82', 'flag': '🇰🇷', 'name': 'South Korea'},
+    {'code': '+94', 'flag': '🇱🇰', 'name': 'Sri Lanka'},
+    {'code': '+66', 'flag': '🇹🇭', 'name': 'Thailand'},
     {'code': '+90', 'flag': '🇹🇷', 'name': 'Turkey'},
     {'code': '+971', 'flag': '🇦🇪', 'name': 'UAE'},
-    {'code': '+44', 'flag': '🇬🇧', 'name': 'United Kingdom'},
-    {'code': '+1', 'flag': '🇺🇸', 'name': 'United States'},
+    {'code': '+84', 'flag': '🇻🇳', 'name': 'Vietnam'},
+    {'code': '+967', 'flag': '🇾🇪', 'name': 'Yemen'},
+    // ── Oceania ──
+    {'code': '+61', 'flag': '🇦🇺', 'name': 'Australia'},
+    {'code': '+679', 'flag': '🇫🇯', 'name': 'Fiji'},
+    {'code': '+64', 'flag': '🇳🇿', 'name': 'New Zealand'},
+    {'code': '+675', 'flag': '🇵🇬', 'name': 'Papua New Guinea'},
   ];
 
   // Title options for the title dropdown
@@ -128,22 +200,33 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     'Protocol',
   ];
 
-  // Country list for 'country' field type
+  // Country list for 'country' field type — international
   static const List<String> _countryList = [
     'Afghanistan', 'Albania', 'Algeria', 'Angola', 'Argentina', 'Australia',
-    'Austria', 'Bangladesh', 'Belgium', 'Benin', 'Botswana', 'Brazil',
-    'Burkina Faso', 'Burundi', 'Cabo Verde', 'Cameroon', 'Canada',
-    'Central African Republic', 'Chad', 'China', 'Colombia', 'Comoros',
-    'Congo (Brazzaville)', 'Congo (DRC)', "Côte d'Ivoire", 'Djibouti',
-    'Egypt', 'Equatorial Guinea', 'Eritrea', 'Eswatini', 'Ethiopia',
-    'France', 'Gabon', 'Gambia', 'Germany', 'Ghana', 'Guinea',
-    'Guinea-Bissau', 'India', 'Japan', 'Kenya', 'Lesotho', 'Liberia',
-    'Libya', 'Madagascar', 'Malawi', 'Mali', 'Mauritania', 'Mauritius',
-    'Morocco', 'Mozambique', 'Namibia', 'Niger', 'Nigeria', 'Rwanda',
-    'São Tomé and Príncipe', 'Saudi Arabia', 'Senegal', 'Seychelles',
-    'Sierra Leone', 'Somalia', 'South Africa', 'South Sudan', 'Sudan',
-    'Tanzania', 'Togo', 'Tunisia', 'Turkey', 'UAE', 'Uganda',
-    'United Kingdom', 'United States', 'Zambia', 'Zimbabwe', 'Other',
+    'Austria', 'Bangladesh', 'Belgium', 'Benin', 'Bolivia', 'Botswana',
+    'Brazil', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cabo Verde',
+    'Cambodia', 'Cameroon', 'Canada', 'Central African Republic', 'Chad',
+    'Chile', 'China', 'Colombia', 'Comoros', 'Congo (Brazzaville)',
+    'Congo (DRC)', 'Costa Rica', "Côte d'Ivoire", 'Croatia', 'Cuba',
+    'Czech Republic', 'Denmark', 'Djibouti', 'Ecuador', 'Egypt',
+    'Equatorial Guinea', 'Eritrea', 'Eswatini', 'Ethiopia', 'Fiji',
+    'Finland', 'France', 'Gabon', 'Gambia', 'Germany', 'Ghana', 'Greece',
+    'Guatemala', 'Guinea', 'Guinea-Bissau', 'Haiti', 'Honduras',
+    'Hong Kong', 'Hungary', 'India', 'Indonesia', 'Iran', 'Iraq',
+    'Ireland', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan',
+    'Kazakhstan', 'Kenya', 'Kuwait', 'Lebanon', 'Lesotho', 'Liberia',
+    'Libya', 'Madagascar', 'Malawi', 'Malaysia', 'Mali', 'Mauritania',
+    'Mauritius', 'Mexico', 'Morocco', 'Mozambique', 'Myanmar', 'Namibia',
+    'Nepal', 'Netherlands', 'New Zealand', 'Niger', 'Nigeria', 'Norway',
+    'Oman', 'Pakistan', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru',
+    'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia',
+    'Rwanda', 'São Tomé and Príncipe', 'Saudi Arabia', 'Senegal',
+    'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Somalia',
+    'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka',
+    'Sudan', 'Sweden', 'Switzerland', 'Tanzania', 'Thailand', 'Togo',
+    'Tunisia', 'Turkey', 'UAE', 'Uganda', 'Ukraine', 'United Kingdom',
+    'United States', 'Uruguay', 'Venezuela', 'Vietnam', 'Yemen',
+    'Zambia', 'Zimbabwe', 'Other',
   ];
 
   /// Converts ISO 3166-1 alpha-2 code to regional indicator flag emoji
@@ -156,8 +239,9 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     ]);
   }
 
-  // Nationality list for 'nationality' field type
+  // Nationality list for 'nationality' field type — international
   static const List<Map<String, String>> _nationalities = [
+    // ── Africa ──
     {'code': 'BI', 'name': 'Burundi'}, {'code': 'DZ', 'name': 'Algeria'},
     {'code': 'AO', 'name': 'Angola'}, {'code': 'BJ', 'name': 'Benin'},
     {'code': 'BW', 'name': 'Botswana'}, {'code': 'BF', 'name': 'Burkina Faso'},
@@ -185,13 +269,51 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     {'code': 'TZ', 'name': 'Tanzania'}, {'code': 'TG', 'name': 'Togo'},
     {'code': 'TN', 'name': 'Tunisia'}, {'code': 'UG', 'name': 'Uganda'},
     {'code': 'ZM', 'name': 'Zambia'}, {'code': 'ZW', 'name': 'Zimbabwe'},
-    {'code': 'BE', 'name': 'Belgium'}, {'code': 'BR', 'name': 'Brazil'},
-    {'code': 'CA', 'name': 'Canada'}, {'code': 'CN', 'name': 'China'},
-    {'code': 'FR', 'name': 'France'}, {'code': 'DE', 'name': 'Germany'},
-    {'code': 'IN', 'name': 'India'}, {'code': 'JP', 'name': 'Japan'},
-    {'code': 'RU', 'name': 'Russia'}, {'code': 'SA', 'name': 'Saudi Arabia'},
-    {'code': 'TR', 'name': 'Turkey'}, {'code': 'AE', 'name': 'UAE'},
-    {'code': 'GB', 'name': 'United Kingdom'}, {'code': 'US', 'name': 'United States'},
+    // ── Americas ──
+    {'code': 'AR', 'name': 'Argentina'}, {'code': 'BO', 'name': 'Bolivia'},
+    {'code': 'BR', 'name': 'Brazil'}, {'code': 'CA', 'name': 'Canada'},
+    {'code': 'CL', 'name': 'Chile'}, {'code': 'CO', 'name': 'Colombia'},
+    {'code': 'CR', 'name': 'Costa Rica'}, {'code': 'CU', 'name': 'Cuba'},
+    {'code': 'EC', 'name': 'Ecuador'}, {'code': 'GT', 'name': 'Guatemala'},
+    {'code': 'HT', 'name': 'Haiti'}, {'code': 'HN', 'name': 'Honduras'},
+    {'code': 'JM', 'name': 'Jamaica'}, {'code': 'MX', 'name': 'Mexico'},
+    {'code': 'PA', 'name': 'Panama'}, {'code': 'PY', 'name': 'Paraguay'},
+    {'code': 'PE', 'name': 'Peru'}, {'code': 'US', 'name': 'United States'},
+    {'code': 'UY', 'name': 'Uruguay'}, {'code': 'VE', 'name': 'Venezuela'},
+    // ── Europe ──
+    {'code': 'AT', 'name': 'Austria'}, {'code': 'BE', 'name': 'Belgium'},
+    {'code': 'BG', 'name': 'Bulgaria'}, {'code': 'HR', 'name': 'Croatia'},
+    {'code': 'CZ', 'name': 'Czech Republic'}, {'code': 'DK', 'name': 'Denmark'},
+    {'code': 'FI', 'name': 'Finland'}, {'code': 'FR', 'name': 'France'},
+    {'code': 'DE', 'name': 'Germany'}, {'code': 'GR', 'name': 'Greece'},
+    {'code': 'HU', 'name': 'Hungary'}, {'code': 'IE', 'name': 'Ireland'},
+    {'code': 'IT', 'name': 'Italy'}, {'code': 'NL', 'name': 'Netherlands'},
+    {'code': 'NO', 'name': 'Norway'}, {'code': 'PL', 'name': 'Poland'},
+    {'code': 'PT', 'name': 'Portugal'}, {'code': 'RO', 'name': 'Romania'},
+    {'code': 'RU', 'name': 'Russia'}, {'code': 'RS', 'name': 'Serbia'},
+    {'code': 'ES', 'name': 'Spain'}, {'code': 'SE', 'name': 'Sweden'},
+    {'code': 'CH', 'name': 'Switzerland'}, {'code': 'UA', 'name': 'Ukraine'},
+    {'code': 'GB', 'name': 'United Kingdom'},
+    // ── Asia & Middle East ──
+    {'code': 'AF', 'name': 'Afghanistan'}, {'code': 'BD', 'name': 'Bangladesh'},
+    {'code': 'KH', 'name': 'Cambodia'}, {'code': 'CN', 'name': 'China'},
+    {'code': 'HK', 'name': 'Hong Kong'}, {'code': 'IN', 'name': 'India'},
+    {'code': 'ID', 'name': 'Indonesia'}, {'code': 'IR', 'name': 'Iran'},
+    {'code': 'IQ', 'name': 'Iraq'}, {'code': 'IL', 'name': 'Israel'},
+    {'code': 'JP', 'name': 'Japan'}, {'code': 'JO', 'name': 'Jordan'},
+    {'code': 'KZ', 'name': 'Kazakhstan'}, {'code': 'KW', 'name': 'Kuwait'},
+    {'code': 'LB', 'name': 'Lebanon'}, {'code': 'MY', 'name': 'Malaysia'},
+    {'code': 'MM', 'name': 'Myanmar'}, {'code': 'NP', 'name': 'Nepal'},
+    {'code': 'OM', 'name': 'Oman'}, {'code': 'PK', 'name': 'Pakistan'},
+    {'code': 'PH', 'name': 'Philippines'}, {'code': 'QA', 'name': 'Qatar'},
+    {'code': 'SA', 'name': 'Saudi Arabia'}, {'code': 'SG', 'name': 'Singapore'},
+    {'code': 'KR', 'name': 'South Korea'}, {'code': 'LK', 'name': 'Sri Lanka'},
+    {'code': 'TH', 'name': 'Thailand'}, {'code': 'TR', 'name': 'Turkey'},
+    {'code': 'AE', 'name': 'UAE'}, {'code': 'VN', 'name': 'Vietnam'},
+    {'code': 'YE', 'name': 'Yemen'},
+    // ── Oceania ──
+    {'code': 'AU', 'name': 'Australia'}, {'code': 'FJ', 'name': 'Fiji'},
+    {'code': 'NZ', 'name': 'New Zealand'}, {'code': 'PG', 'name': 'Papua New Guinea'},
     {'code': 'OTHER', 'name': 'Other'},
   ];
 
@@ -206,6 +328,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     final authProvider = context.read<AuthProvider>();
     for (final field in widget.formFields) {
       if (!field.isActive) continue;
+      if (field.fieldName.toLowerCase().contains('motivation')) continue;
       // Title & position fields always use dropdown (_formValues), never a text controller
       if (field.fieldName == 'title' || field.fieldName == 'position') continue;
       // Create controllers for text-based fields
@@ -276,6 +399,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       final formData = <String, dynamic>{};
       for (final field in widget.formFields) {
         if (!field.isActive) continue;
+        if (field.fieldName.toLowerCase().contains('motivation')) continue;
         final name = field.fieldName;
         if (_formControllers.containsKey(name)) {
           var value = _formControllers[name]!.text.trim();
@@ -475,7 +599,10 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       );
     }
 
-    final activeFields = widget.formFields.where((f) => f.isActive).toList();
+    final activeFields = widget.formFields
+        .where((f) => f.isActive)
+        .where((f) => !f.fieldName.toLowerCase().contains('motivation'))
+        .toList();
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),

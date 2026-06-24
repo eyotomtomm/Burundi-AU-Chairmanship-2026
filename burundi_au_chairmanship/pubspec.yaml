@@ -1,7 +1,7 @@
 name: burundi_au_chairmanship
 description: Be 4 Africa Official App - Digital Magazine, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
 publish_to: 'none'
-version: 1.2.7+37
+version: 1.2.8+38
 
 environment:
   sdk: ^3.10.8
@@ -97,6 +97,9 @@ dependencies:
   # QR Code
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
+
+  # PDF Generation
+  pdf: ^3.11.2
 
   # Error Tracking & Performance Monitoring
   sentry_flutter: ^8.3.0

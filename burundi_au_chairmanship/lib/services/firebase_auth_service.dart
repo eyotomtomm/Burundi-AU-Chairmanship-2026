@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -164,11 +165,20 @@ class FirebaseAuthService {
         );
       }
 
+      if (kDebugMode) {
+        print('Apple identityToken length: ${identityToken.length}');
+        print('Apple identityToken prefix: ${identityToken.substring(0, identityToken.length.clamp(0, 30))}...');
+        print('Apple rawNonce: $rawNonce');
+        print('Apple authorizationCode: ${appleCredential.authorizationCode != null ? "present" : "null"}');
+        print('Apple email: ${appleCredential.email}');
+      }
+
       // 4. Create Firebase credential with the identity token and raw nonce
       final oAuthProvider = OAuthProvider('apple.com');
       final credential = oAuthProvider.credential(
         idToken: identityToken,
         rawNonce: rawNonce,
+        accessToken: appleCredential.authorizationCode,
       );
 
       // 5. Sign in to Firebase
@@ -299,7 +309,7 @@ class FirebaseAuthService {
       // (Apple/Google) is not properly configured in Firebase Console.
       case 'invalid-credential':
         if (provider == 'apple') {
-          return 'Apple Sign-In failed. Please ensure Apple Sign-In is properly configured and try again.';
+          return 'Apple Sign-In failed (${e.message ?? 'invalid credential'}). Please contact support.';
         }
         if (provider == 'google') {
           return 'Google Sign-In failed. Please ensure Google Sign-In is properly configured and try again.';

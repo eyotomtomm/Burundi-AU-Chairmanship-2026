@@ -164,6 +164,24 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    final authProvider = context.read<AuthProvider>();
+                    final navigator = Navigator.of(context);
+                    await authProvider.signOut();
+                    if (mounted) {
+                      navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
+                    }
+                  },
+                  child: Text(
+                    'Use a different email',
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ],
 
               _buildErrorBox(),

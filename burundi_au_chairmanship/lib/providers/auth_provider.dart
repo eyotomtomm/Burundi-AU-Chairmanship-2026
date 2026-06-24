@@ -103,6 +103,15 @@ class AuthProvider extends ChangeNotifier {
     _listenToAuthChanges();
   }
 
+  /// Persist _requiresEmailVerification to SharedPreferences so it survives
+  /// app restarts. Without this, the flag defaults to false and unverified
+  /// users bypass the verification screen if backend sync fails.
+  Future<void> _persistEmailVerificationFlag(bool value) async {
+    _requiresEmailVerification = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('requires_email_verification', value);
+  }
+
   /// Listen to Firebase auth state changes
   ///
   /// Guards against premature sign-out: during app startup, Firebase may briefly
@@ -190,10 +199,12 @@ class AuthProvider extends ChangeNotifier {
         _isAuthenticated = true;
         await _loadLocalUserData();
 
-        // Don't set _requiresEmailVerification from cache here — the
-        // backend sync below will set the authoritative value.  Using
-        // stale cache caused users who verified their email to be
-        // re-prompted after signing back in.
+        // Load cached requiresEmailVerification as a safe default.
+        // If backend sync succeeds, it will override with the fresh value.
+        // If backend sync fails/times out, the cached value ensures
+        // unverified users still get routed to the verification screen.
+        final prefs = await SharedPreferences.getInstance();
+        _requiresEmailVerification = prefs.getBool('requires_email_verification') ?? false;
 
         notifyListeners();
 
@@ -276,8 +287,8 @@ class AuthProvider extends ChangeNotifier {
       );
       await _storeUserData(data['user']);
 
-      // Capture email verification requirement
-      _requiresEmailVerification = data['requires_email_verification'] == true;
+      // Capture email verification requirement and persist it
+      await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
 
       _isAuthenticated = true;
       notifyListeners();
@@ -366,8 +377,8 @@ class AuthProvider extends ChangeNotifier {
       // 5. Store user data locally
       await _storeUserData(data['user']);
 
-      // Capture email verification requirement
-      _requiresEmailVerification = data['requires_email_verification'] == true;
+      // Capture email verification requirement and persist it
+      await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -438,7 +449,7 @@ class AuthProvider extends ChangeNotifier {
 
       // Sign-in never requires email verification — that's only for sign-up.
       // A user who can sign in already has an account.
-      _requiresEmailVerification = false;
+      await _persistEmailVerificationFlag(false);
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -496,7 +507,7 @@ class AuthProvider extends ChangeNotifier {
       await _storeUserData(data['user']);
 
       // Google sign-in: backend trusts Firebase email_verified flag
-      _requiresEmailVerification = data['requires_email_verification'] == true;
+      await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -556,7 +567,7 @@ class AuthProvider extends ChangeNotifier {
       await _storeUserData(data['user']);
 
       // Apple sign-in: backend trusts Firebase email_verified flag
-      _requiresEmailVerification = data['requires_email_verification'] == true;
+      await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
 
       _isAuthenticated = true;
       _isLoading = false;
@@ -664,7 +675,7 @@ class AuthProvider extends ChangeNotifier {
       final data = await _api.post('auth/verify-signup-otp/', {'otp_code': code}, auth: true);
       if (data['email_verified'] == true) {
         _isEmailVerified = true;
-        _requiresEmailVerification = false;
+        await _persistEmailVerificationFlag(false);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('user_email_verified', true);
         notifyListeners();
@@ -1071,6 +1082,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('cached_verification_status');
     await prefs.remove('cached_badge_type');
     await prefs.remove('cached_verification_request_id');
+    await prefs.remove('requires_email_verification');
 
     _userId = null;
     _userName = null;
@@ -1087,6 +1099,7 @@ class AuthProvider extends ChangeNotifier {
     _verificationTitle = null;
     _verificationRole = null;
     _verificationName = null;
+    _requiresEmailVerification = false;
     _receivesNewsletter = false;
     _isUsher = false;
     _adminSections = [];

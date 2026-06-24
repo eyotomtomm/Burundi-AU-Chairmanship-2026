@@ -74,7 +74,7 @@ class ApiService {
   /// UI can listen to this to show a "Reconnecting..." banner.
   final ValueNotifier<bool> authDegraded = ValueNotifier<bool>(false);
 
-  Future<Map<String, String>> _headers({bool auth = false}) async {
+  Future<Map<String, String>> _headers({bool auth = false, bool noAutoAuth = false}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
@@ -85,6 +85,8 @@ class ApiService {
         headers['X-Device-Id'] = deviceId;
       }
     } catch (_) {}
+    // Skip auto-auth for endpoints that handle their own token (e.g. firebase-login, firebase-register)
+    if (noAutoAuth) return headers;
     // Always include Firebase token when user is logged in so the
     // backend can return personalised fields (is_liked, etc.)
     final firebaseUser = FirebaseAuth.instance.currentUser;
@@ -275,6 +277,7 @@ class ApiService {
     String endpoint,
     Map<String, dynamic> body, {
     bool auth = false,
+    bool noAutoAuth = false,
     Map<String, String>? extraHeaders,
   }) async {
     try {
@@ -290,7 +293,7 @@ class ApiService {
               )
               .timeout(const Duration(seconds: 20));
         },
-        () => _headers(auth: auth),
+        () => _headers(auth: auth, noAutoAuth: noAutoAuth),
       );
       final data = json.decode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -485,7 +488,7 @@ class ApiService {
     if (honeypot.isNotEmpty) {
       body['_hp'] = honeypot;
     }
-    return await _post('auth/firebase-register/', body);
+    return await _post('auth/firebase-register/', body, noAutoAuth: true);
   }
 
   Future<Map<String, dynamic>> firebaseLogin({
@@ -499,7 +502,7 @@ class ApiService {
       if (deviceName != null) 'device_name': deviceName,
       if (deviceType != null) 'device_type': deviceType,
       if (appVersion != null) 'app_version': appVersion,
-    });
+    }, noAutoAuth: true);
   }
 
   /// Presence ping used for the admin "users online now" counter.

@@ -237,8 +237,10 @@ class FirebaseAuthService {
     await _auth.currentUser?.delete();
   }
 
-  /// Get a user-friendly error message from FirebaseAuthException
-  String getErrorMessage(FirebaseAuthException e) {
+  /// Get a user-friendly error message from FirebaseAuthException.
+  /// [provider] indicates which sign-in method triggered the error
+  /// ('google', 'apple', or null for email/password).
+  String getErrorMessage(FirebaseAuthException e, {String? provider}) {
     switch (e.code) {
       // Email/Password errors
       case 'email-already-in-use':
@@ -248,6 +250,12 @@ class FirebaseAuthService {
       case 'weak-password':
         return 'Password is too weak. Please use at least 6 characters.';
       case 'user-not-found':
+        if (provider == 'google') {
+          return 'Google Sign-In failed. Please try again or use a different method.';
+        }
+        if (provider == 'apple') {
+          return 'Apple Sign-In failed. Please try again or use a different method.';
+        }
         return 'No account found with this email. Please sign up first.';
       case 'wrong-password':
         return 'Incorrect password. Please try again.';
@@ -256,6 +264,12 @@ class FirebaseAuthService {
       case 'too-many-requests':
         return 'Too many failed attempts. Please try again later.';
       case 'operation-not-allowed':
+        if (provider == 'apple') {
+          return 'Apple Sign-In is not configured. Please contact support.';
+        }
+        if (provider == 'google') {
+          return 'Google Sign-In is not configured. Please contact support.';
+        }
         return 'Email/password sign-in is not enabled. Please contact support.';
       case 'network-request-failed':
         return 'Network error. Please check your internet connection.';
@@ -281,8 +295,15 @@ class FirebaseAuthService {
         return 'This account is already associated with another user.';
 
       // Invalid credential — Firebase v2 merges wrong-password and user-not-found
-      // into this single code for security. Also fires on SHA-1 mismatch for Google.
+      // into this single code for security. Also fires when a social provider
+      // (Apple/Google) is not properly configured in Firebase Console.
       case 'invalid-credential':
+        if (provider == 'apple') {
+          return 'Apple Sign-In failed. Please ensure Apple Sign-In is properly configured and try again.';
+        }
+        if (provider == 'google') {
+          return 'Google Sign-In failed. Please ensure Google Sign-In is properly configured and try again.';
+        }
         return 'Invalid email or password. Please check your credentials and try again.';
 
       default:

@@ -29,13 +29,14 @@ class SplashPreloader {
   /// Safe to call multiple times — subsequent calls are no-ops while loading.
   void startPreload() {
     if (_completer != null) return; // already in-flight
-    _completer = Completer<PreloadedHomeData?>();
+    final completer = Completer<PreloadedHomeData?>();
+    _completer = completer;
 
     _doPreload().then((data) {
       _data = data;
-      if (!_completer!.isCompleted) _completer!.complete(data);
+      if (!completer.isCompleted) completer.complete(data);
     }).catchError((e) {
-      if (!_completer!.isCompleted) _completer!.complete(null);
+      if (!completer.isCompleted) completer.complete(null);
     });
   }
 

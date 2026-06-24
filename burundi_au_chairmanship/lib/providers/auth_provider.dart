@@ -504,7 +504,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
-      _errorMessage = _firebaseAuth.getErrorMessage(e);
+      _errorMessage = _firebaseAuth.getErrorMessage(e, provider: 'google');
       _isLoading = false;
       _isSigningIn = false;
       notifyListeners();
@@ -564,7 +564,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on FirebaseAuthException catch (e) {
-      _errorMessage = _firebaseAuth.getErrorMessage(e);
+      _errorMessage = _firebaseAuth.getErrorMessage(e, provider: 'apple');
       _isLoading = false;
       _isSigningIn = false;
       notifyListeners();
@@ -586,7 +586,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Try firebase login first; if user doesn't exist (404), auto-register.
+  /// Try firebase login first; if user doesn't exist on backend, auto-register.
   /// Also handles 409 (email conflict) by retrying registration which
   /// will link the accounts if the Firebase token has a verified email.
   Future<Map<String, dynamic>> _firebaseLoginOrRegister({
@@ -602,25 +602,37 @@ class AuthProvider extends ChangeNotifier {
         deviceType: Platform.operatingSystem,
         appVersion: AppConstants.appVersion,
       );
-    } on ApiException catch (e) {
-      // If user not found on backend, auto-create their account
-      if (e.statusCode == 404 || e.statusCode == 401) {
-        return await _api.firebaseRegister(
-          idToken: idToken,
-          name: name.isNotEmpty ? name : email.split('@').first,
-          email: email,
-        );
-      }
+    } on ApiException catch (loginError) {
+      if (kDebugMode) print('firebaseLogin failed: ${loginError.statusCode} ${loginError.message}');
       // 409 = email exists but Firebase UID doesn't match.
       // Re-throw with a clearer message for the user.
-      if (e.statusCode == 409) {
+      if (loginError.statusCode == 409) {
         throw ApiException(
           'This email is linked to another sign-in method. '
           'Try signing in with email & password instead.',
           409,
         );
       }
-      rethrow;
+      // 403 = account banned/deactivated — don't auto-register
+      if (loginError.statusCode == 403) {
+        rethrow;
+      }
+      // For any other error (400, 401, 404, 500, etc.), try to register.
+      // Social sign-in users may not exist on the backend yet.
+      try {
+        return await _api.firebaseRegister(
+          idToken: idToken,
+          name: name.isNotEmpty ? name : email.split('@').first,
+          email: email,
+        );
+      } on ApiException catch (registerError) {
+        if (kDebugMode) print('firebaseRegister also failed: ${registerError.statusCode} ${registerError.message}');
+        // If register also fails, throw the more informative error
+        throw ApiException(
+          'Unable to complete sign-in. Please try again later.',
+          registerError.statusCode,
+        );
+      }
     }
   }
 

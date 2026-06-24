@@ -258,15 +258,38 @@ def send_push_notification(notification):
         if site_url:
             image_url = f"{site_url}{notification.image.url}"
 
-    # APNS config for iOS rich notifications (requires mutable-content)
-    apns_config = None
-    if image_url:
-        apns_config = messaging.APNSConfig(
-            payload=messaging.APNSPayload(
-                aps=messaging.Aps(mutable_content=True),
+    # Android config: explicit channel + high priority so background
+    # notifications are displayed immediately on Android 8+ (API 26+).
+    android_config = messaging.AndroidConfig(
+        priority='high',
+        notification=messaging.AndroidNotification(
+            channel_id='default_channel',
+            priority='max',
+            default_sound=True,
+            default_vibrate_timings=True,
+            notification_count=1,
+            icon='@mipmap/ic_launcher',
+            image=image_url,
+        ),
+    )
+
+    # APNS config for iOS: always set so banners, badges, and sounds
+    # are displayed reliably. Add mutable-content when an image is
+    # present so the notification service extension can download it.
+    apns_config = messaging.APNSConfig(
+        headers={
+            'apns-priority': '10',  # immediate delivery
+        },
+        payload=messaging.APNSPayload(
+            aps=messaging.Aps(
+                sound='default',
+                badge=1,
+                mutable_content=bool(image_url),
+                content_available=True,
             ),
-            fcm_options=messaging.APNSFCMOptions(image=image_url),
-        )
+        ),
+        fcm_options=messaging.APNSFCMOptions(image=image_url) if image_url else None,
+    )
 
     total_success = 0
     total_failure = 0
@@ -301,6 +324,7 @@ def send_push_notification(notification):
                     notification=fcm_notification,
                     data=data_payload,
                     token=token,
+                    android=android_config,
                     apns=apns_config,
                 )
                 for token in batch_tokens

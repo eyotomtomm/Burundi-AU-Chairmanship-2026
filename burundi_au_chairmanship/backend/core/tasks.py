@@ -39,15 +39,25 @@ def send_email_async(self, subject, message, from_email, recipient_list, html_me
 def send_push_notification_async(self, user_ids, title, body, data=None):
     """Send FCM push notifications in batch."""
     try:
-        from .models import UserProfile
+        from .models import UserProfile, DeviceToken
+        from config.firebase import initialize_firebase
+        initialize_firebase()
         import firebase_admin.messaging as messaging
 
-        profiles = UserProfile.objects.filter(
-            user_id__in=user_ids,
-            fcm_token__isnull=False,
-        ).exclude(fcm_token='')
-
-        tokens = list(profiles.values_list('fcm_token', flat=True))
+        # Collect tokens from both DeviceToken (preferred) and legacy UserProfile
+        device_tokens = list(
+            DeviceToken.objects.filter(
+                user_id__in=user_ids,
+                is_active=True,
+            ).values_list('token', flat=True).distinct()
+        )
+        legacy_tokens = list(
+            UserProfile.objects.filter(
+                user_id__in=user_ids,
+                fcm_token__isnull=False,
+            ).exclude(fcm_token='').values_list('fcm_token', flat=True)
+        )
+        tokens = list(set(device_tokens + [t for t in legacy_tokens if t]))
         if not tokens:
             return
 
@@ -55,6 +65,25 @@ def send_push_notification_async(self, user_ids, title, body, data=None):
             tokens=tokens,
             notification=messaging.Notification(title=title, body=body),
             data=data or {},
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='default_channel',
+                    priority='max',
+                    default_sound=True,
+                    default_vibrate_timings=True,
+                ),
+            ),
+            apns=messaging.APNSConfig(
+                headers={'apns-priority': '10'},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound='default',
+                        badge=1,
+                        content_available=True,
+                    ),
+                ),
+            ),
         )
         response = messaging.send_each_for_multicast(message)
         logger.info(f"Push sent: {response.success_count} success, {response.failure_count} failed")

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show PlatformDispatcher, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:play_in_app_update/play_in_app_update.dart';
@@ -85,15 +87,53 @@ class AppUpdateDialog {
     }
   }
 
-  /// Attempt native Google Play in-app update.
+  /// Attempt native Google Play in-app update using JNI-based API.
   /// Returns true if an update was triggered, false to fall back to dialog.
   static Future<bool> _tryPlayInAppUpdate(
     BuildContext context,
     String currentVersion,
   ) async {
     try {
-      final updateInfo = await PlayInAppUpdate.checkForUpdate();
-      if (updateInfo.updateAvailability != UpdateAvailability.updateAvailable) {
+      final engineId = PlatformDispatcher.instance.engineId;
+      if (engineId == null) return false;
+
+      final appContext = Jni.androidApplicationContext;
+      final manager = AppUpdateManagerFactory.create(appContext);
+      final infoTask = manager.getAppUpdateInfo();
+
+      // Wait for the update info via a Completer
+      final completer = Completer<AppUpdateInfo?>();
+      infoTask.addOnSuccessListener(OnSuccessListener.implement(
+        $OnSuccessListener<AppUpdateInfo>(
+          onSuccess$async: true,
+          TResult: AppUpdateInfo.type,
+          onSuccess: (result) {
+            if (!completer.isCompleted) completer.complete(result);
+          },
+        ),
+      ));
+      infoTask.addOnFailureListener(OnFailureListener.implement(
+        $OnFailureListener(
+          onFailure$async: true,
+          onFailure: (_) {
+            if (!completer.isCompleted) completer.complete(null);
+          },
+        ),
+      ));
+
+      final updateInfo = await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+      if (updateInfo == null) {
+        manager.release();
+        return false;
+      }
+
+      final availability = updateInfo.updateAvailability();
+      if (availability != UpdateAvailability.UPDATE_AVAILABLE) {
+        updateInfo.release();
+        manager.release();
         return false;
       }
 
@@ -104,22 +144,41 @@ class AppUpdateDialog {
       final min = _parseVersion(minVersion);
       final forceUpdate = current < min;
 
-      if (forceUpdate &&
-          updateInfo.isImmediateUpdateAllowed) {
-        await PlayInAppUpdate.performImmediateUpdate();
+      final activity = Jni.androidActivity(engineId);
+      if (activity == null) {
+        updateInfo.release();
+        manager.release();
+        return false;
+      }
+
+      if (forceUpdate && updateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+        manager.startUpdateFlow(
+          updateInfo,
+          activity,
+          AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE)
+              .setAllowAssetPackDeletion(true)
+              .build(),
+        );
+        // Don't release manager — the update flow takes over
         return true;
       }
 
-      if (updateInfo.isFlexibleUpdateAllowed) {
-        await PlayInAppUpdate.startFlexibleUpdate();
-        await PlayInAppUpdate.completeFlexibleUpdate();
+      if (updateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
+        manager.startUpdateFlow(
+          updateInfo,
+          activity,
+          AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE)
+              .setAllowAssetPackDeletion(true)
+              .build(),
+        );
         return true;
       }
 
-      // Native update not allowed for this type, fall back to dialog
+      updateInfo.release();
+      manager.release();
       return false;
-    } catch (_) {
-      // Play in-app update failed, fall back to Remote Config dialog
+    } catch (e) {
+      if (kDebugMode) debugPrint('Play in-app update failed: $e');
       return false;
     }
   }

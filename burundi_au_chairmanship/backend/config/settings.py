@@ -285,8 +285,12 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440  # 2.5 MB (Django default)
 # Allowed file types for uploads
 ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 ALLOWED_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'zip']
+ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'avi']
+ALLOWED_SUBTITLE_EXTENSIONS = ['srt', 'vtt']
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_SUBTITLE_SIZE = 2 * 1024 * 1024  # 2 MB
 
 # ─── CORS — allow Flutter app to connect ──────────────────────
 CORS_ALLOW_ALL_ORIGINS = False

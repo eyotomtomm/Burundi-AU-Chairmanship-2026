@@ -9,7 +9,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from PIL import Image as PILImage
 
-from .validators import validate_image_file, validate_document_file, validate_fcm_token, validate_professional_email
+from .validators import validate_image_file, validate_document_file, validate_video_file, validate_subtitle_file, validate_fcm_token, validate_professional_email
 
 logger = logging.getLogger(__name__)
 
@@ -963,7 +963,7 @@ class FeatureCardMedia(models.Model):
     image_url = models.URLField(blank=True, help_text='External image URL (used if no file uploaded)')
 
     # Video source — upload OR external link
-    video_file = models.FileField(upload_to='feature_card_media/videos/', blank=True,
+    video_file = models.FileField(upload_to='feature_card_media/videos/', blank=True, validators=[validate_video_file],
                                   help_text='Upload a video file (MP4, MOV, etc.), OR paste a URL below')
     video_url = models.URLField(blank=True, help_text='YouTube/external video URL (used if no file uploaded)')
 
@@ -1813,7 +1813,7 @@ class Video(models.Model):
 
     # Video source - either URL or uploaded file
     video_url = models.URLField(blank=True, help_text='YouTube or external video URL (leave empty if uploading file)')
-    video_file = models.FileField(upload_to='videos/files/', blank=True, help_text='Upload video file (MP4, MOV, etc.) or leave empty if using URL')
+    video_file = models.FileField(upload_to='videos/files/', blank=True, validators=[validate_video_file], help_text='Upload video file (MP4, MOV, etc.) or leave empty if using URL')
 
     thumbnail = models.ImageField(upload_to='videos/thumbnails/', blank=True, validators=[validate_image_file])
     duration = models.CharField(max_length=20, help_text='e.g. 5:30')
@@ -1902,6 +1902,7 @@ class VideoSubtitle(models.Model):
     language = models.CharField(max_length=5, choices=LANGUAGE_CHOICES)
     subtitle_file = models.FileField(
         upload_to='subtitles/',
+        validators=[validate_subtitle_file],
         help_text='Upload .srt or .vtt subtitle file'
     )
     is_default = models.BooleanField(default=False)
@@ -3465,7 +3466,7 @@ class ScheduledMaintenance(models.Model):
     severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='minor')
     affected_services = models.CharField(max_length=200, blank=True, default='all', help_text='Comma-separated list of affected services')
     auto_activate = models.BooleanField(default=False, help_text='Automatically enable maintenance at start time')
-    image = models.ImageField(upload_to='maintenance/', blank=True, null=True, help_text='Full-screen image shown in the app during maintenance')
+    image = models.ImageField(upload_to='maintenance/', blank=True, null=True, validators=[validate_image_file], help_text='Full-screen image shown in the app during maintenance')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -3529,7 +3530,7 @@ class PromotionalSplash(models.Model):
     """Full-screen promotional splash shown on app launch."""
     title = models.CharField(max_length=200)
     title_fr = models.CharField(max_length=200, blank=True)
-    image = models.ImageField(upload_to='promotional_splashes/')
+    image = models.ImageField(upload_to='promotional_splashes/', validators=[validate_image_file])
     action_url = models.CharField(max_length=500, blank=True, help_text='In-app route (e.g. /news) or external URL')
     action_text = models.CharField(max_length=100, blank=True, help_text='Button text (e.g. Learn More)')
     action_text_fr = models.CharField(max_length=100, blank=True)
@@ -4927,7 +4928,7 @@ class YouthDialogueDocument(models.Model):
 
     application = models.ForeignKey(YouthDialogueApplication, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
-    file = models.FileField(upload_to='youth_dialogue/documents/', storage=_private_storage)
+    file = models.FileField(upload_to='youth_dialogue/documents/', storage=_private_storage, validators=[validate_document_file])
     original_filename = models.CharField(max_length=255, blank=True)
     file_size = models.PositiveIntegerField(default=0, help_text='File size in bytes')
 

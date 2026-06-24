@@ -61,7 +61,7 @@ def validate_image_file(file):
 
 def validate_document_file(file):
     """
-    Validate uploaded document file size and extension.
+    Validate uploaded document file size, extension, and content type.
     """
     # Check file size
     if file.size > settings.MAX_DOCUMENT_SIZE:
@@ -74,6 +74,60 @@ def validate_document_file(file):
     if ext not in settings.ALLOWED_DOCUMENT_EXTENSIONS:
         raise ValidationError(
             f'Invalid document format. Allowed formats: {", ".join(settings.ALLOWED_DOCUMENT_EXTENSIONS)}'
+        )
+
+    # Validate actual file content (magic bytes)
+    MAGIC_BYTES = {
+        'pdf': b'%PDF',
+        'doc': b'\xd0\xcf\x11\xe0',   # OLE2 compound document (legacy .doc)
+        'docx': b'PK',                 # ZIP-based (Office Open XML)
+        'zip': b'PK',                  # ZIP archive
+    }
+    expected_magic = MAGIC_BYTES.get(ext)
+    if expected_magic:
+        file.seek(0)
+        header = file.read(8)
+        file.seek(0)
+        if not header[:len(expected_magic)] == expected_magic:
+            raise ValidationError(
+                f'File content does not match expected {ext.upper()} format. '
+                f'The file may be corrupted or have an incorrect extension.'
+            )
+
+    return file
+
+
+def validate_video_file(file):
+    """
+    Validate uploaded video file size and extension.
+    """
+    if file.size > settings.MAX_VIDEO_SIZE:
+        raise ValidationError(
+            f'Video file too large. Maximum size is {settings.MAX_VIDEO_SIZE / (1024 * 1024)}MB.'
+        )
+
+    ext = os.path.splitext(file.name)[1][1:].lower()
+    if ext not in settings.ALLOWED_VIDEO_EXTENSIONS:
+        raise ValidationError(
+            f'Invalid video format. Allowed formats: {", ".join(settings.ALLOWED_VIDEO_EXTENSIONS)}'
+        )
+
+    return file
+
+
+def validate_subtitle_file(file):
+    """
+    Validate uploaded subtitle file size and extension.
+    """
+    if file.size > settings.MAX_SUBTITLE_SIZE:
+        raise ValidationError(
+            f'Subtitle file too large. Maximum size is {settings.MAX_SUBTITLE_SIZE / (1024 * 1024)}MB.'
+        )
+
+    ext = os.path.splitext(file.name)[1][1:].lower()
+    if ext not in settings.ALLOWED_SUBTITLE_EXTENSIONS:
+        raise ValidationError(
+            f'Invalid subtitle format. Allowed formats: {", ".join(settings.ALLOWED_SUBTITLE_EXTENSIONS)}'
         )
 
     return file

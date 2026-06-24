@@ -135,12 +135,14 @@
                             <label for="nationality" class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                                 Nationality
                             </label>
-                            <input type="text"
-                                   id="nationality"
-                                   name="nationality"
-                                   value="{% if profile.nationality %}{{ profile.nationality }}{% endif %}"
-                                   class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                                   placeholder="Enter nationality">
+                            <select id="nationality"
+                                    name="nationality"
+                                    class="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white">
+                                <option value="" {% if not profile.nationality %}selected{% endif %}>-- Select Nationality --</option>
+                                {% for code, name in nationality_choices %}
+                                <option value="{{ code }}" {% if profile.nationality == code %}selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
 
                         <!-- Gender -->

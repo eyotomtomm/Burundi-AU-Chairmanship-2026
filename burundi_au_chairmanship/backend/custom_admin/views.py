@@ -1643,6 +1643,7 @@ def users_list(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def user_create(request):
+    from core.models import NATIONALITY_CHOICES
     if request.method == 'POST':
         username = request.POST.get('username')
         email = request.POST.get('email')
@@ -1652,10 +1653,10 @@ def user_create(request):
 
         if User.objects.filter(username=username).exists():
             messages.error(request, f'Username "{username}" already exists.')
-            return render(request, 'custom_admin/users/form.html', {'action': 'Create'})
+            return render(request, 'custom_admin/users/form.html', {'action': 'Create', 'nationality_choices': NATIONALITY_CHOICES})
         if email and User.objects.filter(email=email).exists():
             messages.error(request, f'Email "{email}" already in use.')
-            return render(request, 'custom_admin/users/form.html', {'action': 'Create'})
+            return render(request, 'custom_admin/users/form.html', {'action': 'Create', 'nationality_choices': NATIONALITY_CHOICES})
 
         user = User.objects.create_user(
             username=username,
@@ -1669,7 +1670,7 @@ def user_create(request):
         user.save()
         messages.success(request, f'User "{username}" created successfully!')
         return redirect('custom_admin:users_list')
-    return render(request, 'custom_admin/users/form.html', {'action': 'Create'})
+    return render(request, 'custom_admin/users/form.html', {'action': 'Create', 'nationality_choices': NATIONALITY_CHOICES})
 
 
 @login_required(login_url='custom_admin:login')
@@ -1715,13 +1716,14 @@ def user_edit(request, pk):
         return redirect('custom_admin:users_list')
 
     verification_requests = VerificationRequest.objects.filter(user=target_user).order_by('-created_at')
-    from core.models import ProfanityStrikeLog
+    from core.models import ProfanityStrikeLog, NATIONALITY_CHOICES
     strike_logs = ProfanityStrikeLog.objects.filter(user=target_user).order_by('-created_at')[:20]
     return render(request, 'custom_admin/users/form.html', {
         'target_user': target_user,
         'profile': profile,
         'verification_requests': verification_requests,
         'strike_logs': strike_logs,
+        'nationality_choices': NATIONALITY_CHOICES,
         'action': 'Edit',
     })
 

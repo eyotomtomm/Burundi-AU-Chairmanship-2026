@@ -45,14 +45,13 @@
       <!-- Title (French) -->
       <div class="mb-6">
         <label for="title_fr" class="block font-headline font-bold text-on-surface mb-2">
-          Title (French) <span class="text-error">*</span>
+          Title (French)
         </label>
         <input
           type="text"
           id="title_fr"
           name="title_fr"
           value="{% if article %}{{ article.title_fr }}{% endif %}"
-          required
           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary"
           placeholder="Entrez le titre de l'article en français"
         />
@@ -77,13 +76,12 @@
       <!-- Content (French) -->
       <div class="mb-6">
         <label for="content_fr" class="block font-headline font-bold text-on-surface mb-2">
-          Content (French) <span class="text-error">*</span>
+          Content (French)
         </label>
         <textarea
           id="content_fr"
           name="content_fr"
           rows="12"
-          required
           class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary resize-y"
           placeholder="Entrez le contenu de l'article en français (HTML supporté)"
         >{% if article %}{{ article.content_fr }}{% endif %}</textarea>
@@ -306,7 +304,7 @@
       <div>
         <h3 class="font-headline font-bold text-on-surface mb-2">Article Guidelines</h3>
         <ul class="text-sm text-on-surface-variant space-y-1">
-          <li>• Both English and French content are required for all articles</li>
+          <li>• English content is required; French is optional but recommended for bilingual support</li>
           <li>• Featured articles will be highlighted on the home screen</li>
           <li>• Use high-quality images (minimum 1200x630px recommended)</li>
           <li>• Choose the most relevant category for better organization</li>

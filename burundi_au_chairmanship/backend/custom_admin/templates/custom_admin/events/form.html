@@ -32,7 +32,7 @@
             <div class="space-y-6">
                 <div class="border-l-4 border-primary-container pl-4">
                     <h2 class="text-xl font-headline font-bold text-on-surface">Event Names</h2>
-                    <p class="text-sm text-on-surface-variant mt-1">Provide event name in both languages</p>
+                    <p class="text-sm text-on-surface-variant mt-1">Provide event name (French is optional)</p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -53,13 +53,12 @@
                     <!-- Name (French) -->
                     <div>
                         <label for="name_fr" class="block text-sm font-body font-medium text-on-surface mb-2">
-                            Name (French) <span class="text-red-500">*</span>
+                            Name (French)
                         </label>
                         <input type="text"
                                id="name_fr"
                                name="name_fr"
                                value="{% if event %}{{ event.name_fr }}{% endif %}"
-                               required
                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
                                placeholder="Entrez le nom de l'événement en français">
                     </div>
@@ -70,7 +69,7 @@
             <div class="space-y-6">
                 <div class="border-l-4 border-primary-container pl-4">
                     <h2 class="text-xl font-headline font-bold text-on-surface">Descriptions</h2>
-                    <p class="text-sm text-on-surface-variant mt-1">Detailed event descriptions in both languages</p>
+                    <p class="text-sm text-on-surface-variant mt-1">Detailed event descriptions (French is optional)</p>
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
@@ -256,7 +255,7 @@
                     <li>Provide accurate date and time information for proper scheduling</li>
                     <li>Upload high-quality images to enhance visual appeal</li>
                     <li>Include GPS coordinates for map integration</li>
-                    <li>Fill in both English and French fields for bilingual support</li>
+                    <li>English name is required; French fields are optional but recommended for bilingual support</li>
                     <li>Mark events as inactive to hide them without deletion</li>
                 </ul>
             </div>

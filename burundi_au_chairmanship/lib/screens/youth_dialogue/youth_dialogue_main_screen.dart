@@ -143,6 +143,13 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     return text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
   }
 
+  /// Returns the programme title from admin settings, falling back to 'Continental Dialogue'.
+  String _programmeTitle(bool isFr) {
+    if (_settings == null) return 'Continental Dialogue';
+    final title = _t('programme_title', 'programme_title_fr', isFr);
+    return title.isNotEmpty ? title : 'Continental Dialogue';
+  }
+
   String? _formatDateRange(bool isFr) {
     final startStr = _settings?['start_date']?.toString() ?? '';
     final endStr = _settings?['end_date']?.toString() ?? '';
@@ -169,7 +176,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       return Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
-          title: const Text('Youth Dialogue'),
+          title: Text(_programmeTitle(isFr)),
           backgroundColor: AppColors.burundiGreen,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -182,7 +189,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       return Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
-          title: const Text('Youth Dialogue'),
+          title: Text(_programmeTitle(isFr)),
           backgroundColor: AppColors.burundiGreen,
           foregroundColor: Colors.white,
           elevation: 0,
@@ -1020,7 +1027,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => YouthDialogueApplyScreen(formFields: _formFields),
+                          builder: (_) => YouthDialogueApplyScreen(formFields: _formFields, programmeTitle: _programmeTitle(isFr)),
                         ),
                       );
                       _loadData();
@@ -1083,8 +1090,8 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               const SizedBox(height: 12),
               Text(
                 isFr
-                    ? 'Votre candidature au Dialogue des Jeunes a été acceptée !'
-                    : 'Your Youth Dialogue application has been accepted!',
+                    ? 'Votre candidature au Dialogue Continental a été acceptée !'
+                    : 'Your Continental Dialogue application has been accepted!',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -2386,7 +2393,7 @@ class _YDYouTubePlayerScreenState extends State<_YDYouTubePlayerScreen> {
                           children: [
                             Icon(Icons.play_circle_rounded, size: 16, color: AppColors.burundiGreen),
                             SizedBox(width: 6),
-                            Text('Youth Dialogue', style: TextStyle(
+                            Text('Continental Dialogue', style: TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.burundiGreen)),
                           ],
                         ),

@@ -83,7 +83,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(_isYdMode ? 'YD Credential Scanner' : 'QR Scanner'),
+        title: Text(_isYdMode ? 'CD Credential Scanner' : 'QR Scanner'),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -145,7 +145,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 else
                   Text(
                     _isYdMode
-                        ? 'Scan a Youth Dialogue QR code'
+                        ? 'Scan a Continental Dialogue QR code'
                         : 'Point your camera at a QR code',
                     textAlign: TextAlign.center,
                     style: TextStyle(

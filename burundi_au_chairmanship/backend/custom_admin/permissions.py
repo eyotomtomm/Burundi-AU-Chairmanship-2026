@@ -62,8 +62,8 @@ ADMIN_MENU_GROUPS = [
         ('users_list',                'User Management',        'group'),
         ('verification_requests_list','Verification Requests',  'verified'),
     ]),
-    ('Youth Dialogue', [
-        ('youth_dialogue_list',       'Youth Dialogue',         'forum'),
+    ('Continental Dialogue', [
+        ('youth_dialogue_list',       'Continental Dialogue',         'forum'),
     ]),
     ('Support & Engagement', [
         ('support_tickets_list',      'Support Tickets',        'support_agent'),

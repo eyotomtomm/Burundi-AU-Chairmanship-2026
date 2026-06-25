@@ -1793,7 +1793,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
     YOUTH DIALOGUE APPLICATIONS
 
     HELP:
-    Manage Youth Dialogue applications through the full pipeline:
+    Manage Continental Dialogue applications through the full pipeline:
     submitted → under_review → accepted → documents_pending → documents_submitted
     → documents_under_review → credential_issued
 
@@ -1899,10 +1899,10 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                     obj.status = 'documents_pending'
                     _send_yd_applicant_email(
                         obj,
-                        'Youth Dialogue: Application Accepted',
+                        'Continental Dialogue: Application Accepted',
                         'Application Accepted',
                         '#28A745',
-                        '<p style="color:#4a5568;font-size:15px;line-height:1.6;">Congratulations! Your application to the Youth Dialogue programme has been accepted.</p>'
+                        '<p style="color:#4a5568;font-size:15px;line-height:1.6;">Congratulations! Your application to the Continental Dialogue programme has been accepted.</p>'
                         '<p style="color:#4a5568;font-size:15px;line-height:1.6;">Please open the app and upload your required documents (passport, national ID, photo, and CV) to proceed.</p>'
                     )
 
@@ -1912,7 +1912,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                     reason = obj.rejection_reason or 'No specific reason provided.'
                     _send_yd_applicant_email(
                         obj,
-                        'Youth Dialogue: Application Update',
+                        'Continental Dialogue: Application Update',
                         'Application Update',
                         '#DC3545',
                         f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">We regret to inform you that your application could not be approved at this time.</p>'
@@ -1931,7 +1931,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                         doc_list += f'<li style="color:#c53030;">{doc.get_document_type_display()}: {doc.rejection_reason or "Rejected"}</li>'
                     _send_yd_applicant_email(
                         obj,
-                        'Youth Dialogue: Documents Need Attention',
+                        'Continental Dialogue: Documents Need Attention',
                         'Documents Need Attention',
                         '#DC3545',
                         f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">Some of your documents need to be re-submitted:</p>'
@@ -1951,10 +1951,10 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                     obj.documents_reviewed_at = timezone.now()
                     _send_yd_applicant_email(
                         obj,
-                        'Youth Dialogue: Your ID Card is Ready',
+                        'Continental Dialogue: Your ID Card is Ready',
                         'Your ID Card is Ready!',
                         '#6F42C1',
-                        f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">Your Youth Dialogue participant credential has been issued.</p>'
+                        f'<p style="color:#4a5568;font-size:15px;line-height:1.6;">Your Continental Dialogue participant credential has been issued.</p>'
                         f'<div style="background:#f7fafc;border-radius:12px;padding:20px;margin:16px 0;text-align:center;">'
                         f'<p style="color:#718096;font-size:12px;margin:0 0 8px;">Your Participant Code</p>'
                         f'<p style="color:#2d3748;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{obj.participant_code}</p></div>'
@@ -1974,7 +1974,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
             app.reviewed_at = timezone.now()
             app.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'])
             _send_yd_applicant_email(
-                app, 'Youth Dialogue: Application Accepted', 'Application Accepted', '#28A745',
+                app, 'Continental Dialogue: Application Accepted', 'Application Accepted', '#28A745',
                 '<p style="color:#4a5568;font-size:15px;">Congratulations! Your application has been accepted. '
                 'Please open the app and upload your documents.</p>'
             )
@@ -1994,7 +1994,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                 app.rejection_reason = 'Application not approved by review committee.'
             app.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at'])
             _send_yd_applicant_email(
-                app, 'Youth Dialogue: Application Update', 'Application Update', '#DC3545',
+                app, 'Continental Dialogue: Application Update', 'Application Update', '#DC3545',
                 f'<p style="color:#4a5568;font-size:15px;">Your application could not be approved. '
                 f'Reason: {app.rejection_reason}</p>'
             )
@@ -2020,7 +2020,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
             app.documents_reviewed_at = timezone.now()
             app.save()
             _send_yd_applicant_email(
-                app, 'Youth Dialogue: Your ID Card is Ready', 'Your ID Card is Ready!', '#6F42C1',
+                app, 'Continental Dialogue: Your ID Card is Ready', 'Your ID Card is Ready!', '#6F42C1',
                 f'<p style="color:#4a5568;font-size:15px;">Your credential has been issued. '
                 f'Participant code: <strong>{app.participant_code}</strong>. Open the app to view your ID card.</p>'
             )

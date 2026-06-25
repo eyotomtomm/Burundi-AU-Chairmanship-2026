@@ -10,8 +10,9 @@ import '../../services/api_service.dart';
 
 class YouthDialogueApplyScreen extends StatefulWidget {
   final List<RegistrationFormField> formFields;
+  final String programmeTitle;
 
-  const YouthDialogueApplyScreen({super.key, required this.formFields});
+  const YouthDialogueApplyScreen({super.key, required this.formFields, this.programmeTitle = 'Continental Dialogue'});
 
   @override
   State<YouthDialogueApplyScreen> createState() => _YouthDialogueApplyScreenState();
@@ -588,7 +589,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: Text(isFr ? 'Retour au Dialogue des Jeunes' : 'Back to Youth Dialogue',
+                  child: Text(isFr ? 'Retour au ${widget.programmeTitle}' : 'Back to ${widget.programmeTitle}',
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
@@ -607,7 +608,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Apply for Youth Dialogue'),
+        title: Text('Apply for ${widget.programmeTitle}'),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         elevation: 0,

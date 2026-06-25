@@ -1,6 +1,6 @@
 {% extends 'custom_admin/base.html' %}
 
-{% block title %}Youth Dialogue Settings - B4Africa Admin{% endblock %}
+{% block title %}Continental Dialogue Settings - B4Africa Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -9,7 +9,7 @@
       <span class="material-symbols-outlined text-slate-600">arrow_back</span>
     </a>
     <div>
-      <h1 class="text-3xl font-bold text-slate-900 font-headline">Youth Dialogue Settings</h1>
+      <h1 class="text-3xl font-bold text-slate-900 font-headline">Continental Dialogue Settings</h1>
       <p class="text-sm text-slate-500 mt-1">Configure visibility, branding, form fields, and support contact info</p>
     </div>
   </div>
@@ -23,14 +23,14 @@
         <span class="material-symbols-outlined text-sky-600">visibility</span>
         Visibility & Quick Access
       </h2>
-      <p class="text-sm text-slate-500 -mt-2">Controls how Youth Dialogue appears in the app's Quick Access grid</p>
+      <p class="text-sm text-slate-500 -mt-2">Controls how Continental Dialogue appears in the app's Quick Access grid</p>
 
       <div class="space-y-4">
         <label class="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" name="is_visible" {% if settings.is_visible %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
           <div>
             <span class="text-sm font-semibold text-slate-700">Visible in Quick Access</span>
-            <p class="text-xs text-slate-500">When unchecked, Youth Dialogue is completely hidden from the home screen</p>
+            <p class="text-xs text-slate-500">When unchecked, Continental Dialogue is completely hidden from the home screen</p>
           </div>
         </label>
 
@@ -75,11 +75,11 @@
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (EN)</label>
-          <input type="text" name="quick_access_title_en" value="{{ settings.quick_access_title_en }}" placeholder="Youth Dialogue" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+          <input type="text" name="quick_access_title_en" value="{{ settings.quick_access_title_en }}" placeholder="Continental Dialogue" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (FR)</label>
-          <input type="text" name="quick_access_title_fr" value="{{ settings.quick_access_title_fr }}" placeholder="Dialogue Jeunesse" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+          <input type="text" name="quick_access_title_fr" value="{{ settings.quick_access_title_fr }}" placeholder="Dialogue Continental" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
         </div>
       </div>
 

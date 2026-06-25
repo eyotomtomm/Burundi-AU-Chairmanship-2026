@@ -1,6 +1,6 @@
 {% extends 'custom_admin/base.html' %}
 
-{% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} Youth Dialogue Event - B4Africa Admin{% endblock %}
+{% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} Continental Dialogue Event - B4Africa Admin{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -10,7 +10,7 @@
     </a>
     <div>
       <h1 class="text-3xl font-bold text-slate-900 font-headline">{% if is_edit %}Edit Event{% else %}Create Event{% endif %}</h1>
-      <p class="text-sm text-slate-500 mt-1">{% if is_edit %}{{ yd_event.programme_title }}{% else %}Set up a new Youth Dialogue event{% endif %}</p>
+      <p class="text-sm text-slate-500 mt-1">{% if is_edit %}{{ yd_event.programme_title }}{% else %}Set up a new Continental Dialogue event{% endif %}</p>
     </div>
   </div>
 
@@ -61,14 +61,14 @@
         <span class="material-symbols-outlined text-sky-600">visibility</span>
         Visibility & Quick Access
       </h2>
-      <p class="text-sm text-slate-500 -mt-2">Controls how Youth Dialogue appears in the app's Quick Access grid</p>
+      <p class="text-sm text-slate-500 -mt-2">Controls how Continental Dialogue appears in the app's Quick Access grid</p>
 
       <div class="space-y-4">
         <label class="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" name="is_visible" {% if yd_event.is_visible %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5">
           <div>
             <span class="text-sm font-semibold text-slate-700">Visible in Quick Access</span>
-            <p class="text-xs text-slate-500">When unchecked, Youth Dialogue is completely hidden from the home screen</p>
+            <p class="text-xs text-slate-500">When unchecked, Continental Dialogue is completely hidden from the home screen</p>
           </div>
         </label>
 
@@ -115,11 +115,11 @@
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (EN)</label>
-          <input type="text" name="quick_access_title_en" value="{{ yd_event.quick_access_title_en|default:'Youth Dialogue' }}" placeholder="Youth Dialogue" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+          <input type="text" name="quick_access_title_en" value="{{ yd_event.quick_access_title_en|default:'Continental Dialogue' }}" placeholder="Continental Dialogue" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Button Title (FR)</label>
-          <input type="text" name="quick_access_title_fr" value="{{ yd_event.quick_access_title_fr|default:'' }}" placeholder="Dialogue Jeunesse" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+          <input type="text" name="quick_access_title_fr" value="{{ yd_event.quick_access_title_fr|default:'' }}" placeholder="Dialogue Continental" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
         </div>
       </div>
 
@@ -214,7 +214,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Programme Title (EN) <span class="text-red-500">*</span></label>
-          <input type="text" name="programme_title" required value="{{ yd_event.programme_title|default:'Youth Dialogue Programme' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+          <input type="text" name="programme_title" required value="{{ yd_event.programme_title|default:'Continental Dialogue Programme' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent">
         </div>
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Programme Title (FR)</label>
@@ -240,7 +240,7 @@
         <span class="material-symbols-outlined text-emerald-600">web</span>
         Landing Page Content
       </h2>
-      <p class="text-sm text-slate-500 -mt-2">Rich content shown on the Youth Dialogue landing page in the app</p>
+      <p class="text-sm text-slate-500 -mt-2">Rich content shown on the Continental Dialogue landing page in the app</p>
 
       <div>
         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Banner Image</label>

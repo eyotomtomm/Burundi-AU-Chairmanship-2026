@@ -2954,8 +2954,8 @@ def home_feed(request):
             'card_type': 'event',
             'event_type': 'in_person',
             'category_data': None,
-            'event_title': yd_event.programme_title or 'Youth Dialogue',
-            'event_title_fr': yd_event.programme_title_fr or 'Dialogue Jeunesse',
+            'event_title': yd_event.programme_title or 'Continental Dialogue',
+            'event_title_fr': yd_event.programme_title_fr or 'Dialogue Continental',
             'event_description': yd_event.description or '',
             'event_description_fr': yd_event.description_fr or '',
             'event_poster': poster_url,
@@ -5951,7 +5951,7 @@ def translation_queue_detail(request, pk):
 # ═══════════════════════════════════════════════════════════════
 
 def _send_yd_admin_notification(application):
-    """Send admin notification email when a new Youth Dialogue application is submitted."""
+    """Send admin notification email when a new Continental Dialogue application is submitted."""
     try:
         admin_emails = getattr(django_settings, 'YD_ADMIN_EMAILS', [])
         if not admin_emails:
@@ -5963,7 +5963,7 @@ def _send_yd_admin_notification(application):
         if not admin_emails:
             return
 
-        subject = f'New Youth Dialogue Application: {application.first_name} {application.last_name}'
+        subject = f'New Continental Dialogue Application: {application.first_name} {application.last_name}'
         html_message = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -5973,7 +5973,7 @@ def _send_yd_admin_notification(application):
       <div style="width:60px;height:60px;background:white;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
-      <h1 style="color:white;font-size:22px;margin:0 0 8px;">New Youth Dialogue Application</h1>
+      <h1 style="color:white;font-size:22px;margin:0 0 8px;">New Continental Dialogue Application</h1>
       <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
     </div>
     <div style="padding:32px;">
@@ -6014,7 +6014,7 @@ def _get_yd_user_lang(application):
 
 
 def _notify_yd(application, event_key):
-    """Unified Youth Dialogue notification: email + push + in-app Notification record.
+    """Unified Continental Dialogue notification: email + push + in-app Notification record.
 
     Event keys and their semantics:
       submitted            — applicant confirmation on submission
@@ -6031,27 +6031,27 @@ def _notify_yd(application, event_key):
 
     EVENT_CONFIG = {
         'submitted': {
-            'subject': 'Dialogue des Jeunes — Candidature reçue avec succès' if is_fr else 'Youth Dialogue — Application Successfully Received',
+            'subject': 'Dialogue Continental — Candidature reçue avec succès' if is_fr else 'Continental Dialogue — Application Successfully Received',
             'heading': 'Candidature reçue avec succès' if is_fr else 'Application Successfully Received',
             'badge_color': '#38a169',
             'body_html': '',  # Built dynamically below
             'push_title': 'Candidature reçue !' if is_fr else 'Application Received!',
-            'push_body': 'Votre candidature au Dialogue des Jeunes a été soumise avec succès.' if is_fr else 'Your Youth Dialogue application has been submitted successfully. Check your email for confirmation details.',
+            'push_body': 'Votre candidature au Dialogue Continental a été soumise avec succès.' if is_fr else 'Your Continental Dialogue application has been submitted successfully. Check your email for confirmation details.',
             'push_route': '/youth-dialogue',
         },
         'accepted': {
-            'subject': 'Dialogue des Jeunes — Candidature acceptée' if is_fr else 'Youth Dialogue — Application Accepted',
+            'subject': 'Dialogue Continental — Candidature acceptée' if is_fr else 'Continental Dialogue — Application Accepted',
             'heading': 'Candidature acceptée' if is_fr else 'Application Accepted',
             'badge_color': '#38a169',
             'body_html': ('''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              Nous avons le plaisir de vous informer que votre candidature au <strong>Programme Dialogue des Jeunes</strong>
+              Nous avons le plaisir de vous informer que votre candidature au <strong>Programme Dialogue Continental</strong>
               a été acceptée.
             </p>
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
               La prochaine étape consiste à télécharger vos documents requis via l'application Be 4 Africa.
               Veuillez soumettre vos documents dans les plus brefs délais.
             </p>''' if is_fr else '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              We are pleased to inform you that your application for the <strong>Youth Dialogue Programme</strong>
+              We are pleased to inform you that your application for the <strong>Continental Dialogue Programme</strong>
               has been accepted.
             </p>
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -6059,19 +6059,19 @@ def _notify_yd(application, event_key):
               Please submit your documents at your earliest convenience.
             </p>'''),
             'push_title': 'Candidature acceptée !' if is_fr else 'Application Accepted!',
-            'push_body': 'Félicitations ! Votre candidature a été acceptée. Veuillez télécharger vos documents.' if is_fr else 'Congratulations! Your Youth Dialogue application has been accepted. Please upload your documents.',
+            'push_body': 'Félicitations ! Votre candidature a été acceptée. Veuillez télécharger vos documents.' if is_fr else 'Congratulations! Your Continental Dialogue application has been accepted. Please upload your documents.',
             'push_route': '/youth-dialogue',
         },
         'rejected': {
-            'subject': 'Dialogue des Jeunes — Mise à jour de la candidature' if is_fr else 'Youth Dialogue — Application Update',
+            'subject': 'Dialogue Continental — Mise à jour de la candidature' if is_fr else 'Continental Dialogue — Application Update',
             'heading': 'Candidature non retenue' if is_fr else 'Application Not Accepted',
             'badge_color': '#e53e3e',
             'push_title': 'Mise à jour de la candidature' if is_fr else 'Application Update',
-            'push_body': 'Le statut de votre candidature au Dialogue des Jeunes a été mis à jour.' if is_fr else 'Your Youth Dialogue application status has been updated.',
+            'push_body': 'Le statut de votre candidature au Dialogue Continental a été mis à jour.' if is_fr else 'Your Continental Dialogue application status has been updated.',
             'push_route': '/youth-dialogue',
         },
         'documents_submitted': {
-            'subject': 'Dialogue des Jeunes — Documents reçus' if is_fr else 'Youth Dialogue — Documents Received',
+            'subject': 'Dialogue Continental — Documents reçus' if is_fr else 'Continental Dialogue — Documents Received',
             'heading': 'Documents reçus' if is_fr else 'Documents Received',
             'badge_color': '#3182ce',
             'body_html': ('''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -6082,19 +6082,19 @@ def _notify_yd(application, event_key):
               We will notify you once the review is complete.
             </p>'''),
             'push_title': 'Documents reçus' if is_fr else 'Documents Received',
-            'push_body': 'Vos documents du Dialogue des Jeunes sont en cours de vérification.' if is_fr else 'Your Youth Dialogue documents are now under verification.',
+            'push_body': 'Vos documents du Dialogue Continental sont en cours de vérification.' if is_fr else 'Your Continental Dialogue documents are now under verification.',
             'push_route': '/youth-dialogue',
         },
         'documents_rejected': {
-            'subject': 'Dialogue des Jeunes — Documents à corriger' if is_fr else 'Youth Dialogue — Documents Need Attention',
+            'subject': 'Dialogue Continental — Documents à corriger' if is_fr else 'Continental Dialogue — Documents Need Attention',
             'heading': 'Documents à corriger' if is_fr else 'Documents Need Attention',
             'badge_color': '#e53e3e',
             'push_title': 'Documents à corriger' if is_fr else 'Documents Need Attention',
-            'push_body': 'Certains de vos documents du Dialogue des Jeunes doivent être rechargés.' if is_fr else 'Some of your Youth Dialogue documents need to be re-uploaded.',
+            'push_body': 'Certains de vos documents du Dialogue Continental doivent être rechargés.' if is_fr else 'Some of your Continental Dialogue documents need to be re-uploaded.',
             'push_route': '/youth-dialogue-documents',
         },
         'documents_resubmitted': {
-            'subject': 'Dialogue des Jeunes — Documents resoumis' if is_fr else 'Youth Dialogue — Documents Resubmitted',
+            'subject': 'Dialogue Continental — Documents resoumis' if is_fr else 'Continental Dialogue — Documents Resubmitted',
             'heading': 'Documents resoumis' if is_fr else 'Documents Resubmitted',
             'badge_color': '#3182ce',
             'body_html': ('''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -6109,19 +6109,19 @@ def _notify_yd(application, event_key):
             'push_route': '/youth-dialogue',
         },
         'credential_issued': {
-            'subject': 'Dialogue des Jeunes — Votre accréditation a été émise' if is_fr else 'Youth Dialogue — Your Credential Has Been Issued',
+            'subject': 'Dialogue Continental — Votre accréditation a été émise' if is_fr else 'Continental Dialogue — Your Credential Has Been Issued',
             'heading': 'Accréditation émise' if is_fr else 'Credential Issued',
             'badge_color': '#5a67d8',
             'push_title': 'Accréditation émise !' if is_fr else 'Credential Issued!',
-            'push_body': 'Votre accréditation de participant est prête. Consultez votre ID numérique dans l\'application.' if is_fr else 'Your Youth Dialogue participant credential is ready. View your digital ID in the app.',
+            'push_body': 'Votre accréditation de participant est prête. Consultez votre ID numérique dans l\'application.' if is_fr else 'Your Continental Dialogue participant credential is ready. View your digital ID in the app.',
             'push_route': '/youth-dialogue-credential',
         },
         'credential_revoked': {
-            'subject': 'Dialogue des Jeunes — Accréditation révoquée' if is_fr else 'Youth Dialogue — Credential Revoked',
+            'subject': 'Dialogue Continental — Accréditation révoquée' if is_fr else 'Continental Dialogue — Credential Revoked',
             'heading': 'Accréditation révoquée' if is_fr else 'Credential Revoked',
             'badge_color': '#e53e3e',
             'push_title': 'Accréditation révoquée' if is_fr else 'Credential Revoked',
-            'push_body': 'Votre accréditation a été révoquée. Contactez le support pour plus de détails.' if is_fr else 'Your Youth Dialogue credential has been revoked. Contact support for details.',
+            'push_body': 'Votre accréditation a été révoquée. Contactez le support pour plus de détails.' if is_fr else 'Your Continental Dialogue credential has been revoked. Contact support for details.',
             'push_route': '/youth-dialogue',
         },
     }
@@ -6135,7 +6135,7 @@ def _notify_yd(application, event_key):
     if event_key == 'submitted':
         # Build rich confirmation email with applicant details
         event = application.event
-        event_name = (event.programme_title_fr if is_fr and event and event.programme_title_fr else event.programme_title) if event else ('Programme Dialogue des Jeunes' if is_fr else 'Youth Dialogue Programme')
+        event_name = (event.programme_title_fr if is_fr and event and event.programme_title_fr else event.programme_title) if event else ('Programme Dialogue Continental' if is_fr else 'Continental Dialogue Programme')
         event_dates = ''
         if event and event.start_date and event.end_date:
             if is_fr:
@@ -6235,7 +6235,7 @@ def _notify_yd(application, event_key):
         if is_fr:
             reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Motif :</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              Nous avons le regret de vous informer que votre candidature au Programme Dialogue des Jeunes
+              Nous avons le regret de vous informer que votre candidature au Programme Dialogue Continental
               n'a pas été retenue.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
@@ -6244,7 +6244,7 @@ def _notify_yd(application, event_key):
         else:
             reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              We regret to inform you that your application for the Youth Dialogue Programme
+              We regret to inform you that your application for the Continental Dialogue Programme
               has not been accepted at this time.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
@@ -6275,7 +6275,7 @@ def _notify_yd(application, event_key):
     elif event_key == 'credential_issued':
         if is_fr:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              Félicitations ! Votre accréditation de participant au Programme Dialogue des Jeunes a été émise.
+              Félicitations ! Votre accréditation de participant au Programme Dialogue Continental a été émise.
             </p>
             <div style="background:#ebf4ff;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
               <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">Code Participant</p>
@@ -6286,7 +6286,7 @@ def _notify_yd(application, event_key):
             </p>'''
         else:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              Congratulations! Your participant credential for the Youth Dialogue Programme has been issued.
+              Congratulations! Your participant credential for the Continental Dialogue Programme has been issued.
             </p>
             <div style="background:#ebf4ff;border-radius:12px;padding:20px;margin:0 0 24px;text-align:center;">
               <p style="color:#2b6cb0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;font-weight:700;">Participant Code</p>
@@ -6300,7 +6300,7 @@ def _notify_yd(application, event_key):
         if is_fr:
             reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Motif :</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              Votre accréditation de participant au Programme Dialogue des Jeunes a été révoquée.
+              Votre accréditation de participant au Programme Dialogue Continental a été révoquée.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
               Si vous pensez qu'il s'agit d'une erreur, contactez-nous à info@burundi4africa.com
@@ -6308,7 +6308,7 @@ def _notify_yd(application, event_key):
         else:
             reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              Your participant credential for the Youth Dialogue Programme has been revoked.
+              Your participant credential for the Continental Dialogue Programme has been revoked.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
               If you believe this was done in error, please contact us at info@burundi4africa.com
@@ -6438,7 +6438,7 @@ def _yd_logo_absolute_url(image_field):
 
 
 def _send_yd_applicant_email(application, subject, heading, badge_color, body_html, lang='en'):
-    """Send branded email to Youth Dialogue applicant with both logos."""
+    """Send branded email to Continental Dialogue applicant with both logos."""
     try:
         if not application.email:
             return
@@ -6460,7 +6460,7 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
             logos = []
             if primary_url:
                 logos.append(
-                    f'<img src="{primary_url}" alt="Youth Dialogue" '
+                    f'<img src="{primary_url}" alt="Continental Dialogue" '
                     f'style="height:50px;width:auto;display:inline-block;vertical-align:middle;">'
                 )
             if secondary_url:
@@ -6474,7 +6474,7 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
                 logo_html = f'<div style="text-align:center;margin-bottom:16px;">{separator.join(logos)}</div>'
 
         greeting = f'Cher(e) <strong>{application.first_name}</strong>,' if is_fr else f'Dear <strong>{application.first_name}</strong>,'
-        programme_label = 'Programme Dialogue des Jeunes' if is_fr else 'Youth Dialogue Programme'
+        programme_label = 'Programme Dialogue Continental' if is_fr else 'Continental Dialogue Programme'
         footer_text = 'Be 4 Africa 2026'
 
         fallback_logo = ('<div style="width:60px;height:60px;background:white;border-radius:12px;'
@@ -6514,12 +6514,12 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
 
 
 class YouthDialogueViewSet(viewsets.GenericViewSet):
-    """Youth Dialogue application pipeline endpoints."""
+    """Continental Dialogue application pipeline endpoints."""
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['get'], url_path='settings', permission_classes=[AllowAny])
     def yd_settings(self, request):
-        """Return Youth Dialogue branding, texts, and support contact info for the active event."""
+        """Return Continental Dialogue branding, texts, and support contact info for the active event."""
         cached = cache.get('yd_settings:v1')
         if cached is not None:
             return Response(cached)
@@ -6550,7 +6550,7 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'], url_path='apply')
     def apply(self, request):
-        """Submit a Youth Dialogue application.
+        """Submit a Continental Dialogue application.
 
         Accepts either:
           - New format: {'form_data': {field_name: value, ...}}
@@ -6691,7 +6691,7 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=['post'], url_path='upload-document',
             parser_classes=[MultiPartParser, FormParser])
     def upload_document(self, request):
-        """Upload a document for the user's Youth Dialogue application."""
+        """Upload a document for the user's Continental Dialogue application."""
         active_event = YouthDialogueEvent.get_active()
         try:
             lookup = {'user': request.user}
@@ -6882,7 +6882,7 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['get'], url_path='eligibility')
     def eligibility(self, request):
-        """Check if the user is eligible for Youth Dialogue features (Quick Access filtering)."""
+        """Check if the user is eligible for Continental Dialogue features (Quick Access filtering)."""
         active_event = YouthDialogueEvent.get_active()
         try:
             lookup = {'user': request.user}
@@ -6907,7 +6907,7 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['get'], url_path='verify-qr', permission_classes=[AllowAny])
     def verify_qr(self, request):
-        """Verify a Youth Dialogue QR code. Public endpoint for check-in staff."""
+        """Verify a Continental Dialogue QR code. Public endpoint for check-in staff."""
         code = request.query_params.get('code', '').strip()
         qr_hash = request.query_params.get('hash', '').strip()
 
@@ -6952,7 +6952,7 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'], url_path='log-activity')
     def log_activity(self, request):
-        """Log a Youth Dialogue activity entry."""
+        """Log a Continental Dialogue activity entry."""
         action_name = request.data.get('action', '')
         screen_name = request.data.get('screen_name', '')
         metadata = request.data.get('metadata', {})
@@ -6982,7 +6982,7 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
 
 def _generate_yd_id_card_pdf(app, request=None):
-    """Generate a professional Youth Dialogue PDF ID card with QR code and logos.
+    """Generate a professional Continental Dialogue PDF ID card with QR code and logos.
 
     Returns a BytesIO buffer containing the PDF.
     Used by both the user-facing credential_pdf endpoint and the admin yd_id_card_pdf view.
@@ -7181,7 +7181,7 @@ def _generate_yd_id_card_pdf(app, request=None):
 @api_view(['GET'])
 @permission_classes([HasAdminSection.for_section('youth_dialogue_list')])
 def yd_id_card_pdf(request, app_id):
-    """Generate a printable PDF ID card for a Youth Dialogue participant."""
+    """Generate a printable PDF ID card for a Continental Dialogue participant."""
     from django.http import HttpResponse as DjangoHttpResponse
 
     app = get_object_or_404(YouthDialogueApplication, pk=app_id)
@@ -7383,7 +7383,7 @@ def verify_qr(request):
             'valid': True,
             'type': 'youth_dialogue',
             'person_name': f'{app.first_name} {app.last_name}',
-            'programme': 'Youth Dialogue',
+            'programme': 'Continental Dialogue',
             'status': 'valid',
             'is_duplicate': is_duplicate,
             'scan_count': scan_count,
@@ -7481,7 +7481,7 @@ def verify_qr_web(request):
                 try:
                     app = YouthDialogueApplication.objects.get(participant_code=ref_id, qr_hash=qr_hash)
                     context['person_name'] = f'{app.first_name} {app.last_name}'
-                    context['programme'] = 'Youth Dialogue'
+                    context['programme'] = 'Continental Dialogue'
                     if app.is_revoked:
                         context['valid'] = False
                         context['status_display'] = 'Revoked'

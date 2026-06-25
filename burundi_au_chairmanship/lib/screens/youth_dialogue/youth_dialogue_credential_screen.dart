@@ -132,7 +132,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
       if (!mounted) return;
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/pdf')],
-        text: 'Youth Dialogue ID Card - $code',
+        text: 'Continental Dialogue ID Card - $code',
       );
     } catch (e) {
       if (mounted) {
@@ -189,7 +189,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                 ),
                 child: pw.Column(
                   children: [
-                    pw.Text('YOUTH DIALOGUE',
+                    pw.Text('CONTINENTAL DIALOGUE',
                       style: pw.TextStyle(
                         color: PdfColors.white,
                         fontSize: 18,
@@ -469,7 +469,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                           border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
                         ),
                         child: const Text(
-                          'YOUTH DIALOGUE',
+                          'CONTINENTAL DIALOGUE',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 12,

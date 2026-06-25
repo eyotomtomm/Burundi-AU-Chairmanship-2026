@@ -8452,7 +8452,7 @@ def media_library_api(request):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_events_list(request):
-    """Landing page: list all Youth Dialogue events."""
+    """Landing page: list all Continental Dialogue events."""
     events = YouthDialogueEvent.objects.annotate(
         app_count=Count('applications'),
     ).order_by('-is_active', '-created_at')
@@ -8465,7 +8465,7 @@ def youth_dialogue_events_list(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @_catch_upload_errors
 def youth_dialogue_event_form(request, event_pk=None):
-    """Create or edit a Youth Dialogue event (settings + form fields)."""
+    """Create or edit a Continental Dialogue event (settings + form fields)."""
     yd_event = None
     if event_pk:
         yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
@@ -8494,7 +8494,7 @@ def youth_dialogue_event_form(request, event_pk=None):
         # Visibility & Quick Access
         yd_event.is_visible = request.POST.get('is_visible') == 'on'
         yd_event.is_registration_open = request.POST.get('is_registration_open') == 'on'
-        yd_event.quick_access_title_en = request.POST.get('quick_access_title_en', 'Youth Dialogue')
+        yd_event.quick_access_title_en = request.POST.get('quick_access_title_en', 'Continental Dialogue')
         yd_event.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
         yd_event.registration_closed_message = request.POST.get('registration_closed_message', '')
         yd_event.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
@@ -8550,7 +8550,7 @@ def youth_dialogue_event_form(request, event_pk=None):
         yd_event.save()
         _save_yd_form_fields(request, yd_event)
         _save_yd_roles(request, yd_event)
-        messages.success(request, f'Youth Dialogue event {"updated" if event_pk else "created"} successfully!')
+        messages.success(request, f'Continental Dialogue event {"updated" if event_pk else "created"} successfully!')
         return redirect('custom_admin:youth_dialogue_event_edit', event_pk=yd_event.pk)
 
     # Prepare form field data for template JS
@@ -8590,7 +8590,7 @@ def youth_dialogue_toggle_active(request, event_pk):
 
 
 def _save_yd_form_fields(request, yd_settings):
-    """Parse and save inline form fields from the Youth Dialogue settings form."""
+    """Parse and save inline form fields from the Continental Dialogue settings form."""
     existing_ids = set(yd_settings.form_fields.values_list('id', flat=True))
     kept_ids = set()
     idx = 0
@@ -8654,7 +8654,7 @@ def _save_yd_form_fields(request, yd_settings):
 
 
 def _save_yd_roles(request, yd_event):
-    """Parse and save inline roles from the Youth Dialogue event form."""
+    """Parse and save inline roles from the Continental Dialogue event form."""
     existing_ids = set(yd_event.roles.values_list('id', flat=True))
     kept_ids = set()
     idx = 0
@@ -8696,7 +8696,7 @@ def _save_yd_roles(request, yd_event):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_media_list(request, event_pk):
-    """List all Youth Dialogue media items for an event."""
+    """List all Continental Dialogue media items for an event."""
     yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
     media_items = YouthDialogueMedia.objects.filter(settings=yd_event).order_by('display_order', '-created_at')
     return render(request, 'custom_admin/youth_dialogue/media_list.html', {
@@ -8708,7 +8708,7 @@ def youth_dialogue_media_list(request, event_pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_media_form(request, event_pk, pk=None):
-    """Create or edit a Youth Dialogue media item."""
+    """Create or edit a Continental Dialogue media item."""
     yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
     media = None
     if pk:
@@ -8749,7 +8749,7 @@ def youth_dialogue_media_form(request, event_pk, pk=None):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def youth_dialogue_media_delete(request, event_pk, pk):
-    """Delete a Youth Dialogue media item."""
+    """Delete a Continental Dialogue media item."""
     yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
     media = get_object_or_404(YouthDialogueMedia, pk=pk, settings=yd_event)
     media.delete()
@@ -8760,7 +8760,7 @@ def youth_dialogue_media_delete(request, event_pk, pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_applications_list(request, event_pk):
-    """Applications for a specific Youth Dialogue event."""
+    """Applications for a specific Continental Dialogue event."""
     yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
     qs = YouthDialogueApplication.objects.filter(event=yd_event).select_related('user').order_by('-created_at')
 
@@ -9148,7 +9148,7 @@ def youth_dialogue_review(request, pk):
 
 
 def _yd_email_html(application, heading, badge_color, body_html):
-    """Build branded HTML email for Youth Dialogue notifications."""
+    """Build branded HTML email for Continental Dialogue notifications."""
     return f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -9159,7 +9159,7 @@ def _yd_email_html(application, heading, badge_color, body_html):
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;">{heading}</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Youth Dialogue Programme</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Continental Dialogue Programme</p>
     </div>
     <div style="padding:32px;">
       <div style="display:inline-block;background:{badge_color};color:white;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;margin:0 0 20px;">{application.get_status_display().upper()}</div>
@@ -9215,7 +9215,7 @@ def youth_dialogue_export_csv(request, event_pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_id_card_pdf(request, pk):
-    """Generate a printable PDF ID card for a Youth Dialogue participant."""
+    """Generate a printable PDF ID card for a Continental Dialogue participant."""
     app = get_object_or_404(YouthDialogueApplication, pk=pk)
     if app.status != 'credential_issued' or not app.participant_code:
         return HttpResponse('Credential not issued yet.', status=400)

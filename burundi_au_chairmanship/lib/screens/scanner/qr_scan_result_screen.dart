@@ -147,7 +147,7 @@ class QrScanResultScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       if (qrType.isNotEmpty)
-                        _infoRow('Type', qrType == 'event' ? 'Event Ticket' : 'Youth Dialogue', isDark),
+                        _infoRow('Type', qrType == 'event' ? 'Event Ticket' : 'Continental Dialogue', isDark),
                       if (qrStatus.isNotEmpty)
                         _infoRow('Status', qrStatus.toUpperCase(), isDark,
                             valueColor: _statusColor(qrStatus)),

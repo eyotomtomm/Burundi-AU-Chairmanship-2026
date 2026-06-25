@@ -763,8 +763,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       final ydTitle = langCode == 'fr'
           ? (_ydSettings!['quick_access_title_fr'] as String? ?? '').isNotEmpty
               ? _ydSettings!['quick_access_title_fr'] as String
-              : _ydSettings!['quick_access_title_en'] as String? ?? 'Youth Dialogue'
-          : _ydSettings!['quick_access_title_en'] as String? ?? 'Youth Dialogue';
+              : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue'
+          : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue';
       final ydIconUrl = _ydSettings!['quick_access_icon_url'] as String? ?? '';
       final ydClosedMsg = langCode == 'fr'
           ? (_ydSettings!['registration_closed_message_fr'] as String? ?? '').isNotEmpty

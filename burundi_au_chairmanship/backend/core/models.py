@@ -817,7 +817,7 @@ class FeatureCard(models.Model):
         ('article', 'Article'),
         ('event', 'Event'),
         ('magazine', 'Magazine'),
-        ('youth_dialogue', 'Youth Dialogue'),
+        ('youth_dialogue', 'Continental Dialogue'),
         ('video', 'Video'),
     ]
 
@@ -1986,7 +1986,7 @@ class QuickAccessMenuItem(models.Model):
     auto_badge_days = models.IntegerField(default=3, help_text='Number of days content is considered "new"')
     visibility_rule = models.CharField(
         max_length=50, blank=True, default='',
-        choices=[('', 'Everyone'), ('youth_dialogue_accepted', 'Youth Dialogue Accepted Only')],
+        choices=[('', 'Everyone'), ('youth_dialogue_accepted', 'Continental Dialogue Accepted Only')],
         help_text='Who can see this menu item. Empty = everyone.'
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -4543,7 +4543,7 @@ class NewsletterSubscriber(models.Model):
 # ═══════════════════════════════════════════════════════════════
 
 class YouthDialogueEvent(models.Model):
-    """Admin-configurable branding and support info for a Youth Dialogue event."""
+    """Admin-configurable branding and support info for a Continental Dialogue event."""
 
     # Event identity
     slug = models.SlugField(max_length=120, unique=True, help_text='URL-friendly identifier (e.g. yd-bujumbura-june-2026)')
@@ -4563,18 +4563,18 @@ class YouthDialogueEvent(models.Model):
                                      help_text='Programme logo — French (dark mode)')
     secondary_logo = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
                                        help_text='Secondary logo (e.g. B4 Africa) — shown alongside programme logo')
-    programme_title = models.CharField(max_length=200, default='Youth Dialogue Programme')
-    programme_title_fr = models.CharField(max_length=200, blank=True, default='Programme du Dialogue de la Jeunesse')
-    description = models.TextField(default='Join the African Union Youth Dialogue and contribute to shaping the continent\'s future. Apply now to participate in this prestigious programme.')
-    description_fr = models.TextField(blank=True, default='Rejoignez le Dialogue de la Jeunesse de l\'Union Africaine et contribuez à façonner l\'avenir du continent.')
+    programme_title = models.CharField(max_length=200, default='Continental Dialogue Programme')
+    programme_title_fr = models.CharField(max_length=200, blank=True, default='Programme du Dialogue Continental')
+    description = models.TextField(default='Join the African Union Continental Dialogue and contribute to shaping the continent\'s future. Apply now to participate in this prestigious programme.')
+    description_fr = models.TextField(blank=True, default='Rejoignez le Dialogue Continental de l\'Union Africaine et contribuez à façonner l\'avenir du continent.')
 
     # Visibility & Quick Access
-    is_visible = models.BooleanField(default=True, help_text='Show Youth Dialogue in Quick Access grid')
+    is_visible = models.BooleanField(default=True, help_text='Show Continental Dialogue in Quick Access grid')
     quick_access_icon = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
                                           help_text='Custom icon for Quick Access grid')
-    quick_access_title_en = models.CharField(max_length=50, blank=True, default='Youth Dialogue',
+    quick_access_title_en = models.CharField(max_length=50, blank=True, default='Continental Dialogue',
                                               help_text='Quick Access button title (EN)')
-    quick_access_title_fr = models.CharField(max_length=50, blank=True, default='Dialogue Jeunesse',
+    quick_access_title_fr = models.CharField(max_length=50, blank=True, default='Dialogue Continental',
                                               help_text='Quick Access button title (FR)')
 
     # Registration control
@@ -4583,7 +4583,7 @@ class YouthDialogueEvent(models.Model):
     registration_closed_message_fr = models.TextField(blank=True, default='Les inscriptions sont actuellement fermées. Veuillez réessayer plus tard.')
 
     # Support & Contact
-    support_email = models.EmailField(blank=True, default='', help_text='Contact email for Youth Dialogue support')
+    support_email = models.EmailField(blank=True, default='', help_text='Contact email for Continental Dialogue support')
     support_phone = models.CharField(max_length=30, blank=True, default='', help_text='Contact phone number')
     live_chat_url = models.URLField(blank=True, default='', help_text='URL for live chat support (e.g. WhatsApp, Tawk.to)')
     support_note = models.TextField(blank=True, default='Need help? Reach out to our support team for assistance with your application.',
@@ -4628,8 +4628,8 @@ class YouthDialogueEvent(models.Model):
 
     class Meta:
         db_table = 'core_youthdialoguesettings'
-        verbose_name = 'Youth Dialogue Event'
-        verbose_name_plural = 'Youth Dialogue Events'
+        verbose_name = 'Continental Dialogue Event'
+        verbose_name_plural = 'Continental Dialogue Events'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -4661,7 +4661,7 @@ YouthDialogueSettings = YouthDialogueEvent
 
 
 class YouthDialogueMedia(models.Model):
-    """Photos and videos for the Youth Dialogue programme gallery and promotional content."""
+    """Photos and videos for the Continental Dialogue programme gallery and promotional content."""
     MEDIA_TYPE_CHOICES = [
         ('photo', 'Photo'),
         ('video', 'Video'),
@@ -4683,8 +4683,8 @@ class YouthDialogueMedia(models.Model):
 
     class Meta:
         ordering = ['display_order', '-created_at']
-        verbose_name = 'Youth Dialogue Media'
-        verbose_name_plural = 'Youth Dialogue Media'
+        verbose_name = 'Continental Dialogue Media'
+        verbose_name_plural = 'Continental Dialogue Media'
 
     def __str__(self):
         return f'{self.get_media_type_display()}: {self.title or "Untitled"}'
@@ -4699,7 +4699,7 @@ class YouthDialogueMedia(models.Model):
 
 
 class YouthDialogueFormField(models.Model):
-    """Dynamic form fields for the Youth Dialogue application form."""
+    """Dynamic form fields for the Continental Dialogue application form."""
     FIELD_TYPE_CHOICES = [
         ('text', 'Text Input'),
         ('email', 'Email'),
@@ -4741,15 +4741,15 @@ class YouthDialogueFormField(models.Model):
 
     class Meta:
         ordering = ['order']
-        verbose_name = 'Youth Dialogue Form Field'
-        verbose_name_plural = 'Youth Dialogue Form Fields'
+        verbose_name = 'Continental Dialogue Form Field'
+        verbose_name_plural = 'Continental Dialogue Form Fields'
 
     def __str__(self):
         return f"{self.field_label} ({self.get_field_type_display()})"
 
 
 class YouthDialogueRole(models.Model):
-    """Backend-configurable roles for Youth Dialogue credentials (e.g. Participant, Moderator)."""
+    """Backend-configurable roles for Continental Dialogue credentials (e.g. Participant, Moderator)."""
     event = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='roles')
     name = models.CharField(max_length=100, help_text='Role name in English (e.g. Participant)')
     name_fr = models.CharField(max_length=100, blank=True, help_text='Role name in French')
@@ -4760,8 +4760,8 @@ class YouthDialogueRole(models.Model):
     class Meta:
         ordering = ['order']
         unique_together = ['event', 'name']
-        verbose_name = 'Youth Dialogue Role'
-        verbose_name_plural = 'Youth Dialogue Roles'
+        verbose_name = 'Continental Dialogue Role'
+        verbose_name_plural = 'Continental Dialogue Roles'
 
     def __str__(self):
         return f"{self.name} ({self.event.programme_title})"
@@ -4772,7 +4772,7 @@ class YouthDialogueRole(models.Model):
 # ═══════════════════════════════════════════════════════════════
 
 class YouthDialogueApplication(models.Model):
-    """Youth Dialogue application — one per user per event, with multi-step status pipeline."""
+    """Continental Dialogue application — one per user per event, with multi-step status pipeline."""
 
     STATUS_CHOICES = [
         ('submitted', 'Submitted'),
@@ -4860,8 +4860,8 @@ class YouthDialogueApplication(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'Youth Dialogue Application'
-        verbose_name_plural = 'Youth Dialogue Applications'
+        verbose_name = 'Continental Dialogue Application'
+        verbose_name_plural = 'Continental Dialogue Applications'
         indexes = [
             models.Index(fields=['status', '-created_at']),
             models.Index(fields=['email']),
@@ -4909,7 +4909,7 @@ class YouthDialogueApplication(models.Model):
 
 
 class YouthDialogueDocument(models.Model):
-    """Documents uploaded for a Youth Dialogue application."""
+    """Documents uploaded for a Continental Dialogue application."""
 
     DOCUMENT_TYPE_CHOICES = [
         ('passport', 'Passport Copy'),
@@ -4946,15 +4946,15 @@ class YouthDialogueDocument(models.Model):
 
     class Meta:
         ordering = ['-uploaded_at']
-        verbose_name = 'Youth Dialogue Document'
-        verbose_name_plural = 'Youth Dialogue Documents'
+        verbose_name = 'Continental Dialogue Document'
+        verbose_name_plural = 'Continental Dialogue Documents'
 
     def __str__(self):
         return f"{self.get_document_type_display()} - {self.application}"
 
 
 class YouthDialogueActivityLog(models.Model):
-    """Activity tracking for the Youth Dialogue feature."""
+    """Activity tracking for the Continental Dialogue feature."""
 
     ACTION_CHOICES = [
         ('screen_visit', 'Screen Visit'),
@@ -4980,8 +4980,8 @@ class YouthDialogueActivityLog(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
-        verbose_name = 'Youth Dialogue Activity Log'
-        verbose_name_plural = 'Youth Dialogue Activity Logs'
+        verbose_name = 'Continental Dialogue Activity Log'
+        verbose_name_plural = 'Continental Dialogue Activity Logs'
         indexes = [
             models.Index(fields=['user', '-timestamp']),
             models.Index(fields=['action', '-timestamp']),
@@ -4995,7 +4995,7 @@ class QRScanLog(models.Model):
     """Log every QR code scan for audit and duplicate detection."""
     QR_TYPE_CHOICES = [
         ('event', 'Event Ticket'),
-        ('youth_dialogue', 'Youth Dialogue Credential'),
+        ('youth_dialogue', 'Continental Dialogue Credential'),
     ]
 
     qr_type = models.CharField(max_length=20, choices=QR_TYPE_CHOICES)

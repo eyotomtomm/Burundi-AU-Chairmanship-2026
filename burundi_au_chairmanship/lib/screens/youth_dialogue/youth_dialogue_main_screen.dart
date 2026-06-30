@@ -1090,8 +1090,8 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               const SizedBox(height: 12),
               Text(
                 isFr
-                    ? 'Votre candidature au Dialogue Continental a été acceptée !'
-                    : 'Your Continental Dialogue application has been accepted!',
+                    ? 'Votre candidature au ${_programmeTitle(isFr)} a été acceptée !'
+                    : 'Your ${_programmeTitle(isFr)} application has been accepted!',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -2086,7 +2086,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => _YDYouTubePlayerScreen(videoId: ytId, title: title),
+          builder: (_) => _YDYouTubePlayerScreen(videoId: ytId, title: title, programmeName: _programmeTitle(Provider.of<LanguageProvider>(context, listen: false).locale.languageCode == 'fr')),
         ),
       );
     } else {
@@ -2286,8 +2286,9 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
 class _YDYouTubePlayerScreen extends StatefulWidget {
   final String videoId;
   final String title;
+  final String programmeName;
 
-  const _YDYouTubePlayerScreen({required this.videoId, required this.title});
+  const _YDYouTubePlayerScreen({required this.videoId, required this.title, this.programmeName = 'Continental Dialogue'});
 
   @override
   State<_YDYouTubePlayerScreen> createState() => _YDYouTubePlayerScreenState();
@@ -2388,12 +2389,12 @@ class _YDYouTubePlayerScreenState extends State<_YDYouTubePlayerScreen> {
                           color: AppColors.burundiGreen.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.play_circle_rounded, size: 16, color: AppColors.burundiGreen),
-                            SizedBox(width: 6),
-                            Text('Continental Dialogue', style: TextStyle(
+                            const Icon(Icons.play_circle_rounded, size: 16, color: AppColors.burundiGreen),
+                            const SizedBox(width: 6),
+                            Text(widget.programmeName, style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.burundiGreen)),
                           ],
                         ),

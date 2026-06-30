@@ -5,8 +5,9 @@ import '../../config/app_colors.dart';
 class QrScanResultScreen extends StatelessWidget {
   final Map<String, dynamic> result;
   final String? mode;
+  final String? programmeName;
 
-  const QrScanResultScreen({super.key, required this.result, this.mode});
+  const QrScanResultScreen({super.key, required this.result, this.mode, this.programmeName});
 
   bool get _isYdMode => mode == 'youth_dialogue';
 
@@ -147,7 +148,7 @@ class QrScanResultScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       if (qrType.isNotEmpty)
-                        _infoRow('Type', qrType == 'event' ? 'Event Ticket' : 'Continental Dialogue', isDark),
+                        _infoRow('Type', qrType == 'event' ? 'Event Ticket' : (programmeName ?? 'Continental Dialogue'), isDark),
                       if (qrStatus.isNotEmpty)
                         _infoRow('Status', qrStatus.toUpperCase(), isDark,
                             valueColor: _statusColor(qrStatus)),

@@ -7,8 +7,9 @@ import 'yd_scan_history_screen.dart';
 
 class QrScannerScreen extends StatefulWidget {
   final String? mode;
+  final String? programmeName;
 
-  const QrScannerScreen({super.key, this.mode});
+  const QrScannerScreen({super.key, this.mode, this.programmeName});
 
   @override
   State<QrScannerScreen> createState() => _QrScannerScreenState();
@@ -50,7 +51,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => QrScanResultScreen(result: result, mode: widget.mode),
+          builder: (_) => QrScanResultScreen(result: result, mode: widget.mode, programmeName: widget.programmeName),
         ),
       );
     } catch (e) {
@@ -64,6 +65,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               'detail': e.toString().replaceFirst('Exception: ', ''),
             },
             mode: widget.mode,
+            programmeName: widget.programmeName,
           ),
         ),
       );
@@ -77,13 +79,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   bool get _isYdMode => widget.mode == 'youth_dialogue';
+  String get _programmeName => widget.programmeName ?? 'Continental Dialogue';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(_isYdMode ? 'CD Credential Scanner' : 'QR Scanner'),
+        title: Text(_isYdMode ? '$_programmeName Scanner' : 'QR Scanner'),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -145,7 +148,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 else
                   Text(
                     _isYdMode
-                        ? 'Scan a Continental Dialogue QR code'
+                        ? 'Scan a $_programmeName QR code'
                         : 'Point your camera at a QR code',
                     textAlign: TextAlign.center,
                     style: TextStyle(

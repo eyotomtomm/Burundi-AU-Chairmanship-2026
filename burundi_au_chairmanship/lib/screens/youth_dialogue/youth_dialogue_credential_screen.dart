@@ -29,13 +29,29 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
   String? _error;
   YouthDialogueCredential? _credential;
   bool _confettiShown = false;
+  String _programmeName = 'Continental Dialogue';
 
   @override
   void initState() {
     super.initState();
     _enableScreenProtection();
+    _loadProgrammeName();
     _loadCredential();
     ApiService().youthDialogueLogActivity('credential_viewed', 'youth_dialogue_credential');
+  }
+
+  Future<void> _loadProgrammeName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('yd_settings_cache');
+      if (cached != null) {
+        final settings = jsonDecode(cached) as Map<String, dynamic>;
+        final title = settings['programme_title']?.toString() ?? '';
+        if (title.isNotEmpty && mounted) {
+          setState(() => _programmeName = title);
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -132,7 +148,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
       if (!mounted) return;
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/pdf')],
-        text: 'Continental Dialogue ID Card - $code',
+        text: '$_programmeName ID Card - $code',
       );
     } catch (e) {
       if (mounted) {
@@ -189,7 +205,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                 ),
                 child: pw.Column(
                   children: [
-                    pw.Text('CONTINENTAL DIALOGUE',
+                    pw.Text(_programmeName.toUpperCase(),
                       style: pw.TextStyle(
                         color: PdfColors.white,
                         fontSize: 18,
@@ -468,8 +484,8 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
                         ),
-                        child: const Text(
-                          'CONTINENTAL DIALOGUE',
+                        child: Text(
+                          _programmeName.toUpperCase(),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 12,

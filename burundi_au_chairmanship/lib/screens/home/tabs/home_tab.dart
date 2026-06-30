@@ -848,11 +848,18 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
     // YD Scanner — for users with the usher role
     if (authProvider.isUsher && !dup('/yd-scanner', 'YD Scanner', 'Scanner YD')) {
+      final ydScannerName = _ydSettings != null
+          ? (langCode == 'fr'
+              ? (_ydSettings!['quick_access_title_fr'] as String? ?? '').isNotEmpty
+                  ? _ydSettings!['quick_access_title_fr'] as String
+                  : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue'
+              : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue')
+          : 'Continental Dialogue';
       items.add(<String, dynamic>{
-        'title': langCode == 'fr' ? 'Scanner YD' : 'YD Scanner',
+        'title': langCode == 'fr' ? 'Scanner $ydScannerName' : '$ydScannerName Scanner',
         'icon': Icons.badge_rounded,
         'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Staff' : 'Staff', 'badgeColor': '#409843',
-        'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen(mode: 'youth_dialogue'))),
+        'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => QrScannerScreen(mode: 'youth_dialogue', programmeName: ydScannerName))),
       });
     }
 

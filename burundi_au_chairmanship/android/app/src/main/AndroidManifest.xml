@@ -102,6 +102,8 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Required for Google Sign-In on Android 11+ (package visibility) -->
+        <package android:name="com.google.android.gms" />
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

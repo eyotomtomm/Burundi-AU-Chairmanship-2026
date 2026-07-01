@@ -18,7 +18,11 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 /// - Token management
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email'],
+    serverClientId:
+        '55634991225-ho69pb48q863skc57niakt61uaullrd7.apps.googleusercontent.com',
+  );
 
   /// Get the currently authenticated Firebase user
   User? get currentUser => _auth.currentUser;
@@ -91,6 +95,14 @@ class FirebaseAuthService {
     } on FirebaseAuthException {
       rethrow;
     } catch (e) {
+      // On some OEM devices (notably OnePlus), SignInHubActivity can throw
+      // a NullPointerException when the OS strips intent extras during
+      // aggressive activity lifecycle management. Disconnect and retry hint.
+      final message = e.toString();
+      if (message.contains('NullPointerException') ||
+          message.contains('SignInHubActivity')) {
+        await _googleSignIn.disconnect().catchError((_) {});
+      }
       throw FirebaseAuthException(
         code: 'ERROR_GOOGLE_SIGN_IN_FAILED',
         message: '$e',

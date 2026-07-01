@@ -17,7 +17,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import api_view, permission_classes, action, throttle_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .permissions import HasAdminSection
+from .permissions import HasAdminSection, IsVerifiedUser
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -221,7 +221,7 @@ def lookup_ip_geolocation(login_history_id):
             entry.city = data.get('city', '')
             entry.save(update_fields=['country', 'city'])
     except Exception:
-        pass  # Non-critical, don't break login flow
+        logger.debug('GeoIP lookup failed for %s', entry.ip_address, exc_info=True)
 
 
 def _parse_device_from_ua(ua_string):
@@ -779,10 +779,26 @@ def firebase_register(request):
                 'requires_email_verification': not profile.is_email_verified,
             }, status=status.HTTP_200_OK)
 
-        # Split display name into first/last (handles long Google/Apple names)
-        first_name, last_name = _split_display_name(name)
+        email_verified = decoded_token.get('email_verified', False)
 
-        # Create Django user with readable username derived from name or email
+        if not email_verified:
+            # Email/password signup — defer user creation until OTP verified.
+            # Store pending registration data in cache instead.
+            cache.set(f'pending_signup:{firebase_uid}', {
+                'email': email,
+                'name': name,
+                'phone_number': phone_number,
+                'gender': gender,
+                'firebase_uid': firebase_uid,
+            }, timeout=1800)  # 30 minutes
+            return Response({
+                'status': 'pending_verification',
+                'requires_email_verification': True,
+                'message': 'Please verify your email to complete registration',
+            }, status=status.HTTP_200_OK)
+
+        # Social login (email already verified) — create user immediately
+        first_name, last_name = _split_display_name(name)
         username = _generate_unique_username(email, firebase_uid, display_name=name)
         user = User.objects.create(
             username=username,
@@ -791,19 +807,18 @@ def firebase_register(request):
             last_name=last_name,
         )
 
-        # Update profile with Firebase data
         profile = user.profile
         profile.firebase_uid = firebase_uid
         profile.phone_number = phone_number
         profile.gender = gender
-        profile.is_email_verified = decoded_token.get('email_verified', False)
+        profile.is_email_verified = True
         profile.save()
 
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
             'message': 'User registered successfully',
-            'email_verified': profile.is_email_verified,
-            'requires_email_verification': not profile.is_email_verified,
+            'email_verified': True,
+            'requires_email_verification': False,
         }, status=status.HTTP_201_CREATED)
 
     except ValueError as e:
@@ -877,18 +892,32 @@ def firebase_login(request):
                 )
 
             if user is None:
-                # Auto-create user if they don't exist (standard for social logins)
-                first_name, last_name = _split_display_name(name)
-                username = _generate_unique_username(email, firebase_uid, display_name=name)
-                user = User.objects.create(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                )
-                profile = user.profile
-                profile.firebase_uid = firebase_uid
-                is_new_user = True
+                if email_verified:
+                    # Social login (verified email) — auto-create user
+                    first_name, last_name = _split_display_name(name)
+                    username = _generate_unique_username(email, firebase_uid, display_name=name)
+                    user = User.objects.create(
+                        username=username,
+                        email=email,
+                        first_name=first_name,
+                        last_name=last_name,
+                    )
+                    profile = user.profile
+                    profile.firebase_uid = firebase_uid
+                    is_new_user = True
+                else:
+                    # Email/password — check for pending signup in cache
+                    pending = cache.get(f'pending_signup:{firebase_uid}')
+                    if pending:
+                        return Response({
+                            'status': 'pending_verification',
+                            'requires_email_verification': True,
+                            'message': 'Please verify your email to complete registration',
+                        })
+                    return Response(
+                        {'detail': 'User not registered'},
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
 
         # Update email and username for existing users if needed
         if not is_new_user:
@@ -1169,8 +1198,7 @@ def logout_view(request):
         token = RefreshToken(refresh_token)
         token.blacklist()
     except Exception:
-        # Token may already be blacklisted or invalid — still proceed
-        pass
+        logger.debug('Token blacklist skipped (already invalid)')
 
     # Deactivate FCM tokens so the user stops receiving push notifications
     fcm_token = request.data.get('fcm_token')
@@ -1331,7 +1359,7 @@ def _get_client_ip(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def export_user_data(request):
     """
     Export all user data in JSON format.
@@ -1402,7 +1430,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
         _dedup_record_view(MagazineEdition, pk, request, 'magazine')
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle], url_path='toggle-like')
+    @action(detail=True, methods=['post'], permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle], url_path='toggle-like')
     def toggle_like(self, request, pk=None):
         """Toggle like on magazine. Requires authentication."""
         edition = self.get_object()
@@ -1508,7 +1536,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
         from django.utils.html import escape
         try:
@@ -1546,7 +1574,7 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(MagazineCommentSerializer(comment, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
-            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+            permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_comment_like(self, request, pk=None, comment_id=None):
         try:
             comment = MagazineComment.objects.get(pk=comment_id, edition_id=pk)
@@ -1658,7 +1686,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = ArticleListSerializer(related_qs, many=True, context={'request': request})
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get', 'post'], url_path='reading-progress', permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['get', 'post'], url_path='reading-progress', permission_classes=[IsVerifiedUser])
     def reading_progress(self, request, pk=None):
         """Get or save reading progress for an article."""
         article = self.get_object()
@@ -1808,7 +1836,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
                         {'type': 'article_comment', 'article_id': str(article.id)},
                     )
                 except Exception:
-                    pass
+                    logger.exception('Push notification failed for article comment mention')
 
         serializer = ArticleCommentSerializer(comment, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1830,7 +1858,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
         from django.utils.html import escape
         try:
@@ -1868,7 +1896,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(ArticleCommentSerializer(comment, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
-            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+            permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_comment_like(self, request, pk=None, comment_id=None):
         try:
             comment = ArticleComment.objects.get(pk=comment_id, article_id=pk)
@@ -1885,7 +1913,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         comment.refresh_from_db()
         return Response({'is_liked': is_liked, 'like_count': comment.like_count})
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on article. Requires authentication."""
         article = self.get_object()
@@ -2008,7 +2036,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         _dedup_record_view(Event, pk, request, 'event')
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on event. Requires authentication."""
         event = self.get_object()
@@ -2050,7 +2078,7 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
         _dedup_record_view(LiveFeed, pk, request, 'livefeed')
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on a live feed."""
         feed = self.get_object()
@@ -2157,7 +2185,7 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
         from django.utils.html import escape
         try:
@@ -2195,7 +2223,7 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(LiveFeedCommentSerializer(comment, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
-            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+            permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_comment_like(self, request, pk=None, comment_id=None):
         try:
             comment = LiveFeedComment.objects.get(pk=comment_id, feed_id=pk)
@@ -2281,7 +2309,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
         _dedup_record_view(GalleryAlbum, pk, request, 'album')
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on gallery album. Requires authentication."""
         album = self.get_object()
@@ -2387,7 +2415,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
         from django.utils.html import escape
         try:
@@ -2425,7 +2453,7 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(GalleryCommentSerializer(comment, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
-            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+            permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_comment_like(self, request, pk=None, comment_id=None):
         try:
             comment = GalleryComment.objects.get(pk=comment_id, album_id=pk)
@@ -2469,7 +2497,7 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
         _dedup_record_view(Video, pk, request, 'video')
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on video. Requires authentication."""
         video = self.get_object()
@@ -2583,7 +2611,7 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='comments/(?P<comment_id>[0-9]+)/edit',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def edit_comment(self, request, pk=None, comment_id=None):
         from django.utils.html import escape
         try:
@@ -2621,7 +2649,7 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(VideoCommentSerializer(comment, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='comments/(?P<comment_id>[0-9]+)/toggle-like',
-            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+            permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_comment_like(self, request, pk=None, comment_id=None):
         try:
             comment = VideoComment.objects.get(pk=comment_id, video_id=pk)
@@ -3239,7 +3267,7 @@ class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):
 # ── Verification System ────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def submit_verification_request(request):
     """
     Submit a verification request for Gold or Blue badge.
@@ -3304,7 +3332,7 @@ def check_verification_status(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def submit_verification_appeal(request):
     """
     Submit appeal for rejected verification request.
@@ -3344,7 +3372,7 @@ def submit_verification_appeal(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def admin_verification_action(request, request_id):
     """
     Admin endpoint to approve or reject verification requests.
@@ -3455,7 +3483,7 @@ class EventRegistrationViewSet(viewsets.ReadOnlyModelViewSet):
 class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
                              mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """User submissions for event registrations (create/list/retrieve only)"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsVerifiedUser]
     serializer_class = EventSubmissionSerializer
 
     def get_queryset(self):
@@ -3863,7 +3891,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def my_event_registrations(request):
     """Return all event submissions for the current user"""
     submissions = EventSubmission.objects.filter(user=request.user).select_related('event_registration')
@@ -3872,6 +3900,183 @@ def my_event_registrations(request):
 
 
   # Duplicate delete_account and export_user_data removed — canonical versions are above (lines ~96-304)
+
+
+# ── Pending Signup OTP Endpoints (pre-registration, no Django User yet) ───
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([OTPRateThrottle])
+def send_pending_otp(request):
+    """Send OTP for a pending (pre-registration) signup. No auth required —
+    verifies Firebase token directly, like firebase_register/firebase_login."""
+    from .otp_utils import generate_otp, _hash_otp
+
+    id_token = request.data.get('firebase_token')
+    if not id_token:
+        return Response(
+            {'detail': 'Firebase token is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        decoded_token = verify_firebase_token(id_token)
+        firebase_uid = decoded_token['uid']
+    except ValueError as e:
+        return Response({'detail': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+    cache_key = f'pending_signup:{firebase_uid}'
+    pending = cache.get(cache_key)
+    if not pending:
+        return Response(
+            {'detail': 'No pending registration found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Generate OTP, hash it, store alongside pending data
+    otp_code = generate_otp()
+    pending['otp_hash'] = _hash_otp(otp_code)
+    pending['otp_expires_at'] = (timezone.now() + timedelta(minutes=10)).isoformat()
+    pending['otp_attempts'] = 0
+    cache.set(cache_key, pending, timeout=1800)  # preserve 30-min TTL
+
+    # Send OTP email
+    from_email = getattr(django_settings, 'DEFAULT_FROM_EMAIL', None)
+    if not from_email:
+        return Response(
+            {'detail': 'Email sending is not configured. Please contact support.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    try:
+        send_mail(
+            'Be 4 Africa - Email Verification OTP',
+            f'Hello {pending["name"]},\n\n'
+            f'Your email verification OTP code is: {otp_code}\n\n'
+            f'This code will expire in 10 minutes.\n\n'
+            f'If you did not request this code, please ignore this email.\n\n'
+            f'Best regards,\n'
+            f'Be 4 Africa Team',
+            from_email,
+            [pending['email']],
+            fail_silently=False,
+        )
+    except Exception as e:
+        logger.exception('Failed to send pending signup OTP email: %s', e)
+        return Response(
+            {'detail': 'Failed to send verification code. Please try again.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    return Response({
+        'message': 'OTP sent',
+        'email': pending['email'],
+    })
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([OTPVerifyThrottle])
+def verify_pending_otp(request):
+    """Verify OTP for a pending signup — creates the Django User on success."""
+    from .otp_utils import _hash_otp
+
+    id_token = request.data.get('firebase_token')
+    otp_code = request.data.get('otp_code')
+
+    if not id_token:
+        return Response(
+            {'detail': 'Firebase token is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    if not otp_code:
+        return Response(
+            {'detail': 'OTP code is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        decoded_token = verify_firebase_token(id_token)
+        firebase_uid = decoded_token['uid']
+    except ValueError as e:
+        return Response({'detail': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+    cache_key = f'pending_signup:{firebase_uid}'
+    pending = cache.get(cache_key)
+    if not pending:
+        return Response(
+            {'detail': 'No pending registration found. Please sign up again.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Check OTP exists
+    if not pending.get('otp_hash'):
+        return Response(
+            {'detail': 'No OTP has been sent. Please request a code first.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check max attempts
+    attempts = pending.get('otp_attempts', 0)
+    if attempts >= 5:
+        return Response(
+            {'detail': 'Too many failed attempts. Please request a new code.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check expiry
+    otp_expires_at = pending.get('otp_expires_at')
+    if otp_expires_at:
+        from django.utils.dateparse import parse_datetime
+        expires = parse_datetime(otp_expires_at)
+        if expires and timezone.now() > expires:
+            return Response(
+                {'detail': 'OTP has expired. Please request a new one.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # Verify OTP hash
+    otp_code = str(otp_code).strip()
+    if pending['otp_hash'] != _hash_otp(otp_code):
+        pending['otp_attempts'] = attempts + 1
+        cache.set(cache_key, pending, timeout=1800)
+        return Response(
+            {'detail': 'Invalid OTP code'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # OTP verified — create Django User + UserProfile
+    email = pending['email']
+    name = pending.get('name', '')
+    phone_number = pending.get('phone_number', '')
+    gender = pending.get('gender', '')
+
+    first_name, last_name = _split_display_name(name)
+    username = _generate_unique_username(email, firebase_uid, display_name=name)
+    user = User.objects.create(
+        username=username,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+    )
+
+    profile = user.profile
+    profile.firebase_uid = firebase_uid
+    profile.phone_number = phone_number
+    profile.gender = gender
+    profile.is_email_verified = True
+    profile.email_verified_at = timezone.now()
+    profile.save()
+
+    # Clean up cache
+    cache.delete(cache_key)
+
+    return Response({
+        'user': UserSerializer(user, context={'request': request}).data,
+        'message': 'Registration complete',
+        'email_verified': True,
+        'requires_email_verification': False,
+    }, status=status.HTTP_201_CREATED)
 
 
 # ── Sign-Up Email Verification OTP Endpoints ─────────────────────────────
@@ -4164,7 +4369,7 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def support_unread_count(request):
     """Total unread support message count across all tickets (for bell badge)."""
     count = TicketMessage.objects.filter(
@@ -4304,7 +4509,7 @@ class BookmarkViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def toggle_reaction(request):
     """Toggle a reaction on content."""
     content_type = request.data.get('content_type')
@@ -4361,7 +4566,7 @@ def get_reactions(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def update_reading_progress(request):
     """Update reading progress for an article."""
     article_id = request.data.get('article_id')
@@ -4427,7 +4632,7 @@ def trending_content(request):
 
 class EventReminderViewSet(viewsets.ModelViewSet):
     """Manage event reminders for authenticated users."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsVerifiedUser]
     serializer_class = EventReminderSerializer
     http_method_names = ['get', 'post', 'delete']
 
@@ -4458,7 +4663,7 @@ class EventSpeakerViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def submit_event_feedback(request):
     """Submit post-event feedback."""
     resp = _require_verified_email(request)
@@ -4472,7 +4677,7 @@ def submit_event_feedback(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def event_checkin(request):
     """Check in to an event using QR code."""
     qr_code = request.data.get('qr_code')
@@ -4497,7 +4702,7 @@ def event_checkin(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def join_event_waitlist(request):
     """Join a waitlist for a full event."""
     event_reg_id = request.data.get('event_registration')
@@ -4694,7 +4899,7 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         _dedup_record_view(Discussion, pk, request, 'discussion')
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+    @action(detail=True, methods=['post'], url_path='toggle-like', permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_like(self, request, pk=None):
         """Toggle like on discussion. Requires authentication."""
         discussion = self.get_object()
@@ -4721,7 +4926,7 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['patch'], url_path='replies/(?P<reply_id>[0-9]+)/edit',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def edit_reply(self, request, pk=None, reply_id=None):
         from django.utils.html import escape
         try:
@@ -4759,7 +4964,7 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         return Response(DiscussionReplySerializer(reply, context={'request': request}).data)
 
     @action(detail=True, methods=['post'], url_path='replies/(?P<reply_id>[0-9]+)/toggle-like',
-            permission_classes=[IsAuthenticated], throttle_classes=[LikeToggleThrottle])
+            permission_classes=[IsVerifiedUser], throttle_classes=[LikeToggleThrottle])
     def toggle_reply_like(self, request, pk=None, reply_id=None):
         try:
             reply = DiscussionReply.objects.get(pk=reply_id, discussion_id=pk)
@@ -4787,7 +4992,7 @@ class PollViewSet(viewsets.ReadOnlyModelViewSet):
             'options', 'votes'
         )
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[IsVerifiedUser])
     def vote(self, request, pk=None):
         """Vote on a poll."""
         resp = _require_verified_email(request)
@@ -4899,7 +5104,7 @@ class LiveQAViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(LiveQAQuestionSerializer(q, context={'request': request}).data, status=201)
 
     @action(detail=True, methods=['post'], url_path='questions/(?P<question_id>[0-9]+)/upvote',
-            permission_classes=[IsAuthenticated])
+            permission_classes=[IsVerifiedUser])
     def upvote_question(self, request, pk=None, question_id=None):
         """Upvote a Q&A question."""
         LiveQAQuestion.objects.filter(pk=question_id, session_id=pk).update(
@@ -5128,7 +5333,7 @@ def auto_translate(request):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def request_account_merge(request):
     """Request to merge another account into the current one."""
     secondary_email = request.data.get('email')
@@ -5156,7 +5361,7 @@ def request_account_merge(request):
 # ══════════════════════════════════════════════════════════════
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def linked_accounts_list(request):
     """List all auth providers linked to the current user's account."""
     accounts = LinkedAccount.objects.filter(user=request.user)
@@ -5165,7 +5370,7 @@ def linked_accounts_list(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def link_account(request):
     """Link a new auth provider to the current user's account.
 
@@ -5233,7 +5438,7 @@ def link_account(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def unlink_account(request):
     """Unlink an auth provider from the current user's account.
 
@@ -5669,14 +5874,14 @@ def event_comments(request, event_id):
                     {'type': 'event_comment', 'event_id': str(event.id)},
                 )
             except Exception:
-                pass
+                logger.exception('Push notification failed for event comment mention')
 
     serializer = EventCommentSerializer(comment, context={'request': request})
     return Response(serializer.data, status=201)
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def event_comment_delete(request, event_id, comment_id):
     """Delete own comment on an event. Users can only delete within 2 minutes; admins anytime."""
     comment = get_object_or_404(EventComment, pk=comment_id, event_id=event_id)
@@ -5690,7 +5895,7 @@ def event_comment_delete(request, event_id, comment_id):
 
 
 @api_view(['PATCH'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def event_comment_edit(request, event_id, comment_id):
     """Edit own comment on an event within 2-minute window."""
     from django.utils.html import escape
@@ -5727,7 +5932,7 @@ def event_comment_edit(request, event_id, comment_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 @throttle_classes([LikeToggleThrottle])
 def event_comment_toggle_like(request, event_id, comment_id):
     """Toggle like on an event comment."""
@@ -5745,7 +5950,7 @@ def event_comment_toggle_like(request, event_id, comment_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def event_attendees(request, event_id):
     """List attendees for event networking (name, badge, nationality only - no email/phone)."""
     event = get_object_or_404(Event, pk=event_id)
@@ -5761,7 +5966,7 @@ def event_attendees(request, event_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsVerifiedUser])
 def toggle_newsletter(request):
     """Toggle newsletter subscription for the authenticated user."""
     profile = request.user.profile
@@ -6157,7 +6362,7 @@ def _send_yd_admin_notification(application):
             )
         threading.Thread(target=_send, daemon=True).start()
     except Exception:
-        pass
+        logger.exception('Continental Dialogue admin notification email failed')
 
 
 def _get_yd_user_lang(application):
@@ -6483,7 +6688,7 @@ def _notify_yd(application, event_key):
             lang=lang,
         )
     except Exception:
-        pass
+        logger.exception('Continental Dialogue email notification failed for user %s', application.user_id)
 
     # 2. Send push notification via Celery (best-effort, non-blocking)
     #    Falls back to synchronous send if Redis/Celery broker is unavailable.
@@ -6554,7 +6759,7 @@ def _notify_yd(application, event_key):
                     )
                     messaging.send_each_for_multicast(msg)
             except Exception:
-                pass
+                logger.exception('Push notification failed for Continental Dialogue user %s', application.user_id)
     threading.Thread(target=_send_push, daemon=True).start()
 
     # 3. Create in-app Notification record (bilingual)
@@ -6573,7 +6778,7 @@ def _notify_yd(application, event_key):
         )
         notif.target_users.add(application.user)
     except Exception:
-        pass
+        logger.exception('In-app notification creation failed for Continental Dialogue user %s', application.user_id)
 
 
 def _yd_logo_absolute_url(image_field):
@@ -6668,12 +6873,12 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
             )
         threading.Thread(target=_send, daemon=True).start()
     except Exception:
-        pass
+        logger.exception('Continental Dialogue applicant email failed')
 
 
 class YouthDialogueViewSet(viewsets.GenericViewSet):
     """Continental Dialogue application pipeline endpoints."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsVerifiedUser]
 
     @action(detail=False, methods=['get'], url_path='settings', permission_classes=[AllowAny])
     def yd_settings(self, request):

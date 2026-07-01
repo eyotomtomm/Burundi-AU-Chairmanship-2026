@@ -42,9 +42,15 @@ def user_handle(user):
     return h or f'user{user.pk}'
 
 
-def resolve_mentioned_users(content, exclude_user=None):
+MAX_MENTIONS_PER_COMMENT = 5
+
+
+def resolve_mentioned_users(content, exclude_user=None, max_mentions=MAX_MENTIONS_PER_COMMENT):
     """Parse @mentions in ``content`` and return User objects whose sanitized
     handle exactly matches any mentioned handle (case-insensitive).
+
+    At most ``max_mentions`` users are returned to prevent a single comment
+    from triggering an unbounded number of push notifications.
 
     This is the privacy-safe replacement for the old
     ``User.objects.filter(username__in=...)`` lookup which accidentally
@@ -55,8 +61,17 @@ def resolve_mentioned_users(content, exclude_user=None):
     raw_handles = re.findall(r'@(\w+)', content or '')
     if not raw_handles:
         return []
-    # Build a lowercase set for matching.
-    wanted = {h.lower() for h in raw_handles}
+    # Deduplicate and cap the number of handles we even attempt to resolve.
+    seen_handles = set()
+    unique_handles = []
+    for h in raw_handles:
+        lower = h.lower()
+        if lower not in seen_handles:
+            seen_handles.add(lower)
+            unique_handles.append(lower)
+        if len(unique_handles) >= max_mentions:
+            break
+    wanted = set(unique_handles)
     # Pull every candidate whose email local-part *could* contain one of the
     # handles. Using ``istartswith`` on username (email) is the cheapest query
     # that reliably includes every potential match.
@@ -75,6 +90,8 @@ def resolve_mentioned_users(content, exclude_user=None):
         seen.add(user.pk)
         if sanitize_handle(user.username).lower() in wanted:
             matched.append(user)
+            if len(matched) >= max_mentions:
+                break
     return matched
 
 

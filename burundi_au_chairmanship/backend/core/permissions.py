@@ -1,9 +1,12 @@
-"""DRF permission classes that enforce the same section-based access control
-used by the custom admin HTML portal.
+"""DRF permission classes.
+
+Includes:
+  - ``IsVerifiedUser`` — authenticated *and* email-verified (DRF default).
+  - ``HasAdminSection`` — staff + admin-portal section check.
 
 Usage::
 
-    from core.permissions import HasAdminSection
+    from core.permissions import IsVerifiedUser, HasAdminSection
 
     @api_view(['GET'])
     @permission_classes([HasAdminSection.for_section('articles_list')])
@@ -11,7 +14,34 @@ Usage::
         ...
 """
 
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated
+
+
+class IsVerifiedUser(IsAuthenticated):
+    """Authenticated user whose email address has been verified.
+
+    Staff and superusers bypass the email-verification check so admin
+    endpoints remain accessible regardless of verification state.
+
+    Endpoints that must work for unverified users (OTP send/verify,
+    profile view, FCM token management, logout, etc.) should explicitly
+    set ``permission_classes = [IsAuthenticated]`` to opt out.
+    """
+
+    message = 'Please verify your email address to perform this action.'
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        user = request.user
+        # Staff/superusers bypass — admin access should never be blocked
+        # by the app-level email verification flow.
+        if user.is_staff:
+            return True
+        profile = getattr(user, 'profile', None)
+        if profile is None:
+            return False
+        return bool(profile.is_email_verified)
 
 
 class HasAdminSection(BasePermission):

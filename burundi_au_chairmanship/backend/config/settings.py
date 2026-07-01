@@ -73,6 +73,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'core.middleware.cloudflare.CloudflareProxyMiddleware',  # Must be first — sets real client IP
     'django.middleware.security.SecurityMiddleware',
+    'core.middleware.security_headers.SecurityHeadersMiddleware',  # Permissions-Policy + admin CSP
     # GZipMiddleware removed — Cloudflare handles compression; avoids BREACH attack vector
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -119,8 +120,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Uses PostgreSQL in production (via DATABASE_URL), SQLite locally
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
+    # conn_max_age=0 is required for transaction-mode connection pooling
+    # (pgbouncer / DO managed pool). Persistent connections (conn_max_age>0)
+    # conflict with the pooler reclaiming server-side connections.
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=0)
     }
 else:
     DATABASES = {
@@ -132,6 +136,17 @@ else:
 
 # ─── Caching (Redis in production, LocMem for dev) ───────────
 REDIS_URL = os.environ.get('REDIS_URL', '')
+if not REDIS_URL and not DEBUG:
+    raise RuntimeError(
+        "CRITICAL: REDIS_URL environment variable is not set.\n"
+        "Redis is required in production for cache, sessions, DRF throttles,\n"
+        "Celery task queue, and WebSocket channel layers.\n\n"
+        "Without Redis, LocMemCache is per-process: throttle counters are not\n"
+        "shared across gunicorn workers or app instances, sessions desync,\n"
+        "and WebSocket pub/sub does not work across instances.\n\n"
+        "Provision a Redis database in .do/app.yaml and set:\n"
+        "  REDIS_URL=${redis.DATABASE_URL}"
+    )
 if REDIS_URL:
     CACHES = {
         'default': {
@@ -179,7 +194,7 @@ CACHE_TTL_STATIC = 86400   # 24 hrs — onboarding steps, app config
 # ─── Database Read Replica ────────────────────────────────────
 READ_REPLICA_URL = os.environ.get('READ_REPLICA_URL', '')
 if READ_REPLICA_URL:
-    DATABASES['replica'] = dj_database_url.parse(READ_REPLICA_URL, conn_max_age=600)
+    DATABASES['replica'] = dj_database_url.parse(READ_REPLICA_URL, conn_max_age=0)
     DATABASE_ROUTERS = ['config.db_router.ReadReplicaRouter']
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -266,6 +281,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        'core': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'custom_admin': {
             'handlers': ['console'],
             'level': 'DEBUG',
@@ -306,10 +326,12 @@ if DEBUG:
     ]
 # ─── DRF settings ─────────────────────────────────────────────
 REST_FRAMEWORK = {
-    # Security: Default to requiring authentication (fail-secure)
-    # Public endpoints must explicitly set permission_classes = [AllowAny]
+    # Security: Default to requiring authentication + email verification.
+    # Public endpoints must explicitly set permission_classes = [AllowAny].
+    # Endpoints for unverified users (OTP, profile, logout, FCM) must
+    # explicitly set permission_classes = [IsAuthenticated].
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'core.permissions.IsVerifiedUser',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'core.authentication.FirebaseAuthentication',  # Try Firebase first
@@ -381,6 +403,18 @@ CUSTOM_ADMIN_SITE_HEADER = 'Content Management System'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 CSRF_COOKIE_HTTPONLY = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+# Permissions-Policy: disable browser features the admin panel doesn't need.
+# Injected by SecurityHeadersMiddleware (see core/middleware/security_headers.py).
+PERMISSIONS_POLICY = {
+    'camera': [],
+    'microphone': [],
+    'geolocation': [],
+    'payment': [],
+    'usb': [],
+    'interest-cohort': [],  # Block FLoC
+}
 
 # ─── Production Security ──────────────────────────────────────
 if not DEBUG:
@@ -434,9 +468,8 @@ CAMPAIGN_EMAIL_PORT = int(os.environ.get('CAMPAIGN_EMAIL_PORT', '465'))
 CAMPAIGN_EMAIL_USE_TLS = os.environ.get('CAMPAIGN_EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
 CAMPAIGN_EMAIL_USE_SSL = os.environ.get('CAMPAIGN_EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
 CAMPAIGN_EMAIL_HOST_USER = os.environ.get('CAMPAIGN_EMAIL_HOST_USER', 'newsletter@burundichairship.africa')
-try:
-    CAMPAIGN_EMAIL_HOST_PASSWORD = os.environ['CAMPAIGN_EMAIL_HOST_PASSWORD']
-except KeyError:
+CAMPAIGN_EMAIL_HOST_PASSWORD = os.environ.get('CAMPAIGN_EMAIL_HOST_PASSWORD', '')
+if not CAMPAIGN_EMAIL_HOST_PASSWORD and not DEBUG:
     raise RuntimeError(
         "CRITICAL: CAMPAIGN_EMAIL_HOST_PASSWORD environment variable is not set.\n"
         "This is required for sending campaign/newsletter emails.\n\n"

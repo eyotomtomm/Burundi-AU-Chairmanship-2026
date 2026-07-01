@@ -21,8 +21,9 @@ services:
     instance_count: 1
     instance_size_slug: professional-xs  # $12/mo, 1 vCPU, 1GB RAM
     http_port: 8080
-    # Web process only — migrate and collectstatic run once in the pre-deploy job below.
-    run_command: gunicorn config.wsgi -c gunicorn.conf.py
+    # ASGI via gunicorn + uvicorn workers — serves both HTTP and WebSocket.
+    # Migrate and collectstatic run once in the pre-deploy job below.
+    run_command: gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -c gunicorn.conf.py
     health_check:
       http_path: /api/health/
       initial_delay_seconds: 30
@@ -63,6 +64,13 @@ services:
       - key: DATABASE_URL
         type: SECRET
         value: "${db.DATABASE_URL}"
+      - key: REDIS_URL
+        type: SECRET
+        value: "${redis.DATABASE_URL}"
+      # Read replica — optional, set in dashboard after creating replica via doctl
+      - key: READ_REPLICA_URL
+        type: SECRET
+        value: ""
       - key: EMAIL_HOST_PASSWORD
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
@@ -88,10 +96,70 @@ services:
       - key: GEMINI_API_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
+      - key: CAMPAIGN_EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
       - key: DO_SPACES_BUCKET
         value: "burundi-au-media"
       - key: DO_SPACES_ENDPOINT
         value: "https://fra1.digitaloceanspaces.com"
+
+
+# Celery worker — processes async push notifications, OTP cleanup, etc.
+# Defined under "workers" (not "services") so App Platform treats it as a
+# background process: no HTTP routing, no HTTP health checks.
+workers:
+  - name: celery-worker
+    github:
+      repo: eyotomtomm/Burundi-AU-Chairmanship-2026
+      branch: main
+      deploy_on_push: false
+    source_dir: /burundi_au_chairmanship/backend
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: professional-xs
+    run_command: celery -A config worker -B -l info --concurrency=2
+    envs:
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+      - key: DJANGO_SECRET_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DATABASE_URL
+        type: SECRET
+        value: "${db.DATABASE_URL}"
+      - key: REDIS_URL
+        type: SECRET
+        value: "${redis.DATABASE_URL}"
+      - key: READ_REPLICA_URL
+        type: SECRET
+        value: ""
+      - key: FIREBASE_CREDENTIALS_JSON
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_SECRET
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: DO_SPACES_BUCKET
+        value: "burundi-au-media"
+      - key: DO_SPACES_ENDPOINT
+        value: "https://fra1.digitaloceanspaces.com"
+      - key: CAMPAIGN_EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: SENTRY_DSN
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      - key: SENTRY_ENVIRONMENT
+        value: "production"
 
 # Pre-deploy job — runs ONCE per deploy, before any web container starts.
 # This prevents migration races when instance_count > 1.
@@ -116,6 +184,9 @@ jobs:
       - key: DATABASE_URL
         type: SECRET
         value: "${db.DATABASE_URL}"
+      - key: REDIS_URL
+        type: SECRET
+        value: "${redis.DATABASE_URL}"
       - key: DO_SPACES_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
@@ -132,4 +203,12 @@ databases:
     engine: PG
     version: "16"
     size: db-s-1vcpu-1gb  # $15/mo managed PostgreSQL
+    num_nodes: 2  # Primary + standby for HA failover (+$15/mo)
+    # Read replica: create separately via doctl, then set READ_REPLICA_URL
+    # in the dashboard to the replica's connection string:
+    #   doctl databases replica create <db-id> read-replica --size db-s-1vcpu-1gb --region fra1
+  - name: redis
+    engine: REDIS
+    version: "7"
+    size: db-s-1vcpu-1gb  # $15/mo managed Redis
     num_nodes: 1

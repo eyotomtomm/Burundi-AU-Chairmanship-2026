@@ -381,6 +381,25 @@ def transition_live_feed_statuses():
     return updated
 
 
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def send_notification_push_async(self, notification_id):
+    """Send push for a Notification model instance in the background."""
+    from .models import Notification
+    from .push_service import send_push_notification
+    try:
+        notification = Notification.objects.get(pk=notification_id)
+    except Notification.DoesNotExist:
+        logger.error(f"Notification {notification_id} not found, skipping push")
+        return 0, 0
+    try:
+        success, failure = send_push_notification(notification)
+        logger.info(f"Async push for notification {notification_id}: {success} sent, {failure} failed")
+        return success, failure
+    except Exception as exc:
+        logger.error(f"Async push failed for notification {notification_id}: {exc}")
+        raise self.retry(exc=exc)
+
+
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
 def optimize_image_async(self, image_path):
     """Generate WebP thumbnails at multiple sizes."""

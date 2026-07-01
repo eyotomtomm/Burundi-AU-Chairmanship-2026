@@ -4,6 +4,8 @@ Extracted from ``custom_admin/views.py`` to keep that file manageable.
 All function names remain unchanged so ``urls.py`` works without edits —
 they are re-exported by ``views.py`` via ``from .email_views import *``.
 """
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -23,6 +25,8 @@ from core.models import (
 from core.utils import log_admin_action
 
 from ._helpers import is_staff
+
+logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -516,7 +520,7 @@ def email_campaign_send(request, pk):
                         latest.category = 'campaign'
                         latest.save(update_fields=['campaign', 'category'])
                 except Exception:
-                    pass
+                    logger.warning('Failed to tag EmailLog for %s', email, exc_info=True)
             except Exception as e:
                 sent_fail += 1
                 last_error = str(e)[:2000]

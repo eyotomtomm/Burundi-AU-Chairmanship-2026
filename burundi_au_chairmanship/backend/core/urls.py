@@ -82,7 +82,11 @@ urlpatterns = [
     path('auth/active-sessions/', views.active_sessions, name='auth-active-sessions'),
     path('auth/sessions/<int:session_id>/revoke/', views.revoke_session, name='auth-revoke-session'),
 
-    # Sign-Up Email Verification
+    # Pending Signup OTP (pre-registration, no Django User yet)
+    path('auth/send-pending-otp/', views.send_pending_otp, name='auth-send-pending-otp'),
+    path('auth/verify-pending-otp/', views.verify_pending_otp, name='auth-verify-pending-otp'),
+
+    # Sign-Up Email Verification (legacy — for existing users)
     path('auth/send-signup-otp/', views.send_signup_otp, name='auth-send-signup-otp'),
     path('auth/verify-signup-otp/', views.verify_signup_otp, name='auth-verify-signup-otp'),
 

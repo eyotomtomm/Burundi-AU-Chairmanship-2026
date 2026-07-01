@@ -103,6 +103,60 @@ def send_email_otp(user, email):
         return False, 'Failed to send verification code. Please try again.', None
 
 
+def send_pending_email_otp(email, name):
+    """
+    Send OTP email for a pending (pre-registration) signup.
+    No User object required — OTP is stored in the Django cache, not the DB.
+    Returns (success, message).
+    """
+    try:
+        otp_code = generate_otp()
+
+        subject = 'Be 4 Africa - Email Verification OTP'
+        message = (
+            f'Hello {name},\n\n'
+            f'Your email verification OTP code is: {otp_code}\n\n'
+            f'This code will expire in 10 minutes.\n\n'
+            f'If you did not request this code, please ignore this email.\n\n'
+            f'Best regards,\n'
+            f'Be 4 Africa Team'
+        )
+
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+        if not from_email:
+            logger.error('DEFAULT_FROM_EMAIL is not configured')
+            return False, 'Email sending is not configured. Please contact support.'
+
+        send_mail(
+            subject,
+            message,
+            from_email,
+            [email],
+            fail_silently=False,
+        )
+
+        logger.info('Pending signup OTP email sent to %s', email)
+        return True, 'OTP sent successfully'
+
+    except ConnectionRefusedError:
+        logger.error(
+            'SMTP connection refused. Check EMAIL_HOST (%s) and EMAIL_PORT (%s).',
+            getattr(settings, 'EMAIL_HOST', '(not set)'),
+            getattr(settings, 'EMAIL_PORT', '(not set)'),
+        )
+        return False, 'Email server is unreachable. Please try again later or contact support.'
+    except Exception as e:
+        logger.exception('Failed to send pending signup OTP: %s', e)
+        error_detail = str(e)
+        if 'authentication' in error_detail.lower():
+            return False, 'Email authentication failed. Please contact support.'
+        elif 'timed out' in error_detail.lower() or 'timeout' in error_detail.lower():
+            return False, 'Email server timed out. Please try again later.'
+        elif 'ssl' in error_detail.lower() or 'certificate' in error_detail.lower():
+            return False, 'Email SSL/TLS error. Please contact support.'
+        return False, 'Failed to send verification code. Please try again.'
+
+
 def verify_email_otp(user, email, otp_code):
     """
     Verify email OTP code with brute-force protection

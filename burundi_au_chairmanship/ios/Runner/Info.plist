@@ -76,37 +76,15 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to allow you to select photos for your profile.</string>
 	<!--
-		Certificate pinning for API domain (iOS 14+).
-		Pins the Google Trust Services intermediate and root CAs used by Cloudflare.
-		Same SPKI hashes as Android network_security_config.xml.
-		NOTE: Android pin-set expires 2027-06-01 (graceful fallback). iOS has no
-		expiration — if the CA rotates, a forced app update is required.
-		Set a calendar reminder before 2027-06-01 to re-evaluate both configs.
+		Certificate pinning removed. iOS NSPinnedDomains has no expiration
+		mechanism (unlike Android's pin-set), so a CA rotation would brick
+		all iOS users until an App Store update ships. The Dart client
+		already removed its own PEM-level pinning after a near-brick caused
+		by a Cloudflare certificate rotation. ATS enforces HTTPS + TLS 1.2
+		minimum by default, which provides baseline transport security.
+		Android retains its pin-set with expiration="2027-06-01" as a
+		graceful-degradation safety net.
 	-->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSPinnedDomains</key>
-		<dict>
-			<key>burundi4africa.com</key>
-			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSPinnedCAIdentities</key>
-				<array>
-					<!-- Google Trust Services WE1 (intermediate CA) -->
-					<dict>
-						<key>SPKI-SHA256-BASE64</key>
-						<string>kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=</string>
-					</dict>
-					<!-- GTS Root R4 (root CA) -->
-					<dict>
-						<key>SPKI-SHA256-BASE64</key>
-						<string>mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=</string>
-					</dict>
-				</array>
-			</dict>
-		</dict>
-	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

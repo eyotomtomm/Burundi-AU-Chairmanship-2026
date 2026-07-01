@@ -5,16 +5,15 @@ import 'package:http/io_client.dart';
 
 /// HTTP client factory for API requests.
 ///
-/// Certificate pinning is handled at the platform level:
-///   - Android: network_security_config.xml (pin-set with expiration)
-///   - iOS: NSPinnedDomains in Info.plist
+/// Certificate pinning is handled at the platform level (Android only):
+///   - Android: network_security_config.xml (pin-set with expiration 2027-06-01)
+///   - iOS: Removed — NSPinnedDomains has no expiration, so a CA rotation
+///     would brick all iOS users until an App Store update ships.
 ///
 /// Platform-level pinning is more resilient because:
 ///   1. Android's pin-set has an expiration date — if pins expire, the app
 ///      falls back to normal certificate validation instead of breaking.
-///   2. iOS NSPinnedDomains uses CA identity pins, not leaf pins, so
-///      certificate rotation by the CDN (Cloudflare) doesn't brick the app.
-///   3. Dart's BoringSSL bypasses platform networking, but system roots
+///   2. Dart's BoringSSL bypasses platform networking, but system roots
 ///      are still trusted, so HTTPS validation is still enforced.
 ///
 /// Previously, this class also did Dart-level PEM pinning, but that caused

@@ -60,8 +60,7 @@ def optimize_image(image_field, max_width=1200, quality=85):
         image_field.save(new_name, ContentFile(buffer.read()), save=False)
 
     except Exception:
-        # If optimization fails, keep the original image
-        pass
+        logger.exception('Image optimization failed for %s', image_field.name)
 
 
 def generate_image_variants(image_field, upload_to=''):
@@ -110,7 +109,7 @@ def generate_image_variants(image_field, upload_to=''):
             variants[size_name] = ContentFile(buffer.read(), name=filename)
 
     except Exception:
-        pass
+        logger.exception('Image variant generation failed for %s', image_field.name)
 
     return variants
 

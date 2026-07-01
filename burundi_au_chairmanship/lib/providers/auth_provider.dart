@@ -285,6 +285,15 @@ class AuthProvider extends ChangeNotifier {
         deviceType: Platform.operatingSystem,
         appVersion: AppConstants.appVersion,
       );
+
+      if (data['status'] == 'pending_verification') {
+        // User hasn't completed OTP yet — route to verification screen
+        await _persistEmailVerificationFlag(true);
+        _isAuthenticated = true;
+        notifyListeners();
+        return;
+      }
+
       await _storeUserData(data['user']);
 
       // Capture email verification requirement and persist it
@@ -374,10 +383,18 @@ class AuthProvider extends ChangeNotifier {
         honeypot: honeypot ?? '',
       );
 
-      // 5. Store user data locally
-      await _storeUserData(data['user']);
+      if (data['status'] == 'pending_verification') {
+        // No Django user created yet — route to OTP verification screen
+        await _persistEmailVerificationFlag(true);
+        _isAuthenticated = true; // So splash routes to /email-verification
+        _isLoading = false;
+        _isSigningIn = false;
+        notifyListeners();
+        return true;
+      }
 
-      // Capture email verification requirement and persist it
+      // Email already verified (Google/Apple) — normal flow
+      await _storeUserData(data['user']);
       await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
 
       _isAuthenticated = true;
@@ -682,6 +699,53 @@ class AuthProvider extends ChangeNotifier {
         return true;
       }
       return false;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Verification failed. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Send OTP for pending (pre-registration) email verification
+  Future<bool> sendPendingSignupOtp() async {
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final idToken = await _firebaseAuth.getIdToken();
+      if (idToken == null) throw Exception('No Firebase token');
+      await _api.sendPendingOtp(idToken: idToken);
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Failed to send verification code. Try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Verify OTP for pending signup — creates the user on success
+  Future<bool> verifyPendingSignupOtp(String code) async {
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final idToken = await _firebaseAuth.getIdToken();
+      if (idToken == null) throw Exception('No Firebase token');
+      final data = await _api.verifyPendingOtp(idToken: idToken, otpCode: code);
+      // User was just created — store their data
+      await _storeUserData(data['user']);
+      _isEmailVerified = true;
+      await _persistEmailVerificationFlag(false);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('user_email_verified', true);
+      notifyListeners();
+      return true;
     } on ApiException catch (e) {
       _errorMessage = e.message;
       notifyListeners();

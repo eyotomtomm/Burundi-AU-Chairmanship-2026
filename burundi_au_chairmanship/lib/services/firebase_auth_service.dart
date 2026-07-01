@@ -179,10 +179,9 @@ class FirebaseAuthService {
 
       if (kDebugMode) {
         print('Apple identityToken length: ${identityToken.length}');
-        print('Apple identityToken prefix: ${identityToken.substring(0, identityToken.length.clamp(0, 30))}...');
-        print('Apple rawNonce: $rawNonce');
-        print('Apple authorizationCode: ${appleCredential.authorizationCode != null ? "present" : "null"}');
-        print('Apple email: ${appleCredential.email}');
+        print('Apple rawNonce length: ${rawNonce.length}');
+        print('Apple authorizationCode: present');
+        print('Apple email: ${appleCredential.email == null ? "withheld" : "provided"}');
       }
 
       // 4. Create Firebase credential with the identity token and raw nonce

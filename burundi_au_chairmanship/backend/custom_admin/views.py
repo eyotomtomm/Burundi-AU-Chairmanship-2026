@@ -1102,21 +1102,17 @@ def notification_create(request):
         # Send push notification if requested
         send_push = request.POST.get('send_push') == 'on'
         if send_push and notification.is_active:
-            try:
-                from core.push_service import send_push_notification
-                success, failure = send_push_notification(notification)
-                log_admin_action(
-                    request, 'send_notification', 'Notification',
-                    object_id=notification.pk, object_repr=notification.title,
-                    changes={'push_sent': {'old': '', 'new': f'{success} success, {failure} failed'}}
-                )
-                messages.success(
-                    request,
-                    f'Notification created and push sent to {success} device(s).'
-                    + (f' ({failure} failed)' if failure else '')
-                )
-            except Exception as e:
-                messages.warning(request, f'Notification created but push failed: {e}')
+            from core.tasks import send_notification_push_async
+            send_notification_push_async.delay(notification.pk)
+            log_admin_action(
+                request, 'send_notification', 'Notification',
+                object_id=notification.pk, object_repr=notification.title,
+                changes={'push_sent': {'old': '', 'new': 'queued'}}
+            )
+            messages.success(
+                request,
+                'Notification created and push queued for delivery.'
+            )
         else:
             messages.success(request, 'Notification created successfully!')
         return redirect('custom_admin:notifications_list')
@@ -1185,16 +1181,12 @@ def notification_edit(request, pk):
         # Send push if explicitly requested on edit
         send_push = request.POST.get('send_push') == 'on'
         if send_push and notification.is_active:
-            try:
-                from core.push_service import send_push_notification
-                success, failure = send_push_notification(notification)
-                messages.success(
-                    request,
-                    f'Notification updated and push sent to {success} device(s).'
-                    + (f' ({failure} failed)' if failure else '')
-                )
-            except Exception as e:
-                messages.warning(request, f'Notification updated but push failed: {e}')
+            from core.tasks import send_notification_push_async
+            send_notification_push_async.delay(notification.pk)
+            messages.success(
+                request,
+                'Notification updated and push queued for delivery.'
+            )
         else:
             messages.success(request, 'Notification updated successfully!')
         return redirect('custom_admin:notifications_list')
@@ -1504,15 +1496,9 @@ def notification_send_push(request, pk):
     if not notification.is_active:
         messages.error(request, 'Cannot send push for an inactive notification. Activate it first.')
         return redirect('custom_admin:notifications_list')
-    try:
-        from core.push_service import send_push_notification
-        success, failure = send_push_notification(notification)
-        push_msg = (
-            f'Push sent to {success} device(s).'
-            + (f' ({failure} failed)' if failure else '')
-        )
-    except Exception as e:
-        push_msg = f'Push notification failed: {e}'
+    from core.tasks import send_notification_push_async
+    send_notification_push_async.delay(notification.pk)
+    push_msg = 'Push queued for delivery.'
 
     # Also send SMS if requested
     send_sms_flag = request.POST.get('send_sms') == 'on'
@@ -1804,6 +1790,7 @@ def admin_management(request):
         try:
             raw = a.profile.admin_sections or []
         except Exception:
+            logger.warning('Failed to load admin_sections for user %s', a.pk, exc_info=True)
             raw = []
         a.allowed_sections_set = set(raw) & MENU_KEYS
 
@@ -1862,7 +1849,7 @@ def admin_invite(request):
             user.profile.force_password_change = True
             user.profile.save(update_fields=['force_password_change'])
         except Exception:
-            pass
+            logger.exception('Failed to set force_password_change for user %s', user.pk)
 
         # Save per-section permissions (staff only; superusers have full access)
         from .permissions import SECTION_KEYS
@@ -6143,17 +6130,12 @@ def segment_notify(request, pk):
     )
     notification.target_users.set(users)
 
-    try:
-        from core.push_service import send_push_notification
-        success, failure = send_push_notification(notification)
-        messages.success(
-            request,
-            f'Notification sent to segment "{segment.name}": '
-            f'{success} delivered'
-            + (f', {failure} failed' if failure else '')
-        )
-    except Exception as e:
-        messages.error(request, f'Failed to send notification: {e}')
+    from core.tasks import send_notification_push_async
+    send_notification_push_async.delay(notification.pk)
+    messages.success(
+        request,
+        f'Notification queued for segment "{segment.name}".'
+    )
 
     return redirect('custom_admin:segment_detail', pk=pk)
 

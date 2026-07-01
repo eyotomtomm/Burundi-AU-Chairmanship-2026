@@ -1,5 +1,9 @@
 """Context processors for the custom admin portal."""
+import logging
+
 from .permissions import SECTION_KEYS
+
+logger = logging.getLogger(__name__)
 
 
 class _AllAccess:
@@ -38,6 +42,7 @@ def admin_sections(request):
     try:
         sections = set(user.profile.admin_sections or [])
     except Exception:
+        logger.warning('Failed to load admin_sections for user %s', user.pk, exc_info=True)
         sections = set()
     # Dashboard is the landing page after login — always accessible to staff
     sections.add('dashboard')

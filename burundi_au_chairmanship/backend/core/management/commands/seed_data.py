@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from core.models import (
     Article, MagazineEdition, EmbassyLocation, Event,
@@ -21,14 +21,26 @@ class Command(BaseCommand):
         # Admin user
         if not User.objects.filter(is_superuser=True).exists():
             import os
-            admin_password = os.environ.get('DJANGO_ADMIN_PASSWORD', 'admin2026')
-            User.objects.create_superuser('admin', 'admin@burundi.gov.bi', admin_password)
-            if admin_password == 'admin2026':
-                self.stdout.write(self.style.WARNING(
-                    '  Admin user created with DEFAULT password — set DJANGO_ADMIN_PASSWORD env var in production!'
-                ))
-            else:
+            from django.conf import settings as django_settings
+            admin_password = os.environ.get('DJANGO_ADMIN_PASSWORD')
+            if admin_password:
+                User.objects.create_superuser('admin', 'admin@burundi.gov.bi', admin_password)
                 self.stdout.write('  Admin user created with password from DJANGO_ADMIN_PASSWORD')
+            elif not django_settings.DEBUG:
+                raise CommandError(
+                    'Refusing to create admin user in production without DJANGO_ADMIN_PASSWORD. '
+                    'Set the DJANGO_ADMIN_PASSWORD environment variable and re-run.'
+                )
+            else:
+                import secrets
+                admin_password = secrets.token_urlsafe(16)
+                User.objects.create_superuser('admin', 'admin@burundi.gov.bi', admin_password)
+                self.stdout.write(self.style.WARNING(
+                    f'  Admin user created with random password: {admin_password}'
+                ))
+                self.stdout.write(self.style.WARNING(
+                    '  Set DJANGO_ADMIN_PASSWORD env var to use a fixed password.'
+                ))
 
         # App Settings
         AppSettings.objects.get_or_create(

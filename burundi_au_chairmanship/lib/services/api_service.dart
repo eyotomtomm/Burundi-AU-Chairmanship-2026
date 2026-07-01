@@ -1187,6 +1187,23 @@ class ApiService {
     return await _post('auth/verify-signup-otp/', {'otp_code': otpCode}, auth: true);
   }
 
+  // ── Pending Signup OTP (pre-registration) ─────────────
+  Future<Map<String, dynamic>> sendPendingOtp({required String idToken}) async {
+    return await _post('auth/send-pending-otp/', {
+      'firebase_token': idToken,
+    }, noAutoAuth: true);
+  }
+
+  Future<Map<String, dynamic>> verifyPendingOtp({
+    required String idToken,
+    required String otpCode,
+  }) async {
+    return await _post('auth/verify-pending-otp/', {
+      'firebase_token': idToken,
+      'otp_code': otpCode,
+    }, noAutoAuth: true);
+  }
+
 
 
   // ── Support Tickets ──────────────────────────────────────

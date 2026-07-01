@@ -1,5 +1,8 @@
 # Gunicorn production configuration
-# Usage: gunicorn config.wsgi -c gunicorn.conf.py
+# Usage: gunicorn config.asgi:application -c gunicorn.conf.py
+#
+# Uses Uvicorn workers so Gunicorn can serve ASGI (HTTP + WebSocket)
+# through a single process group.
 
 import os
 
@@ -10,8 +13,7 @@ bind = "0.0.0.0:8080"
 # fall back to 2 workers for 1GB containers (cpu_count() returns host
 # cores, not container vCPUs, causing OOM).
 workers = int(os.environ.get("WEB_CONCURRENCY", 2))
-worker_class = "gthread"
-threads = 2
+worker_class = "uvicorn.workers.UvicornWorker"
 
 # Timeout (seconds) — increase for slow database queries
 timeout = 120

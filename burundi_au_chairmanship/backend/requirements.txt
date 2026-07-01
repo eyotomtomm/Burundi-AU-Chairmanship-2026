@@ -30,6 +30,7 @@ django-redis==5.4.0
 drf-spectacular==0.29.0
 celery[redis]==5.6.3
 channels[daphne]==4.3.2
+uvicorn[standard]==0.34.3
 channels-redis==4.2.1
 graphene-django==3.2.3
 twilio==9.10.3

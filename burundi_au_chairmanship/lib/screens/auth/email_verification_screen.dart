@@ -58,7 +58,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     setState(() { _isSending = true; _errorMessage = null; });
     try {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.sendSignupEmailOtp();
+      final success = authProvider.userId == null
+          ? await authProvider.sendPendingSignupOtp()
+          : await authProvider.sendSignupEmailOtp();
       if (mounted) {
         setState(() { _isSending = false; _emailOtpSent = success; });
         if (success) {
@@ -85,7 +87,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     setState(() { _isVerifying = true; _errorMessage = null; });
     try {
       final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.verifySignupEmailOtp(code);
+      final success = authProvider.userId == null
+          ? await authProvider.verifyPendingSignupOtp(code)
+          : await authProvider.verifySignupEmailOtp(code);
       if (mounted) {
         if (success) {
           Navigator.of(context).pushReplacementNamed('/home');

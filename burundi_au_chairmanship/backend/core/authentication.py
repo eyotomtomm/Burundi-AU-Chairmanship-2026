@@ -2,7 +2,7 @@ import logging
 from rest_framework import authentication
 from rest_framework import exceptions
 from django.contrib.auth.models import User
-from config.firebase import verify_firebase_token
+from config.firebase import verify_firebase_token, FirebaseTokenRevoked
 from .models import UserProfile
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,31 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             except UserProfile.DoesNotExist:
                 raise exceptions.AuthenticationFailed('User not found')
 
+        except FirebaseTokenRevoked as e:
+            # Firebase account revoked — cascade to Django: deactivate user
+            # and blacklist all outstanding JWT refresh tokens.
+            try:
+                profile = UserProfile.objects.select_related('user').get(
+                    firebase_uid=e.uid,
+                )
+                user = profile.user
+                user.is_active = False
+                user.save(update_fields=['is_active'])
+                # Blacklist all outstanding refresh tokens
+                from rest_framework_simplejwt.token_blacklist.models import (
+                    OutstandingToken, BlacklistedToken,
+                )
+                for token in OutstandingToken.objects.filter(user=user):
+                    BlacklistedToken.objects.get_or_create(token=token)
+                logger.warning(
+                    'Deactivated user %s (firebase_uid=%s) due to revoked Firebase token',
+                    user.pk, e.uid,
+                )
+            except UserProfile.DoesNotExist:
+                logger.warning(
+                    'Revoked Firebase token for unknown uid=%s', e.uid,
+                )
+            raise exceptions.AuthenticationFailed('Account has been disabled')
         except ValueError:
             # Not a valid Firebase token — let the next auth backend
             # (JWTAuthentication) try instead.

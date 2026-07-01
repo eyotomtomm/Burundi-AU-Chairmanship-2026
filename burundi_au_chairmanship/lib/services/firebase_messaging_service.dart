@@ -634,6 +634,29 @@ class FirebaseMessagingService {
     return await _messaging.getToken();
   }
 
+  /// Re-fetch the FCM token from Firebase and re-register it with the
+  /// backend.  Call this on app resume so that stale or missing tokens
+  /// are replaced with a fresh, valid one.  Safe to call repeatedly —
+  /// the backend's ``update_or_create`` prevents duplicates.
+  Future<void> refreshToken() async {
+    try {
+      final settings = await _messaging.getNotificationSettings();
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) return;
+
+      final token = await _messaging.getToken();
+      if (token != null && token != _currentToken) {
+        _currentToken = token;
+        await _sendTokenToBackend(token);
+        if (kDebugMode) print('FCM token refreshed on app resume');
+      } else if (token != null) {
+        // Same token — still re-register in case the previous POST failed
+        await _sendTokenToBackend(token);
+      }
+    } catch (e) {
+      if (kDebugMode) print('FCM token refresh failed: $e');
+    }
+  }
+
   /// Delete the FCM token (useful when user logs out)
   Future<void> deleteToken() async {
     await _messaging.deleteToken();

@@ -72,7 +72,8 @@ final FirebaseAnalytics firebaseAnalytics = FirebaseAnalytics.instance;
 
 // Keep a strong reference so the service (and its stream subscriptions) are
 // never garbage-collected after the fire-and-forget Future completes.
-FirebaseMessagingService? _messagingService;
+// Public so HomeScreen can call refreshToken() on app resume.
+FirebaseMessagingService? messagingService;
 
 Future<void> _initializeApp() async {
   // Wire up ApiService with the global navigator key for 503 maintenance redirect
@@ -137,8 +138,8 @@ void _initFirebaseServicesAsync() {
   // Fire-and-forget — these run in the background
   Future(() async {
     try {
-      _messagingService = FirebaseMessagingService();
-      await _messagingService!.initialize(navigatorKey).timeout(const Duration(seconds: 8));
+      messagingService = FirebaseMessagingService();
+      await messagingService!.initialize(navigatorKey).timeout(const Duration(seconds: 8));
     } catch (e) {
       if (kDebugMode) print('Firebase Messaging init failed: $e');
     }

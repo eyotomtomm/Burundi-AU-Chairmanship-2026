@@ -210,6 +210,79 @@ def get_target_audience_count(notification):
     return count
 
 
+def send_push_to_users(user_ids, title, body, data=None):
+    """
+    Synchronous push to specific users — used as fallback when Celery/Redis
+    is unavailable.  Collects tokens from both DeviceToken and legacy
+    UserProfile, sends via FCM, and cleans stale tokens.
+    """
+    try:
+        from config.firebase import initialize_firebase
+        initialize_firebase()
+        from firebase_admin import messaging
+    except ImportError:
+        logger.error("firebase_admin not available for synchronous push fallback")
+        return
+
+    device_tokens = list(
+        DeviceToken.objects.filter(
+            user_id__in=user_ids, is_active=True,
+        ).values_list('token', flat=True).distinct()
+    )
+    legacy_tokens = list(
+        UserProfile.objects.filter(
+            user_id__in=user_ids, fcm_token__isnull=False,
+        ).exclude(fcm_token='').values_list('fcm_token', flat=True)
+    )
+    tokens = list(set(device_tokens + [t for t in legacy_tokens if t]))
+    if not tokens:
+        return
+
+    fcm_messages = [
+        messaging.Message(
+            notification=messaging.Notification(title=title, body=body),
+            data={k: str(v) for k, v in (data or {}).items()},
+            token=token,
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='default_channel',
+                    priority='max',
+                    default_sound=True,
+                    default_vibrate_timings=True,
+                ),
+            ),
+            apns=messaging.APNSConfig(
+                headers={'apns-priority': '10'},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(sound='default', badge=1, content_available=True),
+                ),
+            ),
+        )
+        for token in tokens
+    ]
+
+    try:
+        response = messaging.send_each(fcm_messages)
+        # Clean stale tokens
+        stale = [
+            tokens[i] for i, r in enumerate(response.responses)
+            if r.exception and isinstance(
+                r.exception,
+                (messaging.UnregisteredError, messaging.SenderIdMismatchError),
+            )
+        ]
+        if stale:
+            UserProfile.objects.filter(fcm_token__in=stale).update(fcm_token='')
+            DeviceToken.objects.filter(token__in=stale).update(is_active=False)
+        logger.info(
+            f"Sync push: {response.success_count} sent, "
+            f"{response.failure_count} failed, {len(stale)} stale cleaned"
+        )
+    except Exception as exc:
+        logger.error(f"Sync push failed: {exc}")
+
+
 def send_push_notification(notification):
     """
     Build and send FCM messages for a Notification instance.

@@ -112,6 +112,17 @@ def _split_display_name(display_name):
     return (first_name, last_name)
 
 
+def _require_verified_email(request):
+    """Return a 403 Response if the user hasn't verified their email, else None."""
+    profile = getattr(request.user, 'profile', None)
+    if not profile or not profile.is_email_verified:
+        return Response(
+            {'detail': 'Please verify your email address to perform this action.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
 def _generate_unique_username(email, firebase_uid, display_name=None):
     """Generate a readable username from display name or email, falling back to Firebase UID.
     Prefers name-based usernames (e.g. 'john.doe') over email-prefix usernames.
@@ -715,7 +726,6 @@ def firebase_register(request):
             # account with a victim's email and hijack their Django account.
             email_verified = decoded_token.get('email_verified', False)
             sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
-            trusted_provider = sign_in_provider in ('google.com', 'apple.com')
 
             if email and email_verified:
                 try:
@@ -845,7 +855,6 @@ def firebase_login(request):
             user = None
             email_verified = decoded_token.get('email_verified', False)
             sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider', '')
-            trusted_provider = sign_in_provider in ('google.com', 'apple.com')
 
             if email and email_verified:
                 try:
@@ -1144,6 +1153,82 @@ def deactivate_fcm_token(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def logout_view(request):
+    """
+    Log out: blacklist the user's refresh token and deactivate FCM token.
+    Immediately invalidates the refresh token so no new access tokens
+    can be minted after the current one expires (15 min lifetime).
+    """
+    refresh_token = request.data.get('refresh')
+    if not refresh_token:
+        return Response(
+            {'detail': 'Refresh token is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        token = RefreshToken(refresh_token)
+        token.blacklist()
+    except Exception:
+        # Token may already be blacklisted or invalid — still proceed
+        pass
+
+    # Deactivate FCM tokens so the user stops receiving push notifications
+    fcm_token = request.data.get('fcm_token')
+    try:
+        if fcm_token:
+            DeviceToken.objects.filter(
+                user=request.user, token=fcm_token,
+            ).update(is_active=False)
+        else:
+            DeviceToken.objects.filter(user=request.user).update(is_active=False)
+        profile = request.user.profile
+        profile.fcm_token = ''
+        profile.save(update_fields=['fcm_token'])
+    except Exception:
+        logger.exception('Failed to deactivate FCM token during logout')
+
+    return Response({'detail': 'Logged out successfully.'})
+
+
+class ActiveUserTokenRefreshView(viewsets.ViewSet):
+    """
+    Custom token refresh that rejects inactive users.
+    Prevents deactivated users from refreshing expired access tokens.
+    """
+
+    @staticmethod
+    def post(request):
+        from rest_framework_simplejwt.views import TokenRefreshView as _BaseRefresh
+        from rest_framework_simplejwt.tokens import UntypedToken
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response(
+                {'detail': 'Refresh token is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            untyped = UntypedToken(refresh_token)
+            user_id = untyped.payload.get('user_id')
+            if user_id:
+                user = User.objects.filter(pk=user_id).first()
+                if user and not user.is_active:
+                    return Response(
+                        {'detail': 'Account has been disabled.'},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+        except TokenError:
+            pass  # Let the base view handle the invalid token error
+
+        # Delegate to the standard refresh view
+        view = _BaseRefresh.as_view()
+        return view(request._request)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_language_preference(request):
     """Update user's preferred language for push notifications.
 
@@ -1364,6 +1449,9 @@ class MagazineEditionViewSet(viewsets.ReadOnlyModelViewSet):
             return paginator.get_paginated_response(serializer.data)
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1639,6 +1727,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         # POST — require auth
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
 
         content = request.data.get('content', '').strip()
 
@@ -1706,7 +1797,18 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
                     data={'type': 'article_comment', 'article_id': str(article.id)},
                 )
             except Exception:
-                pass
+                # Celery/Redis unavailable — fall back to synchronous push
+                try:
+                    from .push_service import send_push_to_users
+                    name = request.user.get_full_name().strip() or user_handle(request.user)
+                    send_push_to_users(
+                        [mu.id],
+                        f'{name} mentioned you',
+                        f'"{content[:80]}" in {article.title[:40]}',
+                        {'type': 'article_comment', 'article_id': str(article.id)},
+                    )
+                except Exception:
+                    pass
 
         serializer = ArticleCommentSerializer(comment, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1995,6 +2097,9 @@ class LiveFeedViewSet(viewsets.ReadOnlyModelViewSet):
         # POST
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2223,6 +2328,9 @@ class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
             return paginator.get_paginated_response(serializer.data)
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2416,6 +2524,9 @@ class VideoViewSet(viewsets.ReadOnlyModelViewSet):
             return paginator.get_paginated_response(serializer.data)
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         content = request.data.get('content', '').strip()
         if not content:
             return Response({'detail': 'Content is required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -3134,6 +3245,9 @@ def submit_verification_request(request):
     Submit a verification request for Gold or Blue badge.
     User must provide professional email, phone, position, and optional social links.
     """
+    resp = _require_verified_email(request)
+    if resp:
+        return resp
     serializer = VerificationRequestSerializer(data=request.data, context={'request': request})
 
     if serializer.is_valid():
@@ -3196,6 +3310,9 @@ def submit_verification_appeal(request):
     Submit appeal for rejected verification request.
     User must provide explanation for why they believe rejection was incorrect.
     """
+    resp = _require_verified_email(request)
+    if resp:
+        return resp
     # Get latest rejected request
     latest_request = VerificationRequest.objects.filter(
         user=request.user,
@@ -3346,6 +3463,12 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         return EventSubmission.objects.filter(
             user=self.request.user
         ).select_related('event_registration', 'user')
+
+    def create(self, request, *args, **kwargs):
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         event_reg = serializer.validated_data['event_registration']
@@ -3924,6 +4047,9 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Create a new ticket with the first message."""
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         subject = request.data.get('subject', '').strip()
         message_text = request.data.get('message', '').strip()
 
@@ -3957,6 +4083,9 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reply(self, request, pk=None):
         """User adds a message to an existing ticket."""
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         ticket = self.get_object()
 
         # Block replies on closed tickets
@@ -4332,6 +4461,9 @@ class EventSpeakerViewSet(viewsets.ReadOnlyModelViewSet):
 @permission_classes([IsAuthenticated])
 def submit_event_feedback(request):
     """Submit post-event feedback."""
+    resp = _require_verified_email(request)
+    if resp:
+        return resp
     serializer = EventFeedbackSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save(user=request.user)
@@ -4481,6 +4613,12 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated()]
         return [AllowAny()]
 
+    def create(self, request, *args, **kwargs):
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
@@ -4507,6 +4645,9 @@ class DiscussionViewSet(viewsets.ModelViewSet):
 
         if not request.user.is_authenticated:
             return Response({'detail': 'Authentication required'}, status=401)
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         if discussion.is_locked:
             return Response({'detail': 'Discussion is locked'}, status=400)
 
@@ -4649,6 +4790,9 @@ class PollViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def vote(self, request, pk=None):
         """Vote on a poll."""
+        resp = _require_verified_email(request)
+        if resp:
+            return resp
         poll = self.get_object()
         option_id = request.data.get('option_id')
 
@@ -5459,6 +5603,9 @@ def event_comments(request, event_id):
     # POST - create a comment
     if not request.user.is_authenticated:
         return Response({'error': 'Login required'}, status=401)
+    resp = _require_verified_email(request)
+    if resp:
+        return resp
 
     content = request.data.get('content', '').strip()
     if not content:
@@ -5511,7 +5658,18 @@ def event_comments(request, event_id):
                 data={'type': 'event_comment', 'event_id': str(event.id)}
             )
         except Exception:
-            pass
+            # Celery/Redis unavailable — fall back to synchronous push
+            try:
+                from .push_service import send_push_to_users
+                name = request.user.get_full_name().strip() or user_handle(request.user)
+                send_push_to_users(
+                    [mu.id],
+                    f'{name} mentioned you',
+                    f'"{content[:80]}..." in {event.name}',
+                    {'type': 'event_comment', 'event_id': str(event.id)},
+                )
+            except Exception:
+                pass
 
     serializer = EventCommentSerializer(comment, context={'request': request})
     return Response(serializer.data, status=201)

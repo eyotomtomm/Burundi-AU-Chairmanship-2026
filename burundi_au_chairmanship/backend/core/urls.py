@@ -1,6 +1,5 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from . import analytics_views
 
@@ -55,7 +54,8 @@ urlpatterns = [
     # Auth - Legacy JWT endpoints (for backward compatibility)
     path('auth/register/', views.register, name='auth-register'),
     path('auth/login/', views.login, name='auth-login'),
-    path('auth/refresh/', TokenRefreshView.as_view(), name='auth-refresh'),
+    path('auth/refresh/', views.ActiveUserTokenRefreshView.as_view({'post': 'post'}), name='auth-refresh'),
+    path('auth/logout/', views.logout_view, name='auth-logout'),
 
     # Auth - Firebase endpoints (new)
     path('auth/firebase-register/', views.firebase_register, name='firebase-register'),

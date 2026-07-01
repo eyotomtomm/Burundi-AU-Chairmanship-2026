@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/popup_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/api_service.dart';
+import '../../main.dart' show messagingService;
 import '../../config/app_constants.dart';
 import '../../widgets/promotional_splash_overlay.dart';
 import '../maintenance/maintenance_screen.dart';
@@ -59,6 +60,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _checkMaintenance();
       // Re-check verification status when app resumes in case admin verified
       _checkVerificationStatus();
+      // Re-register FCM token so the backend always has a fresh, valid token
+      messagingService?.refreshToken();
     }
   }
 

@@ -16,6 +16,14 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+class FirebaseTokenRevoked(Exception):
+    """Raised when a Firebase ID token has been revoked (user disabled/signed out)."""
+
+    def __init__(self, uid, message='Firebase token has been revoked'):
+        self.uid = uid
+        super().__init__(message)
+
+
 def _parse_firebase_json(raw):
     """
     Parse Firebase credentials JSON that may have been mangled by the
@@ -130,7 +138,14 @@ def verify_firebase_token(id_token, check_revoked=False):
     except auth.ExpiredIdTokenError:
         raise ValueError("Firebase ID token has expired")
     except auth.RevokedIdTokenError:
-        raise ValueError("Firebase ID token has been revoked")
+        # Re-verify without revocation check to extract the UID
+        try:
+            decoded = auth.verify_id_token(id_token, check_revoked=False)
+            raise FirebaseTokenRevoked(uid=decoded['uid'])
+        except FirebaseTokenRevoked:
+            raise
+        except Exception:
+            raise ValueError("Firebase ID token has been revoked")
     except Exception as e:
         raise ValueError(f"Firebase token verification failed: {str(e)}")
 

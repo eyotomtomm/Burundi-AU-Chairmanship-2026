@@ -296,8 +296,15 @@ class AuthProvider extends ChangeNotifier {
 
       await _storeUserData(data['user']);
 
-      // Capture email verification requirement and persist it
-      await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
+      // Capture email verification requirement and persist it.
+      // If verification was already required (OTP pending from signUp), only
+      // clear it if the backend confirms the email is actually verified now.
+      // This prevents bypassing OTP when the app is restarted mid-verification.
+      final backendRequires = data['requires_email_verification'] == true;
+      final emailNowVerified = data['user']?['is_email_verified'] == true;
+      await _persistEmailVerificationFlag(
+        backendRequires || (_requiresEmailVerification && !emailNowVerified),
+      );
 
       _isAuthenticated = true;
       notifyListeners();

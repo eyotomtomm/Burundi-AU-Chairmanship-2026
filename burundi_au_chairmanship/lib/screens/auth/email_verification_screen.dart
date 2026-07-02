@@ -113,14 +113,37 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final email = context.watch<AuthProvider>().userEmail ?? '';
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             children: [
-              const SizedBox(height: 60),
+              const SizedBox(height: 12),
+
+              // Back button row
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  onPressed: () async {
+                    final authProvider = context.read<AuthProvider>();
+                    final navigator = Navigator.of(context);
+                    await authProvider.signOut();
+                    if (mounted) {
+                      navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
+                    }
+                  },
+                  icon: Icon(
+                    Icons.arrow_back_ios_rounded,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                  tooltip: 'Back to sign in',
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Icon
               Container(
@@ -196,6 +219,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

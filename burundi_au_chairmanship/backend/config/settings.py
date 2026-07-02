@@ -134,18 +134,13 @@ else:
         }
     }
 
-# ─── Caching (Redis in production, LocMem for dev) ───────────
+# ─── Caching (Redis/Valkey in production, LocMem for dev) ────
 REDIS_URL = os.environ.get('REDIS_URL', '')
 if not REDIS_URL and not DEBUG:
-    raise RuntimeError(
-        "CRITICAL: REDIS_URL environment variable is not set.\n"
-        "Redis is required in production for cache, sessions, DRF throttles,\n"
-        "Celery task queue, and WebSocket channel layers.\n\n"
-        "Without Redis, LocMemCache is per-process: throttle counters are not\n"
-        "shared across gunicorn workers or app instances, sessions desync,\n"
-        "and WebSocket pub/sub does not work across instances.\n\n"
-        "Provision a Redis database in .do/app.yaml and set:\n"
-        "  REDIS_URL=${redis.DATABASE_URL}"
+    import logging as _redis_log
+    _redis_log.getLogger('django').warning(
+        'REDIS_URL not set — falling back to LocMemCache and eager Celery. '
+        'Add a Valkey/Redis database and set REDIS_URL for production use.'
     )
 if REDIS_URL:
     CACHES = {

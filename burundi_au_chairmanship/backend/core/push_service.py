@@ -333,9 +333,15 @@ def send_push_notification(notification):
     # Build absolute image URL for rich push notifications
     image_url = None
     if notification.image:
-        site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
-        if site_url:
-            image_url = f"{site_url}{notification.image.url}"
+        url = notification.image.url
+        if url.startswith('http'):
+            # Already absolute (e.g. DigitalOcean Spaces / CDN)
+            image_url = url
+        else:
+            # Relative path — prepend SITE_URL
+            site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+            if site_url:
+                image_url = f"{site_url}{url}"
 
     # Android config: explicit channel + high priority so background
     # notifications are displayed immediately on Android 8+ (API 26+).

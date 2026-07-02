@@ -9437,3 +9437,195 @@ def device_ban_unban(request, pk):
     messages.success(request, f'Device ban lifted for {ban.device_id[:12]}...')
     return redirect('custom_admin:device_bans_list')
 
+
+# ─── Push Notification Diagnostics ────────────────────────────
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def push_diagnostics(request):
+    """
+    Diagnose the entire push notification pipeline and optionally send
+    a test push to the requesting admin's own device.
+
+    Checks:
+      1. Firebase Admin SDK initialisation
+      2. FCM token inventory (total, active, by platform)
+      3. Celery broker connectivity
+      4. Recent push send history
+      5. (POST) Send a real test push to the admin's registered device
+    """
+    from core.models import DeviceToken, UserProfile, Notification
+
+    checks = {}
+
+    # ── 1. Firebase Admin SDK ──────────────────────────────────
+    try:
+        from config.firebase import initialize_firebase
+        initialize_firebase()
+        import firebase_admin
+        app = firebase_admin.get_app()
+        checks['firebase'] = {
+            'ok': True,
+            'detail': f'Initialised (project: {app.project_id or "default"})',
+        }
+    except Exception as e:
+        checks['firebase'] = {
+            'ok': False,
+            'detail': f'Failed: {e}',
+        }
+
+    # ── 2. FCM token inventory ─────────────────────────────────
+    total_tokens = DeviceToken.objects.count()
+    active_tokens = DeviceToken.objects.filter(is_active=True).count()
+    active_with_user = DeviceToken.objects.filter(is_active=True, user__isnull=False).count()
+    active_anonymous = DeviceToken.objects.filter(is_active=True, user__isnull=True).count()
+
+    # Platform breakdown from device_os field
+    android_count = DeviceToken.objects.filter(is_active=True, device_os__istartswith='android').count()
+    ios_count = DeviceToken.objects.filter(is_active=True, device_os__istartswith='ios').count()
+
+    # Legacy tokens on UserProfile
+    legacy_count = UserProfile.objects.exclude(fcm_token='').exclude(fcm_token__isnull=True).count()
+
+    checks['tokens'] = {
+        'ok': active_tokens > 0,
+        'total': total_tokens,
+        'active': active_tokens,
+        'with_user': active_with_user,
+        'anonymous': active_anonymous,
+        'android': android_count,
+        'ios': ios_count,
+        'legacy_profile': legacy_count,
+    }
+
+    # ── 3. Celery broker ───────────────────────────────────────
+    celery_eager = getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False)
+    if celery_eager:
+        checks['celery'] = {
+            'ok': True,
+            'detail': 'EAGER mode (tasks run synchronously — no broker needed)',
+        }
+    else:
+        try:
+            from config.celery import app as celery_app
+            conn = celery_app.connection()
+            conn.ensure_connection(max_retries=1, timeout=3)
+            conn.close()
+            checks['celery'] = {'ok': True, 'detail': 'Broker connected'}
+        except Exception as e:
+            checks['celery'] = {
+                'ok': False,
+                'detail': f'Broker unreachable: {e}',
+            }
+
+    # ── 4. Recent push history ─────────────────────────────────
+    recent_pushes = Notification.objects.filter(
+        push_sent=True,
+    ).order_by('-push_sent_at')[:5]
+    checks['recent_pushes'] = [
+        {
+            'id': n.pk,
+            'title': n.title[:60],
+            'sent_at': n.push_sent_at,
+            'recipients': n.push_recipient_count,
+            'en': n.push_recipient_en,
+            'fr': n.push_recipient_fr,
+            'opened': n.opened_count,
+        }
+        for n in recent_pushes
+    ]
+
+    # ── 5. Admin's own device token ────────────────────────────
+    admin_tokens = DeviceToken.objects.filter(
+        user=request.user, is_active=True,
+    ).values_list('token', 'device_os', 'device_type')
+    checks['admin_device'] = [
+        {'token_prefix': t[:12] + '…', 'os': os, 'device': dev}
+        for t, os, dev in admin_tokens
+    ]
+
+    # ── POST: send test push ───────────────────────────────────
+    test_result = None
+    if request.method == 'POST' and 'send_test' in request.POST:
+        if not checks['firebase'].get('ok'):
+            test_result = {'ok': False, 'detail': 'Firebase SDK not initialised — cannot send.'}
+        elif not checks['admin_device']:
+            test_result = {
+                'ok': False,
+                'detail': (
+                    'No active device token found for your account. '
+                    'Open the app on your phone first so it registers a token.'
+                ),
+            }
+        else:
+            try:
+                from firebase_admin import messaging
+                tokens = [t for t, _, _ in admin_tokens]
+                fcm_messages = [
+                    messaging.Message(
+                        notification=messaging.Notification(
+                            title='Push Diagnostic Test',
+                            body='If you see this in your system tray, push notifications work.',
+                        ),
+                        data={
+                            'type': 'system',
+                            'notification_id': '0',
+                            'action_type': 'none',
+                            'action_value': '',
+                        },
+                        token=token,
+                        android=messaging.AndroidConfig(
+                            priority='high',
+                            notification=messaging.AndroidNotification(
+                                channel_id='default_channel',
+                                priority='max',
+                                default_sound=True,
+                                default_vibrate_timings=True,
+                                icon='@mipmap/ic_launcher',
+                            ),
+                        ),
+                        apns=messaging.APNSConfig(
+                            headers={'apns-priority': '10'},
+                            payload=messaging.APNSPayload(
+                                aps=messaging.Aps(
+                                    sound='default',
+                                    badge=1,
+                                    content_available=True,
+                                ),
+                            ),
+                        ),
+                    )
+                    for token in tokens
+                ]
+                response = messaging.send_each(fcm_messages)
+                successes = response.success_count
+                failures = response.failure_count
+                errors = [
+                    str(r.exception) for r in response.responses if r.exception
+                ]
+                # Deactivate stale tokens
+                stale = [
+                    tokens[i] for i, r in enumerate(response.responses)
+                    if r.exception and isinstance(
+                        r.exception,
+                        (messaging.UnregisteredError, messaging.SenderIdMismatchError),
+                    )
+                ]
+                if stale:
+                    DeviceToken.objects.filter(token__in=stale).update(is_active=False)
+
+                test_result = {
+                    'ok': successes > 0,
+                    'detail': f'{successes} delivered, {failures} failed.',
+                    'errors': errors,
+                    'stale_cleaned': len(stale),
+                }
+            except Exception as e:
+                test_result = {'ok': False, 'detail': f'Send failed: {e}'}
+
+    return render(request, 'custom_admin/notifications/push_diagnostics.html', {
+        'checks': checks,
+        'test_result': test_result,
+    })
+

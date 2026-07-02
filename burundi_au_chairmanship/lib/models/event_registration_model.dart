@@ -198,6 +198,7 @@ class EventRegistrationModel {
   }
 
   bool get isEventPast {
+    if (eventEndDate != null) return DateTime.now().isAfter(eventEndDate!);
     if (eventDate == null) return false;
     return DateTime.now().isAfter(eventDate!);
   }

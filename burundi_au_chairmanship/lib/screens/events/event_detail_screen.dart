@@ -1131,6 +1131,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       return _buildSignInToRegister(langCode, isDark);
     }
 
+    // Authenticated but email not verified → show verification prompt
+    if (!authProvider.isEmailVerified) {
+      return _buildEmailVerificationRequired(langCode, isDark);
+    }
+
     // Registration is open → show registration form
     return _buildRegistrationForm(langCode, isDark);
   }
@@ -1183,6 +1188,70 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               icon: const Icon(Icons.login_rounded, size: 20),
               label: Text(
                 langCode == 'fr' ? 'Se connecter' : 'Sign In',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailVerificationRequired(String langCode, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.email_outlined,
+            color: AppColors.auGold.withValues(alpha: 0.8),
+            size: 40,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            langCode == 'fr' ? 'Vérification requise' : 'Email Verification Required',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            langCode == 'fr'
+                ? 'Veuillez vérifier votre adresse e-mail pour vous inscrire aux événements'
+                : 'Please verify your email address to register for events',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white54 : Colors.black45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/email-verification'),
+              icon: const Icon(Icons.mark_email_read_outlined, size: 20),
+              label: Text(
+                langCode == 'fr' ? 'Vérifier l\'e-mail' : 'Verify Email',
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(

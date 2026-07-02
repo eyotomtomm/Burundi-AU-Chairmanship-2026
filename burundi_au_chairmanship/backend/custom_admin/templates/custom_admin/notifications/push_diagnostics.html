@@ -1,0 +1,275 @@
+{% extends 'custom_admin/base.html' %}
+{% load static %}
+
+{% block title %}Push Diagnostics - Be 4 Africa{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-2">
+                <a href="{% url 'custom_admin:notifications_list' %}" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <span class="material-symbols-outlined text-2xl">arrow_back</span>
+                </a>
+                <span class="material-symbols-outlined text-4xl text-orange-600 dark:text-orange-400">troubleshoot</span>
+                <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Push Notification Diagnostics</h1>
+            </div>
+            <p class="text-slate-600 dark:text-slate-400 ml-14">End-to-end health check of the push notification pipeline</p>
+        </div>
+
+        <!-- Checks Grid -->
+        <div class="space-y-6">
+
+            <!-- 1. Firebase SDK -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center {% if checks.firebase.ok %}bg-emerald-100 dark:bg-emerald-900/30{% else %}bg-red-100 dark:bg-red-900/30{% endif %}">
+                        <span class="material-symbols-outlined text-xl {% if checks.firebase.ok %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                            {% if checks.firebase.ok %}check_circle{% else %}error{% endif %}
+                        </span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg text-slate-900 dark:text-white">1. Firebase Admin SDK</h3>
+                        <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">{{ checks.firebase.detail }}</p>
+                        {% if not checks.firebase.ok %}
+                        <p class="text-xs text-red-600 dark:text-red-400 mt-2 font-medium">
+                            Fix: Set FIREBASE_CREDENTIALS_JSON env var or place firebase-adminsdk.json in config/
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. FCM Token Inventory -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center {% if checks.tokens.ok %}bg-emerald-100 dark:bg-emerald-900/30{% else %}bg-red-100 dark:bg-red-900/30{% endif %}">
+                        <span class="material-symbols-outlined text-xl {% if checks.tokens.ok %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                            {% if checks.tokens.ok %}check_circle{% else %}error{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-lg text-slate-900 dark:text-white">2. FCM Token Inventory</h3>
+                        {% if not checks.tokens.ok %}
+                        <p class="text-sm text-red-600 dark:text-red-400 mt-1 font-medium">No active device tokens found. Users must open the app and grant notification permission.</p>
+                        {% endif %}
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
+                            <div class="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-center">
+                                <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ checks.tokens.active }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Active</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-center">
+                                <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ checks.tokens.with_user }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Logged-in Users</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-center">
+                                <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ checks.tokens.anonymous }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Anonymous</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-center">
+                                <p class="text-2xl font-bold text-slate-900 dark:text-white">{{ checks.tokens.total }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Total (incl. stale)</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 mt-3">
+                            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
+                                <p class="text-xl font-bold text-green-700 dark:text-green-300">{{ checks.tokens.android }}</p>
+                                <p class="text-xs text-green-600 dark:text-green-400">Android</p>
+                            </div>
+                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+                                <p class="text-xl font-bold text-blue-700 dark:text-blue-300">{{ checks.tokens.ios }}</p>
+                                <p class="text-xs text-blue-600 dark:text-blue-400">iOS</p>
+                            </div>
+                            <div class="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                                <p class="text-xl font-bold text-amber-700 dark:text-amber-300">{{ checks.tokens.legacy_profile }}</p>
+                                <p class="text-xs text-amber-600 dark:text-amber-400">Legacy (UserProfile)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Celery Broker -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center {% if checks.celery.ok %}bg-emerald-100 dark:bg-emerald-900/30{% else %}bg-red-100 dark:bg-red-900/30{% endif %}">
+                        <span class="material-symbols-outlined text-xl {% if checks.celery.ok %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                            {% if checks.celery.ok %}check_circle{% else %}error{% endif %}
+                        </span>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-lg text-slate-900 dark:text-white">3. Celery Task Queue</h3>
+                        <p class="text-sm text-slate-600 dark:text-slate-400 mt-1">{{ checks.celery.detail }}</p>
+                        {% if not checks.celery.ok %}
+                        <p class="text-xs text-red-600 dark:text-red-400 mt-2 font-medium">
+                            Fix: Ensure REDIS_URL is set and the celery-worker component is running in App Platform.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Recent Push History -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 dark:bg-blue-900/30">
+                        <span class="material-symbols-outlined text-xl text-blue-600 dark:text-blue-400">history</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-lg text-slate-900 dark:text-white">4. Recent Push History</h3>
+                        {% if checks.recent_pushes %}
+                        <div class="mt-3 overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-left text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        <th class="pb-2 pr-4">Title</th>
+                                        <th class="pb-2 pr-4">Sent</th>
+                                        <th class="pb-2 pr-4 text-center">Recipients</th>
+                                        <th class="pb-2 pr-4 text-center">EN / FR</th>
+                                        <th class="pb-2 text-center">Opened</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                                    {% for p in checks.recent_pushes %}
+                                    <tr>
+                                        <td class="py-2 pr-4 text-slate-900 dark:text-white truncate max-w-[200px]">{{ p.title }}</td>
+                                        <td class="py-2 pr-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ p.sent_at|date:"M d, H:i" }}</td>
+                                        <td class="py-2 pr-4 text-center">
+                                            <span class="{% if p.recipients > 0 %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %} font-semibold">{{ p.recipients }}</span>
+                                        </td>
+                                        <td class="py-2 pr-4 text-center text-slate-600 dark:text-slate-400">{{ p.en }} / {{ p.fr }}</td>
+                                        <td class="py-2 text-center text-slate-600 dark:text-slate-400">{{ p.opened }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-amber-600 dark:text-amber-400 mt-2">No push notifications have been sent yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Your Device & Test Push -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 p-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center {% if checks.admin_device %}bg-emerald-100 dark:bg-emerald-900/30{% else %}bg-amber-100 dark:bg-amber-900/30{% endif %}">
+                        <span class="material-symbols-outlined text-xl {% if checks.admin_device %}text-emerald-600 dark:text-emerald-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">
+                            {% if checks.admin_device %}phone_android{% else %}phone_disabled{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-lg text-slate-900 dark:text-white">5. Your Device & Test Push</h3>
+                        {% if checks.admin_device %}
+                        <div class="mt-3 space-y-2">
+                            {% for dev in checks.admin_device %}
+                            <div class="flex items-center gap-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg px-4 py-2">
+                                <span class="material-symbols-outlined text-slate-400">
+                                    {% if 'ios' in dev.os|lower or 'iphone' in dev.device|lower %}phone_iphone{% else %}phone_android{% endif %}
+                                </span>
+                                <div>
+                                    <span class="text-sm text-slate-900 dark:text-white font-medium">{{ dev.device|default:"Unknown device" }}</span>
+                                    <span class="text-xs text-slate-500 dark:text-slate-400 ml-2">{{ dev.os|default:"" }}</span>
+                                </div>
+                                <code class="text-xs text-slate-400 ml-auto font-mono">{{ dev.token_prefix }}</code>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <form method="POST" class="mt-4">
+                            {% csrf_token %}
+                            <button type="submit" name="send_test" value="1"
+                                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors duration-150 shadow"
+                                    onclick="return confirm('Send a test push notification to your device?')">
+                                <span class="material-symbols-outlined text-sm">send</span>
+                                Send Test Push to My Device
+                            </button>
+                        </form>
+                        {% else %}
+                        <p class="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                            No active device token found for your account (<strong>{{ request.user.username }}</strong>).
+                            Open the app on your phone and log in with this account first.
+                        </p>
+                        {% endif %}
+
+                        {% if test_result %}
+                        <div class="mt-4 p-4 rounded-lg {% if test_result.ok %}bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800{% else %}bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800{% endif %}">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="material-symbols-outlined text-lg {% if test_result.ok %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                                    {% if test_result.ok %}check_circle{% else %}error{% endif %}
+                                </span>
+                                <span class="font-semibold {% if test_result.ok %}text-emerald-800 dark:text-emerald-300{% else %}text-red-800 dark:text-red-300{% endif %}">
+                                    Test Result
+                                </span>
+                            </div>
+                            <p class="text-sm {% if test_result.ok %}text-emerald-700 dark:text-emerald-400{% else %}text-red-700 dark:text-red-400{% endif %}">
+                                {{ test_result.detail }}
+                            </p>
+                            {% if test_result.errors %}
+                            <div class="mt-2 space-y-1">
+                                {% for err in test_result.errors %}
+                                <p class="text-xs text-red-600 dark:text-red-400 font-mono">{{ err }}</p>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if test_result.stale_cleaned %}
+                            <p class="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                                {{ test_result.stale_cleaned }} stale token(s) deactivated.
+                            </p>
+                            {% endif %}
+                            {% if test_result.ok %}
+                            <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                                Check your phone's notification tray now. If nothing appears, check the device's notification settings for this app.
+                            </p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Interpretation Guide -->
+        <div class="mt-8 bg-slate-100 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
+            <h3 class="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                <span class="material-symbols-outlined text-slate-500">help</span>
+                Troubleshooting Guide
+            </h3>
+            <dl class="space-y-3 text-sm">
+                <div>
+                    <dt class="font-medium text-slate-700 dark:text-slate-300">Firebase fails</dt>
+                    <dd class="text-slate-600 dark:text-slate-400 ml-4">Set <code class="bg-slate-200 dark:bg-slate-700 px-1 rounded">FIREBASE_CREDENTIALS_JSON</code> in App Platform env vars with the service account key JSON from Firebase Console.</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-slate-700 dark:text-slate-300">0 active tokens</dt>
+                    <dd class="text-slate-600 dark:text-slate-400 ml-4">Users must open the app and grant notification permission. The app registers its FCM token on startup.</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-slate-700 dark:text-slate-300">Celery broker unreachable</dt>
+                    <dd class="text-slate-600 dark:text-slate-400 ml-4">Ensure <code class="bg-slate-200 dark:bg-slate-700 px-1 rounded">REDIS_URL</code> is set and the <code class="bg-slate-200 dark:bg-slate-700 px-1 rounded">celery-worker</code> component is running in App Platform.</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-slate-700 dark:text-slate-300">Recipients = 0 in history</dt>
+                    <dd class="text-slate-600 dark:text-slate-400 ml-4">No tokens matched the targeting criteria. Check if the notification's targeting filters are too narrow.</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-slate-700 dark:text-slate-300">Test push succeeds but nothing in system tray</dt>
+                    <dd class="text-slate-600 dark:text-slate-400 ml-4">
+                        <strong>Android:</strong> Settings &rarr; Apps &rarr; Be 4 Africa &rarr; Notifications &rarr; ensure "Default Notifications" channel is ON.<br>
+                        <strong>iOS:</strong> Settings &rarr; Be 4 Africa &rarr; Notifications &rarr; ensure Allow Notifications is ON. Also verify an APNs Key (.p8) is uploaded in Firebase Console &rarr; Project Settings &rarr; Cloud Messaging.
+                    </dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-slate-700 dark:text-slate-300">Test push fails with "Unregistered" error</dt>
+                    <dd class="text-slate-600 dark:text-slate-400 ml-4">The FCM token is stale (app was reinstalled or token expired). Open the app again to register a fresh token.</dd>
+                </div>
+            </dl>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -12,6 +12,7 @@ import '../../widgets/shimmer_loading.dart';
 import '../../widgets/async_content_view.dart';
 import '../../widgets/translate_button.dart';
 import 'event_detail_screen.dart';
+import '../youth_dialogue/youth_dialogue_main_screen.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -241,10 +242,17 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
     return GestureDetector(
       onTap: () {
         HapticService.light();
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)),
-        );
+        if (event.isYouthDialogue) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const YouthDialogueMainScreen()),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)),
+          );
+        }
       },
       child: Opacity(
         opacity: isPast ? 0.7 : 1.0,

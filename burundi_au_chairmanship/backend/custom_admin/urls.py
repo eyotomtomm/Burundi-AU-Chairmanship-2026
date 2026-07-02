@@ -50,6 +50,7 @@ urlpatterns = [
     path('notifications/<int:pk>/delete/', views.notification_delete, name='notification_delete'),
     path('notifications/<int:pk>/send/', views.notification_send_push, name='notification_send_push'),
     path('notifications/estimate-audience/', views.notification_estimate_audience, name='notification_estimate_audience'),
+    path('notifications/push-diagnostics/', views.push_diagnostics, name='push_diagnostics'),
 
     # App Releases (What's New popup)
     path('app-releases/', views.app_releases_list, name='app_releases_list'),

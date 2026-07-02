@@ -465,11 +465,9 @@ CAMPAIGN_EMAIL_USE_SSL = os.environ.get('CAMPAIGN_EMAIL_USE_SSL', 'True').lower(
 CAMPAIGN_EMAIL_HOST_USER = os.environ.get('CAMPAIGN_EMAIL_HOST_USER', 'newsletter@burundichairship.africa')
 CAMPAIGN_EMAIL_HOST_PASSWORD = os.environ.get('CAMPAIGN_EMAIL_HOST_PASSWORD', '')
 if not CAMPAIGN_EMAIL_HOST_PASSWORD and not DEBUG:
-    raise RuntimeError(
-        "CRITICAL: CAMPAIGN_EMAIL_HOST_PASSWORD environment variable is not set.\n"
-        "This is required for sending campaign/newsletter emails.\n\n"
-        "Set it in your .env or environment:\n"
-        "  export CAMPAIGN_EMAIL_HOST_PASSWORD='your-password-here'"
+    import logging as _campaign_log
+    _campaign_log.getLogger('django').warning(
+        'CAMPAIGN_EMAIL_HOST_PASSWORD not set — campaign/newsletter emails will not send.'
     )
 CAMPAIGN_FROM_EMAIL = os.environ.get(
     'CAMPAIGN_FROM_EMAIL',

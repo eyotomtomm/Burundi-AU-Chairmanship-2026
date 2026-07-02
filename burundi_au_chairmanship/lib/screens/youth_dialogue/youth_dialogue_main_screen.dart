@@ -428,6 +428,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 child: Image.network(
                   Environment.fixMediaUrl(logoUrl),
                   height: 240,
+                  memCacheWidth: 480,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),

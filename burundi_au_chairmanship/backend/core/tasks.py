@@ -80,7 +80,6 @@ def send_push_notification_async(self, user_ids, title, body, data=None):
                     aps=messaging.Aps(
                         sound='default',
                         badge=1,
-                        content_available=True,
                     ),
                 ),
             ),

@@ -255,7 +255,7 @@ def send_push_to_users(user_ids, title, body, data=None):
             apns=messaging.APNSConfig(
                 headers={'apns-priority': '10'},
                 payload=messaging.APNSPayload(
-                    aps=messaging.Aps(sound='default', badge=1, content_available=True),
+                    aps=messaging.Aps(sound='default', badge=1),
                 ),
             ),
         )
@@ -355,6 +355,11 @@ def send_push_notification(notification):
     # APNS config for iOS: always set so banners, badges, and sounds
     # are displayed reliably. Add mutable-content when an image is
     # present so the notification service extension can download it.
+    # NOTE: Do NOT set content_available=True for visible notifications.
+    # On iOS, content_available marks the push as a silent background
+    # update. When combined with an alert payload iOS *usually* shows
+    # it, but if the user has force-quit the app, iOS may suppress the
+    # display entirely. Only use content_available for data-only pushes.
     apns_config = messaging.APNSConfig(
         headers={
             'apns-priority': '10',  # immediate delivery
@@ -364,7 +369,6 @@ def send_push_notification(notification):
                 sound='default',
                 badge=1,
                 mutable_content=bool(image_url),
-                content_available=True,
             ),
         ),
         fcm_options=messaging.APNSFCMOptions(image=image_url) if image_url else None,
@@ -414,13 +418,22 @@ def send_push_notification(notification):
             total_failure += response.failure_count
             success_by_lang[lang_code] += response.success_count
 
-            # Collect stale tokens for cleanup
+            # Collect stale tokens for cleanup and log all errors
             for j, send_response in enumerate(response.responses):
-                if send_response.exception and isinstance(
-                    send_response.exception,
-                    (messaging.UnregisteredError, messaging.SenderIdMismatchError),
-                ):
-                    stale_tokens.append(batch_tokens[j])
+                if send_response.exception:
+                    if isinstance(
+                        send_response.exception,
+                        (messaging.UnregisteredError, messaging.SenderIdMismatchError),
+                    ):
+                        stale_tokens.append(batch_tokens[j])
+                    else:
+                        logger.warning(
+                            'FCM send error for notification #%s token=%s…: %s: %s',
+                            notification.pk,
+                            batch_tokens[j][:12],
+                            type(send_response.exception).__name__,
+                            send_response.exception,
+                        )
 
     # Clean up stale tokens from both DeviceToken and legacy UserProfile
     if stale_tokens:

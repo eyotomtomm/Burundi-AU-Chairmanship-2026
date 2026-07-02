@@ -1103,16 +1103,20 @@ def notification_create(request):
         send_push = request.POST.get('send_push') == 'on'
         if send_push and notification.is_active:
             from core.tasks import send_notification_push_async
-            send_notification_push_async.delay(notification.pk)
+            result = send_notification_push_async.delay(notification.pk)
+            try:
+                success, failure = result.get(timeout=30)
+                push_msg = f'Notification created and push sent to {success} device(s).'
+                if failure:
+                    push_msg += f' ({failure} failed)'
+            except Exception:
+                push_msg = 'Notification created and push queued for delivery.'
             log_admin_action(
                 request, 'send_notification', 'Notification',
                 object_id=notification.pk, object_repr=notification.title,
-                changes={'push_sent': {'old': '', 'new': 'queued'}}
+                changes={'push_sent': {'old': '', 'new': push_msg}}
             )
-            messages.success(
-                request,
-                'Notification created and push queued for delivery.'
-            )
+            messages.success(request, push_msg)
         else:
             messages.success(request, 'Notification created successfully!')
         return redirect('custom_admin:notifications_list')
@@ -1497,8 +1501,16 @@ def notification_send_push(request, pk):
         messages.error(request, 'Cannot send push for an inactive notification. Activate it first.')
         return redirect('custom_admin:notifications_list')
     from core.tasks import send_notification_push_async
-    send_notification_push_async.delay(notification.pk)
-    push_msg = 'Push queued for delivery.'
+    result = send_notification_push_async.delay(notification.pk)
+    # When Celery runs eagerly (no Redis), .delay() returns the result
+    # synchronously so we can show actual send counts to the admin.
+    try:
+        success, failure = result.get(timeout=30)
+        push_msg = f'Push sent to {success} device(s).'
+        if failure:
+            push_msg += f' ({failure} failed)'
+    except Exception:
+        push_msg = 'Push queued for delivery.'
 
     # Also send SMS if requested
     send_sms_flag = request.POST.get('send_sms') == 'on'
@@ -9591,7 +9603,6 @@ def push_diagnostics(request):
                                 aps=messaging.Aps(
                                     sound='default',
                                     badge=1,
-                                    content_available=True,
                                 ),
                             ),
                         ),

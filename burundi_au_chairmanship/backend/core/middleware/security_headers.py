@@ -27,16 +27,25 @@ class SecurityHeadersMiddleware:
                 parts.append(f'{feature}=({sources})')
         self._permissions_policy = ', '.join(parts)
 
-        # CSP for admin panel — allow same-origin styles/scripts/images plus
-        # inline styles (Django admin uses them) and the Spaces CDN for media.
+        # CSP for admin panel — allow same-origin plus CDNs used by the
+        # admin templates (Tailwind, Chart.js, Google Fonts, Cropper.js)
+        # and the Spaces CDN for media uploads.
         spaces_cdn = getattr(settings, 'DO_SPACES_ENDPOINT', '')
-        img_src = f"'self' data: {spaces_cdn}" if spaces_cdn else "'self' data:"
+        spaces_bucket = getattr(settings, 'MEDIA_URL', '')
+        img_sources = "'self' data:"
+        if spaces_cdn:
+            img_sources += f" {spaces_cdn}"
+        if spaces_bucket and spaces_bucket.startswith('http'):
+            img_sources += f" {spaces_bucket.rstrip('/')}"
         self._admin_csp = (
             "default-src 'self'; "
-            f"script-src 'self'; "
-            f"style-src 'self' 'unsafe-inline'; "
-            f"img-src {img_src}; "
-            "font-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+            "cdn.tailwindcss.com cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' "
+            "fonts.googleapis.com cdn.jsdelivr.net; "
+            f"img-src {img_sources}; "
+            "font-src 'self' fonts.gstatic.com; "
+            "connect-src 'self'; "
             "frame-ancestors 'self'; "
             "form-action 'self'; "
             "base-uri 'self'"

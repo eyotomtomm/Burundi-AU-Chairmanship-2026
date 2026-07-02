@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../models/event_registration_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -25,6 +26,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   List<EventRegistrationModel> _allEvents = [];
   bool _isLoading = true;
   String? _error;
+  String? _ydBannerUrl;
   late TabController _tabController;
 
   @override
@@ -49,21 +51,29 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       final isAuth = context.read<AuthProvider>().isAuthenticated;
       List<EventRegistrationModel> events = [];
 
-      if (isAuth) {
-        events = await api.getEventRegistrations();
-      } else {
-        try {
-          events = await api.getEventRegistrations();
-        } catch (_) {
-          events = [];
-        }
-      }
+      // Fetch events and youth dialogue banner in parallel
+      final results = await Future.wait([
+        () async {
+          if (isAuth) {
+            return await api.getEventRegistrations();
+          } else {
+            try { return await api.getEventRegistrations(); }
+            catch (_) { return <EventRegistrationModel>[]; }
+          }
+        }(),
+        api.youthDialogueSettings().catchError((_) => <String, dynamic>{}),
+      ]);
+
+      events = results[0] as List<EventRegistrationModel>;
+      final ydSettings = results[1] as Map<String, dynamic>;
+      final bannerUrl = ydSettings['banner_image_url']?.toString() ?? '';
 
       if (!mounted) return;
       // Cache on success
       ContentCacheService().cacheEvents(events);
       setState(() {
         _allEvents = events;
+        _ydBannerUrl = bannerUrl.isNotEmpty ? Environment.fixMediaUrl(bannerUrl) : null;
         _isLoading = false;
       });
     } catch (e) {
@@ -273,14 +283,16 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Poster image or gradient header
-              if (event.eventPoster != null && event.eventPoster!.isNotEmpty)
+              if ((event.eventPoster != null && event.eventPoster!.isNotEmpty) ||
+                  (event.isYouthDialogue && _ydBannerUrl != null))
                 Stack(
                   children: [
                     ClipRRect(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                       child: CachedNetworkImage(
-                        imageUrl: event.eventPoster!,
-                        memCacheWidth: 800,
+                        imageUrl: event.eventPoster?.isNotEmpty == true
+                            ? event.eventPoster!
+                            : _ydBannerUrl!,
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,

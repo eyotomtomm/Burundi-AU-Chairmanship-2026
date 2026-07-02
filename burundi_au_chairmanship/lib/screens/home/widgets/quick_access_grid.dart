@@ -54,7 +54,6 @@ class QuickAccessGrid extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: CachedNetworkImage(
               imageUrl: iconImageUrl,
-              memCacheWidth: 240,
               width: 52,
               height: 52,
               fit: BoxFit.contain,

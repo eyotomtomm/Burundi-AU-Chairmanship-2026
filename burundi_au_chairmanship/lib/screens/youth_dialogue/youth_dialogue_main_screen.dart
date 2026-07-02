@@ -258,7 +258,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(bannerUrl),
                 fit: BoxFit.cover,
-                memCacheWidth: 1200,
                 placeholder: (_, __) => _buildGradientBackground(''),
                 errorWidget: (_, __, ___) => _buildGradientBackground(''),
               )
@@ -428,7 +427,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                 child: Image.network(
                   Environment.fixMediaUrl(logoUrl),
                   height: 240,
-                  memCacheWidth: 480,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
@@ -2021,7 +2019,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                       width: double.infinity,
                       height: 200,
                       fit: BoxFit.cover,
-                      memCacheWidth: 400,
                       placeholder: (_, __) => Container(height: 200, color: isDark ? Colors.grey[900] : Colors.grey[200]),
                       errorWidget: (_, __, ___) => Container(
                         height: 200,
@@ -2161,7 +2158,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                                 child: CachedNetworkImage(
                                   imageUrl: Environment.fixMediaUrl(item.fileUrl),
                                   fit: BoxFit.contain,
-                                  memCacheWidth: 1200,
                                 ),
                               ),
                             ),
@@ -2175,7 +2171,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                               imageUrl: imgUrl,
                               width: 200, height: 160,
                               fit: BoxFit.cover,
-                              memCacheWidth: 400,
                               placeholder: (_, __) => Container(color: isDark ? Colors.grey[900] : Colors.grey[200]),
                               errorWidget: (_, __, ___) => Container(
                                 color: isDark ? Colors.grey[900] : Colors.grey[200],

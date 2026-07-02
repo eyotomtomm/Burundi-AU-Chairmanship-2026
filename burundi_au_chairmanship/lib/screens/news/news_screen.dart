@@ -342,7 +342,6 @@ class _NewsScreenState extends State<NewsScreen> {
           children: [
             CachedNetworkImage(
               imageUrl: Environment.fixMediaUrl(article.imageUrl),
-              memCacheWidth: 800,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
               errorWidget: (_, _, _) => Container(
@@ -532,7 +531,6 @@ class _NewsScreenState extends State<NewsScreen> {
                 children: [
                   CachedNetworkImage(
                     imageUrl: Environment.fixMediaUrl(article.imageUrl),
-                    memCacheWidth: 400,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(
                       color: AppColors.burundiGreen.withValues(alpha: 0.1),

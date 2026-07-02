@@ -661,7 +661,6 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
           child: imageUrl.isNotEmpty
               ? CachedNetworkImage(
                   imageUrl: imageUrl,
-                  memCacheWidth: 800,
                   fit: BoxFit.contain,
                   width: width,
                   height: height,

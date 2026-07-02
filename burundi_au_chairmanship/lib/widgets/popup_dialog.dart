@@ -46,7 +46,6 @@ class PopupDialog extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 child: CachedNetworkImage(
                   imageUrl: popup.image!,
-                  memCacheWidth: 800,
                   width: double.infinity,
                   height: 200,
                   fit: BoxFit.cover,

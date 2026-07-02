@@ -496,7 +496,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 child: feed.thumbnail.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: feed.thumbnail,
-                        memCacheWidth: 800,
                         fit: BoxFit.cover,
                         placeholder: (_, _) => Container(
                           decoration: const BoxDecoration(
@@ -778,7 +777,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
               feed.thumbnail.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: feed.thumbnail,
-                      memCacheWidth: 400,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.burundiRed.withValues(alpha: 0.3)),
                       errorWidget: (_, _, _) => Container(
@@ -901,7 +899,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                     feed.thumbnail.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: feed.thumbnail,
-                            memCacheWidth: 400,
                             fit: BoxFit.cover,
                             placeholder: (_, _) => Container(
                               color: AppColors.auGold.withValues(alpha: 0.15),
@@ -1098,7 +1095,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                     feed.thumbnail.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: feed.thumbnail,
-                            memCacheWidth: 400,
                             fit: BoxFit.cover,
                             placeholder: (_, _) => Container(
                               color: AppColors.burundiGreen

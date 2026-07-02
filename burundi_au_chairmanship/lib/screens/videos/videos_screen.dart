@@ -426,7 +426,6 @@ class _VideosScreenState extends State<VideosScreen> {
                     child: thumbnailUrl != null && thumbnailUrl.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: Environment.fixMediaUrl(thumbnailUrl),
-                            memCacheWidth: 800,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => _videoThumbnailPlaceholder(),
                             errorWidget: (context, url, error) => _videoThumbnailPlaceholder(),

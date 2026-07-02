@@ -420,7 +420,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           if (primary?.backgroundImageUrl != null && primary!.backgroundImageUrl!.isNotEmpty)
                             CachedNetworkImage(
                               imageUrl: Environment.fixMediaUrl(primary.backgroundImageUrl!),
-                              memCacheWidth: 800,
                               fit: BoxFit.cover,
                               errorWidget: (_, _, _) => Container(
                                 decoration: const BoxDecoration(

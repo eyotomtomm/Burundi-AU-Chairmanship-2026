@@ -501,7 +501,6 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           child: CachedNetworkImage(
             imageUrl: imageUrl,
             fit: BoxFit.cover,
-            memCacheWidth: DataSaverService().thumbnailCacheWidth ?? 400,
             placeholder: (context, url) => Container(
               color: Colors.grey[300],
               child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),

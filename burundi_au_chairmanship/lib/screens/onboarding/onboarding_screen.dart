@@ -218,7 +218,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             child: Image.network(
                               imageUrl,
                               height: 260,
-                              memCacheWidth: 520,
                               fit: BoxFit.contain,
                               errorBuilder: (_, _, _) => _buildIconPlaceholder(step),
                             ),

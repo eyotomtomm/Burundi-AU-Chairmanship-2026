@@ -289,7 +289,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   if (_event.eventPoster != null && _event.eventPoster!.isNotEmpty)
                     CachedNetworkImage(
                       imageUrl: Environment.fixMediaUrl(_event.eventPoster!),
-                      memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => _posterFallback(),
                       errorWidget: (context, url, error) => _posterFallback(),
@@ -525,7 +524,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         Positioned.fill(
                           child: CachedNetworkImage(
                             imageUrl: Environment.fixMediaUrl(_event.eventPoster!),
-                            memCacheWidth: 800,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => _greetingGradient(),
                             errorWidget: (context, url, error) => _greetingGradient(),
@@ -2876,7 +2874,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       children: [
                         CachedNetworkImage(
                           imageUrl: Environment.fixMediaUrl(imageUrl),
-                          memCacheWidth: 300,
                           width: 140,
                           height: 140,
                           fit: BoxFit.cover,
@@ -2948,7 +2945,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               borderRadius: BorderRadius.circular(16),
               child: CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(imageUrl),
-                memCacheWidth: 1200,
                 fit: BoxFit.contain,
                 placeholder: (_, _) => const SizedBox(
                   height: 300,

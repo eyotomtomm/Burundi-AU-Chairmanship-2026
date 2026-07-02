@@ -230,7 +230,6 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                               child: isLoggedIn && authProvider.profilePictureUrl != null && authProvider.profilePictureUrl!.isNotEmpty
                                   ? CachedNetworkImage(
                                       imageUrl: Environment.fixMediaUrl(authProvider.profilePictureUrl!),
-                                      memCacheWidth: 200,
                                       width: 64,
                                       height: 64,
                                       fit: BoxFit.cover,

@@ -51,7 +51,6 @@ class HeroSlideshow extends StatelessWidget {
                     CachedNetworkImage(
                       imageUrl: imagePath,
                       fit: BoxFit.cover,
-                      memCacheWidth: DataSaverService().fullImageCacheWidth ?? 800,
                       width: screenWidth,
                       height: 400,
                       placeholder: (context, url) => Container(

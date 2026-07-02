@@ -230,7 +230,6 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
             if (hasImage)
               CachedNetworkImage(
                 imageUrl: _imageUrl!,
-                memCacheWidth: 800,
                 fit: BoxFit.cover,
                 width: screenSize.width,
                 height: screenSize.height,

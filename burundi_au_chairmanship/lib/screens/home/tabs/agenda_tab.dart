@@ -283,7 +283,6 @@ class _AgendaTabState extends State<AgendaTab> {
                       borderRadius: BorderRadius.circular(18),
                       child: CachedNetworkImage(
                         imageUrl: Environment.fixMediaUrl(heroImage),
-                        memCacheWidth: 800,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
                           color: color.withValues(alpha: 0.12),

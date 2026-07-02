@@ -328,7 +328,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
       return CachedNetworkImage(
         imageUrl: fixedUrl,
         fit: BoxFit.cover,
-        memCacheWidth: 400,
         placeholder: (context, url) => Container(
           color: Colors.grey[300],
           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),

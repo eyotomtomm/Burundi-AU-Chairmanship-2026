@@ -191,8 +191,6 @@ class NewsCard extends StatelessWidget {
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
-                  memCacheWidth: 400,
-                  memCacheHeight: 280,
                   errorBuilder: (_, _, _) => Center(
                     child: Icon(
                       Icons.image,

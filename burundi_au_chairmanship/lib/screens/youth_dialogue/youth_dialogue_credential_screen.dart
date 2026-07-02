@@ -547,7 +547,6 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                                 ? CachedNetworkImage(
                                     imageUrl: cred.idPhotoUrl,
                                     fit: BoxFit.cover,
-                                    memCacheWidth: 400,
                                     placeholder: (_, __) => _photoPlaceholder(isDark),
                                     errorWidget: (_, __, ___) => _photoPlaceholder(isDark),
                                   )

@@ -123,7 +123,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             label: 'Profile picture',
                                             child: CachedNetworkImage(
                                             imageUrl: authProvider.profilePictureUrl!,
-                                            memCacheWidth: 200,
                                             width: 88,
                                             height: 88,
                                             fit: BoxFit.cover,

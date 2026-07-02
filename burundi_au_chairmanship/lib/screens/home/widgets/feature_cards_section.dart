@@ -71,7 +71,6 @@ class FeatureCardsSection extends StatelessWidget {
                             CachedNetworkImage(
                               imageUrl: imageUrl,
                               fit: BoxFit.cover,
-                              memCacheWidth: 800,
                               placeholder: (context, url) => Container(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -219,7 +218,6 @@ class FeatureCardsSection extends StatelessWidget {
         imageUrl: Environment.fixMediaUrl(iconImageUrl),
         width: size,
         height: size,
-        memCacheWidth: 128,
         fit: BoxFit.contain,
         placeholder: (_, _) => Icon(
           card['icon'] as IconData? ?? Icons.stars,

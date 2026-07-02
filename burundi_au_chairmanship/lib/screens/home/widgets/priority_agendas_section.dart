@@ -121,7 +121,6 @@ class PriorityAgendasSection extends StatelessWidget {
               if (hasImage)
                 CachedNetworkImage(
                   imageUrl: Environment.fixMediaUrl(heroImage.toString()),
-                  memCacheWidth: 400,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => Container(
                     decoration: BoxDecoration(

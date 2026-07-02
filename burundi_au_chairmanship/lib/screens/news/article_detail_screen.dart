@@ -503,7 +503,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   children: [
                     CachedNetworkImage(
                       imageUrl: Environment.fixMediaUrl(_article.imageUrl),
-                      memCacheWidth: 800,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
                       errorWidget: (_, _, _) => Container(
@@ -721,7 +720,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   child: CachedNetworkImage(
                                     imageUrl: Environment.fixMediaUrl(m.imageUrl),
-                                    memCacheWidth: 800,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
                                     placeholder: (_, _) => Container(
@@ -1089,7 +1087,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(article.imageUrl),
-                memCacheWidth: 400,
                 height: 110,
                 width: double.infinity,
                 fit: BoxFit.cover,

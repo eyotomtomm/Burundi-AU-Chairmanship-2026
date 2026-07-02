@@ -557,7 +557,6 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             children: [
               CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
-                memCacheWidth: 800,
                 fit: BoxFit.cover,
                 placeholder: (_, _) => Container(
                   color: AppColors.burundiGreen.withValues(alpha: 0.2),
@@ -708,7 +707,6 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                     child: CachedNetworkImage(
                       imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
-                      memCacheWidth: 400,
                       fit: BoxFit.cover,
                       placeholder: (_, _) => Container(
                         color: AppColors.burundiGreen.withValues(alpha: 0.1),

@@ -172,7 +172,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Re-fetch announcements when app comes back to foreground
+      _loadUnreadCount();
       _loadAnnouncementBanners();
     }
   }
@@ -514,7 +514,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               getHeroText: _getHeroText,
               onNotificationTap: () async {
                 await Navigator.pushNamed(context, '/notifications');
-                await Future.delayed(const Duration(milliseconds: 300));
+                // Fetch the real unread count from the server after returning.
                 _loadUnreadCount();
               },
               onPageChanged: (i) => setState(() => _heroRawPage = i),

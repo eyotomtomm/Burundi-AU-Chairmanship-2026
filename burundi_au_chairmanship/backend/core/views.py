@@ -2721,9 +2721,11 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         notification = self.get_object()
         notification.read_by.add(request.user)
 
+        remaining = self.get_queryset().exclude(read_by=request.user).count()
         return Response({
             'message': 'Notification marked as read',
-            'is_read': True
+            'is_read': True,
+            'unread_count': remaining,
         })
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], url_path='mark-all-as-read')
@@ -2742,9 +2744,11 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
                 notification.read_by.add(request.user)
                 count += 1
 
+        remaining = self.get_queryset().exclude(read_by=request.user).count()
         return Response({
             'message': f'{count} notification(s) marked as read',
-            'marked_count': count
+            'marked_count': count,
+            'unread_count': remaining,
         })
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='unread-count')

@@ -121,12 +121,16 @@ def get_target_tokens(notification):
 
 def _apply_platform_filter(qs, notification):
     """Apply target_platform filter to a DeviceToken queryset.
-    Filters on device_os which starts with 'Android …' or 'iOS …'."""
+    Filters on device_os which starts with 'Android …' or 'iOS …'.
+    Tokens with empty device_os (registered before device info was
+    collected) are always included so they aren't silently dropped."""
+    from django.db.models import Q
+
     platform = getattr(notification, 'target_platform', '') or ''
     if platform == 'android':
-        return qs.filter(device_os__istartswith='android')
+        return qs.filter(Q(device_os__istartswith='android') | Q(device_os=''))
     elif platform == 'ios':
-        return qs.filter(device_os__istartswith='ios')
+        return qs.filter(Q(device_os__istartswith='ios') | Q(device_os=''))
     return qs
 
 
@@ -166,12 +170,10 @@ def get_target_tokens_by_language(notification):
         dt_qs = _apply_platform_filter(dt_qs, notification)
         device_tokens = list(dt_qs.values_list('token', flat=True).distinct())
 
-        # Also collect legacy tokens (no platform info available — include
-        # them only when no platform filter is set)
-        if not getattr(notification, 'target_platform', ''):
-            legacy_tokens = list(lang_profiles.values_list('fcm_token', flat=True))
-        else:
-            legacy_tokens = []
+        # Also collect legacy tokens from UserProfile.fcm_token.
+        # These have no device_os info, so include them regardless of
+        # platform filter — better to over-deliver than miss users.
+        legacy_tokens = list(lang_profiles.values_list('fcm_token', flat=True))
 
         tokens_by_lang[lang_code] = list(set(
             device_tokens + [t for t in legacy_tokens if t]

@@ -344,69 +344,77 @@ class FirebaseMessagingService {
       );
     }
 
-    // Also show a system-level notification (appears in notification tray)
-    try {
-      final notificationId = messageId.hashCode.abs() % 2147483647;
+    // Show a system-level notification in the notification tray.
+    //
+    // On iOS, setForegroundNotificationPresentationOptions(alert: true) already
+    // causes the OS to display the FCM notification (including the image via
+    // the Notification Service Extension). Creating a second local notification
+    // here would produce a duplicate WITHOUT the image. So we only create the
+    // local notification on Android where it's needed for foreground display.
+    if (Platform.isAndroid) {
+      try {
+        final notificationId = messageId.hashCode.abs() % 2147483647;
 
-      // Resolve image URL: FCM notification payload → data payload fallback
-      final imageUrl = notification?.android?.imageUrl ??
-          notification?.apple?.imageUrl ??
-          message.data['image_url'] as String?;
+        // Resolve image URL: FCM notification payload → data payload fallback
+        final imageUrl = notification?.android?.imageUrl ??
+            notification?.apple?.imageUrl ??
+            message.data['image_url'] as String?;
 
-      // Download the image once for both BigPictureStyle and largeIcon
-      Uint8List? imageBytes;
-      if (imageUrl != null && imageUrl.isNotEmpty) {
-        try {
-          final response = await http.get(Uri.parse(imageUrl)).timeout(
-            const Duration(seconds: 5),
-          );
-          if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-            imageBytes = response.bodyBytes;
+        // Download the image once for both BigPictureStyle and largeIcon
+        Uint8List? imageBytes;
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          try {
+            final response = await http.get(Uri.parse(imageUrl)).timeout(
+              const Duration(seconds: 5),
+            );
+            if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+              imageBytes = response.bodyBytes;
+            }
+          } catch (e) {
+            if (kDebugMode) print('Failed to download notification image: $e');
           }
-        } catch (e) {
-          if (kDebugMode) print('Failed to download notification image: $e');
         }
-      }
 
-      await _localNotifications.show(
-        id: notificationId,
-        title: title,
-        body: body,
-        notificationDetails: NotificationDetails(
-          android: AndroidNotificationDetails(
-            'default_channel',
-            'Default Notifications',
-            channelDescription: 'Default notification channel for general updates',
-            importance: Importance.max,
-            priority: Priority.max,
-            icon: '@mipmap/ic_launcher',
-            enableVibration: true,
-            playSound: true,
-            largeIcon: imageBytes != null
-                ? ByteArrayAndroidBitmap(imageBytes)
-                : null,
-            styleInformation: imageBytes != null
-                ? BigPictureStyleInformation(
-                    ByteArrayAndroidBitmap(imageBytes),
-                    contentTitle: title,
-                    summaryText: body,
-                    hideExpandedLargeIcon: true,
-                  )
-                : null,
+        await _localNotifications.show(
+          id: notificationId,
+          title: title,
+          body: body,
+          notificationDetails: NotificationDetails(
+            android: AndroidNotificationDetails(
+              'default_channel',
+              'Default Notifications',
+              channelDescription: 'Default notification channel for general updates',
+              importance: Importance.max,
+              priority: Priority.max,
+              icon: '@mipmap/ic_launcher',
+              enableVibration: true,
+              playSound: true,
+              largeIcon: imageBytes != null
+                  ? ByteArrayAndroidBitmap(imageBytes)
+                  : null,
+              styleInformation: imageBytes != null
+                  ? BigPictureStyleInformation(
+                      ByteArrayAndroidBitmap(imageBytes),
+                      contentTitle: title,
+                      summaryText: body,
+                      hideExpandedLargeIcon: true,
+                    )
+                  : null,
+            ),
           ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
-        payload: _buildPayload(message),
-      );
+          payload: _buildPayload(message),
+        );
+        if (nid != null && nid.isNotEmpty && nid != '0') {
+          _trackEvent(nid, 'displayed');
+        }
+      } catch (e) {
+        if (kDebugMode) print('Failed to show local notification: $e');
+      }
+    } else {
+      // iOS: OS already displayed the notification — just track the event
       if (nid != null && nid.isNotEmpty && nid != '0') {
         _trackEvent(nid, 'displayed');
       }
-    } catch (e) {
-      if (kDebugMode) print('Failed to show local notification: $e');
     }
   }
 
@@ -555,12 +563,38 @@ class FirebaseMessagingService {
   /// Register FCM token with Django backend (no auth required).
   /// This works for both authenticated and anonymous users,
   /// ensuring all devices can receive global push notifications.
+  /// Includes device type and OS so the admin diagnostics page can
+  /// show an accurate Android / iOS token breakdown.
   Future<void> _sendTokenToBackend(String token) async {
     try {
       final lang = await _currentLanguage();
-      await ApiService().registerFCMToken(token, preferredLanguage: lang);
+
+      // Collect device info so the DeviceToken row includes platform data.
+      String deviceType = '';
+      String deviceOs = '';
+      try {
+        final deviceInfo = DeviceInfoPlugin();
+        if (Platform.isAndroid) {
+          final info = await deviceInfo.androidInfo;
+          deviceType = '${info.brand} ${info.model}';
+          deviceOs = 'Android ${info.version.release}';
+        } else if (Platform.isIOS) {
+          final info = await deviceInfo.iosInfo;
+          deviceType = info.utsname.machine;
+          deviceOs = '${info.systemName} ${info.systemVersion}';
+        }
+      } catch (_) {
+        // Non-critical — register token even if device info fails.
+      }
+
+      await ApiService().registerFCMToken(
+        token,
+        preferredLanguage: lang,
+        deviceType: deviceType,
+        deviceOs: deviceOs,
+      );
       if (kDebugMode) {
-        print('FCM token registered with backend successfully (lang=$lang)');
+        print('FCM token registered with backend successfully (lang=$lang, os=$deviceOs)');
       }
     } catch (e) {
       // Security: Only log detailed errors in debug mode

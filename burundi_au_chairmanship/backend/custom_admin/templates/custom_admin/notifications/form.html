@@ -513,6 +513,26 @@
                             </div>
                         </div>
 
+                        <!-- Platform Filter -->
+                        <div>
+                            <label for="target_platform" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Platform
+                            </label>
+                            <div class="relative">
+                                <select id="target_platform"
+                                        name="target_platform"
+                                        class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 appearance-none">
+                                    <option value="" {% if not notification.target_platform %}selected{% endif %}>All Platforms</option>
+                                    <option value="android" {% if notification.target_platform == 'android' %}selected{% endif %}>Android Only</option>
+                                    <option value="ios" {% if notification.target_platform == 'ios' %}selected{% endif %}>iOS Only</option>
+                                </select>
+                                <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                            </div>
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                Send only to Android or iOS devices. Leave empty to send to all platforms.
+                            </p>
+                        </div>
+
                         <!-- Audience Count Preview -->
                         <div class="md:col-span-2">
                             <div id="audiencePreview" class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -684,6 +704,7 @@ function previewAudienceCount() {
     const isGlobal = document.getElementById('is_global').checked;
     const targetGender = document.getElementById('target_gender').value;
     const targetLanguage = document.getElementById('target_language').value;
+    const targetPlatform = document.getElementById('target_platform').value;
     const targetVerifiedOnly = document.getElementById('target_verified_only').checked;
     const targetBadgeType = document.getElementById('target_badge_type').value;
 
@@ -694,6 +715,7 @@ function previewAudienceCount() {
         is_global: isGlobal,
         target_gender: targetGender,
         target_language: targetLanguage,
+        target_platform: targetPlatform,
         target_verified_only: targetVerifiedOnly,
         target_badge_type: targetBadgeType,
     });
@@ -703,8 +725,15 @@ function previewAudienceCount() {
     .then(data => {
         countEl.textContent = data.count + ' / ' + data.total + ' total';
         const splitEl = document.getElementById('audienceLangSplit');
-        if (splitEl && data.by_language) {
-            splitEl.textContent = (data.by_language.en || 0) + ' EN · ' + (data.by_language.fr || 0) + ' FR';
+        if (splitEl) {
+            let parts = [];
+            if (data.by_language) {
+                parts.push((data.by_language.en || 0) + ' EN · ' + (data.by_language.fr || 0) + ' FR');
+            }
+            if (data.by_platform) {
+                parts.push((data.by_platform.android || 0) + ' Android · ' + (data.by_platform.ios || 0) + ' iOS');
+            }
+            splitEl.textContent = parts.join('  |  ');
         }
     })
     .catch(() => {

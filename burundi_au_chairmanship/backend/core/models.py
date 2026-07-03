@@ -1288,6 +1288,13 @@ class Notification(models.Model):
         default='',
         help_text='Send only to users with this language preference'
     )
+    target_platform = models.CharField(
+        max_length=10,
+        blank=True,
+        choices=[('', 'All Platforms'), ('android', 'Android Only'), ('ios', 'iOS Only')],
+        default='',
+        help_text='Send only to devices on this platform'
+    )
 
     # Scheduling — one-time scheduled_at for backward compatibility
     scheduled_at = models.DateTimeField(

@@ -119,6 +119,17 @@ def get_target_tokens(notification):
     return all_tokens
 
 
+def _apply_platform_filter(qs, notification):
+    """Apply target_platform filter to a DeviceToken queryset.
+    Filters on device_os which starts with 'Android …' or 'iOS …'."""
+    platform = getattr(notification, 'target_platform', '') or ''
+    if platform == 'android':
+        return qs.filter(device_os__istartswith='android')
+    elif platform == 'ios':
+        return qs.filter(device_os__istartswith='ios')
+    return qs
+
+
 def get_target_tokens_by_language(notification):
     """
     Collect FCM tokens grouped by language preference.
@@ -148,15 +159,19 @@ def get_target_tokens_by_language(notification):
         lang_user_ids = list(lang_profiles.values_list('user_id', flat=True))
 
         # Collect from DeviceToken model (active only, deduplicated)
-        device_tokens = list(
-            DeviceToken.objects.filter(
-                user_id__in=lang_user_ids,
-                is_active=True,
-            ).values_list('token', flat=True).distinct()
+        dt_qs = DeviceToken.objects.filter(
+            user_id__in=lang_user_ids,
+            is_active=True,
         )
+        dt_qs = _apply_platform_filter(dt_qs, notification)
+        device_tokens = list(dt_qs.values_list('token', flat=True).distinct())
 
-        # Also collect legacy tokens
-        legacy_tokens = list(lang_profiles.values_list('fcm_token', flat=True))
+        # Also collect legacy tokens (no platform info available — include
+        # them only when no platform filter is set)
+        if not getattr(notification, 'target_platform', ''):
+            legacy_tokens = list(lang_profiles.values_list('fcm_token', flat=True))
+        else:
+            legacy_tokens = []
 
         tokens_by_lang[lang_code] = list(set(
             device_tokens + [t for t in legacy_tokens if t]
@@ -170,6 +185,7 @@ def get_target_tokens_by_language(notification):
             user__isnull=True,
             is_active=True,
         )
+        anon_qs = _apply_platform_filter(anon_qs, notification)
         if notification.target_language:
             anon_qs = anon_qs.filter(preferred_language=notification.target_language)
 
@@ -322,14 +338,6 @@ def send_push_notification(notification):
         ])
         return 0, 0
 
-    # Build the data payload the Flutter app expects
-    data_payload = {
-        'type': notification.notification_type or 'general',
-        'action_type': notification.action_type or 'none',
-        'action_value': notification.action_value or '',
-        'notification_id': str(notification.pk),
-    }
-
     # Build absolute image URL for rich push notifications
     image_url = None
     if notification.image:
@@ -342,6 +350,18 @@ def send_push_notification(notification):
             site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
             if site_url:
                 image_url = f"{site_url}{url}"
+
+    # Build the data payload the Flutter app expects.
+    # image_url is included so the Flutter foreground handler can display
+    # it in the in-app banner and as a fallback for local notifications.
+    data_payload = {
+        'type': notification.notification_type or 'general',
+        'action_type': notification.action_type or 'none',
+        'action_value': notification.action_value or '',
+        'notification_id': str(notification.pk),
+    }
+    if image_url:
+        data_payload['image_url'] = image_url
 
     # Android config: explicit channel + high priority so background
     # notifications are displayed immediately on Android 8+ (API 26+).

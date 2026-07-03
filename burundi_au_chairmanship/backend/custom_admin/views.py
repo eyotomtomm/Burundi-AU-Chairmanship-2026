@@ -1076,6 +1076,7 @@ def notification_create(request):
             target_verified_only=request.POST.get('target_verified_only') == 'on',
             target_badge_type=request.POST.get('target_badge_type', ''),
             target_language=request.POST.get('target_language', ''),
+            target_platform=request.POST.get('target_platform', ''),
             scheduled_at=scheduled_at,
             # Recurring schedule fields
             is_scheduled=request.POST.get('is_scheduled') == 'on',
@@ -1166,6 +1167,7 @@ def notification_edit(request, pk):
         notification.target_verified_only = request.POST.get('target_verified_only') == 'on'
         notification.target_badge_type = request.POST.get('target_badge_type', '')
         notification.target_language = request.POST.get('target_language', '')
+        notification.target_platform = request.POST.get('target_platform', '')
         # Recurring schedule fields
         notification.is_scheduled = request.POST.get('is_scheduled') == 'on'
         notification.schedule_type = request.POST.get('schedule_type', 'once')
@@ -1553,6 +1555,7 @@ def notification_estimate_audience(request):
     ).distinct()
 
     is_global = request.GET.get('is_global') == 'true'
+    platform = request.GET.get('target_platform', '')
     if not is_global:
         gender = request.GET.get('target_gender', '')
         if gender:
@@ -1569,6 +1572,14 @@ def notification_estimate_audience(request):
             if badge_type:
                 profiles = profiles.filter(badge_type=badge_type)
 
+    # When a platform filter is set, narrow to profiles that have at least
+    # one active DeviceToken on that platform.
+    if platform:
+        profiles = profiles.filter(
+            user__device_tokens__is_active=True,
+            user__device_tokens__device_os__istartswith=platform,
+        ).distinct()
+
     count = profiles.count()
 
     # Split by language (before anonymous devices, which have no language)
@@ -1577,10 +1588,13 @@ def notification_estimate_audience(request):
 
     # Include anonymous device tokens for global notifications
     if is_global:
-        anonymous_count = DeviceToken.objects.filter(
+        anon_qs = DeviceToken.objects.filter(
             user__isnull=True,
             is_active=True,
-        ).count()
+        )
+        if platform:
+            anon_qs = anon_qs.filter(device_os__istartswith=platform)
+        anonymous_count = anon_qs.count()
         count += anonymous_count
 
     total = UserProfile.objects.filter(
@@ -1590,10 +1604,15 @@ def notification_estimate_audience(request):
     # Add anonymous device count to total as well
     total += DeviceToken.objects.filter(user__isnull=True, is_active=True).count()
 
+    # Platform breakdown
+    android_count = DeviceToken.objects.filter(is_active=True, device_os__istartswith='android').count()
+    ios_count = DeviceToken.objects.filter(is_active=True, device_os__istartswith='ios').count()
+
     return JsonResponse({
         'count': count,
         'total': total,
         'by_language': {'en': en_count, 'fr': fr_count},
+        'by_platform': {'android': android_count, 'ios': ios_count},
     })
 
 

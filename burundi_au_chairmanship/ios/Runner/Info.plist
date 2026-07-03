@@ -1,81 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
-	<string>B4Africa</string>
-	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>burundi_au_chairmanship</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.55634991225-deervhavteuahc7gjdacfn1p1pnnj3lg</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>b4africa</string>
-			</array>
-		</dict>
-	</array>
-	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<!-- Allow launching native meeting apps (Zoom, Teams, Webex) from Live Feeds.
+	<dict>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>B4Africa</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>burundi_au_chairmanship</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.55634991225-deervhavteuahc7gjdacfn1p1pnnj3lg</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>b4africa</string>
+				</array>
+			</dict>
+		</array>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>FirebaseAppDelegateProxyEnabled</key>
+		<false/>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<!-- Allow launching native meeting apps (Zoom, Teams, Webex) from Live Feeds.
 	     Without these entries, iOS 9+ silently blocks canLaunchUrl / launchUrl for custom schemes. -->
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>zoommtg</string>
-		<string>zoomus</string>
-		<string>msteams</string>
-		<string>webex</string>
-		<string>webexstart</string>
-		<string>https</string>
-		<string>http</string>
-		<string>tel</string>
-		<string>mailto</string>
-	</array>
-	<key>NSCalendarsUsageDescription</key>
-	<string>We need access to your calendar to add Be 4 Africa events and meeting reminders to your personal calendar.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>We need camera access to allow you to take photos for your profile or to scan QR codes at embassy events.</string>
-	<key>NSContactsUsageDescription</key>
-	<string>We need access to your contacts to help you share embassy information with others.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We use your location to show nearby embassies, events, and relevant local information.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>We need permission to save photos from the app to your photo library.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to allow you to select photos for your profile.</string>
-	<!--
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>zoommtg</string>
+			<string>zoomus</string>
+			<string>msteams</string>
+			<string>webex</string>
+			<string>webexstart</string>
+			<string>https</string>
+			<string>http</string>
+			<string>tel</string>
+			<string>mailto</string>
+		</array>
+		<key>NSCalendarsUsageDescription</key>
+		<string>We need access to your calendar to add Be 4 Africa events and meeting reminders to your personal calendar.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>We need camera access to allow you to take photos for your profile or to scan QR codes at embassy events.</string>
+		<key>NSContactsUsageDescription</key>
+		<string>We need access to your contacts to help you share embassy information with others.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>We use your location to show nearby embassies, events, and relevant local information.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>We need permission to save photos from the app to your photo library.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>We need access to your photo library to allow you to select photos for your profile.</string>
+		<!--
 		Certificate pinning removed. iOS NSPinnedDomains has no expiration
 		mechanism (unlike Android's pin-set), so a CA rotation would brick
 		all iOS users until an App Store update ships. The Dart client
@@ -85,28 +85,30 @@
 		Android retains its pin-set with expiration="2027-06-01" as a
 		graceful-degradation safety net.
 	-->
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-</dict>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+		</array>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UIStatusBarHidden</key>
+		<false/>
+	</dict>
 </plist>

@@ -795,6 +795,7 @@ def firebase_register(request):
                 'status': 'pending_verification',
                 'requires_email_verification': True,
                 'message': 'Please verify your email to complete registration',
+                'user': None,  # Backward compat: old app versions expect this key
             }, status=status.HTTP_200_OK)
 
         # Social login (email already verified) — create user immediately
@@ -913,6 +914,7 @@ def firebase_login(request):
                             'status': 'pending_verification',
                             'requires_email_verification': True,
                             'message': 'Please verify your email to complete registration',
+                            'user': None,
                         })
                     return Response(
                         {'detail': 'User not registered'},

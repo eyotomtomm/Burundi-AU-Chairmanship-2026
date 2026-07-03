@@ -984,7 +984,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Store user data in SharedPreferences
-  Future<void> _storeUserData(Map<String, dynamic> user) async {
+  Future<void> _storeUserData(dynamic userData) async {
+    if (userData == null || userData is! Map<String, dynamic>) return;
+    final user = userData;
     final prefs = await SharedPreferences.getInstance();
 
     final uid = user['id'] as int?;

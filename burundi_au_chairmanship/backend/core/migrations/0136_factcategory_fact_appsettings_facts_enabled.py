@@ -9,10 +9,18 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='appsettings',
-            name='facts_enabled',
-            field=models.BooleanField(default=True, help_text='Show Facts & Quotes section in the app'),
+        # Use RunSQL with IF NOT EXISTS because the column may already
+        # exist in production (added before the migration was tracked).
+        migrations.RunSQL(
+            sql="ALTER TABLE core_appsettings ADD COLUMN IF NOT EXISTS facts_enabled boolean DEFAULT true NOT NULL;",
+            reverse_sql="ALTER TABLE core_appsettings DROP COLUMN IF EXISTS facts_enabled;",
+            state_operations=[
+                migrations.AddField(
+                    model_name='appsettings',
+                    name='facts_enabled',
+                    field=models.BooleanField(default=True, help_text='Show Facts & Quotes section in the app'),
+                ),
+            ],
         ),
         migrations.CreateModel(
             name='FactCategory',

@@ -9,6 +9,7 @@ from core.models import (
     QuickAccessMenuItem, WeatherCity, HeroTextContent, Notification,
     FeatureCardKeyPoint, FeatureCardImpactArea,
     EventRegistration, RegistrationFormField,
+    EmergencyContact,
 )
 
 
@@ -1076,5 +1077,32 @@ class Command(BaseCommand):
                 for ff in form_fields_data:
                     RegistrationFormField.objects.create(event_registration=er, **ff)
         self.stdout.write(f'  {len(event_registrations)} Event Registrations created (with form fields)')
+
+        # ── SOS Quick Access Item ──────────────────────────────────
+        QuickAccessMenuItem.objects.get_or_create(
+            title_en='SOS',
+            defaults={
+                'title_fr': 'SOS',
+                'icon_name': 'sos',
+                'action_type': 'route',
+                'action_value': '/emergency',
+                'order': 8,
+                'is_active': True,
+                'badge_text': '',
+                'badge_color': '#E53935',
+            },
+        )
+        self.stdout.write('  SOS Quick Access item created')
+
+        # ── Emergency Contacts ────────────────────────────────────
+        emergency_contacts = [
+            {'name_en': 'Police', 'name_fr': 'Police', 'description_en': 'National Police', 'description_fr': 'Police Nationale', 'icon_name': 'local_police', 'category': 'police', 'action_type': 'call', 'contact_value': '117', 'color': '#1565C0', 'order': 1},
+            {'name_en': 'Fire Department', 'name_fr': 'Pompiers', 'description_en': 'Fire & Rescue', 'description_fr': 'Secours incendie', 'icon_name': 'local_fire_department', 'category': 'fire', 'action_type': 'call', 'contact_value': '118', 'color': '#E53935', 'order': 2},
+            {'name_en': 'Ambulance', 'name_fr': 'Ambulance', 'description_en': 'Emergency Medical', 'description_fr': 'Urgences médicales', 'icon_name': 'medical_services', 'category': 'medical', 'action_type': 'call', 'contact_value': '115', 'color': '#2E7D32', 'order': 3},
+            {'name_en': 'App Support', 'name_fr': 'Assistance', 'description_en': 'In-app support', 'description_fr': 'Assistance dans l\'app', 'icon_name': 'support_agent', 'category': 'support', 'action_type': 'route', 'contact_value': '/support', 'color': '#6A1B9A', 'order': 4},
+        ]
+        for ec in emergency_contacts:
+            EmergencyContact.objects.get_or_create(name_en=ec['name_en'], defaults=ec)
+        self.stdout.write(f'  {len(emergency_contacts)} Emergency Contacts created')
 
         self.stdout.write(self.style.SUCCESS('\nAll data seeded successfully!'))

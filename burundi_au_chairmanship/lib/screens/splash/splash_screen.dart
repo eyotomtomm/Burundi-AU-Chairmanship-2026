@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 import '../../config/app_colors.dart';
@@ -61,6 +62,8 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _startAnimations() async {
+    FlutterNativeSplash.remove();
+
     // Start animations immediately — frame 0 is invisible (opacity 0, scale 0.85)
     _fadeController.forward();
     _scaleController.forward();

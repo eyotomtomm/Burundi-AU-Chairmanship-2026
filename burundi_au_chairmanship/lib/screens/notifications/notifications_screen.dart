@@ -84,31 +84,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   }
 
   Future<void> _markAllAsRead() async {
+    // Optimistic update — clear dots immediately, sync to server in background.
+    // If the API call fails the visual state is still correct for this session;
+    // the next fetch will bring the server state back.
+    setState(() {
+      for (final n in _notifications) {
+        n['is_read'] = true;
+      }
+    });
     try {
       await _apiService.markAllNotificationsAsRead();
-      // Update local state so cards look read
-      setState(() {
-        for (final n in _notifications) {
-          n['is_read'] = true;
-        }
-      });
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to mark all notifications as read: $e');
     }
   }
 
   Future<void> _markAsRead(int notificationId) async {
+    // Optimistic update — remove the dot before the server round-trip.
+    setState(() {
+      final index = _notifications.indexWhere((n) => n['id'] == notificationId);
+      if (index != -1) {
+        _notifications[index]['is_read'] = true;
+      }
+    });
     try {
       await _apiService.post('notifications/$notificationId/mark-as-read/', {});
-      // Update local state
-      setState(() {
-        final index = _notifications.indexWhere((n) => n['id'] == notificationId);
-        if (index != -1) {
-          _notifications[index]['is_read'] = true;
-        }
-      });
     } catch (e) {
-      // Silently fail - not critical
       if (kDebugMode) debugPrint('Failed to mark notification as read: $e');
     }
   }

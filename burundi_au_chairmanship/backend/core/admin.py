@@ -16,6 +16,7 @@ from .models import (
     UserSession, LinkedAccount,
     YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
     DeviceBan, ProfanityStrikeLog,
+    EmergencyContact,
 )
 
 
@@ -425,6 +426,42 @@ class QuickAccessAdmin(admin.ModelAdmin):
                 ('has_live_indicator', 'badge_text'),
             ],
             'classes': ('collapse',),
+        }),
+    )
+
+
+@admin.register(EmergencyContact)
+class EmergencyContactAdmin(admin.ModelAdmin):
+    """
+    EMERGENCY CONTACTS - SOS screen contacts
+
+    HELP:
+    These are the emergency contacts displayed on the SOS screen.
+    Users reach this screen via the SOS quick access menu item.
+
+    HOW TO USE:
+    1. Set the name (shown on the contact card)
+    2. Choose a category (police, fire, medical, etc.)
+    3. Set the action type (call, WhatsApp, SMS, URL, or in-app route)
+    4. Set the contact value (phone number, link, or route)
+    5. Set the order to control position
+    6. Check "is active" to show/hide
+    """
+    list_display = ['name_en', 'category', 'action_type', 'contact_value', 'order', 'is_active']
+    list_editable = ['order', 'is_active']
+    list_filter = ['category', 'is_active']
+    search_fields = ['name_en', 'name_fr']
+
+    fieldsets = (
+        ('Contact Info', {
+            'fields': [
+                ('name_en', 'name_fr'),
+                ('description_en', 'description_fr'),
+                'icon_name',
+                ('category', 'action_type'),
+                'contact_value',
+                ('color', 'order', 'is_active'),
+            ],
         }),
     )
 

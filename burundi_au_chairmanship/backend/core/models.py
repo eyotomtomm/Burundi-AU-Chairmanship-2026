@@ -1589,6 +1589,7 @@ class AppSettings(models.Model):
     discussions_enabled = models.BooleanField(default=True, help_text='Show Discussions feature in the app')
     polls_enabled = models.BooleanField(default=True, help_text='Show Polls feature in the app')
     newsletter_enabled = models.BooleanField(default=True, help_text='Show Weekly Newsletter toggle in the app')
+    facts_enabled = models.BooleanField(default=True, help_text='Show Facts & Quotes section in the app')
 
     # Home countdown (shown next to greeting)
     countdown_target_date = models.DateTimeField(null=True, blank=True, help_text='Target date/time for the home screen countdown')
@@ -1631,6 +1632,64 @@ class AppSettings(models.Model):
 
     def __str__(self):
         return f"App Settings ({self.summit_year})"
+
+
+class FactCategory(models.Model):
+    """Categories for facts & quotes (e.g. Burundi, African Union, Pan-Africanism)."""
+    name = models.CharField(max_length=100)
+    name_fr = models.CharField(max_length=100, blank=True)
+    icon_name = models.CharField(max_length=50, blank=True, help_text='Material icon name')
+    color = models.CharField(max_length=10, default='#1EB53A')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Fact Category'
+        verbose_name_plural = 'Fact Categories'
+
+    def __str__(self):
+        return self.name
+
+
+class Fact(models.Model):
+    """Facts and quotes about Burundi, the AU, and Africa."""
+    FACT_TYPE_CHOICES = [
+        ('fact', 'Fact'),
+        ('quote', 'Quote'),
+    ]
+
+    title = models.CharField(max_length=300)
+    title_fr = models.CharField(max_length=300, blank=True)
+    content = models.TextField()
+    content_fr = models.TextField(blank=True)
+    category = models.ForeignKey(FactCategory, on_delete=models.PROTECT, related_name='facts')
+    fact_type = models.CharField(max_length=10, choices=FACT_TYPE_CHOICES, default='fact')
+
+    # For facts
+    source = models.CharField(max_length=300, blank=True)
+    source_fr = models.CharField(max_length=300, blank=True)
+
+    # For quotes
+    author_name = models.CharField(max_length=200, blank=True)
+    author_title = models.CharField(max_length=300, blank=True)
+    author_title_fr = models.CharField(max_length=300, blank=True)
+
+    image = models.ImageField(upload_to='facts/', blank=True)
+    is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False, help_text='Show on home screen carousel')
+    status = models.CharField(max_length=20, choices=CONTENT_STATUS_CHOICES, default='published')
+    order = models.IntegerField(default=0)
+    view_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return f"[{self.get_fact_type_display()}] {self.title}"
 
 
 class PriorityAgenda(models.Model):
@@ -1998,6 +2057,45 @@ class QuickAccessMenuItem(models.Model):
 
     def __str__(self):
         return self.title_en
+
+
+class EmergencyContact(models.Model):
+    """Emergency contacts displayed on the SOS screen"""
+    CATEGORY_CHOICES = [
+        ('police', 'Police'),
+        ('fire', 'Fire'),
+        ('medical', 'Medical'),
+        ('support', 'Customer Support'),
+        ('other', 'Other'),
+    ]
+    ACTION_TYPE_CHOICES = [
+        ('call', 'Phone Call'),
+        ('whatsapp', 'WhatsApp'),
+        ('sms', 'SMS'),
+        ('url', 'Website / Link'),
+        ('route', 'In-App Route'),
+    ]
+
+    name_en = models.CharField(max_length=100)
+    name_fr = models.CharField(max_length=100, blank=True)
+    description_en = models.CharField(max_length=200, blank=True)
+    description_fr = models.CharField(max_length=200, blank=True)
+    icon_name = models.CharField(max_length=50, default='phone')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+    action_type = models.CharField(max_length=20, choices=ACTION_TYPE_CHOICES, default='call')
+    contact_value = models.CharField(max_length=200, help_text='Phone number, WhatsApp link, URL, or app route')
+    color = models.CharField(max_length=10, default='#E53935', help_text='Card accent color (hex)')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Emergency Contact'
+        verbose_name_plural = 'Emergency Contacts'
+
+    def __str__(self):
+        return self.name_en
 
 
 class OTPVerification(models.Model):
@@ -4615,6 +4713,11 @@ class YouthDialogueEvent(models.Model):
     privacy_policy = models.TextField(blank=True, default='',
                                        help_text='Privacy policy text shown before application (EN)')
     privacy_policy_fr = models.TextField(blank=True, default='')
+
+    # Sponsors / Partners
+    sponsors_image = models.ImageField(upload_to='youth_dialogue/sponsors/', blank=True, null=True,
+                                        validators=[validate_image_file],
+                                        help_text='Single merged image showing all sponsor/partner logos')
 
     # Configurable required documents for applicants
     required_documents = models.JSONField(

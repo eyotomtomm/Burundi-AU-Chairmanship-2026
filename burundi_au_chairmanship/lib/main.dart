@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
@@ -63,6 +64,7 @@ import 'screens/youth_dialogue/youth_dialogue_credential_screen.dart';
 import 'screens/maintenance/maintenance_screen.dart';
 import 'screens/scanner/qr_scanner_screen.dart';
 import 'screens/scanner/yd_scan_history_screen.dart';
+import 'screens/emergency/emergency_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -241,7 +243,8 @@ Future<Map<String, String>> _getDeviceInfo() async {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   await _initializeApp();
 
@@ -392,6 +395,7 @@ class BurundiAUApp extends StatelessWidget {
                 '/youth-dialogue-credential': (context) => const YouthDialogueCredentialScreen(),
                 '/qr-scanner': (context) => const QrScannerScreen(),
                 '/yd-scan-history': (context) => const YdScanHistoryScreen(),
+                '/emergency': (context) => const EmergencyScreen(),
               };
 
               // Handle maintenance route with arguments

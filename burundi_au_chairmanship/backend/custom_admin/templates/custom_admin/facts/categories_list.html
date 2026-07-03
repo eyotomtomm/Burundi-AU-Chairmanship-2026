@@ -1,0 +1,82 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'custom_admin:facts_list' %}" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors">
+            <span class="material-symbols-outlined text-xl text-on-surface-variant">arrow_back</span>
+        </a>
+        <span class="material-symbols-outlined text-3xl text-amber-600">folder</span>
+        <h1 class="text-2xl font-headline font-bold text-on-surface">Fact Categories</h1>
+    </div>
+    <a href="{% url 'custom_admin:fact_category_create' %}" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-medium rounded-lg py-2.5 px-5 hover:bg-emerald-700 transition-colors">
+        <span class="material-symbols-outlined text-lg">add</span>
+        Add Category
+    </a>
+</div>
+
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+            <tr>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Name</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">French Name</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Icon</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Color</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Facts</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Order</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Active</th>
+                <th class="text-right py-3 px-4 font-medium text-on-surface-variant">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+            {% for cat in categories %}
+            <tr class="hover:bg-surface-container-low transition-colors">
+                <td class="py-3 px-4 font-medium text-on-surface">{{ cat.name }}</td>
+                <td class="py-3 px-4 text-on-surface-variant">{{ cat.name_fr|default:'-' }}</td>
+                <td class="py-3 px-4">
+                    {% if cat.icon_name %}
+                    <span class="material-symbols-outlined text-lg" style="color: {{ cat.color }}">{{ cat.icon_name }}</span>
+                    {% else %}-{% endif %}
+                </td>
+                <td class="py-3 px-4">
+                    <div class="flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full border border-outline-variant" style="background: {{ cat.color }}"></span>
+                        <span class="text-xs text-on-surface-variant">{{ cat.color }}</span>
+                    </div>
+                </td>
+                <td class="py-3 px-4 text-center">{{ cat.fact_count }}</td>
+                <td class="py-3 px-4 text-center text-on-surface-variant">{{ cat.order }}</td>
+                <td class="py-3 px-4 text-center">
+                    {% if cat.is_active %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 px-4 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <a href="{% url 'custom_admin:fact_category_edit' cat.pk %}" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Edit">
+                            <span class="material-symbols-outlined text-lg text-blue-600">edit</span>
+                        </a>
+                        <form method="post" action="{% url 'custom_admin:fact_category_delete' cat.pk %}" class="inline" onsubmit="return confirm('Delete this category?')">
+                            {% csrf_token %}
+                            <button type="submit" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Delete">
+                                <span class="material-symbols-outlined text-lg text-red-600">delete</span>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="py-12 text-center text-on-surface-variant">
+                    <span class="material-symbols-outlined text-4xl mb-2 block">folder_open</span>
+                    No categories yet. Create your first one!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

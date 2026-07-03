@@ -40,6 +40,9 @@ import '../widgets/support_options_modal.dart';
 import '../widgets/hero_slideshow.dart';
 import '../widgets/feature_cards_section.dart';
 import '../widgets/priority_agendas_section.dart';
+import '../widgets/facts_section.dart';
+import '../../facts/facts_list_screen.dart';
+import '../../../models/fact_model.dart';
 import '../../scanner/qr_scanner_screen.dart';
 import '../../youth_dialogue/youth_dialogue_main_screen.dart';
 import '../../../widgets/login_gate.dart';
@@ -75,6 +78,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   List<Map<String, dynamic>>? _apiPriorityAgendas;
   List<EventRegistrationModel>? _apiEventCards;
   List<MagazineEdition>? _apiMagazines;
+  List<Fact>? _apiFacts;
   Map<String, String>? _heroTextContent;
   List<Map<String, dynamic>>? _quickAccessItems;
   int _unreadBadgeCount = 0;
@@ -139,7 +143,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     // is available (it depends on inherited widgets that aren't ready in initState).
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
     _loadUnreadCount();
-    _loadAnnouncementBanners();
+    _loadDismissedAnnouncementIds().then((_) => _loadAnnouncementBanners());
     _loadTrendingContent();
     _startHeroAutoSlide();
     _startFeatureAutoSlide();
@@ -211,6 +215,26 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  static const String _dismissedAnnouncementsKey = 'dismissed_announcement_ids';
+
+  Future<void> _loadDismissedAnnouncementIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList(_dismissedAnnouncementsKey) ?? [];
+      _dismissedAnnouncementIds.addAll(saved.map(int.parse));
+    } catch (_) {}
+  }
+
+  Future<void> _saveDismissedAnnouncementIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        _dismissedAnnouncementsKey,
+        _dismissedAnnouncementIds.map((id) => id.toString()).toList(),
+      );
+    } catch (_) {}
+  }
+
   Future<void> _loadAnnouncementBanners() async {
     try {
       final banners = await ApiService().getAnnouncementBanners();
@@ -219,7 +243,11 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       // add any new ones, and remove ones the backend deactivated.
       final newIds = banners.map((b) => b['id']).toSet();
       // Remove dismissed IDs that no longer exist in the API response
+      final sizeBefore = _dismissedAnnouncementIds.length;
       _dismissedAnnouncementIds.removeWhere((id) => !newIds.contains(id));
+      if (_dismissedAnnouncementIds.length != sizeBefore) {
+        _saveDismissedAnnouncementIds();
+      }
       setState(() => _announcementBanners = banners);
     } catch (_) {}
   }
@@ -406,6 +434,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         .map((j) => EventRegistrationModel.fromJson(j as Map<String, dynamic>)).toList();
     final magazines = (homeFeed['magazines'] as List<dynamic>? ?? [])
         .map((j) => MagazineEdition.fromJson(j as Map<String, dynamic>)).toList();
+    final facts = (homeFeed['facts'] as List<dynamic>? ?? [])
+        .map((j) => Fact.fromJson(j as Map<String, dynamic>)).toList();
 
     final settingsData = homeFeed['settings'] as Map<String, dynamic>? ?? {};
     _cacheFeatureFlags(settingsData);
@@ -425,6 +455,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
           return (a.eventDate ?? DateTime(2099)).compareTo(b.eventDate ?? DateTime(2099));
         });
       _apiMagazines = magazines;
+      _apiFacts = facts;
       _heroTextContent = heroTextMap;
       _quickAccessItems = quickAccessMenu;
       _isLoading = false;
@@ -471,6 +502,11 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       'translate': Icons.translate_rounded, 'cloud': Icons.cloud_rounded,
       'calendar_month': Icons.calendar_month_rounded,
       'live_tv': Icons.live_tv, 'menu_book': Icons.menu_book,
+      'sos': Icons.sos, 'local_police': Icons.local_police,
+      'local_fire_department': Icons.local_fire_department,
+      'medical_services': Icons.medical_services,
+      'support_agent': Icons.support_agent,
+      'emergency': Icons.emergency, 'phone': Icons.phone,
     };
     return iconMap[iconName] ?? Icons.stars;
   }
@@ -528,9 +564,12 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       key: ValueKey('banner_${b['id']}'),
                       banner: b,
                       langCode: langCode,
-                      onDismiss: () => setState(() {
-                        if (b['id'] != null) _dismissedAnnouncementIds.add(b['id'] as int);
-                      }),
+                      onDismiss: () {
+                        if (b['id'] != null) {
+                          setState(() => _dismissedAnnouncementIds.add(b['id'] as int));
+                          _saveDismissedAnnouncementIds();
+                        }
+                      },
                     ),
                   )),
           if (_showProfilePrompt && !_profilePromptDismissed && isAuth)
@@ -659,6 +698,31 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                     },
                   );
                 }),
+              ),
+            ),
+          ],
+          if (_apiFacts != null && _apiFacts!.isNotEmpty && _appSettings?['facts_enabled'] == true) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+                child: SectionTitle(
+                  title: langCode == 'fr' ? 'Faits & Citations' : 'Facts & Quotes',
+                  showSeeAll: true,
+                  onSeeAll: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const FactsListScreen())),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 170,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _apiFacts!.length,
+                  itemBuilder: (context, index) {
+                    return FactCard(fact: _apiFacts![index], langCode: langCode);
+                  },
+                ),
               ),
             ),
           ],

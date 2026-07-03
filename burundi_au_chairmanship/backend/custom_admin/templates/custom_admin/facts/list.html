@@ -1,0 +1,197 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-3xl text-amber-600">lightbulb</span>
+        <h1 class="text-2xl font-headline font-bold text-on-surface">Facts & Quotes</h1>
+    </div>
+    <div class="flex gap-2">
+        <a href="{% url 'custom_admin:fact_categories_list' %}" class="inline-flex items-center gap-2 bg-surface-container text-on-surface font-medium rounded-lg py-2.5 px-5 hover:bg-surface-container-high transition-colors border border-outline-variant">
+            <span class="material-symbols-outlined text-lg">folder</span>
+            Categories
+        </a>
+        <a href="{% url 'custom_admin:fact_create' %}" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-medium rounded-lg py-2.5 px-5 hover:bg-emerald-700 transition-colors">
+            <span class="material-symbols-outlined text-lg">add</span>
+            Add New
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl p-4 border border-outline-variant">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl text-blue-600">database</span>
+            <div>
+                <div class="text-2xl font-bold text-on-surface">{{ total }}</div>
+                <div class="text-sm text-on-surface-variant">Total</div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl p-4 border border-outline-variant">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl text-amber-600">lightbulb</span>
+            <div>
+                <div class="text-2xl font-bold text-on-surface">{{ facts_count }}</div>
+                <div class="text-sm text-on-surface-variant">Facts</div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl p-4 border border-outline-variant">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl text-violet-600">format_quote</span>
+            <div>
+                <div class="text-2xl font-bold text-on-surface">{{ quotes_count }}</div>
+                <div class="text-sm text-on-surface-variant">Quotes</div>
+            </div>
+        </div>
+    </div>
+    <div class="bg-white rounded-xl p-4 border border-outline-variant">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-2xl text-emerald-600">star</span>
+            <div>
+                <div class="text-2xl font-bold text-on-surface">{{ featured_count }}</div>
+                <div class="text-sm text-on-surface-variant">Featured</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl p-4 border border-outline-variant mb-6">
+    <form method="get" class="flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-medium text-on-surface-variant mb-1">Type</label>
+            <select name="type" class="rounded-lg border-outline-variant text-sm py-2 px-3 bg-surface-container-low">
+                <option value="">All Types</option>
+                <option value="fact" {% if type_filter == 'fact' %}selected{% endif %}>Facts</option>
+                <option value="quote" {% if type_filter == 'quote' %}selected{% endif %}>Quotes</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-on-surface-variant mb-1">Category</label>
+            <select name="category" class="rounded-lg border-outline-variant text-sm py-2 px-3 bg-surface-container-low">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat.pk }}" {% if category_filter == cat.pk|stringformat:"d" %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-on-surface-variant mb-1">Status</label>
+            <select name="status" class="rounded-lg border-outline-variant text-sm py-2 px-3 bg-surface-container-low">
+                <option value="">All Status</option>
+                <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Published</option>
+                <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archived</option>
+            </select>
+        </div>
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-medium text-on-surface-variant mb-1">Search</label>
+            <input type="text" name="search" value="{{ search }}" placeholder="Search title, content, author..."
+                class="w-full rounded-lg border-outline-variant text-sm py-2 px-3">
+        </div>
+        <button type="submit" class="inline-flex items-center gap-1 bg-blue-600 text-white rounded-lg py-2 px-4 text-sm hover:bg-blue-700">
+            <span class="material-symbols-outlined text-lg">filter_list</span> Filter
+        </button>
+        <a href="{% url 'custom_admin:facts_list' %}" class="text-sm text-on-surface-variant hover:text-on-surface">Clear</a>
+    </form>
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+            <tr>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Title</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Type</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Category</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Status</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Featured</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Views</th>
+                <th class="text-right py-3 px-4 font-medium text-on-surface-variant">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+            {% for fact in facts %}
+            <tr class="hover:bg-surface-container-low transition-colors {% if not fact.is_active %}opacity-50{% endif %}">
+                <td class="py-3 px-4">
+                    <div class="font-medium text-on-surface max-w-xs truncate">{{ fact.title }}</div>
+                    {% if fact.author_name %}<div class="text-xs text-on-surface-variant">{{ fact.author_name }}</div>{% endif %}
+                </td>
+                <td class="py-3 px-4">
+                    {% if fact.fact_type == 'quote' %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
+                        <span class="material-symbols-outlined text-xs">format_quote</span> Quote
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                        <span class="material-symbols-outlined text-xs">lightbulb</span> Fact
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="py-3 px-4">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style="background: {{ fact.category.color }}20; color: {{ fact.category.color }}">
+                        {{ fact.category.name }}
+                    </span>
+                </td>
+                <td class="py-3 px-4">
+                    {% if fact.status == 'published' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Published</span>
+                    {% elif fact.status == 'draft' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Draft</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600">{{ fact.get_status_display }}</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 px-4 text-center">
+                    {% if fact.is_featured %}<span class="material-symbols-outlined text-amber-500">star</span>{% else %}<span class="text-gray-300">-</span>{% endif %}
+                </td>
+                <td class="py-3 px-4 text-center text-on-surface-variant">{{ fact.view_count }}</td>
+                <td class="py-3 px-4 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <a href="{% url 'custom_admin:fact_edit' fact.pk %}" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Edit">
+                            <span class="material-symbols-outlined text-lg text-blue-600">edit</span>
+                        </a>
+                        <form method="post" action="{% url 'custom_admin:fact_toggle_active' fact.pk %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="{% if fact.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                <span class="material-symbols-outlined text-lg {% if fact.is_active %}text-emerald-600{% else %}text-gray-400{% endif %}">{% if fact.is_active %}visibility{% else %}visibility_off{% endif %}</span>
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'custom_admin:fact_delete' fact.pk %}" class="inline" onsubmit="return confirm('Delete this item?')">
+                            {% csrf_token %}
+                            <button type="submit" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Delete">
+                                <span class="material-symbols-outlined text-lg text-red-600">delete</span>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="py-12 text-center text-on-surface-variant">
+                    <span class="material-symbols-outlined text-4xl mb-2 block">lightbulb</span>
+                    No facts or quotes yet. Create your first one!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page.has_other_pages %}
+<div class="flex justify-center mt-6 gap-2">
+    {% if page.has_previous %}
+    <a href="?page={{ page.previous_page_number }}&type={{ type_filter }}&category={{ category_filter }}&status={{ status_filter }}&search={{ search }}"
+       class="px-3 py-1.5 rounded-lg border border-outline-variant text-sm hover:bg-surface-container">Previous</a>
+    {% endif %}
+    <span class="px-3 py-1.5 text-sm text-on-surface-variant">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+    <a href="?page={{ page.next_page_number }}&type={{ type_filter }}&category={{ category_filter }}&status={{ status_filter }}&search={{ search }}"
+       class="px-3 py-1.5 rounded-lg border border-outline-variant text-sm hover:bg-surface-container">Next</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

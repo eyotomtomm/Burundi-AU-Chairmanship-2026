@@ -70,6 +70,12 @@ class FirebaseAuthService {
   /// Throws FirebaseAuthException if signin fails
   Future<UserCredential> signInWithGoogle() async {
     try {
+      // Clear any stale session state from a previous install or sign-in
+      // attempt. Without this, the first signIn() call on a fresh app
+      // session can return null on both Android and iOS even though the
+      // OS-level Google account picker showed "Signed in".
+      try { await _googleSignIn.signOut(); } catch (_) {}
+
       // 1. Trigger Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 

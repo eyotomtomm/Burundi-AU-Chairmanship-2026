@@ -323,6 +323,36 @@ abstract class AppLocalizationsGenerated {
   /// **'Latest News'**
   String get latest_news;
 
+  /// No description provided for @facts_and_quotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Facts & Quotes'**
+  String get facts_and_quotes;
+
+  /// No description provided for @facts.
+  ///
+  /// In en, this message translates to:
+  /// **'Facts'**
+  String get facts;
+
+  /// No description provided for @quotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotes'**
+  String get quotes;
+
+  /// No description provided for @all_facts.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get all_facts;
+
+  /// No description provided for @fact_source.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get fact_source;
+
   /// No description provided for @upcoming_events.
   ///
   /// In en, this message translates to:

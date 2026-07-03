@@ -157,7 +157,7 @@ class QuickAccessGrid extends StatelessWidget {
                     color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

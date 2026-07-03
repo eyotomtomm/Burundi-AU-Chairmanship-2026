@@ -171,18 +171,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Check and show promotional splash screen
+  /// Check and show promotional splash screen (round-robin rotation).
   Future<void> _checkPromotionalSplash() async {
     try {
-      final splash = await ApiService().getActivePromotionalSplash();
-      if (splash == null || !mounted) return;
+      final splashes = await ApiService().getAllActivePromotionalSplashes();
+      if (splashes.isEmpty || !mounted) return;
 
-      // Check show_once via SharedPreferences
-      if (splash['show_once'] == true) {
-        final prefs = await SharedPreferences.getInstance();
-        final seenKey = 'seen_splash_${splash['id']}';
-        if (prefs.getBool(seenKey) == true) return;
-        await prefs.setBool(seenKey, true);
+      final prefs = await SharedPreferences.getInstance();
+
+      // Filter out show_once splashes that have already been seen
+      final eligible = splashes.where((s) {
+        if (s['show_once'] == true) {
+          return prefs.getBool('seen_splash_${s['id']}') != true;
+        }
+        return true;
+      }).toList();
+
+      if (eligible.isEmpty || !mounted) return;
+
+      // Round-robin: find the next splash after the last shown one
+      final lastShownId = prefs.getInt('last_shown_splash_id');
+      Map<String, dynamic> chosen;
+
+      if (lastShownId == null) {
+        chosen = eligible.first;
+      } else {
+        final lastIndex = eligible.indexWhere((s) => s['id'] == lastShownId);
+        if (lastIndex == -1 || lastIndex == eligible.length - 1) {
+          // Not found or was the last item → wrap to first
+          chosen = eligible.first;
+        } else {
+          chosen = eligible[lastIndex + 1];
+        }
+      }
+
+      // Save the chosen splash ID for next rotation
+      await prefs.setInt('last_shown_splash_id', chosen['id']);
+
+      // Mark show_once splashes as seen
+      if (chosen['show_once'] == true) {
+        await prefs.setBool('seen_splash_${chosen['id']}', true);
       }
 
       if (!mounted) return;
@@ -191,9 +219,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       await PromotionalSplashOverlay.show(
         context: context,
-        splash: splash,
+        splash: chosen,
         languageCode: languageCode,
       );
+
+      // Track the view for the splash that was actually shown
+      ApiService().trackPromotionalSplashView(chosen['id']);
     } catch (e) {
       if (kDebugMode) print('Promotional splash check failed: $e');
     }

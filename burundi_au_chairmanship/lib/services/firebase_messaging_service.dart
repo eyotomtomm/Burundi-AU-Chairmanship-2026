@@ -1,11 +1,15 @@
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_constants.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/deep_link_router.dart';
 import '../widgets/in_app_notification_banner.dart';
@@ -313,6 +317,12 @@ class FirebaseMessagingService {
       _processedMessageIds.remove(_processedMessageIds.first);
     }
 
+    // If the push signals a verification status change, auto-refresh the
+    // user profile so the badge/status updates immediately without a restart.
+    if (message.data['type'] == 'verification_status_changed') {
+      _refreshAuthProfile();
+    }
+
     // Extract title/body from notification payload or data payload as fallback
     final notification = message.notification;
     final title = notification?.title ?? message.data['title'] as String? ?? '';
@@ -337,6 +347,27 @@ class FirebaseMessagingService {
     // Also show a system-level notification (appears in notification tray)
     try {
       final notificationId = messageId.hashCode.abs() % 2147483647;
+
+      // Resolve image URL: FCM notification payload → data payload fallback
+      final imageUrl = notification?.android?.imageUrl ??
+          notification?.apple?.imageUrl ??
+          message.data['image_url'] as String?;
+
+      // Download the image once for both BigPictureStyle and largeIcon
+      Uint8List? imageBytes;
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        try {
+          final response = await http.get(Uri.parse(imageUrl)).timeout(
+            const Duration(seconds: 5),
+          );
+          if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+            imageBytes = response.bodyBytes;
+          }
+        } catch (e) {
+          if (kDebugMode) print('Failed to download notification image: $e');
+        }
+      }
+
       await _localNotifications.show(
         id: notificationId,
         title: title,
@@ -351,6 +382,17 @@ class FirebaseMessagingService {
             icon: '@mipmap/ic_launcher',
             enableVibration: true,
             playSound: true,
+            largeIcon: imageBytes != null
+                ? ByteArrayAndroidBitmap(imageBytes)
+                : null,
+            styleInformation: imageBytes != null
+                ? BigPictureStyleInformation(
+                    ByteArrayAndroidBitmap(imageBytes),
+                    contentTitle: title,
+                    summaryText: body,
+                    hideExpandedLargeIcon: true,
+                  )
+                : null,
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,
@@ -365,6 +407,24 @@ class FirebaseMessagingService {
       }
     } catch (e) {
       if (kDebugMode) print('Failed to show local notification: $e');
+    }
+  }
+
+  /// Refresh the AuthProvider profile from the backend.
+  ///
+  /// Used when a server-side event (e.g. verification approval) means the
+  /// locally cached profile is stale. Accesses AuthProvider via the navigator
+  /// context so it works without a direct Provider dependency.
+  void _refreshAuthProfile() {
+    try {
+      final ctx = navigatorKey?.currentContext;
+      if (ctx != null) {
+        final authProvider =
+            Provider.of<AuthProvider>(ctx, listen: false);
+        authProvider.refreshProfile();
+      }
+    } catch (e) {
+      if (kDebugMode) print('Auto-refresh profile failed: $e');
     }
   }
 

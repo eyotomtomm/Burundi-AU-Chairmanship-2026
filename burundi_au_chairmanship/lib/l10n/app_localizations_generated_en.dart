@@ -120,6 +120,21 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   String get latest_news => 'Latest News';
 
   @override
+  String get facts_and_quotes => 'Facts & Quotes';
+
+  @override
+  String get facts => 'Facts';
+
+  @override
+  String get quotes => 'Quotes';
+
+  @override
+  String get all_facts => 'All';
+
+  @override
+  String get fact_source => 'Source';
+
+  @override
   String get upcoming_events => 'Upcoming Events';
 
   @override

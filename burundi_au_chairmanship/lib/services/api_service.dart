@@ -13,6 +13,7 @@ import '../models/api_models.dart';
 import '../models/magazine_model.dart';
 import '../models/event_registration_model.dart';
 import '../models/location_model.dart';
+import '../models/fact_model.dart';
 import 'pinned_http_client.dart';
 
 /// Wraps a single page of results from a paginated DRF response.
@@ -1119,6 +1120,12 @@ class ApiService {
     return _extractResults(data).cast<Map<String, dynamic>>();
   }
 
+  // ── Emergency Contacts ──────────────────────────────────
+  Future<List<Map<String, dynamic>>> getEmergencyContacts() async {
+    final data = await _get('emergency-contacts/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
   // ── Search ───────────────────────────────────────────────
   Future<List<Article>> searchArticles(String query, String language) async {
     final encodedQuery = Uri.encodeComponent(query);
@@ -1736,6 +1743,22 @@ class ApiService {
     return data['splash'];
   }
 
+  Future<List<Map<String, dynamic>>> getAllActivePromotionalSplashes() async {
+    final data = await _get('promotional-splash/active/');
+    final splashes = data['splashes'];
+    if (splashes is List) {
+      return splashes.cast<Map<String, dynamic>>();
+    }
+    // Fallback for old backend versions that don't return 'splashes'
+    final splash = data['splash'];
+    if (splash != null) return [splash as Map<String, dynamic>];
+    return [];
+  }
+
+  Future<void> trackPromotionalSplashView(int id) async {
+    await _post('promotional-splash/$id/view/', {});
+  }
+
   Future<void> trackPromotionalSplashClick(int id) async {
     await _post('promotional-splash/$id/click/', {});
   }
@@ -1841,6 +1864,33 @@ class ApiService {
   Future<List<dynamic>> youthDialogueScanHistory() async {
     final data = await _get('youth-dialogue/scan-history/', auth: true);
     return data['results'] as List<dynamic>? ?? [];
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  FACTS & QUOTES
+  // ═══════════════════════════════════════════════════════════
+
+  Future<List<FactCategory>> getFactCategories() async {
+    final data = await _get('fact-categories/');
+    final results = data is List ? data : (data['results'] as List<dynamic>? ?? []);
+    return results.map((j) => FactCategory.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<Fact>> getFacts({int? category, String? factType, bool? featured}) async {
+    final params = <String, String>{};
+    if (category != null) params['category'] = category.toString();
+    if (factType != null) params['type'] = factType;
+    if (featured == true) params['featured'] = 'true';
+    final query = params.entries.map((e) => '${e.key}=${e.value}').join('&');
+    final url = 'facts/${query.isNotEmpty ? '?$query' : ''}';
+    final data = await _get(url);
+    final results = _extractResults(data);
+    return results.map((j) => Fact.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  Future<Fact> getFactDetail(int factId) async {
+    final data = await _get('facts/$factId/');
+    return Fact.fromJson(data);
   }
 
   // ── Upload Validation ────────────────────────────────────

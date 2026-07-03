@@ -1,0 +1,177 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'custom_admin:facts_list' %}" class="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined text-lg">arrow_back</span> Back to Facts & Quotes
+    </a>
+</div>
+
+<h1 class="text-2xl font-headline font-bold text-on-surface mb-6">
+    {% if fact %}Edit {{ fact.get_fact_type_display }}{% else %}Create Fact or Quote{% endif %}
+</h1>
+
+<form method="post" enctype="multipart/form-data" class="space-y-6">
+    {% csrf_token %}
+
+    <!-- Type Selector -->
+    <div class="bg-white rounded-xl border border-outline-variant p-6">
+        <h2 class="text-lg font-headline font-semibold text-on-surface mb-4">Type</h2>
+        <div class="flex gap-4">
+            <label class="flex-1 cursor-pointer">
+                <input type="radio" name="fact_type" value="fact" {% if not fact or fact.fact_type == 'fact' %}checked{% endif %} class="peer sr-only" id="type_fact">
+                <div class="peer-checked:border-amber-500 peer-checked:bg-amber-50 border-2 border-outline-variant rounded-xl p-4 text-center transition-all">
+                    <span class="material-symbols-outlined text-3xl text-amber-600">lightbulb</span>
+                    <div class="font-medium mt-1">Fact</div>
+                    <div class="text-xs text-on-surface-variant">Informational content with source</div>
+                </div>
+            </label>
+            <label class="flex-1 cursor-pointer">
+                <input type="radio" name="fact_type" value="quote" {% if fact and fact.fact_type == 'quote' %}checked{% endif %} class="peer sr-only" id="type_quote">
+                <div class="peer-checked:border-violet-500 peer-checked:bg-violet-50 border-2 border-outline-variant rounded-xl p-4 text-center transition-all">
+                    <span class="material-symbols-outlined text-3xl text-violet-600">format_quote</span>
+                    <div class="font-medium mt-1">Quote</div>
+                    <div class="text-xs text-on-surface-variant">Attributed quote with author</div>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Basic Info -->
+    <div class="bg-white rounded-xl border border-outline-variant p-6">
+        <h2 class="text-lg font-headline font-semibold text-on-surface mb-4">Basic Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Title (English) *</label>
+                <input type="text" name="title" value="{{ fact.title|default:'' }}" required
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Title (French)</label>
+                <input type="text" name="title_fr" value="{{ fact.title_fr|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Content (English) *</label>
+                <textarea name="content" rows="4" required
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">{{ fact.content|default:'' }}</textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Content (French)</label>
+                <textarea name="content_fr" rows="4"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">{{ fact.content_fr|default:'' }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category & Status -->
+    <div class="bg-white rounded-xl border border-outline-variant p-6">
+        <h2 class="text-lg font-headline font-semibold text-on-surface mb-4">Category & Status</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Category *</label>
+                <select name="category" required class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    <option value="">Select category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.pk }}" {% if fact and fact.category_id == cat.pk %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Status</label>
+                <select name="status" class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                    <option value="published" {% if fact and fact.status == 'published' %}selected{% endif %}>Published</option>
+                    <option value="draft" {% if fact and fact.status == 'draft' %}selected{% endif %}>Draft</option>
+                    <option value="archived" {% if fact and fact.status == 'archived' %}selected{% endif %}>Archived</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Display Order</label>
+                <input type="number" name="order" value="{{ fact.order|default:'0' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+        </div>
+        <div class="mt-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="is_featured" {% if fact and fact.is_featured %}checked{% endif %}
+                    class="w-4 h-4 rounded border-outline-variant text-amber-600 focus:ring-amber-500">
+                <span class="text-sm font-medium text-on-surface">Featured on home screen</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Source (for facts) -->
+    <div id="source-section" class="bg-white rounded-xl border border-outline-variant p-6">
+        <h2 class="text-lg font-headline font-semibold text-on-surface mb-4">
+            <span class="material-symbols-outlined text-lg align-middle mr-1">source</span> Source
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Source (English)</label>
+                <input type="text" name="source" value="{{ fact.source|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Source (French)</label>
+                <input type="text" name="source_fr" value="{{ fact.source_fr|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- Author (for quotes) -->
+    <div id="author-section" class="bg-white rounded-xl border border-outline-variant p-6">
+        <h2 class="text-lg font-headline font-semibold text-on-surface mb-4">
+            <span class="material-symbols-outlined text-lg align-middle mr-1">person</span> Author
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Author Name</label>
+                <input type="text" name="author_name" value="{{ fact.author_name|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Author Title (English)</label>
+                <input type="text" name="author_title" value="{{ fact.author_title|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Author Title (French)</label>
+                <input type="text" name="author_title_fr" value="{{ fact.author_title_fr|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- Image -->
+    <div class="bg-white rounded-xl border border-outline-variant p-6">
+        <h2 class="text-lg font-headline font-semibold text-on-surface mb-4">Image (Optional)</h2>
+        {% if fact and fact.image %}
+        <div class="mb-4">
+            <img src="{{ fact.image.url }}" alt="" class="h-32 rounded-lg object-cover">
+        </div>
+        {% endif %}
+        <input type="file" name="image" accept="image/*"
+            class="block w-full text-sm text-on-surface-variant file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+    </div>
+
+    <!-- Submit -->
+    <div class="flex items-center gap-4">
+        <button type="submit" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-medium rounded-lg py-3 px-8 hover:bg-emerald-700 transition-colors">
+            <span class="material-symbols-outlined">save</span>
+            {% if fact %}Update{% else %}Create{% endif %}
+        </button>
+        <a href="{% url 'custom_admin:facts_list' %}" class="text-sm text-on-surface-variant hover:text-on-surface">Cancel</a>
+    </div>
+</form>
+
+<script>
+    function toggleSections() {
+        const isQuote = document.querySelector('input[name="fact_type"][value="quote"]').checked;
+        document.getElementById('source-section').style.display = isQuote ? 'none' : 'block';
+        document.getElementById('author-section').style.display = isQuote ? 'block' : 'none';
+    }
+    document.querySelectorAll('input[name="fact_type"]').forEach(r => r.addEventListener('change', toggleSections));
+    toggleSections();
+</script>
+{% endblock %}

@@ -49,6 +49,7 @@ from .models import (
     EventComment, CommentMention, NewsletterEdition,
     EventAgendaItem, LinkedAccount,
     DeviceToken, NotificationEvent,
+    EmergencyContact,
     # Engagement models
     EventLike, DiscussionLike, VideoComment, GalleryComment, AppOpenEvent,
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
@@ -57,6 +58,7 @@ from .models import (
     YouthDialogueEvent, YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
     YouthDialogueRole, YouthDialogueMedia,
     QRScanLog,
+    FactCategory, Fact,
 )
 from .serializers import (
     get_recent_likers,
@@ -96,6 +98,8 @@ from .serializers import (
     YouthDialogueDocumentSerializer, YouthDialogueCredentialSerializer,
     # Promotional Splash
     PromotionalSplashSerializer,
+    EmergencyContactSerializer,
+    FactCategorySerializer, FactListSerializer, FactDetailSerializer,
 )
 
 
@@ -798,22 +802,23 @@ def firebase_register(request):
                 'user': None,  # Backward compat: old app versions expect this key
             }, status=status.HTTP_200_OK)
 
-        # Social login (email already verified) — create user immediately
+        # Social login (email already verified) — create user immediately.
+        # Atomic so User + Profile are either both committed or rolled back.
         first_name, last_name = _split_display_name(name)
         username = _generate_unique_username(email, firebase_uid, display_name=name)
-        user = User.objects.create(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-        )
-
-        profile = user.profile
-        profile.firebase_uid = firebase_uid
-        profile.phone_number = phone_number
-        profile.gender = gender
-        profile.is_email_verified = True
-        profile.save()
+        with transaction.atomic():
+            user = User.objects.create(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            profile = user.profile
+            profile.firebase_uid = firebase_uid
+            profile.phone_number = phone_number
+            profile.gender = gender
+            profile.is_email_verified = True
+            profile.save()
 
         return Response({
             'user': UserSerializer(user, context={'request': request}).data,
@@ -894,17 +899,26 @@ def firebase_login(request):
 
             if user is None:
                 if email_verified:
-                    # Social login (verified email) — auto-create user
+                    # Social login (verified email) — auto-create user.
+                    # Wrap in a transaction so User + Profile are either
+                    # both committed or both rolled back. Without this,
+                    # a failure after User.objects.create() leaves a
+                    # half-created user (no firebase_uid on profile),
+                    # causing the first Google Sign-In to fail while
+                    # the second succeeds.
                     first_name, last_name = _split_display_name(name)
                     username = _generate_unique_username(email, firebase_uid, display_name=name)
-                    user = User.objects.create(
-                        username=username,
-                        email=email,
-                        first_name=first_name,
-                        last_name=last_name,
-                    )
-                    profile = user.profile
-                    profile.firebase_uid = firebase_uid
+                    with transaction.atomic():
+                        user = User.objects.create(
+                            username=username,
+                            email=email,
+                            first_name=first_name,
+                            last_name=last_name,
+                        )
+                        profile = user.profile
+                        profile.firebase_uid = firebase_uid
+                        profile.is_email_verified = True
+                        profile.save(update_fields=['firebase_uid', 'is_email_verified'])
                     is_new_user = True
                 else:
                     # Email/password — check for pending signup in cache
@@ -2994,6 +3008,47 @@ def _annotated_event_registrations(request):
     return qs
 
 
+# ═══════════════════════════════════════════════════════════════
+#  FACTS & QUOTES
+# ═══════════════════════════════════════════════════════════════
+
+class FactCategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = FactCategorySerializer
+    permission_classes = [AllowAny]
+    queryset = FactCategory.objects.filter(is_active=True)
+    pagination_class = None
+
+
+class FactViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [AllowAny]
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return FactDetailSerializer
+        return FactListSerializer
+
+    def get_queryset(self):
+        qs = Fact.objects.select_related('category').filter(
+            is_active=True, status='published',
+        )
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category_id=category)
+        fact_type = self.request.query_params.get('type')
+        if fact_type in ('fact', 'quote'):
+            qs = qs.filter(fact_type=fact_type)
+        featured = self.request.query_params.get('featured')
+        if featured == 'true':
+            qs = qs.filter(is_featured=True)
+        return qs
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        Fact.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def home_feed(request):
@@ -3147,6 +3202,14 @@ def home_feed(request):
             is_liked=Exists(MagazineLike.objects.filter(user=request.user, edition=OuterRef('pk')))
         )
 
+    # Featured facts & quotes
+    facts_data = []
+    if settings and settings.facts_enabled:
+        featured_facts = Fact.objects.select_related('category').filter(
+            is_active=True, status='published', is_featured=True,
+        )[:10]
+        facts_data = FactListSerializer(featured_facts, many=True, context={'request': request}).data
+
     data = {
         'hero_slides': HeroSlideSerializer(hero_slides, many=True, context={'request': request}).data,
         'featured_articles': ArticleSerializer(featured_articles, many=True, context={'request': request}).data,
@@ -3158,6 +3221,7 @@ def home_feed(request):
         'magazines': MagazineEditionSerializer(magazines, many=True, context={'request': request}).data,
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
+        'facts': facts_data,
     }
     cache.set(cache_key, data, django_settings.CACHE_TTL_SHORT)
     return Response(data)
@@ -3267,6 +3331,24 @@ class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(cached)
         response = super().list(request, *args, **kwargs)
         cache.set('quick_access_menu:v1', response.data, django_settings.CACHE_TTL_MEDIUM)
+        return response
+
+
+class EmergencyContactViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for emergency contacts.
+    Returns active contacts ordered by order field.
+    """
+    queryset = EmergencyContact.objects.filter(is_active=True)
+    serializer_class = EmergencyContactSerializer
+    permission_classes = [AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        cached = cache.get('emergency_contacts:v1')
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set('emergency_contacts:v1', response.data, django_settings.CACHE_TTL_MEDIUM)
         return response
 
 
@@ -7570,17 +7652,31 @@ def yd_id_card_pdf(request, app_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def active_promotional_splash(request):
-    """Return the highest-priority active promotional splash, if any."""
-    now = timezone.now()
-    splash = PromotionalSplash.objects.filter(
-        is_active=True, starts_at__lte=now, ends_at__gt=now,
-    ).order_by('-priority').first()
+    """Return all active promotional splashes ordered by priority.
 
-    if splash:
-        PromotionalSplash.objects.filter(pk=splash.pk).update(view_count=F('view_count') + 1)
+    Returns both ``splash`` (first item, for backward compatibility with
+    older app versions) and ``splashes`` (full ordered list used by newer
+    app versions for round-robin rotation).
+    """
+    now = timezone.now()
+    splashes = PromotionalSplash.objects.filter(
+        is_active=True, starts_at__lte=now, ends_at__gt=now,
+    ).order_by('-priority')
+
+    if splashes.exists():
         ctx = {'request': request}
-        return Response({'splash': PromotionalSplashSerializer(splash, context=ctx).data})
-    return Response({'splash': None})
+        serialized = PromotionalSplashSerializer(splashes, many=True, context=ctx).data
+        return Response({'splash': serialized[0], 'splashes': serialized})
+    return Response({'splash': None, 'splashes': []})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def track_promotional_splash_view(request, pk):
+    """Increment the view count for a promotional splash."""
+    splash = get_object_or_404(PromotionalSplash, pk=pk)
+    PromotionalSplash.objects.filter(pk=splash.pk).update(view_count=F('view_count') + 1)
+    return Response({'success': True})
 
 
 @api_view(['POST'])

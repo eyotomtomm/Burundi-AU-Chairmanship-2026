@@ -80,6 +80,8 @@ from core.models import (
     YouthDialogueMedia,
     EventPhoto,
     DeviceBan,
+    EmergencyContact,
+    FactCategory, Fact,
 )
 
 # Email-related views live in custom_admin/email_views.py. Re-exported here so
@@ -1997,9 +1999,9 @@ def verification_request_review(request, pk):
                 changes={'status': {'old': 'pending', 'new': 'approved'}, 'badge_type': {'old': '', 'new': badge_type}}
             )
             # Send verification approval email
+            user = ver_request.user
             try:
                 from django.core.mail import send_mail
-                user = ver_request.user
                 send_mail(
                     subject='Congratulations! Your Account is Verified',
                     message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Be 4 Africa community.\n\nBest regards,\nB4Africa Team',
@@ -2009,6 +2011,23 @@ def verification_request_review(request, pk):
                 )
             except Exception:
                 pass
+            # Send push notification to the user
+            try:
+                from core.push_service import send_push_to_users
+                send_push_to_users(
+                    user_ids=[user.pk],
+                    title='Account Verified',
+                    body=f'Congratulations! Your account has been verified with a {badge_type} badge.',
+                    data={
+                        'type': 'verification_status_changed',
+                        'status': 'approved',
+                        'badge_type': badge_type,
+                        'action_type': 'route',
+                        'action_value': '/profile',
+                    },
+                )
+            except Exception as e:
+                logger.warning(f'Verification approval push failed for user {user.pk}: {e}')
             messages.success(request, f'Approved {ver_request.full_name} with {badge_type} badge.')
         elif action == 'reject':
             ver_request.status = 'rejected'
@@ -2021,6 +2040,22 @@ def verification_request_review(request, pk):
                 object_repr=ver_request.full_name,
                 changes={'status': {'old': 'pending', 'new': 'rejected'}, 'reason': {'old': '', 'new': ver_request.rejection_reason}}
             )
+            # Send push notification to the user
+            try:
+                from core.push_service import send_push_to_users
+                send_push_to_users(
+                    user_ids=[ver_request.user.pk],
+                    title='Verification Update',
+                    body='Your verification request has been reviewed. Please check the app for details.',
+                    data={
+                        'type': 'verification_status_changed',
+                        'status': 'rejected',
+                        'action_type': 'route',
+                        'action_value': '/verification-request',
+                    },
+                )
+            except Exception as e:
+                logger.warning(f'Verification rejection push failed for user {ver_request.user.pk}: {e}')
             messages.success(request, f'Rejected verification request from {ver_request.full_name}.')
         return redirect('custom_admin:verification_requests_list')
     return render(request, 'custom_admin/verification/review.html', {'ver_request': ver_request})
@@ -2962,6 +2997,71 @@ def quick_access_delete(request, pk):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  EMERGENCY CONTACTS
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def emergency_contacts_list(request):
+    items = EmergencyContact.objects.all().order_by('order')
+    return render(request, 'custom_admin/emergency_contacts/list.html', {'items': items})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def emergency_contact_create(request):
+    if request.method == 'POST':
+        EmergencyContact.objects.create(
+            name_en=request.POST.get('name_en'),
+            name_fr=request.POST.get('name_fr', ''),
+            description_en=request.POST.get('description_en', ''),
+            description_fr=request.POST.get('description_fr', ''),
+            icon_name=request.POST.get('icon_name', 'phone'),
+            category=request.POST.get('category', 'other'),
+            action_type=request.POST.get('action_type', 'call'),
+            contact_value=request.POST.get('contact_value'),
+            color=request.POST.get('color', '#E53935'),
+            order=request.POST.get('order', 0),
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'Emergency contact created successfully!')
+        return redirect('custom_admin:emergency_contacts_list')
+    return render(request, 'custom_admin/emergency_contacts/form.html', {'action': 'Create'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def emergency_contact_edit(request, pk):
+    item = get_object_or_404(EmergencyContact, pk=pk)
+    if request.method == 'POST':
+        item.name_en = request.POST.get('name_en')
+        item.name_fr = request.POST.get('name_fr', '')
+        item.description_en = request.POST.get('description_en', '')
+        item.description_fr = request.POST.get('description_fr', '')
+        item.icon_name = request.POST.get('icon_name', 'phone')
+        item.category = request.POST.get('category', 'other')
+        item.action_type = request.POST.get('action_type', 'call')
+        item.contact_value = request.POST.get('contact_value')
+        item.color = request.POST.get('color', '#E53935')
+        item.order = request.POST.get('order', 0)
+        item.is_active = request.POST.get('is_active') == 'on'
+        item.save()
+        messages.success(request, 'Emergency contact updated successfully!')
+        return redirect('custom_admin:emergency_contacts_list')
+    return render(request, 'custom_admin/emergency_contacts/form.html', {'item': item, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def emergency_contact_delete(request, pk):
+    item = get_object_or_404(EmergencyContact, pk=pk)
+    item.delete()
+    messages.success(request, 'Emergency contact deleted successfully!')
+    return redirect('custom_admin:emergency_contacts_list')
+
+
+# ═══════════════════════════════════════════════════════════════
 #  PRIORITY AGENDAS
 # ═══════════════════════════════════════════════════════════════
 
@@ -3533,6 +3633,7 @@ def app_settings(request):
         settings.discussions_enabled = request.POST.get('discussions_enabled') == 'on'
         settings.polls_enabled = request.POST.get('polls_enabled') == 'on'
         settings.newsletter_enabled = request.POST.get('newsletter_enabled') == 'on'
+        settings.facts_enabled = request.POST.get('facts_enabled') == 'on'
         settings.app_store_url = request.POST.get('app_store_url', '')
         settings.play_store_url = request.POST.get('play_store_url', '')
         settings.app_store_id = request.POST.get('app_store_id', '')
@@ -3546,6 +3647,198 @@ def app_settings(request):
         return redirect('custom_admin:app_settings')
     audit_logs = AuditLogEntry.objects.all()[:20]
     return render(request, 'custom_admin/app_settings/view.html', {'settings': settings, 'audit_logs': audit_logs})
+
+
+# ═══════════════════════════════════════════════════════════════
+#  FACTS & QUOTES
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def facts_list(request):
+    facts = Fact.objects.select_related('category').all()
+
+    # Filters
+    type_filter = request.GET.get('type')
+    if type_filter in ('fact', 'quote'):
+        facts = facts.filter(fact_type=type_filter)
+    category_filter = request.GET.get('category')
+    if category_filter:
+        facts = facts.filter(category_id=category_filter)
+    status_filter = request.GET.get('status')
+    if status_filter:
+        facts = facts.filter(status=status_filter)
+    search = request.GET.get('search')
+    if search:
+        facts = facts.filter(Q(title__icontains=search) | Q(content__icontains=search) | Q(author_name__icontains=search))
+
+    total = Fact.objects.count()
+    facts_count = Fact.objects.filter(fact_type='fact').count()
+    quotes_count = Fact.objects.filter(fact_type='quote').count()
+    featured_count = Fact.objects.filter(is_featured=True).count()
+
+    paginator = Paginator(facts, 25)
+    page = paginator.get_page(request.GET.get('page', 1))
+    categories = FactCategory.objects.all()
+
+    return render(request, 'custom_admin/facts/list.html', {
+        'facts': page, 'page': page,
+        'total': total, 'facts_count': facts_count,
+        'quotes_count': quotes_count, 'featured_count': featured_count,
+        'categories': categories,
+        'type_filter': type_filter or '',
+        'category_filter': category_filter or '',
+        'status_filter': status_filter or '',
+        'search': search or '',
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def fact_create(request):
+    categories = FactCategory.objects.filter(is_active=True)
+    if request.method == 'POST':
+        fact = Fact(
+            title=request.POST.get('title', ''),
+            title_fr=request.POST.get('title_fr', ''),
+            content=request.POST.get('content', ''),
+            content_fr=request.POST.get('content_fr', ''),
+            category_id=request.POST.get('category'),
+            fact_type=request.POST.get('fact_type', 'fact'),
+            source=request.POST.get('source', ''),
+            source_fr=request.POST.get('source_fr', ''),
+            author_name=request.POST.get('author_name', ''),
+            author_title=request.POST.get('author_title', ''),
+            author_title_fr=request.POST.get('author_title_fr', ''),
+            status=request.POST.get('status', 'published'),
+            is_featured=request.POST.get('is_featured') == 'on',
+            order=request.POST.get('order', 0) or 0,
+        )
+        if request.FILES.get('image'):
+            fact.image = request.FILES['image']
+        fact.save()
+        AuditLogEntry.objects.create(
+            user=request.user, action='create',
+            content_type='fact', object_id=str(fact.pk),
+            description=f'Created {fact.get_fact_type_display()}: {fact.title}',
+        )
+        messages.success(request, f'{fact.get_fact_type_display()} created successfully!')
+        return redirect('custom_admin:facts_list')
+    return render(request, 'custom_admin/facts/form.html', {'categories': categories, 'fact': None})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def fact_edit(request, pk):
+    fact = get_object_or_404(Fact, pk=pk)
+    categories = FactCategory.objects.filter(is_active=True)
+    if request.method == 'POST':
+        fact.title = request.POST.get('title', '')
+        fact.title_fr = request.POST.get('title_fr', '')
+        fact.content = request.POST.get('content', '')
+        fact.content_fr = request.POST.get('content_fr', '')
+        fact.category_id = request.POST.get('category')
+        fact.fact_type = request.POST.get('fact_type', 'fact')
+        fact.source = request.POST.get('source', '')
+        fact.source_fr = request.POST.get('source_fr', '')
+        fact.author_name = request.POST.get('author_name', '')
+        fact.author_title = request.POST.get('author_title', '')
+        fact.author_title_fr = request.POST.get('author_title_fr', '')
+        fact.status = request.POST.get('status', 'published')
+        fact.is_featured = request.POST.get('is_featured') == 'on'
+        fact.order = request.POST.get('order', 0) or 0
+        if request.FILES.get('image'):
+            fact.image = request.FILES['image']
+        fact.save()
+        AuditLogEntry.objects.create(
+            user=request.user, action='update',
+            content_type='fact', object_id=str(fact.pk),
+            description=f'Updated {fact.get_fact_type_display()}: {fact.title}',
+        )
+        messages.success(request, f'{fact.get_fact_type_display()} updated successfully!')
+        return redirect('custom_admin:facts_list')
+    return render(request, 'custom_admin/facts/form.html', {'categories': categories, 'fact': fact})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def fact_delete(request, pk):
+    fact = get_object_or_404(Fact, pk=pk)
+    AuditLogEntry.objects.create(
+        user=request.user, action='delete',
+        content_type='fact', object_id=str(fact.pk),
+        description=f'Deleted {fact.get_fact_type_display()}: {fact.title}',
+    )
+    fact.delete()
+    messages.success(request, 'Fact/Quote deleted successfully!')
+    return redirect('custom_admin:facts_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def fact_toggle_active(request, pk):
+    fact = get_object_or_404(Fact, pk=pk)
+    fact.is_active = not fact.is_active
+    fact.save(update_fields=['is_active'])
+    state = 'activated' if fact.is_active else 'deactivated'
+    messages.success(request, f'Fact/Quote {state} successfully!')
+    return redirect('custom_admin:facts_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def fact_categories_list(request):
+    categories = FactCategory.objects.annotate(fact_count=Count('facts'))
+    return render(request, 'custom_admin/facts/categories_list.html', {'categories': categories})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def fact_category_create(request):
+    if request.method == 'POST':
+        FactCategory.objects.create(
+            name=request.POST.get('name', ''),
+            name_fr=request.POST.get('name_fr', ''),
+            icon_name=request.POST.get('icon_name', ''),
+            color=request.POST.get('color', '#1EB53A'),
+            order=request.POST.get('order', 0) or 0,
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'Category created successfully!')
+        return redirect('custom_admin:fact_categories_list')
+    return render(request, 'custom_admin/facts/category_form.html', {'category': None})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def fact_category_edit(request, pk):
+    category = get_object_or_404(FactCategory, pk=pk)
+    if request.method == 'POST':
+        category.name = request.POST.get('name', '')
+        category.name_fr = request.POST.get('name_fr', '')
+        category.icon_name = request.POST.get('icon_name', '')
+        category.color = request.POST.get('color', '#1EB53A')
+        category.order = request.POST.get('order', 0) or 0
+        category.is_active = request.POST.get('is_active') == 'on'
+        category.save()
+        messages.success(request, 'Category updated successfully!')
+        return redirect('custom_admin:fact_categories_list')
+    return render(request, 'custom_admin/facts/category_form.html', {'category': category})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def fact_category_delete(request, pk):
+    category = get_object_or_404(FactCategory, pk=pk)
+    if category.facts.exists():
+        messages.error(request, 'Cannot delete category with existing facts. Remove or reassign facts first.')
+        return redirect('custom_admin:fact_categories_list')
+    category.delete()
+    messages.success(request, 'Category deleted successfully!')
+    return redirect('custom_admin:fact_categories_list')
 
 
 # ═══════════════════════════════════════════════════════════════

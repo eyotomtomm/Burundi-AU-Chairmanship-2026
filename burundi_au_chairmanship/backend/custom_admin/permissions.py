@@ -41,6 +41,7 @@ ADMIN_MENU_GROUPS = [
         ('categories_list',           'Categories',             'folder'),
         ('magazines_list',            'Magazines',              'auto_stories'),
         ('feature_cards_list',        'Feature Cards',          'view_carousel'),
+        ('facts_list',                'Facts & Quotes',         'lightbulb'),
     ]),
     ('Events', [
         ('events_list',               'Events',                 'event'),
@@ -206,6 +207,10 @@ def get_required_section(url_name):
         return 'feature_cards_list'
     if 'magazine' in url_name:
         return 'magazines_list'
+    if 'fact_categor' in url_name:
+        return 'facts_list'
+    if url_name.startswith('fact'):
+        return 'facts_list'
     if 'categor' in url_name:
         return 'categories_list'
     if 'article' in url_name:

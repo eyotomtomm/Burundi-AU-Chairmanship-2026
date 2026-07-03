@@ -2003,6 +2003,168 @@ function toggleDarkMode() {
 })();
 </script>
 
+<!-- ─── Global Auto-Translate for all bilingual forms ─── -->
+<script>
+(function() {
+  var TRANSLATE_URL = '{% url "custom_admin:auto_translate" %}';
+
+  // Core translate function — callable from anywhere
+  window._autoTranslateField = function(sourceId, targetId, sourceLang, targetLang, btn) {
+    var sourceEl = document.getElementById(sourceId);
+    var targetEl = document.getElementById(targetId);
+    if (!sourceEl || !targetEl) return;
+    var text = sourceEl.value.trim();
+    if (!text) { targetEl.focus(); return; }
+
+    var origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[13px] animate-spin">progress_activity</span> ...';
+
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) { btn.disabled = false; btn.innerHTML = origHTML; return; }
+
+    var fd = new FormData();
+    fd.append('text', text);
+    fd.append('source', sourceLang);
+    fd.append('target', targetLang);
+
+    fetch(TRANSLATE_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken.value },
+      body: fd,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.translated) {
+        targetEl.value = data.translated;
+        targetEl.style.transition = 'box-shadow 0.3s';
+        targetEl.style.boxShadow = '0 0 0 2px #10b981';
+        setTimeout(function() { targetEl.style.boxShadow = ''; }, 1500);
+        // Trigger input event so any validation listeners update
+        targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        alert(data.error || 'Translation failed.');
+      }
+    })
+    .catch(function() { alert('Translation service unavailable. Please try again.'); })
+    .finally(function() { btn.disabled = false; btn.innerHTML = origHTML; });
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    // Find all _fr fields (skip array fields, hidden inputs, and fields already handled)
+    var frFields = document.querySelectorAll(
+      'input[name$="_fr"]:not([type="hidden"]):not([data-auto-translate]), ' +
+      'textarea[name$="_fr"]:not([data-auto-translate])'
+    );
+    if (!frFields.length) return;
+
+    var pairs = [];
+
+    frFields.forEach(function(frField) {
+      var frName = frField.getAttribute('name');
+      // Skip array/dynamic fields
+      if (frName.indexOf('[]') !== -1 || frName.indexOf('${') !== -1) return;
+
+      // Derive English field name: remove trailing _fr
+      var enName = frName.replace(/_fr$/, '');
+      var enField = document.querySelector(
+        'input[name="' + enName + '"]:not([type="hidden"]), textarea[name="' + enName + '"]'
+      );
+      // Some fields use _en suffix (e.g. quick_access_title_en)
+      if (!enField) {
+        enField = document.querySelector(
+          'input[name="' + enName + '_en"]:not([type="hidden"]), textarea[name="' + enName + '_en"]'
+        );
+      }
+      if (!enField) return;
+
+      // Ensure both have IDs
+      if (!enField.id) enField.id = '_at_' + enName.replace(/[^a-zA-Z0-9_]/g, '_');
+      if (!frField.id) frField.id = '_at_' + frName.replace(/[^a-zA-Z0-9_]/g, '_');
+
+      // Mark as handled
+      frField.setAttribute('data-auto-translate', '1');
+
+      pairs.push({ enId: enField.id, frId: frField.id });
+
+      // Create translate button row
+      var btnRow = document.createElement('div');
+      btnRow.className = 'flex items-center gap-2 mt-1.5';
+      btnRow.innerHTML =
+        '<button type="button" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors" ' +
+        'onclick="_autoTranslateField(\'' + enField.id + '\',\'' + frField.id + '\',\'en\',\'fr\',this)">' +
+        '<span class="material-symbols-outlined text-[13px]">translate</span>EN&#8594;FR</button>' +
+        '<button type="button" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors" ' +
+        'onclick="_autoTranslateField(\'' + frField.id + '\',\'' + enField.id + '\',\'fr\',\'en\',this)">' +
+        '<span class="material-symbols-outlined text-[13px]">translate</span>FR&#8594;EN</button>';
+
+      // Insert after the FR field (or after its wrapper if inside a relative div)
+      var insertAfter = frField;
+      var wrapper = frField.parentElement;
+      if (wrapper && wrapper.classList.contains('relative')) {
+        insertAfter = wrapper;
+      }
+      insertAfter.parentNode.insertBefore(btnRow, insertAfter.nextSibling);
+    });
+
+    // Add floating "Translate All EN → FR" button if we found at least 2 pairs
+    if (pairs.length >= 2) {
+      var fab = document.createElement('div');
+      fab.className = 'fixed bottom-6 right-6 z-50';
+      fab.innerHTML =
+        '<button type="button" id="_translateAllFab" ' +
+        'class="inline-flex items-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 ring-2 ring-white dark:ring-slate-800">' +
+        '<span class="material-symbols-outlined text-[18px]">translate</span>' +
+        'Translate All EN&#8594;FR</button>';
+      document.body.appendChild(fab);
+
+      document.getElementById('_translateAllFab').addEventListener('click', function() {
+        var btn = this;
+        var origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span> Translating...';
+
+        var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfToken) { btn.disabled = false; btn.innerHTML = origHTML; return; }
+
+        var promises = pairs.map(function(pair) {
+          var enEl = document.getElementById(pair.enId);
+          var frEl = document.getElementById(pair.frId);
+          if (!enEl || !frEl || !enEl.value.trim()) return Promise.resolve();
+
+          var fd = new FormData();
+          fd.append('text', enEl.value.trim());
+          fd.append('source', 'en');
+          fd.append('target', 'fr');
+
+          return fetch(TRANSLATE_URL, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken.value },
+            body: fd,
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.translated) {
+              frEl.value = data.translated;
+              frEl.style.transition = 'box-shadow 0.3s';
+              frEl.style.boxShadow = '0 0 0 2px #10b981';
+              setTimeout(function() { frEl.style.boxShadow = ''; }, 1500);
+              frEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          })
+          .catch(function() {});
+        });
+
+        Promise.all(promises).then(function() {
+          btn.disabled = false;
+          btn.innerHTML = origHTML;
+        });
+      });
+    }
+  });
+})();
+</script>
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>

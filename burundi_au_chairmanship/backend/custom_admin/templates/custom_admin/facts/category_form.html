@@ -1,0 +1,72 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'custom_admin:fact_categories_list' %}" class="inline-flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined text-lg">arrow_back</span> Back to Categories
+    </a>
+</div>
+
+<h1 class="text-2xl font-headline font-bold text-on-surface mb-6">
+    {% if category %}Edit Category{% else %}Create Category{% endif %}
+</h1>
+
+<form method="post" class="space-y-6">
+    {% csrf_token %}
+    <div class="bg-white rounded-xl border border-outline-variant p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Name (English) *</label>
+                <input type="text" name="name" value="{{ category.name|default:'' }}" required
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Name (French)</label>
+                <input type="text" name="name_fr" value="{{ category.name_fr|default:'' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Icon Name</label>
+                <input type="text" name="icon_name" value="{{ category.icon_name|default:'' }}" placeholder="e.g. public, flag, school"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                <p class="text-xs text-on-surface-variant mt-1">Material Symbols icon name. <a href="https://fonts.google.com/icons" target="_blank" class="text-blue-600 hover:underline">Browse icons</a></p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Color</label>
+                <div class="flex items-center gap-3">
+                    <input type="color" name="color" value="{{ category.color|default:'#1EB53A' }}" id="color-picker"
+                        class="w-10 h-10 rounded-lg border-outline-variant cursor-pointer">
+                    <input type="text" id="color-text" value="{{ category.color|default:'#1EB53A' }}" readonly
+                        class="flex-1 rounded-lg border-outline-variant text-sm py-2.5 px-3 bg-surface-container-low">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-on-surface-variant mb-1">Display Order</label>
+                <input type="number" name="order" value="{{ category.order|default:'0' }}"
+                    class="w-full rounded-lg border-outline-variant text-sm py-2.5 px-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            </div>
+            <div class="flex items-end">
+                <label class="flex items-center gap-2 cursor-pointer pb-2">
+                    <input type="checkbox" name="is_active" {% if category.is_active or not category %}checked{% endif %}
+                        class="w-4 h-4 rounded border-outline-variant text-emerald-600 focus:ring-emerald-500">
+                    <span class="text-sm font-medium text-on-surface">Active</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-4">
+        <button type="submit" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-medium rounded-lg py-3 px-8 hover:bg-emerald-700 transition-colors">
+            <span class="material-symbols-outlined">save</span>
+            {% if category %}Update{% else %}Create{% endif %}
+        </button>
+        <a href="{% url 'custom_admin:fact_categories_list' %}" class="text-sm text-on-surface-variant hover:text-on-surface">Cancel</a>
+    </div>
+</form>
+
+<script>
+    document.getElementById('color-picker').addEventListener('input', function() {
+        document.getElementById('color-text').value = this.value;
+    });
+</script>
+{% endblock %}

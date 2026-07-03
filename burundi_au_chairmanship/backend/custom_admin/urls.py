@@ -100,6 +100,12 @@ urlpatterns = [
     path('quick-access/<int:pk>/edit/', views.quick_access_edit, name='quick_access_edit'),
     path('quick-access/<int:pk>/delete/', views.quick_access_delete, name='quick_access_delete'),
 
+    # Emergency Contacts
+    path('emergency-contacts/', views.emergency_contacts_list, name='emergency_contacts_list'),
+    path('emergency-contacts/create/', views.emergency_contact_create, name='emergency_contact_create'),
+    path('emergency-contacts/<int:pk>/edit/', views.emergency_contact_edit, name='emergency_contact_edit'),
+    path('emergency-contacts/<int:pk>/delete/', views.emergency_contact_delete, name='emergency_contact_delete'),
+
     # Priority Agendas
     path('priority-agendas/', views.priority_agendas_list, name='priority_agendas_list'),
     path('priority-agendas/create/', views.priority_agenda_create, name='priority_agenda_create'),
@@ -351,6 +357,17 @@ urlpatterns = [
     path('youth-dialogue/<int:event_pk>/export-csv/', views.youth_dialogue_export_csv, name='youth_dialogue_export_csv'),
     path('youth-dialogue/applications/<int:pk>/id-card-pdf/', views.youth_dialogue_id_card_pdf, name='youth_dialogue_id_card_pdf'),
     path('youth-dialogue/verify/', views.youth_dialogue_verify_qr, name='youth_dialogue_verify_qr'),
+
+    # Facts & Quotes
+    path('facts/', views.facts_list, name='facts_list'),
+    path('facts/create/', views.fact_create, name='fact_create'),
+    path('facts/<int:pk>/edit/', views.fact_edit, name='fact_edit'),
+    path('facts/<int:pk>/delete/', views.fact_delete, name='fact_delete'),
+    path('facts/<int:pk>/toggle-active/', views.fact_toggle_active, name='fact_toggle_active'),
+    path('fact-categories/', views.fact_categories_list, name='fact_categories_list'),
+    path('fact-categories/create/', views.fact_category_create, name='fact_category_create'),
+    path('fact-categories/<int:pk>/edit/', views.fact_category_edit, name='fact_category_edit'),
+    path('fact-categories/<int:pk>/delete/', views.fact_category_delete, name='fact_category_delete'),
 
     # Comment Ban Management
     path('users/<int:pk>/toggle-comment-ban/', views.user_toggle_comment_ban, name='user_toggle_comment_ban'),

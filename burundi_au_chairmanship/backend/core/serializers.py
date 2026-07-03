@@ -30,6 +30,8 @@ from .models import (
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
     YouthDialogueEvent, YouthDialogueFormField, YouthDialogueRole, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog, YouthDialogueMedia,
+    EmergencyContact,
+    FactCategory, Fact,
 )
 
 
@@ -847,9 +849,39 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'app_store_id', 'play_store_id',
                   'bookmarks_enabled', 'discussions_enabled',
                   'polls_enabled', 'newsletter_enabled',
-                  'qr_code_mode',
+                  'facts_enabled', 'qr_code_mode',
                   'countdown_target_date', 'countdown_label',
                   'countdown_label_fr', 'countdown_enabled']
+
+
+class FactCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FactCategory
+        fields = ['id', 'name', 'name_fr', 'icon_name', 'color', 'order', 'is_active']
+
+
+class FactListSerializer(serializers.ModelSerializer):
+    category = FactCategorySerializer(read_only=True)
+    content_preview = serializers.SerializerMethodField()
+    content_preview_fr = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Fact
+        fields = ['id', 'title', 'title_fr', 'content_preview', 'content_preview_fr',
+                  'category', 'fact_type', 'source', 'source_fr',
+                  'author_name', 'author_title', 'author_title_fr',
+                  'image', 'is_featured', 'view_count', 'created_at']
+
+    def get_content_preview(self, obj):
+        return obj.content[:200] if obj.content else ''
+
+    def get_content_preview_fr(self, obj):
+        return obj.content_fr[:200] if obj.content_fr else ''
+
+
+class FactDetailSerializer(FactListSerializer):
+    class Meta(FactListSerializer.Meta):
+        fields = FactListSerializer.Meta.fields + ['content', 'content_fr']
 
 
 class PriorityAgendaSerializer(serializers.ModelSerializer):
@@ -1009,6 +1041,14 @@ class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
                 return 'NEW'
 
         return ''
+
+
+class EmergencyContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmergencyContact
+        fields = ['id', 'name_en', 'name_fr', 'description_en', 'description_fr',
+                  'icon_name', 'category', 'action_type', 'contact_value',
+                  'color', 'order', 'is_active']
 
 
 class VerificationSocialMediaSerializer(serializers.ModelSerializer):
@@ -2099,6 +2139,7 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     quick_access_icon_url = serializers.SerializerMethodField()
     banner_image_url = serializers.SerializerMethodField()
+    sponsors_image_url = serializers.SerializerMethodField()
     logo_light_url = serializers.SerializerMethodField()
     logo_light_fr_url = serializers.SerializerMethodField()
     logo_dark_url = serializers.SerializerMethodField()
@@ -2119,7 +2160,7 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
             'is_visible', 'is_registration_open',
             'registration_closed_message', 'registration_closed_message_fr',
             'quick_access_icon_url', 'quick_access_title_en', 'quick_access_title_fr',
-            'banner_image_url',
+            'banner_image_url', 'sponsors_image_url',
             'event_tagline', 'event_tagline_fr',
             'venue_name', 'venue_name_fr',
             'venue_address', 'venue_address_fr',
@@ -2144,6 +2185,9 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
 
     def get_banner_image_url(self, obj):
         return self._build_url(obj.banner_image)
+
+    def get_sponsors_image_url(self, obj):
+        return self._build_url(obj.sponsors_image)
 
     def get_logo_light_url(self, obj):
         return self._build_url(obj.logo_light)

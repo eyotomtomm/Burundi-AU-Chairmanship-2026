@@ -208,6 +208,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             _buildHeroAppBar(isDark, isFr),
+            SliverToBoxAdapter(child: _buildSponsorsSection(isDark, isFr)),
             SliverToBoxAdapter(child: _buildInfoBar(isDark, isFr)),
             SliverToBoxAdapter(child: _buildAboutSection(isDark, isFr)),
             SliverToBoxAdapter(child: _buildHighlightsSection(isDark, isFr)),
@@ -1574,6 +1575,46 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Sponsors Section ────────────────────────────────────────
+  Widget _buildSponsorsSection(bool isDark, bool isFr) {
+    final sponsorsUrl = _settings?['sponsors_image_url']?.toString() ?? '';
+    if (sponsorsUrl.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        children: [
+          Text(
+            isFr ? 'Partenaires' : 'Partners & Sponsors',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: CachedNetworkImage(
+              imageUrl: Environment.fixMediaUrl(sponsorsUrl),
+              width: double.infinity,
+              fit: BoxFit.contain,
+              placeholder: (_, __) => Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.burundiGreen)),
+              ),
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+        ],
       ),
     );
   }

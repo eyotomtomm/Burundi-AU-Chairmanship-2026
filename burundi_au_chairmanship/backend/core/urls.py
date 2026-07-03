@@ -20,6 +20,7 @@ router.register('weather-cities', views.WeatherCityViewSet)
 router.register('notifications', views.NotificationViewSet, basename='notification')
 router.register('hero-text-content', views.HeroTextContentViewSet)
 router.register('quick-access-menu', views.QuickAccessMenuViewSet)
+router.register('emergency-contacts', views.EmergencyContactViewSet)
 router.register('event-registrations', views.EventRegistrationViewSet, basename='event-registration')
 router.register('event-submissions', views.EventSubmissionViewSet, basename='event-submission')
 router.register('support/tickets', views.SupportTicketViewSet, basename='support-ticket')
@@ -40,6 +41,8 @@ router.register('live-qa', views.LiveQAViewSet, basename='live-qa')
 router.register('onboarding-steps', views.OnboardingStepViewSet, basename='onboarding-step')
 router.register('event-agenda-items', views.EventAgendaItemViewSet, basename='event-agenda-item')
 router.register('youth-dialogue', views.YouthDialogueViewSet, basename='youth-dialogue')
+router.register('fact-categories', views.FactCategoryViewSet, basename='fact-category')
+router.register('facts', views.FactViewSet, basename='fact')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -134,6 +137,7 @@ urlpatterns = [
 
     # Promotional Splash
     path('promotional-splash/active/', views.active_promotional_splash, name='active-promotional-splash'),
+    path('promotional-splash/<int:pk>/view/', views.track_promotional_splash_view, name='track-promotional-splash-view'),
     path('promotional-splash/<int:pk>/click/', views.track_promotional_splash_click, name='track-promotional-splash-click'),
 
     # Admin Audit & Management (NEW)

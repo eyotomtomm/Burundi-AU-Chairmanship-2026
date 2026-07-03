@@ -411,6 +411,24 @@
                             <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
                             {% endif %}
                         </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <input
+                                type="checkbox"
+                                name="facts_enabled"
+                                {% if settings.facts_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-amber-600 focus:ring-amber-600"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-amber-600">lightbulb</span>
+                                <span class="font-body text-on-surface font-medium">Facts & Quotes</span>
+                            </span>
+                            {% if settings.facts_enabled %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                            {% else %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                            {% endif %}
+                        </label>
                     </div>
                 </div>
 

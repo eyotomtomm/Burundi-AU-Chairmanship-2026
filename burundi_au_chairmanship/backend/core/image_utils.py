@@ -260,6 +260,9 @@ def get_variant_url(image_field, size_name):
     Does *not* check whether the file exists on disk (the frontend should
     fall back to the original URL if a variant 404s).
 
+    Always returns an absolute URL. For S3/Spaces storage the URL is already
+    absolute; for local FileSystemStorage, SITE_URL is prepended.
+
     Args:
         image_field: A Django FieldFile / ImageFieldFile instance (e.g. ``instance.image``).
         size_name: One of ``'thumb'``, ``'medium'``, or ``'large'``.
@@ -281,6 +284,12 @@ def get_variant_url(image_field, size_name):
 
     # Build the full URL the same way Django does
     try:
-        return image_field.storage.url(variant_name)
+        url = image_field.storage.url(variant_name)
+        # If URL is relative (local FileSystemStorage), prepend SITE_URL
+        if url and not url.startswith(('http://', 'https://')):
+            site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+            if site_url:
+                url = f"{site_url}{url}"
+        return url
     except Exception:
         return None

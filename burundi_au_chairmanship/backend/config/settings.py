@@ -227,8 +227,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Absolute base URL for building full media URLs (e.g. push notification images)
-SITE_URL = os.environ.get('SITE_URL', 'http://127.0.0.1:8000' if DEBUG else '')
+# Absolute base URL for building full media URLs (e.g. push notification images,
+# image variant URLs in API responses). Must be set in production.
+SITE_URL = os.environ.get('SITE_URL', 'http://127.0.0.1:8000' if DEBUG else 'https://burundi4africa.com')
 
 # DigitalOcean Spaces for media files (production only)
 if not DEBUG:

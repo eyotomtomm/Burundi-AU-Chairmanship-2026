@@ -30,13 +30,16 @@ class SecurityHeadersMiddleware:
         # CSP for admin panel — allow same-origin plus CDNs used by the
         # admin templates (Tailwind, Chart.js, Google Fonts, Cropper.js)
         # and the Spaces CDN for media uploads.
-        spaces_cdn = getattr(settings, 'DO_SPACES_ENDPOINT', '')
-        spaces_bucket = getattr(settings, 'MEDIA_URL', '')
+        # Use AWS_S3_ENDPOINT_URL (the actual settings attribute) rather than
+        # the env var name. Trailing slash is preserved for CSP prefix matching.
+        spaces_endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', '')
+        media_url = getattr(settings, 'MEDIA_URL', '')
         img_sources = "'self' data:"
-        if spaces_cdn:
-            img_sources += f" {spaces_cdn}"
-        if spaces_bucket and spaces_bucket.startswith('http'):
-            img_sources += f" {spaces_bucket.rstrip('/')}"
+        if spaces_endpoint:
+            img_sources += f" {spaces_endpoint}"
+        if media_url and media_url.startswith('http'):
+            # Keep trailing slash so CSP uses path-prefix matching (not exact)
+            img_sources += f" {media_url}"
         self._admin_csp = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' "

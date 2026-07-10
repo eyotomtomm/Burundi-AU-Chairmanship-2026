@@ -912,7 +912,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         if (rule == 'youth_dialogue_accepted' && !_ydEligible) return false;
         // Respect feature toggles for route-based items
         final route = m['action_value'] as String? ?? '';
-        if (route == '/live-feeds' && _appSettings?['live_feeds_enabled'] == false) return false;
+        final titleEn = (m['title_en'] as String? ?? '').toLowerCase();
+        if ((route == '/live-feeds' || route == '/live' || titleEn == 'live' || titleEn == 'live feeds') && _appSettings?['live_feeds_enabled'] == false) return false;
         if (route == '/discussions' && _appSettings?['discussions_enabled'] == false) return false;
         return true;
       }).toList();
@@ -979,8 +980,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       }
     }
 
-    bool dup(String av, String en, String fr) =>
-        existingActionValues.contains(av) || existingTitles.contains(en.toLowerCase()) || existingTitles.contains(fr.toLowerCase());
+    bool dup(String av, String en, String fr, [List<String> alts = const []]) =>
+        existingActionValues.contains(av) || existingTitles.contains(en.toLowerCase()) || existingTitles.contains(fr.toLowerCase()) || alts.any((a) => existingTitles.contains(a.toLowerCase()));
 
     // Staff-only QR Scanner
     final qrScannerTitle = langCode == 'fr'
@@ -1025,7 +1026,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     final hardcoded = <Map<String, dynamic>>[
       if (!dup('/magazine', 'Magazine', 'Magazine'))
         {'title': langCode == 'fr' ? 'Magazines' : 'Magazines', 'icon': Icons.menu_book_rounded, 'hasLiveDot': false, 'badgeText': badge('/magazine'), 'badgeColor': badgeColor('/magazine'), 'onTap': () => widget.onSwitchTab?.call(2)},
-      if (_appSettings?['live_feeds_enabled'] != false && !dup('/live-feeds', 'Live Feeds', 'En direct'))
+      if (_appSettings?['live_feeds_enabled'] != false && !dup('/live-feeds', 'Live Feeds', 'En direct', ['Live', 'Direct']))
         {'title': langCode == 'fr' ? 'En direct' : 'Live Feeds', 'icon': Icons.live_tv_rounded, 'hasLiveDot': false, 'badgeText': badge('/live-feeds'), 'badgeColor': badgeColor('/live-feeds'), 'onTap': () => Navigator.pushNamed(context, '/live-feeds')},
       if (!dup('/events', 'Events', 'Événements'))
         {'title': langCode == 'fr' ? 'Événements' : 'Events', 'icon': Icons.event_rounded, 'hasLiveDot': false, 'badgeText': badge('/calendar'), 'badgeColor': badgeColor('/calendar'), 'onTap': () => Navigator.pushNamed(context, '/events')},

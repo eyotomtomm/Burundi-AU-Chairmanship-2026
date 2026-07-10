@@ -7416,7 +7416,14 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             app.documents.filter(status__in=('pending', 'approved'))
             .values_list('document_type', flat=True)
         )
-        required = {'passport', 'national_id', 'photo', 'cv'}
+        # Burundian nationals can use National ID OR Passport; foreigners need Passport only
+        if app.nationality and app.nationality.upper() == 'BI':
+            has_id_doc = ('passport' in existing_types) or ('national_id' in existing_types)
+            required = {'photo'}
+            if not has_id_doc:
+                required.add('passport')  # will show as missing
+        else:
+            required = {'passport', 'photo'}
         missing = required - existing_types
         if missing:
             labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
@@ -8072,8 +8079,8 @@ def verify_manual(request):
         return Response({'detail': 'Staff access required.'}, status=403)
 
     lookup_type = request.data.get('lookup_type', '').strip()
-    if lookup_type not in ('code', 'name_email'):
-        return Response({'detail': 'lookup_type must be "code" or "name_email".'}, status=400)
+    if lookup_type not in ('code', 'name_email', 'name_search'):
+        return Response({'detail': 'lookup_type must be "code", "name_email", or "name_search".'}, status=400)
 
     ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
     if ip_address and ',' in ip_address:
@@ -8102,6 +8109,55 @@ def verify_manual(request):
             pass
 
         return Response({'valid': False, 'detail': 'No credential or ticket found for that code.'}, status=404)
+
+    if lookup_type == 'name_search':
+        name = request.data.get('name', '').strip()
+        if not name:
+            return Response({'detail': 'name is required for name_search.'}, status=400)
+        nationality = request.data.get('nationality', '').strip()
+        role = request.data.get('role', '').strip()
+
+        name_parts = name.split(None, 1)
+        first_part = name_parts[0]
+        last_part = name_parts[1] if len(name_parts) > 1 else ''
+
+        yd_qs = YouthDialogueApplication.objects.select_related('event').filter(
+            status='credential_issued',
+        )
+        if last_part:
+            yd_qs = yd_qs.filter(
+                Q(first_name__icontains=first_part, last_name__icontains=last_part) |
+                Q(first_name__icontains=last_part, last_name__icontains=first_part)
+            )
+        else:
+            yd_qs = yd_qs.filter(
+                Q(first_name__icontains=first_part) | Q(last_name__icontains=first_part)
+            )
+        if nationality:
+            yd_qs = yd_qs.filter(nationality__iexact=nationality)
+        if role:
+            yd_qs = yd_qs.filter(position__iexact=role)
+
+        yd_matches = list(yd_qs[:20])
+
+        if not yd_matches:
+            return Response({'valid': False, 'detail': 'No matches found.'}, status=404)
+
+        if len(yd_matches) == 1:
+            return _manual_yd_result(request, yd_matches[0], ip_address)
+
+        pick_list = []
+        for app in yd_matches:
+            pick_list.append({
+                'match_type': 'youth_dialogue',
+                'id': app.participant_code,
+                'name': f'{app.first_name} {app.last_name}',
+                'email': app.email,
+                'event': app.event.name if app.event else '',
+                'nationality': app.get_nationality_display(),
+                'role': app.position or '',
+            })
+        return Response({'multiple': True, 'matches': pick_list})
 
     # lookup_type == 'name_email'
     name = request.data.get('name', '').strip()
@@ -8274,6 +8330,51 @@ def _manual_event_result(request, submission, ip_address):
             'submission_id': submission.id,
         },
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def yd_scan_history(request):
+    """Return the current user's recent YD scan history for the scanner screen."""
+    if not request.user.is_staff:
+        return Response({'detail': 'Staff access required.'}, status=403)
+
+    logs = QRScanLog.objects.filter(
+        qr_type='youth_dialogue', scanned_by=request.user,
+    ).order_by('-scanned_at')[:100]
+
+    # Batch-fetch all referenced applications for efficiency
+    ref_ids = [log.reference_id for log in logs]
+    apps_by_code = {}
+    if ref_ids:
+        apps = YouthDialogueApplication.objects.filter(
+            participant_code__in=ref_ids,
+        ).select_related('event')
+        apps_by_code = {a.participant_code: a for a in apps}
+
+    results = []
+    for log in logs:
+        app = apps_by_code.get(log.reference_id)
+        if app:
+            role_name = app.position or 'Participant'
+            person_name = f'{app.first_name} {app.last_name}'
+        else:
+            role_name = ''
+            person_name = log.reference_id  # fallback to code
+
+        results.append({
+            'person_name': person_name,
+            'participant_code': log.reference_id,
+            'role': role_name,
+            'scanned_by': request.user.get_full_name() or request.user.username,
+            'scanned_at': log.scanned_at.isoformat(),
+            'is_duplicate': log.is_duplicate,
+            'scan_count': QRScanLog.objects.filter(
+                qr_type='youth_dialogue', reference_id=log.reference_id,
+            ).count(),
+        })
+
+    return Response({'results': results})
 
 
 def verify_qr_web(request):

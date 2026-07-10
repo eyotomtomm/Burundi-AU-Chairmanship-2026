@@ -101,6 +101,7 @@ urlpatterns = [
     # QR Code Verification
     path('verify-qr/', views.verify_qr, name='verify-qr'),
     path('verify-manual/', views.verify_manual, name='verify-manual'),
+    path('youth-dialogue/scan-history/', views.yd_scan_history, name='yd-scan-history'),
 
     # Event registrations
     path('my-registrations/', views.my_event_registrations, name='my-registrations'),

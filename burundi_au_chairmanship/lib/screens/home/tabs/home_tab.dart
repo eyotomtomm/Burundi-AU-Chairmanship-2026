@@ -1005,10 +1005,14 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     if (authProvider.isUsher && !dup('/yd-scanner', 'YD Scanner', 'Scanner YD')) {
       final ydScannerName = _ydSettings != null
           ? (langCode == 'fr'
-              ? (_ydSettings!['quick_access_title_fr'] as String? ?? '').isNotEmpty
-                  ? _ydSettings!['quick_access_title_fr'] as String
-                  : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue'
-              : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue')
+              ? (_ydSettings!['scanner_title_fr'] as String? ?? '').isNotEmpty
+                  ? _ydSettings!['scanner_title_fr'] as String
+                  : (_ydSettings!['quick_access_title_fr'] as String? ?? '').isNotEmpty
+                      ? _ydSettings!['quick_access_title_fr'] as String
+                      : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue'
+              : (_ydSettings!['scanner_title_en'] as String? ?? '').isNotEmpty
+                  ? _ydSettings!['scanner_title_en'] as String
+                  : _ydSettings!['quick_access_title_en'] as String? ?? 'Continental Dialogue')
           : 'Continental Dialogue';
       items.add(<String, dynamic>{
         'title': langCode == 'fr' ? 'Scanner $ydScannerName' : '$ydScannerName Scanner',

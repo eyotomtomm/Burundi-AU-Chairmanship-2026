@@ -560,6 +560,20 @@
                                 placeholder="Scanner QR"
                                 class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
                         </div>
+                        <div>
+                            <label for="sos_title" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">SOS Title (EN)</label>
+                            <input type="text" id="sos_title" name="sos_title"
+                                value="{{ settings.sos_title|default:'Emergency / SOS' }}"
+                                placeholder="Emergency / SOS"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="sos_title_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">SOS Title (FR)</label>
+                            <input type="text" id="sos_title_fr" name="sos_title_fr"
+                                value="{{ settings.sos_title_fr|default:'Urgence / SOS' }}"
+                                placeholder="Urgence / SOS"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
                     </div>
                 </div>
 

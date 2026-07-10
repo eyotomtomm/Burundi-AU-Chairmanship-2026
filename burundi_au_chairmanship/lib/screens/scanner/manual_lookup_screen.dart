@@ -24,13 +24,18 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
 
+  // By Name tab (name search with optional filters)
+  final _nameSearchController = TextEditingController();
+  final _nationalityController = TextEditingController();
+  final _roleController = TextEditingController();
+
   bool _loading = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() => _error = null);
@@ -44,6 +49,9 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
     _codeController.dispose();
     _nameController.dispose();
     _emailController.dispose();
+    _nameSearchController.dispose();
+    _nationalityController.dispose();
+    _roleController.dispose();
     super.dispose();
   }
 
@@ -66,11 +74,29 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
     await _performLookup(lookupType: 'name_email', name: name, email: email);
   }
 
+  Future<void> _lookupByName() async {
+    final name = _nameSearchController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Please enter a name to search.');
+      return;
+    }
+    final nationality = _nationalityController.text.trim();
+    final role = _roleController.text.trim();
+    await _performLookup(
+      lookupType: 'name_search',
+      name: name,
+      nationality: nationality.isNotEmpty ? nationality : null,
+      role: role.isNotEmpty ? role : null,
+    );
+  }
+
   Future<void> _performLookup({
     required String lookupType,
     String? code,
     String? name,
     String? email,
+    String? nationality,
+    String? role,
   }) async {
     setState(() {
       _loading = true;
@@ -83,6 +109,8 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
         code: code,
         name: name,
         email: email,
+        nationality: nationality,
+        role: role,
       );
 
       if (!mounted) return;
@@ -196,7 +224,16 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          '${m['email'] ?? ''}\n${m['event'] ?? ''}',
+                          [
+                            if ((m['nationality'] as String?)?.isNotEmpty == true)
+                              m['nationality'] as String,
+                            if ((m['role'] as String?)?.isNotEmpty == true)
+                              m['role'] as String,
+                            if ((m['email'] as String?)?.isNotEmpty == true)
+                              m['email'] as String,
+                            if ((m['event'] as String?)?.isNotEmpty == true)
+                              m['event'] as String,
+                          ].take(2).join('\n'),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -247,6 +284,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
           tabs: const [
             Tab(text: 'By ID / Code'),
             Tab(text: 'By Name & Email'),
+            Tab(text: 'By Name'),
           ],
         ),
       ),
@@ -255,6 +293,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
         children: [
           _buildCodeTab(isDark),
           _buildNameEmailTab(isDark),
+          _buildNameSearchTab(isDark),
         ],
       ),
     );
@@ -401,7 +440,7 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             ),
           ),
           const SizedBox(height: 20),
-          if (_error != null && _tabController.index == 1) ...[
+          if (_error != null && _tabController.index == 1 && !_loading) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -422,6 +461,124 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
             height: 50,
             child: ElevatedButton.icon(
               onPressed: _loading ? null : _lookupByNameEmail,
+              icon: _loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.search_rounded),
+              label: Text(
+                _loading ? 'Searching...' : 'Search',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.burundiGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNameSearchTab(bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Search by name',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Enter the person\'s name. Optionally filter by nationality or role.',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? Colors.white38 : Colors.black45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nameSearchController,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              hintText: 'Name (required)',
+              prefixIcon: const Icon(Icons.person_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _nationalityController,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              hintText: 'Nationality (optional, e.g. BI, RW, KE)',
+              prefixIcon: const Icon(Icons.flag_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _roleController,
+            textInputAction: TextInputAction.search,
+            textCapitalization: TextCapitalization.words,
+            onSubmitted: (_) => _lookupByName(),
+            decoration: InputDecoration(
+              hintText: 'Role (optional, e.g. Participant, Moderator)',
+              prefixIcon: const Icon(Icons.badge_rounded),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_error != null && _tabController.index == 2 && !_loading) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Text(
+                _error!,
+                style: TextStyle(color: Colors.red.shade800, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _loading ? null : _lookupByName,
               icon: _loading
                   ? const SizedBox(
                       width: 20,

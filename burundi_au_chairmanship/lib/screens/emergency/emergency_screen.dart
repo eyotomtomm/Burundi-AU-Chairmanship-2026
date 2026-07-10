@@ -17,6 +17,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   List<Map<String, dynamic>> _contacts = [];
   bool _isLoading = true;
   String? _error;
+  String _sosTitle = 'Emergency / SOS';
+  String _sosTitleFr = 'Urgence / SOS';
+  bool _liveAgentOnline = false;
 
   @override
   void initState() {
@@ -26,10 +29,20 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
   Future<void> _loadContacts() async {
     try {
-      final data = await ApiService().getEmergencyContacts();
+      final api = ApiService();
+      final results = await Future.wait([
+        api.getEmergencyContacts(),
+        api.getSettings(),
+      ]);
       if (mounted) {
+        final settings = results[1];
         setState(() {
-          _contacts = data;
+          _contacts = results[0] as List<Map<String, dynamic>>;
+          if (settings != null) {
+            _sosTitle = (settings.sosTitle.isNotEmpty) ? settings.sosTitle : 'Emergency / SOS';
+            _sosTitleFr = (settings.sosTitleFr.isNotEmpty) ? settings.sosTitleFr : 'Urgence / SOS';
+            _liveAgentOnline = settings.liveAgentOnline;
+          }
           _isLoading = false;
         });
       }
@@ -81,6 +94,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       case 'sms':
         uri = Uri.parse('sms:$value');
         break;
+      case 'email':
+        uri = Uri.parse('mailto:$value');
+        break;
       case 'whatsapp':
       case 'url':
         uri = Uri.parse(value);
@@ -94,6 +110,34 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
             SnackBar(content: Text('Could not open $value')),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _handleLiveAgent() async {
+    HapticFeedback.mediumImpact();
+    if (!_liveAgentOnline) return;
+    try {
+      final api = ApiService();
+      final result = await api.createTicket(
+        'Live Chat Support',
+        'Started a live chat session.',
+      );
+      if (mounted) {
+        Navigator.pushNamed(
+          context,
+          '/ticket-conversation',
+          arguments: result['id'],
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start live chat: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }
@@ -121,6 +165,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         return 'WhatsApp';
       case 'sms':
         return 'SMS';
+      case 'email':
+        return 'Email';
       case 'url':
         return 'Open';
       case 'route':
@@ -138,6 +184,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         return Icons.chat;
       case 'sms':
         return Icons.sms;
+      case 'email':
+        return Icons.email;
       case 'url':
         return Icons.open_in_new;
       case 'route':
@@ -151,6 +199,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final langCode = context.watch<LanguageProvider>().languageCode;
+    final title = langCode == 'fr' ? _sosTitleFr : _sosTitle;
 
     return Scaffold(
       body: _isLoading
@@ -193,9 +242,9 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                         pinned: true,
                         backgroundColor: const Color(0xFFE53935),
                         flexibleSpace: FlexibleSpaceBar(
-                          title: const Text(
-                            'Emergency / SOS',
-                            style: TextStyle(
+                          title: Text(
+                            title,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -264,6 +313,14 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                         ),
                       ),
 
+                      // Live Agent card
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverToBoxAdapter(
+                          child: _buildLiveAgentCard(isDark, langCode),
+                        ),
+                      ),
+
                       // Contacts grouped by category
                       ..._buildCategorySections(isDark, langCode),
 
@@ -272,6 +329,114 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildLiveAgentCard(bool isDark, String langCode) {
+    final cardColor = isDark ? AppColors.darkSurface : Colors.white;
+    final agentColor = _liveAgentOnline ? AppColors.burundiGreen : Colors.grey;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _liveAgentOnline ? () => _handleLiveAgent() : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Icon
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: agentColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.support_agent_rounded,
+                        color: agentColor, size: 28),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Live Agent',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _liveAgentOnline
+                                  ? (isDark ? Colors.white : Colors.black87)
+                                  : Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _liveAgentOnline
+                                  ? Colors.green
+                                  : Colors.grey[400],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              _liveAgentOnline ? 'ONLINE' : 'OFFLINE',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _liveAgentOnline
+                            ? (langCode == 'fr'
+                                ? 'Réponse rapide via le chat support'
+                                : 'Quick response via support chat')
+                            : (langCode == 'fr'
+                                ? 'Aucun agent disponible pour le moment'
+                                : 'No agents available right now'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _liveAgentOnline
+                              ? (isDark ? Colors.white60 : Colors.grey[600])
+                              : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_liveAgentOnline)
+                  Icon(Icons.chevron_right,
+                      color: isDark ? Colors.white54 : Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -427,7 +592,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                         ),
                       ],
                       if (actionType == 'call' ||
-                          actionType == 'sms') ...[
+                          actionType == 'sms' ||
+                          actionType == 'email') ...[
                         const SizedBox(height: 6),
                         Text(
                           contactValue,

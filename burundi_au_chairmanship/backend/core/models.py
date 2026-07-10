@@ -1656,6 +1656,10 @@ class AppSettings(models.Model):
     qr_scanner_title = models.CharField(max_length=100, blank=True, default='QR Scanner', help_text='QR Scanner quick access title (English)')
     qr_scanner_title_fr = models.CharField(max_length=100, blank=True, default='Scanner QR', help_text='QR Scanner quick access title (French)')
 
+    # SOS screen title
+    sos_title = models.CharField(max_length=100, blank=True, default='Emergency / SOS', help_text='SOS screen title (English)')
+    sos_title_fr = models.CharField(max_length=100, blank=True, default='Urgence / SOS', help_text='SOS screen title (French)')
+
     class Meta:
         verbose_name = 'App Settings'
         verbose_name_plural = 'App Settings'
@@ -2147,6 +2151,7 @@ class EmergencyContact(models.Model):
         ('call', 'Phone Call'),
         ('whatsapp', 'WhatsApp'),
         ('sms', 'SMS'),
+        ('email', 'Email'),
         ('url', 'Website / Link'),
         ('route', 'In-App Route'),
     ]
@@ -4755,6 +4760,11 @@ class YouthDialogueEvent(models.Model):
                                               help_text='Quick Access button title (EN)')
     quick_access_title_fr = models.CharField(max_length=50, blank=True, default='Dialogue Continental',
                                               help_text='Quick Access button title (FR)')
+
+    scanner_title_en = models.CharField(max_length=100, blank=True, default='',
+                                        help_text='Scanner screen title (English). Falls back to quick access title if blank.')
+    scanner_title_fr = models.CharField(max_length=100, blank=True, default='',
+                                        help_text='Scanner screen title (French). Falls back to quick access title if blank.')
 
     # Registration control
     is_registration_open = models.BooleanField(default=True, help_text='Whether new applications are accepted')

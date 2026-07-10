@@ -265,6 +265,8 @@ class AppSettingsModel {
   final String contactWebsite;
   final String contactWebsiteUrl;
   final String contactEmail;
+  final String sosTitle;
+  final String sosTitleFr;
 
   AppSettingsModel({
     required this.summitYear,
@@ -296,6 +298,8 @@ class AppSettingsModel {
     this.contactWebsite = 'burundi4africa.com',
     this.contactWebsiteUrl = 'https://burundi4africa.com',
     this.contactEmail = 'info@burundi4africa.com',
+    this.sosTitle = 'Emergency / SOS',
+    this.sosTitleFr = 'Urgence / SOS',
   });
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -329,6 +333,8 @@ class AppSettingsModel {
       contactWebsite: json['contact_website'] ?? 'burundi4africa.com',
       contactWebsiteUrl: json['contact_website_url'] ?? 'https://burundi4africa.com',
       contactEmail: json['contact_email'] ?? 'info@burundi4africa.com',
+      sosTitle: json['sos_title'] ?? 'Emergency / SOS',
+      sosTitleFr: json['sos_title_fr'] ?? 'Urgence / SOS',
     );
   }
 
@@ -351,6 +357,11 @@ class AppSettingsModel {
   String getFeaturesTitle(String langCode) {
     if (langCode == 'fr') return aboutFeaturesTitleFr.isNotEmpty ? aboutFeaturesTitleFr : aboutFeaturesTitle;
     return aboutFeaturesTitle.isNotEmpty ? aboutFeaturesTitle : aboutFeaturesTitleFr;
+  }
+
+  String getSosTitle(String langCode) {
+    if (langCode == 'fr') return sosTitleFr.isNotEmpty ? sosTitleFr : sosTitle;
+    return sosTitle.isNotEmpty ? sosTitle : sosTitleFr;
   }
 }
 

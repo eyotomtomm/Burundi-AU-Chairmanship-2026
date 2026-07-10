@@ -863,6 +863,7 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'about_features_title', 'about_features_title_fr',
                   'contact_website', 'contact_website_url', 'contact_email',
                   'qr_scanner_title', 'qr_scanner_title_fr',
+                  'sos_title', 'sos_title_fr',
                   'developer_role', 'app_ownership_text']
 
 
@@ -2198,6 +2199,7 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
             'is_visible', 'is_registration_open', 'min_app_version',
             'registration_closed_message', 'registration_closed_message_fr',
             'quick_access_icon_url', 'quick_access_title_en', 'quick_access_title_fr',
+            'scanner_title_en', 'scanner_title_fr',
             'banner_image_url', 'sponsors_image_url',
             'event_tagline', 'event_tagline_fr',
             'venue_name', 'venue_name_fr',

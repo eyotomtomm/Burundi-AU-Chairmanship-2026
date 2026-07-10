@@ -3785,6 +3785,9 @@ def app_settings(request):
         # QR Scanner titles
         settings.qr_scanner_title = request.POST.get('qr_scanner_title', '') or 'QR Scanner'
         settings.qr_scanner_title_fr = request.POST.get('qr_scanner_title_fr', '') or 'Scanner QR'
+        # SOS titles
+        settings.sos_title = request.POST.get('sos_title', '') or 'Emergency / SOS'
+        settings.sos_title_fr = request.POST.get('sos_title_fr', '') or 'Urgence / SOS'
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')
@@ -9122,6 +9125,8 @@ def youth_dialogue_event_form(request, event_pk=None):
         yd_event.min_app_version = request.POST.get('min_app_version', '').strip()
         yd_event.quick_access_title_en = request.POST.get('quick_access_title_en', 'Continental Dialogue')
         yd_event.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
+        yd_event.scanner_title_en = request.POST.get('scanner_title_en', '')
+        yd_event.scanner_title_fr = request.POST.get('scanner_title_fr', '')
         yd_event.registration_closed_message = request.POST.get('registration_closed_message', '')
         yd_event.registration_closed_message_fr = request.POST.get('registration_closed_message_fr', '')
         yd_event.support_email = request.POST.get('support_email', '')

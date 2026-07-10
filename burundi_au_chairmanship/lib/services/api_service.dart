@@ -1096,12 +1096,16 @@ class ApiService {
     String? code,
     String? name,
     String? email,
+    String? nationality,
+    String? role,
   }) async {
     final body = <String, dynamic>{
       'lookup_type': lookupType,
       if (code != null) 'code': code,
       if (name != null) 'name': name,
       if (email != null) 'email': email,
+      if (nationality != null) 'nationality': nationality,
+      if (role != null) 'role': role,
     };
     final data = await _post('verify-manual/', body, auth: true);
     return data as Map<String, dynamic>;

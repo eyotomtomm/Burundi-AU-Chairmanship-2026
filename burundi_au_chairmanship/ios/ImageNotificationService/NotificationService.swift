@@ -21,11 +21,24 @@ class NotificationService: UNNotificationServiceExtension {
             return
         }
 
-        // FCM puts the image URL in userInfo["fcm_options"]["image"]
-        guard let fcmOptions = bestAttemptContent.userInfo["fcm_options"] as? [String: Any],
-              let imageURLString = fcmOptions["image"] as? String,
+        // Try to find the image URL. FCM may place it in different locations
+        // depending on whether FirebaseAppDelegateProxyEnabled is on or off:
+        //   1. fcm_options.image  (when proxy swizzling is enabled)
+        //   2. image_url          (data payload — always delivered)
+        let imageURLString: String? = {
+            if let fcmOptions = bestAttemptContent.userInfo["fcm_options"] as? [String: Any],
+               let url = fcmOptions["image"] as? String, !url.isEmpty {
+                return url
+            }
+            if let url = bestAttemptContent.userInfo["image_url"] as? String, !url.isEmpty {
+                return url
+            }
+            return nil
+        }()
+
+        guard let imageURLString = imageURLString,
               let imageURL = URL(string: imageURLString) else {
-            logger.info("No image URL in fcm_options — delivering text-only")
+            logger.info("No image URL found in fcm_options or data payload — delivering text-only")
             contentHandler(bestAttemptContent)
             return
         }

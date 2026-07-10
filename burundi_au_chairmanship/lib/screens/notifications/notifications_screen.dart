@@ -111,7 +111,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       }
     });
     try {
-      await _apiService.post('notifications/$notificationId/mark-as-read/', {});
+      await _apiService.post('notifications/$notificationId/mark-as-read/', {}, auth: true);
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to mark notification as read: $e');
     }

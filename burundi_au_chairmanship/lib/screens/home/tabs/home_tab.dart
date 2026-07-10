@@ -94,11 +94,21 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   Timer? _announcementTimer;
   Map<String, dynamic>? _appSettings;
   bool _ydEligible = false;
+  bool _ydHasCredential = false;
   Map<String, dynamic>? _ydSettings;
   bool _showProfilePrompt = false;
   bool _profilePromptDismissed = false;
   final LikeService _likeService = LikeService();
   VoidCallback? _removeLikeListener;
+
+  bool _isYdComingSoon() {
+    if (_ydSettings == null) return false;
+    final startStr = _ydSettings!['registration_start_date']?.toString() ?? '';
+    if (startStr.isEmpty) return false;
+    final start = DateTime.tryParse(startStr);
+    if (start == null) return false;
+    return DateTime.now().isBefore(start);
+  }
 
   List<Map<String, dynamic>> get _heroSlides {
     if (_apiHeroSlides != null && _apiHeroSlides!.isNotEmpty) {
@@ -361,6 +371,12 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     if (isAuth) {
       api.youthDialogueEligibility().then((data) {
         if (mounted) setState(() => _ydEligible = data['eligible'] == true);
+      }).catchError((_) {});
+
+      api.youthDialogueStatus().then((data) {
+        if (mounted) {
+          setState(() => _ydHasCredential = data['has_credential'] == true);
+        }
       }).catchError((_) {});
     }
   }
@@ -843,8 +859,16 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             ? (langCode == 'fr' ? 'Connexion' : 'Sign in')
             : isUsher
                 ? (langCode == 'fr' ? 'Scanner' : 'Scan Only')
-                : '',
-        'badgeColor': !isLoggedIn ? '#9E9E9E' : isUsher ? '#9E9E9E' : '',
+                : ydIsOpen
+                    ? (langCode == 'fr' ? 'Ouvert' : 'Open')
+                    : _isYdComingSoon()
+                        ? (langCode == 'fr' ? 'Bientôt' : 'Coming Soon')
+                        : (langCode == 'fr' ? 'Fermé' : 'Closed'),
+        'badgeColor': !isLoggedIn ? '#9E9E9E'
+            : isUsher ? '#9E9E9E'
+            : ydIsOpen ? '#4CAF50'
+            : _isYdComingSoon() ? '#FF9800'
+            : '#9E9E9E',
         'locked': !isLoggedIn || isUsher || !ydIsOpen,
         'onTap': !isLoggedIn
             ? () => Navigator.pushNamed(context, '/auth')
@@ -1022,7 +1046,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         {'title': langCode == 'fr' ? 'Vidéos' : 'Videos', 'icon': Icons.play_circle_rounded, 'hasLiveDot': false, 'badgeText': badge('/videos'), 'badgeColor': badgeColor('/videos'), 'onTap': () => Navigator.pushNamed(context, '/videos')},
       if (!dup('/social-media', 'Follow Us', 'Suivez-nous'))
         {'title': langCode == 'fr' ? 'Suivez-nous' : 'Follow Us', 'icon': Icons.share_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/social-media')},
-      if (!dup('/emergency', 'SOS', 'SOS'))
+      if (_ydHasCredential && !dup('/emergency', 'SOS', 'SOS'))
         {'title': 'SOS', 'icon': Icons.sos_rounded, 'isEmergency': true, 'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Urgence' : 'Emergency', 'badgeColor': '#E53935', 'onTap': () => Navigator.pushNamed(context, '/emergency')},
     ];
     items.addAll(hardcoded);

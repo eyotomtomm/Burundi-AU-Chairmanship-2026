@@ -35,6 +35,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   Timer? _maintenanceTimer;
+  bool _showingVerificationPopup = false;
 
   @override
   void initState() {
@@ -106,9 +107,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Check if we should show popup
     final shouldShow = await verificationProvider.shouldShowStatusPopup();
-    if (!shouldShow || !mounted) return;
+    if (!shouldShow || !mounted || _showingVerificationPopup) return;
 
     if (status == 'approved') {
+      // Mark as shown BEFORE displaying the dialog to prevent duplicate
+      // popups when the app resumes or the user navigates while it's open.
+      _showingVerificationPopup = true;
+      await verificationProvider.markStatusPopupShown();
+
       // Show approval dialog with confetti celebration
       final badgeType = verificationProvider.badgeType ?? 'BLUE';
       HapticService.success();
@@ -118,8 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         badgeType: badgeType,
       );
 
-      // Mark as shown
-      await verificationProvider.markStatusPopupShown();
+      _showingVerificationPopup = false;
 
       // Refresh auth profile to get updated badge
       await authProvider.refreshProfile();

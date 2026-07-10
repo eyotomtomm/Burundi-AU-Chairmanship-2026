@@ -472,10 +472,11 @@ class FirebaseMessagingService {
       print('Data: ${message.data}');
     }
 
-    // Track notification open
+    // Track notification open and mark as read
     final notificationId = message.data['notification_id'];
     if (notificationId != null) {
       _trackNotificationOpened(notificationId);
+      _markAsRead(notificationId);
     }
 
     _navigateForMessage(message);
@@ -489,10 +490,11 @@ class FirebaseMessagingService {
       try {
         final payload = response.payload!;
 
-        // Extract notification_id from payload for open tracking
+        // Extract notification_id from payload for open tracking and mark as read
         final nidMatch = RegExp(r'\|nid:(\d+)').firstMatch(payload);
         if (nidMatch != null) {
           _trackNotificationOpened(nidMatch.group(1)!);
+          _markAsRead(nidMatch.group(1)!);
         }
 
         // Remove the nid suffix for route parsing
@@ -546,6 +548,22 @@ class FirebaseMessagingService {
   /// Back-compat shim: older code paths called ``_trackNotificationOpened``.
   Future<void> _trackNotificationOpened(String notificationId) =>
       _trackEvent(notificationId, 'opened');
+
+  /// Mark a notification as read on the backend. Fire-and-forget so it never
+  /// blocks navigation or crashes the app.
+  Future<void> _markAsRead(String notificationId) async {
+    try {
+      await ApiService().post(
+        'notifications/$notificationId/mark-as-read/',
+        {},
+        auth: true,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to mark notification $notificationId as read: $e');
+      }
+    }
+  }
 
   /// Read the user's current in-app language from SharedPreferences so the
   /// messaging service can forward it to the backend without pulling in a

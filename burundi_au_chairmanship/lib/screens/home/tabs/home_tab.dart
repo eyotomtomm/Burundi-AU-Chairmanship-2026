@@ -909,8 +909,11 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
       final filtered = _quickAccessItems!.where((m) {
         final rule = m['visibility_rule'] as String? ?? '';
-        if (rule.isEmpty) return true;
-        if (rule == 'youth_dialogue_accepted') return _ydEligible;
+        if (rule == 'youth_dialogue_accepted' && !_ydEligible) return false;
+        // Respect feature toggles for route-based items
+        final route = m['action_value'] as String? ?? '';
+        if (route == '/live-feeds' && _appSettings?['live_feeds_enabled'] == false) return false;
+        if (route == '/discussions' && _appSettings?['discussions_enabled'] == false) return false;
         return true;
       }).toList();
       items.addAll(filtered.map((m) {
@@ -1022,7 +1025,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     final hardcoded = <Map<String, dynamic>>[
       if (!dup('/magazine', 'Magazine', 'Magazine'))
         {'title': langCode == 'fr' ? 'Magazines' : 'Magazines', 'icon': Icons.menu_book_rounded, 'hasLiveDot': false, 'badgeText': badge('/magazine'), 'badgeColor': badgeColor('/magazine'), 'onTap': () => widget.onSwitchTab?.call(2)},
-      if (!dup('/live-feeds', 'Live Feeds', 'En direct'))
+      if (_appSettings?['live_feeds_enabled'] != false && !dup('/live-feeds', 'Live Feeds', 'En direct'))
         {'title': langCode == 'fr' ? 'En direct' : 'Live Feeds', 'icon': Icons.live_tv_rounded, 'hasLiveDot': false, 'badgeText': badge('/live-feeds'), 'badgeColor': badgeColor('/live-feeds'), 'onTap': () => Navigator.pushNamed(context, '/live-feeds')},
       if (!dup('/events', 'Events', 'Événements'))
         {'title': langCode == 'fr' ? 'Événements' : 'Events', 'icon': Icons.event_rounded, 'hasLiveDot': false, 'badgeText': badge('/calendar'), 'badgeColor': badgeColor('/calendar'), 'onTap': () => Navigator.pushNamed(context, '/events')},

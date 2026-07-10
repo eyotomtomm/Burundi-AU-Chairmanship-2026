@@ -135,7 +135,7 @@ def _on_support_ticket_created(sender, instance, created, **kwargs):
             notification_type='new_ticket',
             title='New support ticket',
             message=instance.subject,
-            link=f'/portal/support/{instance.pk}/',
+            link=f'/admin/support/{instance.pk}/',
             icon='support_agent',
         )
     except Exception:
@@ -153,7 +153,7 @@ def _on_verification_request_created(sender, instance, created, **kwargs):
             notification_type='new_verification',
             title='New verification request',
             message=f'from {username}',
-            link=f'/portal/verification-requests/{instance.pk}/review/',
+            link=f'/admin/verification-requests/{instance.pk}/review/',
             icon='verified',
         )
     except Exception:
@@ -170,7 +170,7 @@ def _on_user_created(sender, instance, created, **kwargs):
             notification_type='new_user',
             title='New user registered',
             message=instance.username,
-            link=f'/portal/users/{instance.pk}/edit/',
+            link=f'/admin/users/{instance.pk}/edit/',
             icon='person_add',
         )
     except Exception:

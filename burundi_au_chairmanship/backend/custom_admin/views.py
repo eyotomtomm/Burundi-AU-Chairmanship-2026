@@ -14,7 +14,8 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User as AuthUser
 from django.contrib import messages
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, Value
+from django.db.models.functions import Replace
 from django.http import JsonResponse, HttpResponse
 from axes.exceptions import AxesBackendRequestParameterRequired
 from django.views.decorators.http import require_POST
@@ -7290,7 +7291,7 @@ def admin_notifications_api(request):
                 'notification_type': n.notification_type,
                 'title': n.title,
                 'message': n.message,
-                'link': n.link,
+                'link': n.link.replace('/portal/', '/admin/', 1) if n.link.startswith('/portal/') else n.link,
                 'icon': n.icon,
                 'is_read': n.is_read,
                 'created_at': n.created_at.isoformat(),
@@ -7350,6 +7351,11 @@ def admin_notification_mark_read(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def admin_notifications_page(request):
     """Full page view of all admin notifications with filtering and pagination."""
+    # One-time fix: rewrite any legacy /portal/ links to /admin/
+    AdminNotification.objects.filter(link__startswith='/portal/').update(
+        link=Replace('link', Value('/portal/'), Value('/admin/'))
+    )
+
     filter_status = request.GET.get('status', 'all')
     qs = AdminNotification.objects.order_by('-created_at')
 

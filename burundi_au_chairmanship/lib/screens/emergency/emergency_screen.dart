@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../providers/language_provider.dart';
+import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 
 class EmergencyScreen extends StatefulWidget {
@@ -35,12 +36,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         api.getSettings(),
       ]);
       if (mounted) {
-        final settings = results[1];
+        final settings = results[1] as AppSettingsModel?;
         setState(() {
           _contacts = results[0] as List<Map<String, dynamic>>;
           if (settings != null) {
-            _sosTitle = (settings.sosTitle.isNotEmpty) ? settings.sosTitle : 'Emergency / SOS';
-            _sosTitleFr = (settings.sosTitleFr.isNotEmpty) ? settings.sosTitleFr : 'Urgence / SOS';
+            _sosTitle = settings.sosTitle.isNotEmpty ? settings.sosTitle : 'Emergency / SOS';
+            _sosTitleFr = settings.sosTitleFr.isNotEmpty ? settings.sosTitleFr : 'Urgence / SOS';
             _liveAgentOnline = settings.liveAgentOnline;
           }
           _isLoading = false;

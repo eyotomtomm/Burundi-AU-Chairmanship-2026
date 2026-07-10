@@ -6,7 +6,7 @@
 class AppConstants {
   // App Info (build-time constants)
   static const String appName = 'Be 4 Africa';
-  static const String appVersion = '1.2.18';
+  static const String appVersion = '1.2.19';
 
   // Storage Keys (build-time constants)
   static const String themeKey = 'theme_mode';

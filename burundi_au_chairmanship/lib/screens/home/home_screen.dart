@@ -109,7 +109,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final shouldShow = await verificationProvider.shouldShowStatusPopup();
     if (!shouldShow || !mounted || _showingVerificationPopup) return;
 
-    if (status == 'approved') {
+    final isAdminVerified = verificationProvider.isProfileVerified && status == null;
+
+    if (status == 'approved' || isAdminVerified) {
       // Mark as shown BEFORE displaying the dialog to prevent duplicate
       // popups when the app resumes or the user navigates while it's open.
       _showingVerificationPopup = true;

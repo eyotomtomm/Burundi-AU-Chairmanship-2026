@@ -97,6 +97,11 @@ class UserProfile(models.Model):
         help_text='Firebase Cloud Messaging token for push notifications'
     )
 
+    # Verification profile fields (filled by admin during verification)
+    organization = models.CharField(max_length=200, blank=True, help_text='Organization or company the user belongs to')
+    role = models.CharField(max_length=200, blank=True, help_text='Role or position within their organization')
+    social_media_url = models.URLField(max_length=500, blank=True, help_text='Primary social media profile URL (LinkedIn, X, etc.)')
+
     # Verification fields
     is_email_verified = models.BooleanField(default=False)
     is_government_official = models.BooleanField(default=False)

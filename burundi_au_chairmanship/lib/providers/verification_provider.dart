@@ -7,7 +7,6 @@ class VerificationProvider extends ChangeNotifier {
 
   Map<String, dynamic>? _verificationStatus;
   bool _isChecking = false;
-  String? _lastCheckedStatusKey;
 
   Map<String, dynamic>? get verificationStatus => _verificationStatus;
   bool get isChecking => _isChecking;
@@ -35,19 +34,6 @@ class VerificationProvider extends ChangeNotifier {
       // Only update if we got a valid response
       if (response['has_verification_request'] == true) {
         _verificationStatus = response;
-
-        // Track if we need to show popup using both request ID and status
-        // so that when status changes (e.g., pending -> approved), we detect it
-        final requestId = response['id']?.toString();
-        final status = response['status']?.toString();
-        final statusKey = '${requestId}_$status';
-
-        if (statusKey != _lastCheckedStatusKey) {
-          // Status changed - mark as needing popup
-          if (requestId != null) {
-            await _markStatusAsNew(requestId, status ?? '');
-          }
-        }
       } else if (response['is_verified'] == true) {
         // Admin verified user directly from backend without a verification request.
         // Store the response so isProfileVerified returns true.
@@ -70,38 +56,54 @@ class VerificationProvider extends ChangeNotifier {
     }
   }
 
+  /// Build the SharedPreferences key for tracking popup shown state.
+  /// Uses requestId + status when available, falls back to 'admin_verified'
+  /// for users verified directly by admin without a verification request.
+  String? _popupShownKey() {
+    if (_verificationStatus == null) return null;
+
+    final requestId = _verificationStatus!['id']?.toString();
+    final status = requestStatus;
+
+    if (requestId != null && status != null) {
+      return 'verification_popup_shown_${requestId}_$status';
+    }
+
+    // Admin-verified without a request — use a stable key per user
+    if (_verificationStatus!['is_verified'] == true) {
+      return 'verification_popup_shown_admin_verified';
+    }
+
+    return null;
+  }
+
   /// Check if we should show popup for current status
   Future<bool> shouldShowStatusPopup() async {
     if (_verificationStatus == null) return false;
 
-    final requestId = _verificationStatus!['id']?.toString();
-    if (requestId == null) return false;
-
-    final prefs = await SharedPreferences.getInstance();
     final status = requestStatus;
+    final isAdminVerified = _verificationStatus!['is_verified'] == true && status == null;
 
-    // Show popup for approved or rejected status (one time only per status change)
-    if (status == 'approved' || status == 'rejected') {
-      final shownKey = 'verification_popup_shown_${requestId}_$status';
-      final alreadyShown = prefs.getBool(shownKey) ?? false;
+    // Show popup for approved, rejected, or admin-verified (once per status)
+    if (status == 'approved' || status == 'rejected' || isAdminVerified) {
+      final key = _popupShownKey();
+      if (key == null) return false;
+
+      final prefs = await SharedPreferences.getInstance();
+      final alreadyShown = prefs.getBool(key) ?? false;
       return !alreadyShown;
     }
 
     return false;
   }
 
-  /// Mark status popup as shown
+  /// Mark status popup as shown — persisted permanently so it never shows again
   Future<void> markStatusPopupShown() async {
-    if (_verificationStatus == null) return;
+    final key = _popupShownKey();
+    if (key == null) return;
 
-    final requestId = _verificationStatus!['id']?.toString();
-    if (requestId == null) return;
-
-    final status = requestStatus;
     final prefs = await SharedPreferences.getInstance();
-    final shownKey = 'verification_popup_shown_${requestId}_$status';
-    await prefs.setBool(shownKey, true);
-    _lastCheckedStatusKey = '${requestId}_$status';
+    await prefs.setBool(key, true);
   }
 
   /// Submit appeal for rejected request
@@ -119,14 +121,6 @@ class VerificationProvider extends ChangeNotifier {
       if (kDebugMode) debugPrint('Error submitting appeal: $e');
       return false;
     }
-  }
-
-  /// Mark a new status change as requiring popup
-  Future<void> _markStatusAsNew(String requestId, String status) async {
-    final prefs = await SharedPreferences.getInstance();
-    final shownKey = 'verification_popup_shown_${requestId}_$status';
-    // Reset the shown flag for this new status
-    await prefs.remove(shownKey);
   }
 
   /// Cache verification state locally so we don't re-prompt on every launch
@@ -163,11 +157,12 @@ class VerificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Clear verification data (e.g., on logout)
+  /// Clear verification data (e.g., on logout).
+  /// Note: we do NOT clear the popup-shown SharedPreferences keys here
+  /// so that the congratulations popup never re-appears after logout/login.
   void clear() {
     _verificationStatus = null;
     _isChecking = false;
-    _lastCheckedStatusKey = null;
     notifyListeners();
   }
 }

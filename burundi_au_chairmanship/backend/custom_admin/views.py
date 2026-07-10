@@ -1744,15 +1744,66 @@ def user_edit(request, pk):
 
         target_user.save()
 
+        # Snapshot previous verification state before updating
+        was_verified = profile.is_verified
+        old_badge = profile.badge_type
+
         # Profile fields
         profile.phone_number = request.POST.get('phone_number', '')
         profile.nationality = request.POST.get('nationality', '')
         profile.gender = request.POST.get('gender', '')
-        profile.is_verified = request.POST.get('is_verified') == 'on'
         profile.badge_type = request.POST.get('badge_type') or None
+        # Auto-verify when a badge is assigned; keep manual checkbox for unbadged users
+        profile.is_verified = True if profile.badge_type else request.POST.get('is_verified') == 'on'
+        profile.organization = request.POST.get('organization', '').strip()
+        profile.role = request.POST.get('role', '').strip()
+        profile.social_media_url = request.POST.get('social_media_url', '').strip()
         profile.is_government_official = request.POST.get('is_government_official') == 'on'
         profile.is_usher = request.POST.get('is_usher') == 'on'
+        if profile.is_verified and not was_verified:
+            profile.verified_at = timezone.now()
         profile.save()
+
+        # Send push + email when user is newly verified or gets a new badge
+        newly_verified = profile.is_verified and (not was_verified or profile.badge_type != old_badge)
+        if newly_verified and profile.badge_type:
+            badge_label = {'GOLD': 'Gold', 'BLUE': 'Blue', 'GREEN': 'Green'}.get(profile.badge_type, profile.badge_type)
+            # Push notification
+            try:
+                from core.push_service import send_push_to_users
+                send_push_to_users(
+                    user_ids=[target_user.pk],
+                    title='Account Verified! 🎉',
+                    body=f'Congratulations! Your account has been verified with a {badge_label} Badge.',
+                    data={
+                        'type': 'verification_status_changed',
+                        'status': 'approved',
+                        'badge_type': profile.badge_type,
+                        'action_type': 'route',
+                        'action_value': '/profile',
+                    },
+                )
+            except Exception as e:
+                logger.warning(f'Manual verification push failed for user {target_user.pk}: {e}')
+            # Email
+            try:
+                from django.core.mail import send_mail
+                send_mail(
+                    subject='Congratulations! Your Account is Verified',
+                    message=(
+                        f'Dear {target_user.first_name or target_user.username},\n\n'
+                        f'Great news! Your account has been verified by our team. '
+                        f'You now have a {badge_label} Badge on your Be 4 Africa profile.\n\n'
+                        f'Open the app to see your verified badge.\n\n'
+                        f'Thank you for being part of the Be 4 Africa community.\n\n'
+                        f'Best regards,\nThe Be 4 Africa Team'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[target_user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
 
         messages.success(request, f'User "{target_user.username}" updated successfully!')
         return redirect('custom_admin:users_list')
@@ -2028,37 +2079,60 @@ def verification_request_review(request, pk):
             ver_request.reviewed_by = request.user
             ver_request.reviewed_at = timezone.now()
             ver_request.save()
-            # Update user profile
+            # Update user profile with badge + verification request data
             profile = ver_request.user.profile
             profile.is_verified = True
             profile.badge_type = badge_type
             profile.verified_at = timezone.now()
+            # Copy verification request info to profile
+            if ver_request.position_role:
+                profile.role = ver_request.position_role
+            if ver_request.phone_number:
+                profile.phone_number = f'{ver_request.country_code}{ver_request.phone_number}'.strip()
+            # Extract the professional email domain as organization if not already set
+            if not profile.organization and ver_request.email:
+                domain = ver_request.email.split('@')[-1].split('.')[0].title()
+                profile.organization = domain
+            # Copy first social media URL to profile
+            first_social = ver_request.social_media_profiles.first()
+            if first_social and not profile.social_media_url:
+                url = first_social.username_or_url
+                if not url.startswith('http'):
+                    url = f'https://{first_social.platform}.com/{url.lstrip("@")}'
+                profile.social_media_url = url
             profile.save()
             log_admin_action(
                 request, 'approve', 'VerificationRequest', object_id=pk,
                 object_repr=ver_request.full_name,
                 changes={'status': {'old': 'pending', 'new': 'approved'}, 'badge_type': {'old': '', 'new': badge_type}}
             )
-            # Send verification approval email
+            # Send verification approval email + push notification
             user = ver_request.user
+            badge_label = {'GOLD': 'Gold', 'BLUE': 'Blue', 'GREEN': 'Green'}.get(badge_type, badge_type)
             try:
                 from django.core.mail import send_mail
                 send_mail(
                     subject='Congratulations! Your Account is Verified',
-                    message=f'Dear {user.first_name or user.username},\n\nYour verification request has been approved. You now have a {badge_type} badge on your profile.\n\nThank you for being part of the Be 4 Africa community.\n\nBest regards,\nB4Africa Team',
+                    message=(
+                        f'Dear {user.first_name or user.username},\n\n'
+                        f'Great news! Your verification request has been approved. '
+                        f'You now have a {badge_label} Badge on your Be 4 Africa profile.\n\n'
+                        f'Open the app to see your verified badge.\n\n'
+                        f'Thank you for being part of the Be 4 Africa community.\n\n'
+                        f'Best regards,\nThe Be 4 Africa Team'
+                    ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[user.email],
                     fail_silently=True,
                 )
             except Exception:
                 pass
-            # Send push notification to the user
             try:
                 from core.push_service import send_push_to_users
                 send_push_to_users(
                     user_ids=[user.pk],
-                    title='Account Verified',
-                    body=f'Congratulations! Your account has been verified with a {badge_type} badge.',
+                    title='Account Verified! 🎉',
+                    body=f'Congratulations! Your account has been verified with a {badge_label} Badge.',
                     data={
                         'type': 'verification_status_changed',
                         'status': 'approved',

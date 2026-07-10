@@ -77,6 +77,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         _notifications = items;
         _isLoading = false;
       });
+      // Mark all as read as soon as the screen is opened
+      _markAllAsRead();
     } catch (e) {
       if (kDebugMode) debugPrint('Notifications load error: $e');
       setState(() {

@@ -78,6 +78,7 @@ class ApiService {
   Future<Map<String, String>> _headers({bool auth = false, bool noAutoAuth = false}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
+      'X-App-Version': AppConstants.appVersion,
     };
     // Persistent device ID for ban enforcement
     try {

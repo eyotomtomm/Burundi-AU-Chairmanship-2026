@@ -7024,6 +7024,20 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     """Continental Dialogue application pipeline endpoints."""
     permission_classes = [IsVerifiedUser]
 
+    @staticmethod
+    def _compare_versions(a, b):
+        """Compare two semver strings. Returns <0 if a<b, 0 if equal, >0 if a>b."""
+        def _parts(v):
+            try:
+                return [int(x) for x in v.split('.')]
+            except (ValueError, AttributeError):
+                return [0]
+        pa, pb = _parts(a), _parts(b)
+        for x, y in zip(pa + [0] * 3, pb + [0] * 3):
+            if x != y:
+                return x - y
+        return 0
+
     @action(detail=False, methods=['get'], url_path='settings', permission_classes=[AllowAny])
     def yd_settings(self, request):
         """Return Continental Dialogue branding, texts, and support contact info for the active event."""
@@ -7078,6 +7092,17 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
           - Legacy flat format: {field_name: value, ...}
         Known field names map to model columns; extras go to additional_data JSON.
         """
+        # Enforce minimum app version server-side so old clients cannot bypass
+        active_event = YouthDialogueEvent.get_active()
+        if active_event and active_event.min_app_version:
+            client_version = request.META.get('HTTP_X_APP_VERSION', '')
+            if not client_version or self._compare_versions(client_version, active_event.min_app_version) < 0:
+                return Response(
+                    {'detail': f'Please update your app to version {active_event.min_app_version} or later to apply.',
+                     'min_version': active_event.min_app_version},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         # Block banned devices from applying
         from core.models import YouthDialogueDeviceBan
         device_id = request.META.get('HTTP_X_DEVICE_ID', '')
@@ -7155,7 +7180,6 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             data=model_data, context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
-        active_event = YouthDialogueEvent.get_active()
         app = serializer.save(
             user=request.user, status='submitted',
             additional_data=additional_data,

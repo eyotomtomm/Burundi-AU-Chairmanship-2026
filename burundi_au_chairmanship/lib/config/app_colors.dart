@@ -39,4 +39,7 @@ class AppColors {
   static const Color error = Color(0xFFE11C23); // Burundi Red
   static const Color info = Color(0xFF996515); // Deep gold (5.74:1 on white)
 
+  // Scanner
+  static const Color scannerBlue = Color(0xFF1565C0);
+
 }

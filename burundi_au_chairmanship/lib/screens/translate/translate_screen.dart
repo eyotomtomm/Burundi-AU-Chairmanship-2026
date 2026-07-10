@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/api_service.dart';
 
 class TranslateScreen extends StatefulWidget {
   const TranslateScreen({super.key});
@@ -10,54 +11,59 @@ class TranslateScreen extends StatefulWidget {
 }
 
 class _TranslateScreenState extends State<TranslateScreen> {
-  String _selectedCategory = 'greetings';
+  List<_PhrasebookCategory> _categories = [];
+  int _selectedIndex = 0;
+  bool _loading = true;
+  String? _error;
 
-  static const Map<String, List<Map<String, String>>> _phrases = {
-    'greetings': [
-      {'kirundi': 'Amahoro', 'en': 'Hello / Peace', 'fr': 'Bonjour / Paix'},
-      {'kirundi': 'Mwaramutse', 'en': 'Good morning', 'fr': 'Bonjour (matin)'},
-      {'kirundi': 'Mwiriwe', 'en': 'Good afternoon', 'fr': 'Bon après-midi'},
-      {'kirundi': 'Ijoro ryiza', 'en': 'Good night', 'fr': 'Bonne nuit'},
-      {'kirundi': 'Urakoze', 'en': 'Thank you', 'fr': 'Merci'},
-      {'kirundi': 'Ego', 'en': 'Yes', 'fr': 'Oui'},
-      {'kirundi': 'Oya', 'en': 'No', 'fr': 'Non'},
-      {'kirundi': 'Bite?', 'en': 'How are you?', 'fr': 'Comment allez-vous?'},
-      {'kirundi': 'Ndagukunda', 'en': 'I love you', 'fr': 'Je t\'aime'},
-      {'kirundi': 'Turabonana', 'en': 'See you later', 'fr': 'À bientôt'},
-    ],
-    'directions': [
-      {'kirundi': 'Iburyo', 'en': 'Right', 'fr': 'Droite'},
-      {'kirundi': 'Ibubamfu', 'en': 'Left', 'fr': 'Gauche'},
-      {'kirundi': 'Ruguru', 'en': 'Straight ahead', 'fr': 'Tout droit'},
-      {'kirundi': 'Hafi', 'en': 'Near / Close', 'fr': 'Près'},
-      {'kirundi': 'Kure', 'en': 'Far', 'fr': 'Loin'},
-      {'kirundi': 'Mu gisagara', 'en': 'In the city', 'fr': 'En ville'},
-      {'kirundi': 'Ahabanza', 'en': 'First / Here', 'fr': 'Ici / D\'abord'},
-      {'kirundi': 'Aho', 'en': 'There', 'fr': 'Là-bas'},
-    ],
-    'diplomacy': [
-      {'kirundi': 'Umunyamabanga', 'en': 'Secretary', 'fr': 'Secrétaire'},
-      {'kirundi': 'Umukuru w\'igihugu', 'en': 'Head of State', 'fr': 'Chef d\'État'},
-      {'kirundi': 'Ambasade', 'en': 'Embassy', 'fr': 'Ambassade'},
-      {'kirundi': 'Ubumwe', 'en': 'Unity', 'fr': 'Unité'},
-      {'kirundi': 'Amajambere', 'en': 'Development', 'fr': 'Développement'},
-      {'kirundi': 'Demokarasi', 'en': 'Democracy', 'fr': 'Démocratie'},
-      {'kirundi': 'Intahe', 'en': 'Justice', 'fr': 'Justice'},
-      {'kirundi': 'Umugambi', 'en': 'Conference', 'fr': 'Conférence'},
-    ],
+  static const Map<String, IconData> _iconMap = {
+    'waving_hand': Icons.waving_hand_rounded,
+    'explore': Icons.explore_rounded,
+    'account_balance': Icons.account_balance_rounded,
+    'tag': Icons.tag_rounded,
+    'restaurant': Icons.restaurant_rounded,
+    'flight': Icons.flight_rounded,
+    'theater_comedy': Icons.theater_comedy_rounded,
+    'business_center': Icons.business_center_rounded,
+    'translate': Icons.translate_rounded,
   };
 
-  static const Map<String, IconData> _categoryIcons = {
-    'greetings': Icons.waving_hand_rounded,
-    'directions': Icons.explore_rounded,
-    'diplomacy': Icons.account_balance_rounded,
-  };
+  @override
+  void initState() {
+    super.initState();
+    _fetchPhrases();
+  }
 
-  static const Map<String, String> _categoryLabelsEn = {
-    'greetings': 'Greetings',
-    'directions': 'Directions',
-    'diplomacy': 'Diplomacy',
-  };
+  Future<void> _fetchPhrases() async {
+    try {
+      final data = await ApiService().get('phrasebook/');
+      final List<dynamic> items = data is List ? data : [];
+      setState(() {
+        _categories = items.map((cat) {
+          final phrases = (cat['phrases'] as List<dynamic>? ?? [])
+              .map((p) => _Phrase(
+                    kirundi: p['kirundi'] ?? '',
+                    english: p['english'] ?? '',
+                    french: p['french'] ?? '',
+                  ))
+              .toList();
+          return _PhrasebookCategory(
+            key: cat['category'] ?? '',
+            label: cat['label'] ?? '',
+            icon: _iconMap[cat['icon']] ?? Icons.translate_rounded,
+            phrases: phrases,
+          );
+        }).toList();
+        _selectedIndex = 0;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Could not load phrasebook.';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,11 +82,30 @@ class _TranslateScreenState extends State<TranslateScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: _buildPhrasebook(isDark, l10n),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off_rounded, size: 48, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                      const SizedBox(height: 12),
+                      Text(_error!, style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                      const SizedBox(height: 12),
+                      TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); _fetchPhrases(); }, child: const Text('Retry')),
+                    ],
+                  ),
+                )
+              : _categories.isEmpty
+                  ? Center(child: Text('No phrases available.', style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)))
+                  : _buildPhrasebook(isDark),
     );
   }
 
-  Widget _buildPhrasebook(bool isDark, AppLocalizations l10n) {
+  Widget _buildPhrasebook(bool isDark) {
+    final selectedCategory = _categories[_selectedIndex];
+
     return Column(
       children: [
         // Category chips
@@ -90,9 +115,9 @@ class _TranslateScreenState extends State<TranslateScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                children: _categoryIcons.entries.map((entry) {
-                  final isSelected = _selectedCategory == entry.key;
-                  final labels = _categoryLabelsEn;
+                children: List.generate(_categories.length, (i) {
+                  final cat = _categories[i];
+                  final isSelected = _selectedIndex == i;
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: FilterChip(
@@ -101,12 +126,12 @@ class _TranslateScreenState extends State<TranslateScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            entry.value,
+                            cat.icon,
                             size: 16,
                             color: isSelected ? Colors.white : (isDark ? AppColors.auGold : AppColors.burundiGreen),
                           ),
                           const SizedBox(width: 6),
-                          Text(labels[entry.key]!),
+                          Text(cat.label),
                         ],
                       ),
                       labelStyle: TextStyle(
@@ -119,10 +144,10 @@ class _TranslateScreenState extends State<TranslateScreen> {
                       side: BorderSide(
                         color: isSelected ? AppColors.burundiGreen : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
                       ),
-                      onSelected: (_) => setState(() => _selectedCategory = entry.key),
+                      onSelected: (_) => setState(() => _selectedIndex = i),
                     ),
                   );
-                }).toList(),
+                }),
               ),
             ),
           ),
@@ -142,7 +167,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Français', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.auGold)),
+                  child: Text('Fran\u00e7ais', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.auGold)),
                 ),
               ],
             ),
@@ -153,13 +178,13 @@ class _TranslateScreenState extends State<TranslateScreen> {
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _phrases[_selectedCategory]!.length,
+              itemCount: selectedCategory.phrases.length,
               separatorBuilder: (_, _) => Divider(
                 height: 1,
                 color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
               ),
               itemBuilder: (context, index) {
-                final phrase = _phrases[_selectedCategory]![index];
+                final phrase = selectedCategory.phrases[index];
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   child: Row(
@@ -167,7 +192,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                       Expanded(
                         flex: 2,
                         child: Text(
-                          phrase['kirundi']!,
+                          phrase.kirundi,
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -178,7 +203,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                       Expanded(
                         flex: 2,
                         child: Text(
-                          phrase['en']!,
+                          phrase.english,
                           style: TextStyle(
                             fontSize: 14,
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -188,7 +213,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                       Expanded(
                         flex: 2,
                         child: Text(
-                          phrase['fr']!,
+                          phrase.french,
                           style: TextStyle(
                             fontSize: 14,
                             color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -204,4 +229,26 @@ class _TranslateScreenState extends State<TranslateScreen> {
         ],
       );
   }
+}
+
+class _PhrasebookCategory {
+  final String key;
+  final String label;
+  final IconData icon;
+  final List<_Phrase> phrases;
+
+  _PhrasebookCategory({
+    required this.key,
+    required this.label,
+    required this.icon,
+    required this.phrases,
+  });
+}
+
+class _Phrase {
+  final String kirundi;
+  final String english;
+  final String french;
+
+  _Phrase({required this.kirundi, required this.english, required this.french});
 }

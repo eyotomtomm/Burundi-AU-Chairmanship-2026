@@ -48,6 +48,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       _notifications.where((n) => _isSystemType(n)).toList();
 
   bool _isSystemType(Map<String, dynamic> notification) {
+    // Use explicit source field from backend; fall back to type-based check
+    // for backward compatibility with older API responses
+    if (notification.containsKey('source')) {
+      return notification['source'] == 'system';
+    }
     final type = notification['notification_type'] as String? ?? 'general';
     return _systemTypes.contains(type);
   }
@@ -59,7 +64,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     });
 
     try {
-      final response = await _apiService.get('notifications/');
+      final response = await _apiService.get('notifications/', auth: true);
       List<Map<String, dynamic>> items;
       if (response is Map && response['results'] != null) {
         items = List<Map<String, dynamic>>.from(response['results']);
@@ -72,8 +77,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         _notifications = items;
         _isLoading = false;
       });
-      // Mark all as read on the server so the badge clears when user goes back
-      await _markAllAsRead();
     } catch (e) {
       if (kDebugMode) debugPrint('Notifications load error: $e');
       setState(() {
@@ -147,12 +150,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
     final adminUnread = _adminNotifications.where((n) => n['is_read'] != true).length;
     final systemUnread = _systemNotifications.where((n) => n['is_read'] != true).length;
+    final totalUnread = adminUnread + systemUnread;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.translate('notifications')),
         backgroundColor: AppColors.burundiGreen,
         foregroundColor: Colors.white,
+        actions: [
+          if (totalUnread > 0)
+            TextButton.icon(
+              onPressed: _markAllAsRead,
+              icon: const Icon(Icons.done_all_rounded, size: 18, color: Colors.white),
+              label: Text(
+                isFr ? 'Tout lire' : 'Read All',
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,

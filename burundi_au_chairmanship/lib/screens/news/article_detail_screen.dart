@@ -626,6 +626,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
                         ),
                         GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: _toggleLike,
                           child: _buildEngagementStat(
                             _article.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,

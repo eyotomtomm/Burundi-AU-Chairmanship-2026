@@ -308,6 +308,13 @@ class QrScanResultScreen extends StatelessWidget {
     final eventEndDate = details['event_end_date'] as String?;
     final eventLocation = details['event_location'] as String? ?? '';
     final revokedReason = details['revoked_reason'] as String? ?? '';
+    final sideEvent = details['side_event'] as String? ?? '';
+
+    // Field visibility config — empty list means all visible (backward compatible)
+    final scanVisibleFields = (details['scan_result_visible_fields'] as List<dynamic>?)
+        ?.map((e) => e.toString())
+        .toList() ?? [];
+    bool isFieldVisible(String key) => scanVisibleFields.isEmpty || scanVisibleFields.contains(key);
 
     return Container(
       width: double.infinity,
@@ -371,43 +378,45 @@ class QrScanResultScreen extends StatelessWidget {
             child: Column(
               children: [
                 // Photo with border ring
-                Container(
-                  width: 110,
-                  height: 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isValid ? roleColor : Colors.red.shade400,
-                      width: 3,
+                if (isFieldVisible('photo'))
+                  Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isValid ? roleColor : Colors.red.shade400,
+                        width: 3,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: idPhotoUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: idPhotoUrl,
+                              width: 104,
+                              height: 104,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => Container(
+                                color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                                child: const Icon(Icons.person, size: 48, color: Colors.grey),
+                              ),
+                              errorWidget: (_, _, _) => Container(
+                                color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                                child: const Icon(Icons.person, size: 48, color: Colors.grey),
+                              ),
+                            )
+                          : Container(
+                              width: 104,
+                              height: 104,
+                              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                              child: const Icon(Icons.person, size: 48, color: Colors.grey),
+                            ),
                     ),
                   ),
-                  child: ClipOval(
-                    child: idPhotoUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: idPhotoUrl,
-                            width: 104,
-                            height: 104,
-                            fit: BoxFit.cover,
-                            placeholder: (_, _) => Container(
-                              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-                              child: const Icon(Icons.person, size: 48, color: Colors.grey),
-                            ),
-                            errorWidget: (_, _, _) => Container(
-                              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-                              child: const Icon(Icons.person, size: 48, color: Colors.grey),
-                            ),
-                          )
-                        : Container(
-                            width: 104,
-                            height: 104,
-                            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-                            child: const Icon(Icons.person, size: 48, color: Colors.grey),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                if (isFieldVisible('photo'))
+                  const SizedBox(height: 16),
 
-                // Full name
+                // Full name (always visible)
                 Text(
                   personName,
                   textAlign: TextAlign.center,
@@ -420,46 +429,49 @@ class QrScanResultScreen extends StatelessWidget {
                 const SizedBox(height: 8),
 
                 // Role badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: roleColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: roleColor.withValues(alpha: 0.4)),
-                  ),
-                  child: Text(
-                    role,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? roleColor : HSLColor.fromColor(roleColor).withLightness(0.3).toColor(),
+                if (isFieldVisible('role'))
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: roleColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: roleColor.withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      role,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? roleColor : HSLColor.fromColor(roleColor).withLightness(0.3).toColor(),
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 20),
 
                 // Divider
                 Divider(color: isDark ? Colors.white12 : Colors.black12),
                 const SizedBox(height: 12),
 
-                // Info rows
-                if (nationality.isNotEmpty)
+                // Info rows (with visibility checks)
+                if (isFieldVisible('nationality') && nationality.isNotEmpty)
                   _credentialRow(Icons.flag_rounded, 'Nationality', '$nationalityFlag $nationality', isDark),
-                if (organization.isNotEmpty)
+                if (isFieldVisible('organization') && organization.isNotEmpty)
                   _credentialRow(Icons.business_rounded, 'Organization', organization, isDark),
-                if (eventStartDate != null || eventEndDate != null)
+                if (isFieldVisible('event_dates') && (eventStartDate != null || eventEndDate != null))
                   _credentialRow(Icons.calendar_today_rounded, 'Event Dates',
                       _formatEventDates(eventStartDate, eventEndDate), isDark),
-                if (eventLocation.isNotEmpty)
+                if (isFieldVisible('event_location') && eventLocation.isNotEmpty)
                   _credentialRow(Icons.location_on_rounded, 'Location', eventLocation, isDark),
-                if (email.isNotEmpty)
+                if (isFieldVisible('email') && email.isNotEmpty)
                   _credentialRow(Icons.email_rounded, 'Email', email, isDark),
-                if (participantCode.isNotEmpty)
+                if (isFieldVisible('participant_code') && participantCode.isNotEmpty)
                   _credentialRow(Icons.confirmation_number_rounded, 'Participant Code', participantCode, isDark),
-                if (referenceId.isNotEmpty)
+                if (isFieldVisible('reference_id') && referenceId.isNotEmpty)
                   _credentialRow(Icons.tag_rounded, 'Reference ID', referenceId, isDark),
-                if (credentialIssuedAt != null)
+                if (isFieldVisible('credential_issued_at') && credentialIssuedAt != null)
                   _credentialRow(Icons.verified_rounded, 'Credential Issued', _formatDateTime(credentialIssuedAt), isDark),
+                if (isFieldVisible('side_event') && sideEvent.isNotEmpty)
+                  _credentialRow(Icons.event_rounded, 'Side Event', sideEvent, isDark),
                 if (revokedReason.isNotEmpty)
                   _credentialRow(Icons.block_rounded, 'Revocation Reason', revokedReason, isDark,
                       valueColor: Colors.red.shade700),

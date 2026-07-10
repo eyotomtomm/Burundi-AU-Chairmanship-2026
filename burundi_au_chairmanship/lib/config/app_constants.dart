@@ -6,7 +6,7 @@
 class AppConstants {
   // App Info (build-time constants)
   static const String appName = 'Be 4 Africa';
-  static const String appVersion = '1.2.14';
+  static const String appVersion = '1.2.16';
 
   // Storage Keys (build-time constants)
   static const String themeKey = 'theme_mode';
@@ -16,7 +16,7 @@ class AppConstants {
   static const String onboardingKey = 'onboarding_complete';
 
   // Animation Durations (build-time constants)
-  static const Duration splashMinDuration = Duration(milliseconds: 1500);
+  static const Duration splashMinDuration = Duration(milliseconds: 3000);
   static const Duration splashMaxDuration = Duration(seconds: 6);
   static const Duration animationDuration = Duration(milliseconds: 300);
   static const Duration longAnimationDuration = Duration(milliseconds: 500);

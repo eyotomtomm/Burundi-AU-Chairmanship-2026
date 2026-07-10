@@ -150,7 +150,13 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.of(context).pushReplacementNamed('/home');
       }
     } else {
-      Navigator.of(context).pushReplacementNamed('/auth');
+      // If user previously chose to continue as guest, skip auth screen
+      final isGuest = prefs.getBool('guest_mode') ?? false;
+      if (isGuest) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/auth');
+      }
     }
   }
 

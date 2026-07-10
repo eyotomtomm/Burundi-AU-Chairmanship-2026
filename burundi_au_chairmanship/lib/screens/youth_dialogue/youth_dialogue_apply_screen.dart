@@ -5,14 +5,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../config/app_colors.dart';
 import '../../models/event_registration_model.dart';
+import '../../models/youth_dialogue_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 
 class YouthDialogueApplyScreen extends StatefulWidget {
   final List<RegistrationFormField> formFields;
+  final List<YouthDialogueSideEvent> sideEvents;
   final String programmeTitle;
 
-  const YouthDialogueApplyScreen({super.key, required this.formFields, this.programmeTitle = 'Continental Dialogue'});
+  const YouthDialogueApplyScreen({super.key, required this.formFields, this.sideEvents = const [], this.programmeTitle = 'Continental Dialogue'});
 
   @override
   State<YouthDialogueApplyScreen> createState() => _YouthDialogueApplyScreenState();
@@ -28,6 +30,9 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   final Map<String, TextEditingController> _formControllers = {};
   final Map<String, dynamic> _formValues = {};
   final Map<String, File> _pickedFiles = {};
+
+  // Side events selection
+  final Set<int> _selectedSideEventIds = {};
 
   // Phone country code state
   String _phoneCountryCode = '+257'; // Default Burundi
@@ -422,6 +427,11 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         formData['position'] = _formValues['position'];
       }
 
+      // Include selected side events
+      if (_selectedSideEventIds.isNotEmpty) {
+        formData['selected_side_events'] = _selectedSideEventIds.toList();
+      }
+
       await ApiService().youthDialogueApply({'form_data': formData});
       if (!mounted) return;
       setState(() => _submitted = true);
@@ -605,6 +615,67 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         .where((f) => !f.fieldName.toLowerCase().contains('motivation'))
         .toList();
 
+    // Build ordered form widgets:
+    // Title > name fields > email > phone > dob > gender > nationality > organization > position > side events > remaining
+    final hasBackendTitle = activeFields.any((f) => f.fieldName == 'title');
+    final hasBackendPosition = activeFields.any((f) => f.fieldName == 'position');
+
+    // Desired field ordering — fields listed here render in this sequence;
+    // any backend field whose fieldName is NOT in this list renders afterwards.
+    const _fieldOrder = [
+      'title', 'first_name', 'last_name', 'name', 'email', 'phone_number',
+      'date_of_birth', 'gender', 'nationality', 'country_code',
+      'organization', 'position',
+    ];
+
+    int _orderOf(String fieldName) {
+      final idx = _fieldOrder.indexOf(fieldName);
+      return idx >= 0 ? idx : _fieldOrder.length;
+    }
+
+    // Sort backend fields to match desired order (stable sort preserves
+    // relative order of fields not in _fieldOrder).
+    final sortedFields = List<RegistrationFormField>.from(activeFields)
+      ..sort((a, b) {
+        final oa = _orderOf(a.fieldName);
+        final ob = _orderOf(b.fieldName);
+        if (oa != ob) return oa.compareTo(ob);
+        return a.order.compareTo(b.order);
+      });
+
+    // Build widget list with fixed dropdowns injected at the right spots
+    final formWidgets = <Widget>[];
+
+    // If title is not a backend field, inject it first
+    if (!hasBackendTitle) {
+      formWidgets.add(_buildFixedDropdown('title', 'Title', 'Select title', _titleOptions, isDark, isRequired: true));
+    }
+
+    bool positionInserted = hasBackendPosition; // already handled if backend field
+    for (final field in sortedFields) {
+      formWidgets.add(_buildFormField(field, langCode, isDark));
+
+      // After 'organization' (or after the last personal-info field), inject position if needed
+      if (!positionInserted && (field.fieldName == 'organization' || field.fieldName == 'nationality')) {
+        // Don't insert yet if organization comes later
+        final hasOrg = sortedFields.any((f) => f.fieldName == 'organization');
+        if (!hasOrg || field.fieldName == 'organization') {
+          formWidgets.add(_buildFixedDropdown('position', 'Position / Role', 'Select position', _positionOptions, isDark, isRequired: true));
+          positionInserted = true;
+        }
+      }
+    }
+
+    // If position still hasn't been inserted (no organization/nationality field), add at end
+    if (!positionInserted) {
+      formWidgets.add(_buildFixedDropdown('position', 'Position / Role', 'Select position', _positionOptions, isDark, isRequired: true));
+    }
+
+    // Side events at the end
+    if (widget.sideEvents.isNotEmpty) {
+      formWidgets.add(_buildSideEventsSection(langCode, isDark));
+    }
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -624,15 +695,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             _buildEmailVerificationBanner(isDark),
             const SizedBox(height: 16),
 
-            // Title dropdown (always shown)
-            if (!activeFields.any((f) => f.fieldName == 'title'))
-              _buildFixedDropdown('title', 'Title', 'Select title', _titleOptions, isDark, isRequired: true),
-
-            // Position dropdown (always shown)
-            if (!activeFields.any((f) => f.fieldName == 'position'))
-              _buildFixedDropdown('position', 'Position / Role', 'Select position', _positionOptions, isDark, isRequired: true),
-
-            ...activeFields.map((field) => _buildFormField(field, langCode, isDark)),
+            ...formWidgets,
 
             const SizedBox(height: 16),
 
@@ -654,6 +717,61 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             const SizedBox(height: 40),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSideEventsSection(String langCode, bool isDark) {
+    final isFr = langCode == 'fr';
+    final textColor = isDark ? Colors.white70 : Colors.black87;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isFr ? 'Événements parallèles' : 'Side Events',
+            style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              isFr ? 'Choisissez un événement auquel vous souhaitez participer' : 'Choose one event you would like to attend',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.sideEvents.map((se) {
+              final isSelected = _selectedSideEventIds.contains(se.id);
+              final label = se.getName(langCode);
+              return ChoiceChip(
+                label: Text(label),
+                selected: isSelected,
+                onSelected: (val) {
+                  setState(() {
+                    _selectedSideEventIds.clear();
+                    if (val) {
+                      _selectedSideEventIds.add(se.id);
+                    }
+                  });
+                },
+                selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
+                checkmarkColor: AppColors.burundiGreen,
+                labelStyle: TextStyle(
+                  color: isSelected ? AppColors.burundiGreen : textColor,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: isSelected ? AppColors.burundiGreen : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

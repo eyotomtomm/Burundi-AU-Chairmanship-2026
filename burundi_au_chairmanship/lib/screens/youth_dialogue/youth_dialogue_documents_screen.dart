@@ -26,8 +26,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
   static const _defaultDocs = [
     {'type': 'passport', 'label': 'Passport Copy', 'label_fr': 'Copie du Passeport'},
     {'type': 'national_id', 'label': 'National ID', 'label_fr': "Carte d'Identité"},
-    {'type': 'photo', 'label': 'Passport Photo', 'label_fr': "Photo d'Identité"},
-    {'type': 'cv', 'label': 'CV / Resume', 'label_fr': 'CV / Résumé'},
+    {'type': 'photo', 'label': 'Photo', 'label_fr': 'Photo'},
   ];
 
   static const _iconMap = {
@@ -54,6 +53,11 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     } catch (_) {
       return 'en';
     }
+  }
+
+  bool get _isBurundian {
+    final nat = _application?.nationality.toUpperCase() ?? '';
+    return nat == 'BI';
   }
 
   String _docLabel(Map<String, dynamic> doc) {
@@ -107,10 +111,21 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
         _requiredDocs = List<Map<String, dynamic>>.from(_defaultDocs);
       }
 
+      YouthDialogueApplication? app;
+      if (status['has_application'] == true) {
+        app = YouthDialogueApplication.fromJson(status);
+      }
+
+      // Filter documents based on nationality:
+      // - Burundian (BI): can upload either National ID or Passport (both shown)
+      // - Non-Burundian: must upload Passport only (no National ID option)
+      final nationality = app?.nationality.toUpperCase() ?? '';
+      if (nationality.isNotEmpty && nationality != 'BI') {
+        _requiredDocs.removeWhere((d) => _docKey(d) == 'national_id');
+      }
+
       setState(() {
-        if (status['has_application'] == true) {
-          _application = YouthDialogueApplication.fromJson(status);
-        }
+        _application = app;
         _isLoading = false;
       });
     } catch (e) {
@@ -726,6 +741,33 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   ),
                 ],
                 const SizedBox(height: 20),
+
+                // For Burundians: show hint that only one ID document is needed
+                if (_isBurundian) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.burundiGreen.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 18, color: AppColors.burundiGreen),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _isFr() == 'fr'
+                                ? 'Veuillez télécharger soit votre carte d\'identité nationale, soit votre passeport.'
+                                : 'Please upload either your National ID or Passport.',
+                            style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 ..._requiredDocs.map((req) {
                   final type = _docKey(req);

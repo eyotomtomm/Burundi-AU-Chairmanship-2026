@@ -316,8 +316,11 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                         ],
                         // Like button
                         GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: _toggleLike,
-                          child: Row(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
                             children: [
                               Icon(
                                 likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -342,6 +345,7 @@ class _YouTubePlayerScreenState extends State<YouTubePlayerScreen> {
                                 ),
                               ),
                             ],
+                          ),
                           ),
                         ),
                         if (likeState.recentLikers.isNotEmpty) ...[

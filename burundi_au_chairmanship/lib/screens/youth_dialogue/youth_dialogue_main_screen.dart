@@ -12,6 +12,7 @@ import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/app_update_dialog.dart';
 import '../../widgets/confetti_overlay.dart';
 import 'youth_dialogue_apply_screen.dart';
 
@@ -29,6 +30,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   YouthDialogueApplication? _application;
   Map<String, dynamic>? _settings;
   List<RegistrationFormField> _formFields = [];
+  List<YouthDialogueSideEvent> _sideEvents = [];
   bool _showApprovalBanner = false;
   DateTime? _lastChecked;
   bool _isRefreshing = false;
@@ -48,7 +50,17 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       ]);
       if (!mounted) return;
 
+      final settingsData = results[0];
       final statusData = results[1];
+
+      // Check if device is banned from Continental Dialogue
+      final isBanned = settingsData['is_device_banned'] == true ||
+          statusData['is_device_banned'] == true;
+      if (isBanned && mounted) {
+        _showBannedAndPop();
+        return;
+      }
+
       final hasApp = statusData['has_application'] == true;
       YouthDialogueApplication? app;
       if (hasApp) {
@@ -66,7 +78,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
           showAcceptedDialog = true;
         }
       }
-      if (app != null && app.status == 'credential_issued') {
+      if (app != null && app.status == 'credential_issued' && !app.isRevoked) {
         final prefs = await SharedPreferences.getInstance();
         final key = 'yd_credential_issued_seen_${app.id}';
         if (!prefs.containsKey(key)) {
@@ -75,11 +87,16 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       }
 
       setState(() {
-        _settings = results[0];
+        _settings = settingsData;
         final rawFields = _settings?['form_fields'] as List<dynamic>? ?? [];
         _formFields = rawFields
             .map((f) => RegistrationFormField.fromJson(f as Map<String, dynamic>))
             .where((f) => f.isActive)
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+        final rawSideEvents = _settings?['side_events'] as List<dynamic>? ?? [];
+        _sideEvents = rawSideEvents
+            .map((se) => YouthDialogueSideEvent.fromJson(se as Map<String, dynamic>))
             .toList()
           ..sort((a, b) => a.order.compareTo(b.order));
         _hasApplication = hasApp;
@@ -115,6 +132,33 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _showBannedAndPop() {
+    setState(() => _isLoading = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final isFr = Localizations.localeOf(context).languageCode == 'fr';
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(isFr ? 'Acc\u00e8s refus\u00e9' : 'Access Denied'),
+          content: Text(isFr
+              ? 'Vous avez \u00e9t\u00e9 banni de ce programme.'
+              : 'You have been banned from this programme.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (mounted) Navigator.of(context).pop();
+              },
+              child: Text(isFr ? 'OK' : 'OK'),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Future<void> _refreshStatus() async {
@@ -209,6 +253,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
           slivers: [
             _buildHeroAppBar(isDark, isFr),
             SliverToBoxAdapter(child: _buildSponsorsSection(isDark, isFr)),
+            SliverToBoxAdapter(child: _buildKeyDatesSection(isDark, isFr)),
             SliverToBoxAdapter(child: _buildInfoBar(isDark, isFr)),
             SliverToBoxAdapter(child: _buildAboutSection(isDark, isFr)),
             SliverToBoxAdapter(child: _buildHighlightsSection(isDark, isFr)),
@@ -236,16 +281,10 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     final dateRange = _formatDateRange(isFr);
     final location = _settings?['location']?.toString() ?? '';
 
-    // Language-specific local logos
-    final dialogueLogo = isFr
-        ? 'assets/images/youth_dialogue/dialogue_logo_fr.png'
-        : 'assets/images/youth_dialogue/dialogue_logo_en.png';
-    const b4AfricaLogo = 'assets/images/youth_dialogue/b4_africa_logo.png';
-
     return SliverAppBar(
       expandedHeight: 420,
       pinned: true,
-      backgroundColor: AppColors.burundiGreen,
+      backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFF1B3A2D),
       foregroundColor: Colors.white,
       actions: [
         _buildLanguageToggle(),
@@ -254,17 +293,18 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            // Background: banner image or rich gradient
+            // Background: banner/poster image or gradient
             if (bannerUrl.isNotEmpty)
               CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(bannerUrl),
                 fit: BoxFit.cover,
-                placeholder: (_, __) => _buildGradientBackground(''),
+                fadeInDuration: const Duration(milliseconds: 200),
+                placeholder: (_, __) => Container(color: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5)),
                 errorWidget: (_, __, ___) => _buildGradientBackground(''),
               )
             else
               _buildGradientBackground(''),
-            // Subtle pattern overlay
+            // Bottom gradient for readability
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -279,79 +319,6 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                     stops: const [0.0, 0.35, 1.0],
                   ),
                 ),
-              ),
-            ),
-            // ── Logos centered in upper area ──
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 80,
-              child: Column(
-                children: [
-                  // Dual logo row: Dialogue Logo + divider + B4 Africa
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Dialogue logo (EN or FR)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 20, offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          dialogueLogo,
-                          height: 90,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                      // Elegant divider
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        child: Container(
-                          width: 1.5, height: 50,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.white.withValues(alpha: 0.1),
-                                Colors.white.withValues(alpha: 0.6),
-                                Colors.white.withValues(alpha: 0.1),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // B4 Africa logo
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 20, offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          b4AfricaLogo,
-                          height: 90,
-                          width: 120,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
             // ── Title + tagline + chips at bottom ──
@@ -495,6 +462,126 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Key Dates Section ───────────────────────────────────────
+  Widget _buildKeyDatesSection(bool isDark, bool isFr) {
+    final regStartStr = _settings?['registration_start_date']?.toString() ?? '';
+    final regEndStr = _settings?['registration_end_date']?.toString() ?? '';
+    final evtStartStr = _settings?['event_start_date']?.toString() ?? '';
+    final evtEndStr = _settings?['event_end_date']?.toString() ?? '';
+
+    final hasRegistration = regStartStr.isNotEmpty || regEndStr.isNotEmpty;
+    final hasEvent = evtStartStr.isNotEmpty || evtEndStr.isNotEmpty;
+
+    if (!hasRegistration && !hasEvent) return const SizedBox.shrink();
+
+    final locale = isFr ? 'fr' : 'en';
+
+    String formatDateCard(String startStr, String endStr) {
+      final start = DateTime.tryParse(startStr);
+      final end = endStr.isNotEmpty ? DateTime.tryParse(endStr) : null;
+      if (start == null) {
+        if (end != null) return DateFormat('MMM d, y', locale).format(end);
+        return '';
+      }
+      if (end != null && end != start) {
+        if (start.year == end.year) {
+          if (start.month == end.month) {
+            return '${DateFormat('MMM d', locale).format(start)} – ${DateFormat('d', locale).format(end)}\n${DateFormat('y', locale).format(start)}';
+          }
+          return '${DateFormat('MMM d', locale).format(start)} – ${DateFormat('MMM d', locale).format(end)}\n${DateFormat('y', locale).format(start)}';
+        }
+        return '${DateFormat('MMM d, y', locale).format(start)} –\n${DateFormat('MMM d, y', locale).format(end)}';
+      }
+      return '${DateFormat('MMM d', locale).format(start)}\n${DateFormat('y', locale).format(start)}';
+    }
+
+    Widget buildDateCard({
+      required String title,
+      required String dateText,
+      required Color accentColor,
+      required IconData icon,
+    }) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: accentColor.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 20, color: accentColor),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: accentColor,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                dateText,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        children: [
+          if (hasRegistration)
+            buildDateCard(
+              title: isFr ? 'Inscription' : 'Registration',
+              dateText: formatDateCard(regStartStr, regEndStr),
+              accentColor: AppColors.burundiGreen,
+              icon: Icons.edit_calendar_rounded,
+            ),
+          if (hasRegistration && hasEvent) const SizedBox(width: 12),
+          if (hasEvent)
+            buildDateCard(
+              title: isFr ? 'Jour de l\'événement' : 'Event Day',
+              dateText: formatDateCard(evtStartStr, evtEndStr),
+              accentColor: AppColors.burundiRed,
+              icon: Icons.event_rounded,
+            ),
+        ],
       ),
     );
   }
@@ -953,7 +1040,9 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
               height: 50,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  if (_application!.status == 'credential_issued') {
+                  if (_application!.isRevoked) {
+                    _navigateToStatusPage(isFr);
+                  } else if (_application!.status == 'credential_issued') {
                     Navigator.pushNamed(context, '/youth-dialogue-credential').then((_) => _loadData());
                   } else if (['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)) {
                     Navigator.pushNamed(context, '/youth-dialogue-documents').then((_) => _loadData());
@@ -962,25 +1051,31 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   }
                 },
                 icon: Icon(
-                  _application!.status == 'credential_issued'
-                      ? Icons.badge_rounded
-                      : ['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)
-                          ? Icons.upload_rounded
-                          : Icons.assignment_outlined,
+                  _application!.isRevoked
+                      ? Icons.block_rounded
+                      : _application!.status == 'credential_issued'
+                          ? Icons.badge_rounded
+                          : ['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)
+                              ? Icons.upload_rounded
+                              : Icons.assignment_outlined,
                   color: Colors.white,
                 ),
                 label: Text(
-                  _application!.status == 'credential_issued'
-                      ? (isFr ? 'Voir la carte d\'identité' : 'View ID Card')
-                      : ['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)
-                          ? (isFr ? 'Gérer les documents' : 'Manage Documents')
-                          : (isFr ? 'Voir le statut' : 'View Status'),
+                  _application!.isRevoked
+                      ? (isFr ? 'Voir le statut' : 'View Status')
+                      : _application!.status == 'credential_issued'
+                          ? (isFr ? 'Voir la carte d\'identité' : 'View ID Card')
+                          : ['accepted', 'documents_pending', 'documents_rejected'].contains(_application!.status)
+                              ? (isFr ? 'Gérer les documents' : 'Manage Documents')
+                              : (isFr ? 'Voir le statut' : 'View Status'),
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _application!.status == 'credential_issued'
-                      ? Colors.purple
-                      : AppColors.burundiGreen,
+                  backgroundColor: _application!.isRevoked
+                      ? Colors.red
+                      : _application!.status == 'credential_issued'
+                          ? Colors.purple
+                          : AppColors.burundiGreen,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
@@ -1009,6 +1104,12 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                   height: 50,
                   child: ElevatedButton.icon(
                     onPressed: () async {
+                      // Check minimum app version before allowing registration
+                      final minVersion = _settings?['min_app_version']?.toString() ?? '';
+                      if (minVersion.isNotEmpty) {
+                        final ok = await AppUpdateDialog.checkMinVersion(context, minVersion);
+                        if (!ok || !mounted) return;
+                      }
                       final isFrLocal = Localizations.localeOf(context).languageCode == 'fr';
                       final privacyPolicy = _t('privacy_policy', 'privacy_policy_fr', isFrLocal);
                       if (privacyPolicy.isNotEmpty) {
@@ -1027,7 +1128,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => YouthDialogueApplyScreen(formFields: _formFields, programmeTitle: _programmeTitle(isFr)),
+                          builder: (_) => YouthDialogueApplyScreen(formFields: _formFields, sideEvents: _sideEvents, programmeTitle: _programmeTitle(isFr)),
                         ),
                       );
                       _loadData();
@@ -1585,36 +1686,23 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     if (sponsorsUrl.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Column(
-        children: [
-          Text(
-            isFr ? 'Partenaires' : 'Partners & Sponsors',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: Environment.fixMediaUrl(sponsorsUrl),
+          width: double.infinity,
+          fit: BoxFit.contain,
+          placeholder: (_, __) => Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.grey[800] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.burundiGreen)),
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: CachedNetworkImage(
-              imageUrl: Environment.fixMediaUrl(sponsorsUrl),
-              width: double.infinity,
-              fit: BoxFit.contain,
-              placeholder: (_, __) => Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.burundiGreen)),
-              ),
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
-            ),
-          ),
-        ],
+          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        ),
       ),
     );
   }
@@ -1725,6 +1813,11 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
   // ── Status View Switch ──────────────────────────────────────
   Widget _buildStatusView(bool isDark) {
     final app = _application!;
+
+    // Check for revocation before normal status handling
+    if (app.isRevoked) {
+      return _buildRevokedCard(isDark, app);
+    }
 
     switch (app.status) {
       case 'submitted':
@@ -2317,6 +2410,138 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
       ),
     );
   }
+
+  Widget _buildRevokedCard(bool isDark, YouthDialogueApplication app) {
+    final isOpen = _settings?['is_registration_open'] ?? false;
+    final isFr = Provider.of<LanguageProvider>(context, listen: false).isFrench;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: isDark ? 0.15 : 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.block_rounded, size: 40, color: Colors.red),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isFr ? 'Accréditation révoquée' : 'Your Credential Has Been Revoked',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (app.revokedReason != null && app.revokedReason!.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: isDark ? 0.1 : 0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: Colors.red.withValues(alpha: 0.8)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      app.revokedReason!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Text(
+            isFr
+                ? 'Votre accréditation a été révoquée et ne peut plus être utilisée.'
+                : 'Your credential has been revoked and can no longer be used.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.white54 : Colors.black45,
+            ),
+          ),
+          if (app.allowReapply) ...[
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final isFrLocal = Provider.of<LanguageProvider>(context, listen: false).isFrench;
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => YouthDialogueApplyScreen(
+                        formFields: _formFields,
+                        sideEvents: _sideEvents,
+                        programmeTitle: _programmeTitle(isFrLocal),
+                      ),
+                    ),
+                  );
+                  _loadData();
+                },
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                label: Text(
+                  isFr ? 'Postuler à nouveau' : 'Apply Again',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.burundiGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ] else if (!app.allowReapply) ...[
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: isDark ? 0.1 : 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+              ),
+              child: Text(
+                isFr
+                    ? 'Vous n\'êtes pas éligible pour postuler à nouveau à ce programme.'
+                    : 'You are not eligible to re-apply for this programme.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.red.shade300 : Colors.red.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ── Lightweight In-App YouTube Player ──────────────────────────
@@ -2461,26 +2686,12 @@ class _YDPrivacyPolicyScreen extends StatefulWidget {
 
 class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
   bool _agreed = false;
-  bool _scrolledToBottom = false;
   final ScrollController _scrollController = ScrollController();
 
   @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
-      if (!_scrolledToBottom) setState(() => _scrolledToBottom = true);
-    }
   }
 
   @override
@@ -2556,25 +2767,6 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
             ),
           ),
 
-          // Scroll hint
-          if (!_scrolledToBottom)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              width: double.infinity,
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.keyboard_arrow_down, size: 16, color: isDark ? Colors.white38 : Colors.black38),
-                  const SizedBox(width: 4),
-                  Text(
-                    isFr ? 'Faites défiler pour lire la suite' : 'Scroll down to read more',
-                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
-                  ),
-                ],
-              ),
-            ),
-
           // Agreement + Continue
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -2587,7 +2779,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
               child: Column(
                 children: [
                   GestureDetector(
-                    onTap: _scrolledToBottom ? () => setState(() => _agreed = !_agreed) : null,
+                    onTap: () => setState(() => _agreed = !_agreed),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -2595,7 +2787,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
                           width: 24, height: 24,
                           child: Checkbox(
                             value: _agreed,
-                            onChanged: _scrolledToBottom ? (v) => setState(() => _agreed = v ?? false) : null,
+                            onChanged: (v) => setState(() => _agreed = v ?? false),
                             activeColor: AppColors.burundiGreen,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                           ),
@@ -2608,9 +2800,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
                                 : 'I have read and agree to the Data Privacy Policy',
                             style: TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w500,
-                              color: _scrolledToBottom
-                                  ? (isDark ? Colors.white : Colors.black87)
-                                  : (isDark ? Colors.white30 : Colors.black26),
+                              color: isDark ? Colors.white : Colors.black87,
                             ),
                           ),
                         ),
@@ -2666,6 +2856,9 @@ class _YDStatusPage extends StatelessWidget {
   ];
 
   int _currentStep() {
+    // Revoked credential — show at Digital ID step (with red X)
+    if (application.isRevoked) return 4;
+
     switch (application.status) {
       case 'submitted':
       case 'under_review':
@@ -2694,6 +2887,7 @@ class _YDStatusPage extends StatelessWidget {
     final step = _currentStep();
     final isRejected = status == 'rejected';
     final isDocsRejected = status == 'documents_rejected';
+    final isRevoked = application.isRevoked;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF5F5F5),
@@ -2718,11 +2912,11 @@ class _YDStatusPage extends StatelessWidget {
 
             // ── Pipeline tracker ──
             const SizedBox(height: 20),
-            _buildPipeline(isDark, step, isRejected, isDocsRejected),
+            _buildPipeline(isDark, step, isRejected, isDocsRejected, isRevoked: isRevoked),
 
             // ── What happens next ──
             const SizedBox(height: 20),
-            _buildNextSteps(isDark, status, step),
+            _buildNextSteps(isDark, status, step, isRevoked: isRevoked),
 
             // ── Rejection details ──
             if (isRejected && application.rejectionReason != null && application.rejectionReason!.isNotEmpty)
@@ -2752,7 +2946,14 @@ class _YDStatusPage extends StatelessWidget {
     final String title;
     final String subtitle;
 
-    if (status == 'rejected') {
+    if (application.isRevoked) {
+      icon = Icons.block_rounded;
+      color = Colors.red;
+      title = isFr ? 'Accréditation révoquée' : 'Credential Revoked';
+      subtitle = isFr
+          ? 'Votre accréditation a été révoquée et ne peut plus être utilisée.'
+          : 'Your credential has been revoked and can no longer be used.';
+    } else if (status == 'rejected') {
       icon = Icons.cancel_rounded;
       color = Colors.red;
       title = isFr ? 'Candidature non retenue' : 'Application Not Accepted';
@@ -2884,7 +3085,7 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── Pipeline tracker — 5 real steps ──
-  Widget _buildPipeline(bool isDark, int currentStep, bool isRejected, bool isDocsRejected) {
+  Widget _buildPipeline(bool isDark, int currentStep, bool isRejected, bool isDocsRejected, {bool isRevoked = false}) {
     final steps = [
       {'icon': Icons.app_registration_rounded, 'en': 'Applied', 'fr': 'Inscrit(e)'},
       {'icon': Icons.rate_review_outlined, 'en': 'Under Review', 'fr': 'En révision'},
@@ -2925,12 +3126,18 @@ class _YDStatusPage extends StatelessWidget {
             final isRejectedHere = isRejected && i == 1;
             // Special: docs rejected → step 2 shows warning
             final isDocsRejectedHere = isDocsRejected && i == 2;
+            // Special: revoked → Digital ID step (4) shows red X
+            final isRevokedHere = isRevoked && i == 4;
 
             final Color circleColor;
             final Color iconColor;
             final IconData displayIcon;
 
-            if (isRejectedHere) {
+            if (isRevokedHere) {
+              circleColor = Colors.red;
+              iconColor = Colors.white;
+              displayIcon = Icons.close_rounded;
+            } else if (isRejectedHere) {
               circleColor = Colors.red;
               iconColor = Colors.white;
               displayIcon = Icons.close_rounded;
@@ -2953,7 +3160,7 @@ class _YDStatusPage extends StatelessWidget {
             }
 
             // Connector color
-            final connectorDone = isDone && !isRejectedHere;
+            final connectorDone = isDone && !isRejectedHere && !isRevokedHere;
 
             return Column(
               children: [
@@ -2965,10 +3172,10 @@ class _YDStatusPage extends StatelessWidget {
                       height: 36,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: (isDone || isRejectedHere || isDocsRejectedHere)
+                        color: (isDone || isRejectedHere || isDocsRejectedHere || isRevokedHere)
                             ? circleColor
                             : circleColor.withValues(alpha: isActive ? 0.15 : 0.3),
-                        border: isActive && !isRejectedHere && !isDocsRejectedHere
+                        border: isActive && !isRejectedHere && !isDocsRejectedHere && !isRevokedHere
                             ? Border.all(color: circleColor, width: 2.5)
                             : null,
                       ),
@@ -2985,16 +3192,16 @@ class _YDStatusPage extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: (isDone || isActive) ? FontWeight.w600 : FontWeight.w400,
-                              color: isPending && !isRejected
+                              color: isPending && !isRejected && !isRevoked
                                   ? (isDark ? Colors.white30 : Colors.black38)
-                                  : isRejectedHere
+                                  : isRejectedHere || isRevokedHere
                                       ? Colors.red
                                       : isDocsRejectedHere
                                           ? Colors.orange
                                           : (isDark ? Colors.white : Colors.black87),
                             ),
                           ),
-                          // Extra label for rejected / docs rejected
+                          // Extra label for rejected / docs rejected / revoked
                           if (isRejectedHere)
                             Text(
                               isFr ? 'Non retenue' : 'Not accepted',
@@ -3005,11 +3212,16 @@ class _YDStatusPage extends StatelessWidget {
                               isFr ? 'Re-téléchargement nécessaire' : 'Re-upload required',
                               style: const TextStyle(fontSize: 12, color: Colors.orange),
                             ),
+                          if (isRevokedHere)
+                            Text(
+                              isFr ? 'Révoqué' : 'Revoked',
+                              style: const TextStyle(fontSize: 12, color: Colors.red),
+                            ),
                         ],
                       ),
                     ),
                     // Spinning indicator for active step
-                    if (isActive && !isRejected && !isDocsRejected)
+                    if (isActive && !isRejected && !isDocsRejected && !isRevoked)
                       SizedBox(
                         width: 18,
                         height: 18,
@@ -3018,7 +3230,7 @@ class _YDStatusPage extends StatelessWidget {
                           color: Colors.orange.withValues(alpha: 0.7),
                         ),
                       ),
-                    if (isDone && !isRejectedHere)
+                    if (isDone && !isRejectedHere && !isRevokedHere)
                       const Icon(Icons.check_circle, size: 18, color: AppColors.burundiGreen),
                   ],
                 ),
@@ -3051,10 +3263,22 @@ class _YDStatusPage extends StatelessWidget {
   }
 
   // ── What happens next ──
-  Widget _buildNextSteps(bool isDark, String status, int step) {
+  Widget _buildNextSteps(bool isDark, String status, int step, {bool isRevoked = false}) {
     final List<Map<String, String>> items;
 
-    if (status == 'rejected') {
+    if (isRevoked) {
+      items = [
+        {
+          'icon': 'email',
+          'en': application.allowReapply
+              ? 'Your credential has been revoked. You may apply again if registration is open.'
+              : 'Your credential has been permanently revoked. You are not eligible to re-apply.',
+          'fr': application.allowReapply
+              ? 'Votre accréditation a été révoquée. Vous pouvez postuler à nouveau si les inscriptions sont ouvertes.'
+              : 'Votre accréditation a été définitivement révoquée. Vous n\'êtes pas éligible pour postuler à nouveau.',
+        },
+      ];
+    } else if (status == 'rejected') {
       items = [
         {
           'icon': 'email',

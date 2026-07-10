@@ -29,9 +29,10 @@ from .models import (
     ArticleCommentLike, MagazineCommentLike, VideoCommentLike,
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
-    YouthDialogueEvent, YouthDialogueFormField, YouthDialogueRole, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog, YouthDialogueMedia,
+    YouthDialogueEvent, YouthDialogueFormField, YouthDialogueSideEvent, YouthDialogueRole, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog, YouthDialogueMedia,
     EmergencyContact,
     FactCategory, Fact,
+    AboutFeature,
 )
 
 
@@ -827,7 +828,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'title', 'title_fr', 'message', 'message_fr',
-                  'notification_type', 'action_type', 'action_value',
+                  'notification_type', 'source', 'action_type', 'action_value',
                   'image', 'is_read', 'created_at']
 
     def get_is_read(self, obj):
@@ -849,9 +850,26 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'app_store_id', 'play_store_id',
                   'bookmarks_enabled', 'discussions_enabled',
                   'polls_enabled', 'newsletter_enabled',
-                  'facts_enabled', 'qr_code_mode',
+                  'facts_enabled', 'live_feeds_enabled', 'qr_code_mode',
                   'countdown_target_date', 'countdown_label',
-                  'countdown_label_fr', 'countdown_enabled']
+                  'countdown_label_fr', 'countdown_enabled',
+                  'section_title_news', 'section_title_news_fr',
+                  'section_title_events', 'section_title_events_fr',
+                  'section_title_magazines', 'section_title_magazines_fr',
+                  'section_title_trending', 'section_title_trending_fr',
+                  'section_title_facts', 'section_title_facts_fr',
+                  'section_title_agendas', 'section_title_agendas_fr',
+                  'about_mission_title', 'about_mission_title_fr',
+                  'about_features_title', 'about_features_title_fr',
+                  'contact_website', 'contact_website_url', 'contact_email',
+                  'qr_scanner_title', 'qr_scanner_title_fr',
+                  'developer_role', 'app_ownership_text']
+
+
+class AboutFeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AboutFeature
+        fields = ['id', 'title', 'title_fr', 'icon_name', 'color', 'order']
 
 
 class FactCategorySerializer(serializers.ModelSerializer):
@@ -991,12 +1009,22 @@ class HeroTextContentSerializer(serializers.ModelSerializer):
 
 class QuickAccessMenuItemSerializer(serializers.ModelSerializer):
     badge_text = serializers.SerializerMethodField()
+    icon_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = QuickAccessMenuItem
-        fields = ['id', 'title_en', 'title_fr', 'icon_name', 'action_type',
-                  'action_value', 'order', 'is_active', 'has_live_indicator',
-                  'badge_text', 'badge_color', 'visibility_rule']
+        fields = ['id', 'title_en', 'title_fr', 'icon_name', 'icon_image_url',
+                  'action_type', 'action_value', 'order', 'is_active',
+                  'has_live_indicator', 'badge_text', 'badge_color',
+                  'visibility_rule']
+
+    def get_icon_image_url(self, obj):
+        if obj.icon_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.icon_image.url)
+            return obj.icon_image.url
+        return ''
 
     def get_badge_text(self, obj):
         # Manual badge always takes priority
@@ -2128,6 +2156,13 @@ class YouthDialogueMediaSerializer(serializers.ModelSerializer):
         return ''
 
 
+class YouthDialogueSideEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = YouthDialogueSideEvent
+        fields = ['id', 'name', 'name_fr', 'description', 'description_fr',
+                  'event_date', 'event_time', 'order']
+
+
 class YouthDialogueRoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = YouthDialogueRole
@@ -2145,6 +2180,7 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
     logo_dark_url = serializers.SerializerMethodField()
     logo_dark_fr_url = serializers.SerializerMethodField()
     secondary_logo_url = serializers.SerializerMethodField()
+    side_events = serializers.SerializerMethodField()
     media = serializers.SerializerMethodField()
     promotional_video = serializers.SerializerMethodField()
 
@@ -2157,7 +2193,9 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
             'programme_title', 'programme_title_fr',
             'description', 'description_fr',
             'location', 'start_date', 'end_date',
-            'is_visible', 'is_registration_open',
+            'registration_start_date', 'registration_end_date',
+            'event_start_date', 'event_end_date',
+            'is_visible', 'is_registration_open', 'min_app_version',
             'registration_closed_message', 'registration_closed_message_fr',
             'quick_access_icon_url', 'quick_access_title_en', 'quick_access_title_fr',
             'banner_image_url', 'sponsors_image_url',
@@ -2171,7 +2209,7 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
             'required_documents',
             'support_email', 'support_phone', 'live_chat_url',
             'support_note', 'support_note_fr',
-            'form_fields', 'roles', 'media', 'promotional_video',
+            'form_fields', 'roles', 'side_events', 'media', 'promotional_video',
         ]
 
     def _build_url(self, field):
@@ -2216,6 +2254,14 @@ class YouthDialogueSettingsSerializer(serializers.ModelSerializer):
             roles = obj.roles.filter(is_active=True)
         return YouthDialogueRoleSerializer(roles, many=True).data
 
+    def get_side_events(self, obj):
+        try:
+            all_side_events = obj.side_events.all()
+            active = [se for se in all_side_events if se.is_active]
+        except Exception:
+            active = obj.side_events.filter(is_active=True)
+        return YouthDialogueSideEventSerializer(active, many=True).data
+
     def get_media(self, obj):
         # Use prefetch cache if available (already filtered & ordered)
         try:
@@ -2253,7 +2299,7 @@ class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         active_event = YouthDialogueEvent.get_active()
-        qs = YouthDialogueApplication.objects.filter(email=value)
+        qs = YouthDialogueApplication.objects.filter(email=value).exclude(is_revoked=True)
         if active_event:
             qs = qs.filter(event=active_event)
         if qs.exists():
@@ -2269,9 +2315,19 @@ class YouthDialogueApplicationCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {'detail': 'Please verify your email address before applying.'}
                 )
-            # Check one-per-user per active event
+            # Check if user is permanently revoked (cannot re-apply)
             active_event = YouthDialogueEvent.get_active()
-            qs = YouthDialogueApplication.objects.filter(user=request.user)
+            permanently_revoked = YouthDialogueApplication.objects.filter(
+                user=request.user, is_revoked=True, allow_reapply=False,
+            )
+            if active_event:
+                permanently_revoked = permanently_revoked.filter(event=active_event)
+            if permanently_revoked.exists():
+                raise serializers.ValidationError(
+                    {'detail': 'You are not eligible to re-apply.'}
+                )
+            # Check one-per-user per active event (exclude revoked applications)
+            qs = YouthDialogueApplication.objects.filter(user=request.user).exclude(is_revoked=True)
             if active_event:
                 qs = qs.filter(event=active_event)
             if qs.exists():
@@ -2303,6 +2359,7 @@ class YouthDialogueApplicationStatusSerializer(serializers.ModelSerializer):
             'nationality', 'organization', 'position',
             'rejection_reason', 'documents_rejection_notes',
             'participant_code', 'has_credential', 'documents', 'created_at',
+            'is_revoked', 'revoked_reason', 'revoked_at', 'allow_reapply',
         ]
         read_only_fields = fields
 
@@ -2314,6 +2371,8 @@ class YouthDialogueApplicationStatusSerializer(serializers.ModelSerializer):
         return YouthDialogueDocumentSerializer(docs, many=True).data
 
     def get_has_credential(self, obj):
+        if obj.is_revoked:
+            return False
         return obj.status == 'credential_issued' and bool(obj.participant_code)
 
 
@@ -2326,6 +2385,8 @@ class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
     role_color = serializers.SerializerMethodField()
     event_start_date = serializers.DateField(source='event.start_date', read_only=True)
     event_end_date = serializers.DateField(source='event.end_date', read_only=True)
+    id_card_visible_fields = serializers.SerializerMethodField()
+    side_event = serializers.SerializerMethodField()
 
     class Meta:
         model = YouthDialogueApplication
@@ -2335,6 +2396,7 @@ class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
             'organization', 'position', 'participant_code',
             'qr_data', 'id_photo_url', 'credential_issued_at',
             'is_revoked', 'role', 'role_color', 'event_start_date', 'event_end_date',
+            'id_card_visible_fields', 'side_event',
         ]
         read_only_fields = fields
 
@@ -2366,6 +2428,17 @@ class YouthDialogueCredentialSerializer(serializers.ModelSerializer):
             return role.color
         except YouthDialogueRole.DoesNotExist:
             return '#4CAF50'
+
+    def get_id_card_visible_fields(self, obj):
+        if obj.event:
+            return obj.event.get_id_card_visible_fields()
+        return []
+
+    def get_side_event(self, obj):
+        se = obj.selected_side_events.first()
+        if se:
+            return {'name': se.name, 'name_fr': se.name_fr}
+        return None
 
 
 class PromotionalSplashSerializer(serializers.ModelSerializer):

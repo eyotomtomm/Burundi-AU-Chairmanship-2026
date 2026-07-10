@@ -42,6 +42,7 @@ ADMIN_MENU_GROUPS = [
         ('magazines_list',            'Magazines',              'auto_stories'),
         ('feature_cards_list',        'Feature Cards',          'view_carousel'),
         ('facts_list',                'Facts & Quotes',         'lightbulb'),
+        ('phrasebook_list',           'Phrasebook',             'translate'),
     ]),
     ('Events', [
         ('events_list',               'Events',                 'event'),
@@ -65,6 +66,7 @@ ADMIN_MENU_GROUPS = [
     ]),
     ('Continental Dialogue', [
         ('youth_dialogue_list',       'Continental Dialogue',         'forum'),
+        ('qr_scan_log',              'QR Scan Log',                  'qr_code_scanner'),
     ]),
     ('Support & Engagement', [
         ('support_tickets_list',      'Support Tickets',        'support_agent'),
@@ -98,6 +100,7 @@ ADMIN_MENU_GROUPS = [
     ]),
     ('Settings', [
         ('app_settings',              'App Settings',           'settings'),
+        ('about_features_list',       'About Features',         'info'),
         ('translation_manager',       'Translation Manager',    'translate'),
         ('reorder',                   'Reorder Content',        'swap_vert'),
     ]),
@@ -207,10 +210,14 @@ def get_required_section(url_name):
         return 'feature_cards_list'
     if 'magazine' in url_name:
         return 'magazines_list'
+    if 'about_feature' in url_name:
+        return 'about_features_list'
     if 'fact_categor' in url_name:
         return 'facts_list'
     if url_name.startswith('fact'):
         return 'facts_list'
+    if 'phrasebook' in url_name:
+        return 'phrasebook_list'
     if 'categor' in url_name:
         return 'categories_list'
     if 'article' in url_name:
@@ -253,6 +260,10 @@ def get_required_section(url_name):
     # Verifications
     if 'verification' in url_name:
         return 'verification_requests_list'
+
+    # QR Scan Log
+    if 'qr_scan_log' in url_name or 'scan_log' in url_name:
+        return 'qr_scan_log'
 
     # Youth Dialogue
     if 'youth_dialogue' in url_name:

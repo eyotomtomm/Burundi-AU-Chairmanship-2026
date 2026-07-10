@@ -41,6 +41,7 @@ router.register('live-qa', views.LiveQAViewSet, basename='live-qa')
 router.register('onboarding-steps', views.OnboardingStepViewSet, basename='onboarding-step')
 router.register('event-agenda-items', views.EventAgendaItemViewSet, basename='event-agenda-item')
 router.register('youth-dialogue', views.YouthDialogueViewSet, basename='youth-dialogue')
+router.register('about-features', views.AboutFeatureViewSet, basename='about-feature')
 router.register('fact-categories', views.FactCategoryViewSet, basename='fact-category')
 router.register('facts', views.FactViewSet, basename='fact')
 
@@ -99,6 +100,7 @@ urlpatterns = [
 
     # QR Code Verification
     path('verify-qr/', views.verify_qr, name='verify-qr'),
+    path('verify-manual/', views.verify_manual, name='verify-manual'),
 
     # Event registrations
     path('my-registrations/', views.my_event_registrations, name='my-registrations'),
@@ -186,6 +188,9 @@ urlpatterns = [
 
     # Youth Dialogue Admin
     path('youth-dialogue/admin/<int:app_id>/id-card-pdf/', views.yd_id_card_pdf, name='yd-id-card-pdf'),
+
+    # Phrasebook (public)
+    path('phrasebook/', views.phrasebook_list_api, name='phrasebook-list'),
 
     # Analytics API (admin only)
     path('analytics/overview/', analytics_views.analytics_overview, name='analytics-overview'),

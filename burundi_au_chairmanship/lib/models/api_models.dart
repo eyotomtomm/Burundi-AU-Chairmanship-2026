@@ -256,6 +256,15 @@ class AppSettingsModel {
   final String playStoreUrl;
   final String appStoreId;
   final String playStoreId;
+  final String aboutMissionTitle;
+  final String aboutMissionTitleFr;
+  final String aboutFeaturesTitle;
+  final String aboutFeaturesTitleFr;
+  final String developerRole;
+  final String appOwnershipText;
+  final String contactWebsite;
+  final String contactWebsiteUrl;
+  final String contactEmail;
 
   AppSettingsModel({
     required this.summitYear,
@@ -278,6 +287,15 @@ class AppSettingsModel {
     this.playStoreUrl = '',
     this.appStoreId = '6740047505',
     this.playStoreId = 'com.b4africa.app',
+    this.aboutMissionTitle = 'Our Mission',
+    this.aboutMissionTitleFr = 'Notre Mission',
+    this.aboutFeaturesTitle = 'Key Features',
+    this.aboutFeaturesTitleFr = 'Fonctionnalit\u00e9s',
+    this.developerRole = 'Lead Developer',
+    this.appOwnershipText = 'Property of Burundi Embassy in Addis Ababa',
+    this.contactWebsite = 'burundi4africa.com',
+    this.contactWebsiteUrl = 'https://burundi4africa.com',
+    this.contactEmail = 'info@burundi4africa.com',
   });
 
   factory AppSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -290,7 +308,7 @@ class AppSettingsModel {
       twitterUrl: json['twitter_url'] ?? '',
       instagramUrl: json['instagram_url'] ?? '',
       appDescription: json['app_description'] ?? 'Official application for Be 4 Africa.',
-      appDescriptionFr: json['app_description_fr'] ?? 'Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.',
+      appDescriptionFr: json['app_description_fr'] ?? 'Application officielle de la Pr\u00e9sidence de l\'Union Africaine du Burundi 2026.',
       developerName: json['developer_name'] ?? 'Eyosias Tamene',
       developerUrl: json['developer_url'] ?? 'https://eyosias.dev',
       liveAgentOnline: json['live_agent_online'] ?? false,
@@ -302,6 +320,15 @@ class AppSettingsModel {
       playStoreUrl: json['play_store_url'] ?? '',
       appStoreId: json['app_store_id'] ?? '6740047505',
       playStoreId: json['play_store_id'] ?? 'com.b4africa.app',
+      aboutMissionTitle: json['about_mission_title'] ?? 'Our Mission',
+      aboutMissionTitleFr: json['about_mission_title_fr'] ?? 'Notre Mission',
+      aboutFeaturesTitle: json['about_features_title'] ?? 'Key Features',
+      aboutFeaturesTitleFr: json['about_features_title_fr'] ?? 'Fonctionnalit\u00e9s',
+      developerRole: json['developer_role'] ?? 'Lead Developer',
+      appOwnershipText: json['app_ownership_text'] ?? 'Property of Burundi Embassy in Addis Ababa',
+      contactWebsite: json['contact_website'] ?? 'burundi4africa.com',
+      contactWebsiteUrl: json['contact_website_url'] ?? 'https://burundi4africa.com',
+      contactEmail: json['contact_email'] ?? 'info@burundi4africa.com',
     );
   }
 
@@ -314,6 +341,16 @@ class AppSettingsModel {
   String getDescription(String langCode) {
     if (langCode == 'fr') return appDescriptionFr.isNotEmpty ? appDescriptionFr : appDescription;
     return appDescription.isNotEmpty ? appDescription : appDescriptionFr;
+  }
+
+  String getMissionTitle(String langCode) {
+    if (langCode == 'fr') return aboutMissionTitleFr.isNotEmpty ? aboutMissionTitleFr : aboutMissionTitle;
+    return aboutMissionTitle.isNotEmpty ? aboutMissionTitle : aboutMissionTitleFr;
+  }
+
+  String getFeaturesTitle(String langCode) {
+    if (langCode == 'fr') return aboutFeaturesTitleFr.isNotEmpty ? aboutFeaturesTitleFr : aboutFeaturesTitle;
+    return aboutFeaturesTitle.isNotEmpty ? aboutFeaturesTitle : aboutFeaturesTitleFr;
   }
 }
 

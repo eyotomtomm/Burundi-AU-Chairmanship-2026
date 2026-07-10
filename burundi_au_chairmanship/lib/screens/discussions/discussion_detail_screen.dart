@@ -215,8 +215,11 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                       ),
                                       const Spacer(),
                                       GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
                                         onTap: _toggleLike,
-                                        child: Row(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          child: Row(
                                           children: [
                                             Icon(
                                               _likeService.getState(EntityType.discussion, widget.discussionId).isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -249,6 +252,7 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                               ),
                                             ],
                                           ],
+                                        ),
                                         ),
                                       ),
                                     ],

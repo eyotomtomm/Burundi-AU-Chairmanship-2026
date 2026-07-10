@@ -14,10 +14,13 @@
         <p class="text-sm text-slate-500 mt-1">Full-screen promotions shown on app launch</p>
       </div>
     </div>
-    <a href="{% url 'custom_admin:promotional_splash_create' %}" class="inline-flex items-center gap-2 bg-purple-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-purple-700 transition-all shadow-sm">
-      <span class="material-symbols-outlined text-sm">add</span>
-      Create New
-    </a>
+    <div class="flex items-center gap-4">
+      <span class="text-xs text-slate-500 bg-slate-100 rounded-lg px-3 py-2">Server time: {{ server_time_local|date:"M d, Y H:i" }} (Bujumbura, UTC+2)</span>
+      <a href="{% url 'custom_admin:promotional_splash_create' %}" class="inline-flex items-center gap-2 bg-purple-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-purple-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">add</span>
+        Create New
+      </a>
+    </div>
   </div>
 
   <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
@@ -51,6 +54,7 @@
             <td class="px-6 py-4">
               <p class="text-sm text-slate-700">{{ splash.starts_at|date:"M d, Y H:i" }}</p>
               <p class="text-xs text-slate-500">to {{ splash.ends_at|date:"M d, Y H:i" }}</p>
+              <p class="text-xs text-slate-400 mt-0.5">Bujumbura time</p>
             </td>
             <td class="px-6 py-4">
               {% if not splash.is_active %}
@@ -76,6 +80,11 @@
             </td>
             <td class="px-6 py-4 text-right">
               <div class="flex items-center justify-end gap-1">
+                {% if splash.is_upcoming %}
+                <form method="post" action="{% url 'custom_admin:promotional_splash_activate_now' splash.pk %}" class="inline" onsubmit="return confirm('Activate this splash immediately?');">{% csrf_token %}
+                  <button type="submit" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Activate Now"><span class="material-symbols-outlined text-xl">play_arrow</span></button>
+                </form>
+                {% endif %}
                 <a href="{% url 'custom_admin:promotional_splash_edit' splash.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">edit</span></a>
                 <form method="post" action="{% url 'custom_admin:promotional_splash_delete' splash.pk %}" class="inline" onsubmit="return confirm('Delete this promotional splash?');">{% csrf_token %}
                   <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">delete</span></button>

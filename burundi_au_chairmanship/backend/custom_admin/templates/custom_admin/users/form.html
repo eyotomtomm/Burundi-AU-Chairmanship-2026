@@ -405,6 +405,58 @@
             </form>
         </div>
 
+        <!-- Continental Dialogue Ban Card -->
+        <div class="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-purple-600 dark:text-purple-400">forum</span>
+                Continental Dialogue Ban Status
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Ban Status</p>
+                    {% if is_yd_banned %}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Banned</span>
+                    {% else %}
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Not Banned</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Device Bans</p>
+                    <p class="font-semibold text-slate-900 dark:text-white">{{ yd_device_bans.count }} total</p>
+                </div>
+                <div>
+                    <p class="text-slate-600 dark:text-slate-400">Banned Device IDs</p>
+                    {% for ban in yd_device_bans %}
+                        <p class="font-mono text-xs text-slate-900 dark:text-white break-all">
+                            {{ ban.device_id|truncatechars:20 }}
+                            {% if ban.is_active %}
+                                <span class="text-red-500">(active)</span>
+                            {% else %}
+                                <span class="text-slate-400">(lifted)</span>
+                            {% endif %}
+                        </p>
+                    {% empty %}
+                        <p class="text-slate-400 text-xs">None</p>
+                    {% endfor %}
+                </div>
+            </div>
+            <form method="post" action="{% url 'custom_admin:user_toggle_yd_ban' target_user.pk %}"
+                  onsubmit="return confirm('{% if is_yd_banned %}Lift Continental Dialogue ban for this user? Device bans will also be lifted.{% else %}Ban this user from Continental Dialogue? All applications will be permanently revoked and device bans created.{% endif %}')">
+                {% csrf_token %}
+                {% if is_yd_banned %}
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition">
+                        <span class="material-symbols-outlined text-sm">lock_open</span>
+                        Lift Continental Dialogue Ban
+                    </button>
+                {% else %}
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition">
+                        <span class="material-symbols-outlined text-sm">block</span>
+                        Ban from Continental Dialogue
+                    </button>
+                {% endif %}
+            </form>
+        </div>
+
         <!-- Profanity Strike History -->
         {% if strike_logs %}
         <div class="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-md p-6">

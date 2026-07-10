@@ -7,12 +7,14 @@ class PreloadedHomeData {
   final List<Map<String, dynamic>> priorityAgendas;
   final List<Map<String, dynamic>> heroTextContent;
   final List<Map<String, dynamic>> quickAccessMenu;
+  final Map<String, String> quickAccessBadges;
 
   const PreloadedHomeData({
     required this.homeFeed,
     required this.priorityAgendas,
     required this.heroTextContent,
     required this.quickAccessMenu,
+    this.quickAccessBadges = const {},
   });
 }
 
@@ -46,14 +48,16 @@ class SplashPreloader {
       api.getHomeFeed(),
       api.getPriorityAgendas().catchError((_) => <Map<String, dynamic>>[]),
       api.getHeroTextContent().catchError((_) => <Map<String, dynamic>>[]),
-      api.getQuickAccessMenu().catchError((_) => <Map<String, dynamic>>[]),
+      api.getQuickAccessMenuWithBadges().catchError((_) => <String, dynamic>{'items': <Map<String, dynamic>>[], 'badges': <String, String>{}}),
     ]);
 
+    final qaData = results[3] as Map<String, dynamic>;
     return PreloadedHomeData(
       homeFeed: results[0] as Map<String, dynamic>,
       priorityAgendas: results[1] as List<Map<String, dynamic>>,
       heroTextContent: results[2] as List<Map<String, dynamic>>,
-      quickAccessMenu: results[3] as List<Map<String, dynamic>>,
+      quickAccessMenu: (qaData['items'] as List<dynamic>).cast<Map<String, dynamic>>(),
+      quickAccessBadges: Map<String, String>.from(qaData['badges'] as Map? ?? {}),
     );
   }
 

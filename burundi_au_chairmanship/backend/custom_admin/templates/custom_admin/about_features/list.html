@@ -1,0 +1,77 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-3xl text-emerald-600">info</span>
+        <h1 class="text-2xl font-headline font-bold text-on-surface">About Features</h1>
+    </div>
+    <a href="{% url 'custom_admin:about_feature_create' %}" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-medium rounded-lg py-2.5 px-5 hover:bg-emerald-700 transition-colors">
+        <span class="material-symbols-outlined text-lg">add</span>
+        Add Feature
+    </a>
+</div>
+
+<p class="text-sm text-on-surface-variant mb-4">These features appear in the About page grid inside the mobile app.</p>
+
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+            <tr>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Title</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">French Title</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Icon</th>
+                <th class="text-left py-3 px-4 font-medium text-on-surface-variant">Color</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Order</th>
+                <th class="text-center py-3 px-4 font-medium text-on-surface-variant">Active</th>
+                <th class="text-right py-3 px-4 font-medium text-on-surface-variant">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+            {% for f in features %}
+            <tr class="hover:bg-surface-container-low transition-colors">
+                <td class="py-3 px-4 font-medium text-on-surface">{{ f.title }}</td>
+                <td class="py-3 px-4 text-on-surface-variant">{{ f.title_fr|default:'-' }}</td>
+                <td class="py-3 px-4">
+                    <span class="material-symbols-outlined text-lg" style="color: {{ f.color }}">{{ f.icon_name }}</span>
+                </td>
+                <td class="py-3 px-4">
+                    <div class="flex items-center gap-2">
+                        <span class="w-5 h-5 rounded-full border border-outline-variant" style="background: {{ f.color }}"></span>
+                        <span class="text-xs text-on-surface-variant">{{ f.color }}</span>
+                    </div>
+                </td>
+                <td class="py-3 px-4 text-center text-on-surface-variant">{{ f.order }}</td>
+                <td class="py-3 px-4 text-center">
+                    {% if f.is_active %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 px-4 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <a href="{% url 'custom_admin:about_feature_edit' f.pk %}" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Edit">
+                            <span class="material-symbols-outlined text-lg text-blue-600">edit</span>
+                        </a>
+                        <form method="post" action="{% url 'custom_admin:about_feature_delete' f.pk %}" class="inline" onsubmit="return confirm('Delete this feature?')">
+                            {% csrf_token %}
+                            <button type="submit" class="p-1.5 rounded-lg hover:bg-surface-container transition-colors" title="Delete">
+                                <span class="material-symbols-outlined text-lg text-red-600">delete</span>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="py-12 text-center text-on-surface-variant">
+                    <span class="material-symbols-outlined text-4xl mb-2 block">info</span>
+                    No about features yet. Create your first one!
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

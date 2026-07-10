@@ -99,11 +99,15 @@
       <!-- Date Range -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Starts At <span class="text-red-500">*</span></label>
-          <input type="datetime-local" name="starts_at" required value="{{ splash.starts_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Starts At <span class="text-xs font-normal text-slate-500">(Bujumbura time, UTC+2)</span> <span class="text-red-500">*</span></label>
+          <input type="datetime-local" id="starts_at_input" name="starts_at" required value="{{ splash.starts_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <label class="flex items-center gap-2 cursor-pointer mt-2">
+            <input type="checkbox" name="start_now" id="start_now_cb" onchange="var el=document.getElementById('starts_at_input'); el.disabled=this.checked; if(this.checked){el.removeAttribute('required');}else{el.setAttribute('required','');}" class="rounded border-slate-300 text-green-600 focus:ring-green-500">
+            <span class="text-sm text-green-700 font-medium">Start immediately (activate now)</span>
+          </label>
         </div>
         <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Ends At <span class="text-red-500">*</span></label>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Ends At <span class="text-xs font-normal text-slate-500">(Bujumbura time, UTC+2)</span> <span class="text-red-500">*</span></label>
           <input type="datetime-local" name="ends_at" required value="{{ splash.ends_at|date:'Y-m-d\TH:i'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
         </div>
       </div>

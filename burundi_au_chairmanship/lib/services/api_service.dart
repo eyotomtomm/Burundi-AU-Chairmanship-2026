@@ -489,21 +489,27 @@ class ApiService {
     if (honeypot.isNotEmpty) {
       body['_hp'] = honeypot;
     }
-    return await _post('auth/firebase-register/', body, noAutoAuth: true);
+    final result = await _post('auth/firebase-register/', body, noAutoAuth: true);
+    if (result is Map<String, dynamic>) return result;
+    return <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> firebaseLogin({
     required String idToken,
+    String? name,
     String? deviceName,
     String? deviceType,
     String? appVersion,
   }) async {
-    return await _post('auth/firebase-login/', {
+    final result = await _post('auth/firebase-login/', {
       'firebase_token': idToken,
+      if (name != null) 'name': name,
       if (deviceName != null) 'device_name': deviceName,
       if (deviceType != null) 'device_type': deviceType,
       if (appVersion != null) 'app_version': appVersion,
     }, noAutoAuth: true);
+    if (result is Map<String, dynamic>) return result;
+    return <String, dynamic>{};
   }
 
   /// Presence ping used for the admin "users online now" counter.
@@ -882,6 +888,12 @@ class ApiService {
     return null;
   }
 
+  // ── About Features ──────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getAboutFeatures() async {
+    final data = await _get('about-features/');
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
   // ── Feature Cards ──────────────────────────────────────
   Future<Map<String, dynamic>> recordFeatureCardView(int cardId) async {
     return await _post('feature-cards/$cardId/record-view/', {});
@@ -1077,6 +1089,23 @@ class ApiService {
     return data as Map<String, dynamic>;
   }
 
+  /// Manual credential/ticket lookup (staff-only fallback when QR can't be scanned).
+  Future<Map<String, dynamic>> manualLookup({
+    required String lookupType,
+    String? code,
+    String? name,
+    String? email,
+  }) async {
+    final body = <String, dynamic>{
+      'lookup_type': lookupType,
+      if (code != null) 'code': code,
+      if (name != null) 'name': name,
+      if (email != null) 'email': email,
+    };
+    final data = await _post('verify-manual/', body, auth: true);
+    return data as Map<String, dynamic>;
+  }
+
   // ── Event Ticket & Calendar ────────────────────────────────
   Future<Map<String, dynamic>> getEventQrTicket(int submissionId) async {
     final data = await _get('event-submissions/$submissionId/qr-ticket/', auth: true);
@@ -1115,9 +1144,14 @@ class ApiService {
   }
 
   // ── Quick Access Menu ────────────────────────────────────
-  Future<List<Map<String, dynamic>>> getQuickAccessMenu() async {
+  /// Returns {'items': [...menu items], 'badges': {'/route': 'NEW', ...}}
+  Future<Map<String, dynamic>> getQuickAccessMenuWithBadges() async {
     final data = await _get('quick-access-menu/');
-    return _extractResults(data).cast<Map<String, dynamic>>();
+    final items = _extractResults(data).cast<Map<String, dynamic>>();
+    final badges = (data is Map && data.containsKey('badges'))
+        ? Map<String, String>.from(data['badges'] as Map)
+        : <String, String>{};
+    return {'items': items, 'badges': badges};
   }
 
   // ── Emergency Contacts ──────────────────────────────────

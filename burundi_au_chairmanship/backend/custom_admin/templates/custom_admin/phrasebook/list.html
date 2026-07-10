@@ -1,0 +1,112 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Phrasebook - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white">translate</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Phrasebook</h1>
+        <p class="text-sm text-slate-500 mt-1">Kirundi / English / French phrases shown in the Translate screen</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Category filter -->
+      <form method="get" class="flex items-center gap-2">
+        <select name="category" onchange="this.form.submit()" class="border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-3 text-sm text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+          <option value="">All Categories</option>
+          {% for value, label in categories %}
+          <option value="{{ value }}" {% if current_category == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <a href="{% url 'custom_admin:phrasebook_create' %}" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-emerald-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">add</span>
+        Add Phrase
+      </a>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Category</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Kirundi</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">English</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Fran&ccedil;ais</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-center">Order</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-center">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for entry in entries %}
+          <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-6 py-4">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold
+                {% if entry.category == 'greetings' %}bg-amber-50 text-amber-700 border border-amber-200
+                {% elif entry.category == 'directions' %}bg-blue-50 text-blue-700 border border-blue-200
+                {% elif entry.category == 'diplomacy' %}bg-purple-50 text-purple-700 border border-purple-200
+                {% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                {{ entry.get_category_display }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm font-semibold text-slate-900">{{ entry.kirundi }}</span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm text-slate-700">{{ entry.english }}</span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm text-slate-700">{{ entry.french }}</span>
+            </td>
+            <td class="px-6 py-4 text-center">
+              <span class="text-sm text-slate-500">{{ entry.display_order }}</span>
+            </td>
+            <td class="px-6 py-4 text-center">
+              {% if entry.is_active %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
+                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>Active
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-1">
+                <a href="{% url 'custom_admin:phrasebook_edit' entry.pk %}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">edit</span></a>
+                <form method="post" action="{% url 'custom_admin:phrasebook_delete' entry.pk %}" class="inline" onsubmit="return confirm('Delete this phrase?');">{% csrf_token %}
+                  <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl">delete</span></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="px-6 py-16 text-center"><p class="text-slate-500">No phrases found. <a href="{% url 'custom_admin:phrasebook_create' %}" class="text-emerald-600 hover:underline">Add one</a></p></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if entries.has_other_pages %}
+    <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+      <p class="text-sm text-slate-500">Page {{ entries.number }} of {{ entries.paginator.num_pages }} &middot; {{ entries.paginator.count }} total phrases</p>
+      <div class="flex items-center gap-1">
+        {% if entries.has_previous %}
+        <a href="?page={{ entries.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">&laquo; Prev</a>
+        {% endif %}
+        {% if entries.has_next %}
+        <a href="?page={{ entries.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}" class="px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Next &raquo;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

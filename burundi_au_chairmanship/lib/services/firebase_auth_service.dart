@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 /// Service for Firebase Authentication operations
@@ -201,13 +202,18 @@ class FirebaseAuthService {
       // 5. Sign in to Firebase
       final userCredential = await _auth.signInWithCredential(credential);
 
-      // 6. Update display name if provided (only on first sign-in)
+      // 6. Update display name if Apple provided it.
+      // Apple only provides name on the FIRST authorization — cache it
+      // locally so subsequent sign-ins can use it as a fallback.
       if (appleCredential.givenName != null &&
-          appleCredential.familyName != null &&
-          userCredential.additionalUserInfo?.isNewUser == true) {
-        final displayName =
-            '${appleCredential.givenName} ${appleCredential.familyName}';
+          appleCredential.givenName!.isNotEmpty) {
+        final familyName = appleCredential.familyName ?? '';
+        final displayName = familyName.isNotEmpty
+            ? '${appleCredential.givenName} $familyName'
+            : appleCredential.givenName!;
         await userCredential.user?.updateDisplayName(displayName);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('apple_display_name', displayName);
       }
 
       return userCredential;

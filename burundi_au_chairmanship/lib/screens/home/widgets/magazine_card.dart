@@ -83,11 +83,13 @@ class MagazineCard extends StatelessWidget {
 class MagazineSectionTitle extends StatelessWidget {
   final String langCode;
   final VoidCallback? onSeeAll;
+  final String? customTitle;
 
   const MagazineSectionTitle({
     super.key,
     required this.langCode,
     this.onSeeAll,
+    this.customTitle,
   });
 
   @override
@@ -111,7 +113,7 @@ class MagazineSectionTitle extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              langCode == 'fr' ? 'Derniers Magazines' : 'Latest Magazines',
+              customTitle ?? (langCode == 'fr' ? 'Derniers Magazines' : 'Latest Magazines'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),

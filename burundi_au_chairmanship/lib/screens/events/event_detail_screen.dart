@@ -370,8 +370,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   Builder(builder: (_) {
                     final likeState = _likeService.getState(EntityType.event, _event.id);
                     return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: _toggleLike,
-                      child: Row(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
                         children: [
                           Icon(
                             likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -404,6 +407,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             ),
                           ],
                         ],
+                      ),
                       ),
                     );
                   }),

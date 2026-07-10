@@ -135,6 +135,168 @@ def generate_users_excel(queryset, filters=None):
 
 
 # ──────────────────────────────────────────────────────
+# Excel: Youth Dialogue Participants Report
+# ──────────────────────────────────────────────────────
+def generate_youth_dialogue_excel(event, status_filter=None):
+    """Generate a styled Excel workbook with Youth Dialogue participants.
+    Returns a BytesIO buffer.
+    """
+    from core.models import YouthDialogueApplication
+    from datetime import date
+
+    wb = Workbook()
+
+    # ── Sheet 1: Participants List ──
+    ws = wb.active
+    ws.title = 'Participants'
+
+    qs = YouthDialogueApplication.objects.filter(event=event).select_related('user').order_by('last_name', 'first_name')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    columns = [
+        '#', 'Title', 'Name', 'Country', 'Position', 'Gender', 'Age',
+        'Email', 'Phone', 'Organisation', 'Status', 'Participant Code',
+        'Applied At', 'Documents',
+    ]
+
+    # Collect dynamic field labels from additional_data
+    extra_keys = []
+    for app in qs:
+        if app.additional_data:
+            for key in app.additional_data.keys():
+                if key not in extra_keys:
+                    extra_keys.append(key)
+    # Pretty-print extra field names as column headers
+    extra_labels = [k.replace('_', ' ').title() for k in extra_keys]
+    columns += extra_labels
+
+    ws.append(columns)
+
+    # Header styling: dark maroon like the screenshot
+    header_font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='5B1A2A', end_color='5B1A2A', fill_type='solid')
+    header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    for col in range(1, len(columns) + 1):
+        cell = ws.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+    ws.row_dimensions[1].height = 32
+
+    data_font = Font(name='Arial', size=10)
+    alt_fill = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+    wrap_align = Alignment(vertical='center', wrap_text=True)
+
+    # Status badge colors
+    status_fills = {
+        'accepted': PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid'),
+        'credential_issued': PatternFill(start_color='D1FAE5', end_color='D1FAE5', fill_type='solid'),
+        'rejected': PatternFill(start_color='FEE2E2', end_color='FEE2E2', fill_type='solid'),
+        'submitted': PatternFill(start_color='DBEAFE', end_color='DBEAFE', fill_type='solid'),
+        'under_review': PatternFill(start_color='FEF3C7', end_color='FEF3C7', fill_type='solid'),
+    }
+
+    row_idx = 2
+    for idx, app in enumerate(qs, start=1):
+        # Calculate age
+        age = ''
+        if app.date_of_birth:
+            today = date.today()
+            age = today.year - app.date_of_birth.year - (
+                (today.month, today.day) < (app.date_of_birth.month, app.date_of_birth.day)
+            )
+
+        total_docs = app.documents.count()
+        approved_docs = app.documents.filter(status='approved').count()
+        docs_status = f'{approved_docs}/{total_docs} approved' if total_docs else 'None'
+
+        row = [
+            idx,
+            app.get_title_display() if app.title else '',
+            f'{app.first_name} {app.last_name}',
+            app.get_nationality_display() if app.nationality else '',
+            app.get_position_display() if app.position else '',
+            app.get_gender_display() if app.gender else '',
+            age,
+            app.email,
+            f'{app.country_code}{app.phone_number}' if app.phone_number else '',
+            app.organization,
+            app.get_status_display(),
+            app.participant_code or '',
+            app.created_at.strftime('%Y-%m-%d %H:%M') if app.created_at else '',
+            docs_status,
+        ]
+        # Append dynamic extra fields
+        for key in extra_keys:
+            val = app.additional_data.get(key, '') if app.additional_data else ''
+            row.append(str(val) if val else '')
+
+        ws.append(row)
+        for col in range(1, len(columns) + 1):
+            cell = ws.cell(row=row_idx, column=col)
+            cell.font = data_font
+            cell.alignment = wrap_align
+            if row_idx % 2 == 0:
+                cell.fill = alt_fill
+        # Color the status cell
+        status_col = columns.index('Status') + 1
+        status_cell = ws.cell(row=row_idx, column=status_col)
+        if app.status in status_fills:
+            status_cell.fill = status_fills[app.status]
+        row_idx += 1
+
+    _auto_width(ws)
+
+    # ── Sheet 2: Summary Statistics ──
+    ws2 = wb.create_sheet(title='Summary')
+    ws2.append(['Statistic', 'Value'])
+    _style_header_row(ws2, 2)
+
+    total = qs.count()
+    stats = [
+        ('Event', event.programme_title or event.slug),
+        ('Total Applications', total),
+    ]
+    # Status breakdown
+    for code, label in YouthDialogueApplication.STATUS_CHOICES:
+        count = qs.filter(status=code).count()
+        if count > 0:
+            stats.append((label, count))
+    # Gender breakdown
+    male = qs.filter(gender='male').count()
+    female = qs.filter(gender='female').count()
+    stats += [('Male', male), ('Female', female)]
+    # Top nationalities
+    from django.db.models import Count as DjCount
+    top_countries = qs.values('nationality').annotate(c=DjCount('id')).order_by('-c')[:10]
+    for entry in top_countries:
+        nat = entry['nationality']
+        if nat:
+            # Get display name
+            display = nat
+            try:
+                from core.models import NATIONALITY_CHOICES
+                nat_dict = dict(NATIONALITY_CHOICES)
+                display = nat_dict.get(nat, nat)
+            except Exception:
+                pass
+            stats.append((f'Country: {display}', entry['c']))
+
+    data_font2 = Font(name='Arial', size=10)
+    for i, (label, value) in enumerate(stats, start=2):
+        ws2.cell(row=i, column=1, value=label).font = data_font2
+        ws2.cell(row=i, column=2, value=value).font = Font(name='Arial', size=10, bold=True)
+
+    _auto_width(ws2)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+# ──────────────────────────────────────────────────────
 # Excel: Events Report
 # ──────────────────────────────────────────────────────
 def generate_events_excel(queryset):

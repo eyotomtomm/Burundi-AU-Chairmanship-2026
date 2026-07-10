@@ -77,25 +77,25 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Column(
                   children: [
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
 
                     // Logo — switches between light/dark variants
                     Image.asset(
                       isDark
                           ? 'assets/images/b4africa_logo_white.png'
                           : 'assets/images/b4africa_logo.png',
-                      height: 120,
+                      height: 80,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => _buildLogo(),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
 
                     // App title
                     Text(
                       '#B4Africa',
                       style: TextStyle(
-                        fontSize: 26,
+                        fontSize: 22,
                         fontWeight: FontWeight.w700,
                         color: AppColors.burundiGreen,
                         letterSpacing: 2,
@@ -105,19 +105,19 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     Text(
                       'BE FOR AFRICA',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                         letterSpacing: 3,
                       ),
                     ),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 20),
 
                     // Tab switch
                     _buildTabSwitch(l10n, isDark),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
                     // Tab content
                     AnimatedBuilder(
@@ -133,7 +133,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         );
                       },
                     ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -287,25 +287,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Welcome text
-          Text(
-            l10n.welcomeBack,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.darkText : AppColors.lightText,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l10n.signInContinue,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 24),
-
           // Email
           _buildTextField(
             controller: _signInEmailController,
@@ -315,7 +296,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isDark: isDark,
             validator: InputSanitizer.validateEmail,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Password
           _buildTextField(
@@ -340,14 +321,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               onPressed: () => setState(() => _obscureSignInPassword = !_obscureSignInPassword),
             ),
           ),
-          const SizedBox(height: 8),
 
           // Forgot password
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () => _showForgotPasswordDialog(context),
-              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               child: Text(
                 l10n.forgotPassword,
                 style: TextStyle(
@@ -357,7 +341,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Sign In button
           _buildPrimaryButton(
@@ -366,97 +350,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isLoading: context.watch<AuthProvider>().isLoading,
             color: AppColors.burundiGreen,
           ),
-          const SizedBox(height: 20),
-
-          // OR divider
-          Row(
-            children: [
-              Expanded(
-                child: Divider(
-                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'OR',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Divider(
-                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Social Sign-In buttons (side by side)
-          Row(
-            children: [
-              // Google Sign-In button
-              Expanded(
-                child: _buildSocialButton(
-                  label: 'Google',
-                  iconPath: 'assets/icons/google_logo.png',
-                  onPressed: () => _signInWithGoogle(context),
-                  backgroundColor: theme.colorScheme.surface,
-                  textColor: theme.colorScheme.onSurface,
-                  borderColor: theme.dividerColor,
-                  isLoading: context.watch<AuthProvider>().isLoading,
-                ),
-              ),
-              if (Platform.isIOS) const SizedBox(width: 12),
-              // Apple Sign-In button (iOS only)
-              if (Platform.isIOS)
-                Expanded(
-                  child: _buildSocialButton(
-                    label: 'Apple',
-                    icon: Icons.apple,
-                    onPressed: () => _signInWithApple(context),
-                    backgroundColor: isDark ? Colors.white : Colors.black,
-                    textColor: isDark ? Colors.black : Colors.white,
-                    borderColor: isDark ? Colors.white : Colors.black,
-                    isLoading: context.watch<AuthProvider>().isLoading,
-                  ),
-                ),
-            ],
-          ),
           const SizedBox(height: 16),
 
-          // Continue as Guest button
-          OutlinedButton(
-            onPressed: () => _skipAuth(context),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.burundiGreen,
-              side: BorderSide(color: AppColors.burundiGreen.withValues(alpha: 0.5)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              minimumSize: const Size(double.infinity, 52),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  l10n.skipForNow,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded, size: 18),
-              ],
-            ),
-          ),
+          // OR divider
+          _buildOrDivider(isDark),
+          const SizedBox(height: 16),
+
+          // Social Sign-In buttons (side by side)
+          _buildSocialButtons(theme, isDark),
         ],
       ),
     );
@@ -468,24 +369,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            l10n.createAccount,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.darkText : AppColors.lightText,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Join the Burundi AU community',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(height: 24),
-
           // Name
           _buildTextField(
             controller: _signUpNameController,
@@ -494,7 +377,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isDark: isDark,
             validator: InputSanitizer.validateName,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
 
           // Email
           _buildTextField(
@@ -505,7 +388,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isDark: isDark,
             validator: InputSanitizer.validateEmail,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
 
           // Password
           _buildTextField(
@@ -527,7 +410,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             validator: InputSanitizer.validatePassword,
           ),
           PasswordStrengthMeter(password: _signUpPassword),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
 
           // Confirm Password
           _buildTextField(
@@ -553,8 +436,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           ),
 
           // Honeypot field — invisible to real users, bots auto-fill it.
-          // Positioned off-screen with zero height so it's hidden from view.
-          // ExcludeSemantics prevents screen readers from announcing it.
           ExcludeSemantics(
             child: SizedBox(
               height: 0,
@@ -572,7 +453,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
           // Sign Up button
           _buildPrimaryButton(
@@ -581,97 +462,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             isLoading: context.watch<AuthProvider>().isLoading,
             color: AppColors.burundiRed,
           ),
-          const SizedBox(height: 20),
-
-          // OR divider
-          Row(
-            children: [
-              Expanded(
-                child: Divider(
-                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'OR',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Divider(
-                  color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Social Sign-In buttons (side by side)
-          Row(
-            children: [
-              // Google Sign-In button
-              Expanded(
-                child: _buildSocialButton(
-                  label: 'Google',
-                  iconPath: 'assets/icons/google_logo.png',
-                  onPressed: () => _signInWithGoogle(context),
-                  backgroundColor: theme.colorScheme.surface,
-                  textColor: theme.colorScheme.onSurface,
-                  borderColor: theme.dividerColor,
-                  isLoading: context.watch<AuthProvider>().isLoading,
-                ),
-              ),
-              if (Platform.isIOS) const SizedBox(width: 12),
-              // Apple Sign-In button (iOS only)
-              if (Platform.isIOS)
-                Expanded(
-                  child: _buildSocialButton(
-                    label: 'Apple',
-                    icon: Icons.apple,
-                    onPressed: () => _signInWithApple(context),
-                    backgroundColor: isDark ? Colors.white : Colors.black,
-                    textColor: isDark ? Colors.black : Colors.white,
-                    borderColor: isDark ? Colors.white : Colors.black,
-                    isLoading: context.watch<AuthProvider>().isLoading,
-                  ),
-                ),
-            ],
-          ),
           const SizedBox(height: 16),
 
-          // Continue as Guest button
-          OutlinedButton(
-            onPressed: () => _skipAuth(context),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.burundiRed,
-              side: BorderSide(color: AppColors.burundiRed.withValues(alpha: 0.5)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              minimumSize: const Size(double.infinity, 52),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  l10n.skipForNow,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded, size: 18),
-              ],
-            ),
-          ),
+          // OR divider
+          _buildOrDivider(isDark),
+          const SizedBox(height: 16),
+
+          // Social Sign-In buttons (side by side)
+          _buildSocialButtons(theme, isDark),
         ],
       ),
     );
@@ -762,6 +560,62 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     );
   }
 
+  Widget _buildOrDivider(bool isDark) {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'OR',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Divider(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialButtons(ThemeData theme, bool isDark) {
+    final isLoading = context.watch<AuthProvider>().isLoading;
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSocialButton(
+            label: 'Google',
+            iconPath: 'assets/icons/google_logo.png',
+            onPressed: () => _signInWithGoogle(context),
+            backgroundColor: theme.colorScheme.surface,
+            textColor: theme.colorScheme.onSurface,
+            borderColor: theme.dividerColor,
+            isLoading: isLoading,
+          ),
+        ),
+        if (Platform.isIOS) ...[
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildSocialButton(
+              label: 'Apple',
+              icon: Icons.apple,
+              onPressed: () => _signInWithApple(context),
+              backgroundColor: isDark ? Colors.white : Colors.black,
+              textColor: isDark ? Colors.black : Colors.white,
+              borderColor: isDark ? Colors.white : Colors.black,
+              isLoading: isLoading,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildSocialButton({
     required String label,
     String? iconPath,
@@ -776,7 +630,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       button: true,
       label: 'Sign in with $label',
       child: SizedBox(
-        height: 50,
+        height: 46,
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
@@ -798,11 +652,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 )
               else if (icon != null)
                 Icon(icon, size: 20, semanticLabel: '$label icon'),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -811,6 +665,38 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         ),
       ),
     );
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithGoogle();
+    if (success && context.mounted) {
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    } else if (context.mounted && authProvider.errorMessage != null) {
+      HapticFeedback.heavyImpact();
+      _showErrorSnackBar(context, authProvider.errorMessage!);
+    }
+  }
+
+  Future<void> _signInWithApple(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithApple();
+    if (success && context.mounted) {
+      if (authProvider.requiresEmailVerification) {
+        Navigator.of(context).pushReplacementNamed('/email-verification');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/home');
+      }
+    } else if (context.mounted && authProvider.errorMessage != null) {
+      HapticFeedback.heavyImpact();
+      _showErrorSnackBar(context, authProvider.errorMessage!);
+    }
   }
 
   Future<void> _signIn(BuildContext context) async {
@@ -873,38 +759,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       } else {
         _showErrorSnackBar(context, authProvider.errorMessage!);
       }
-    }
-  }
-
-  Future<void> _signInWithGoogle(BuildContext context) async {
-    HapticFeedback.lightImpact();
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.signInWithGoogle();
-    if (success && context.mounted) {
-      if (authProvider.requiresEmailVerification) {
-        Navigator.of(context).pushReplacementNamed('/email-verification');
-      } else {
-        Navigator.of(context).pushReplacementNamed('/home');
-      }
-    } else if (context.mounted && authProvider.errorMessage != null) {
-      HapticFeedback.heavyImpact();
-      _showErrorSnackBar(context, authProvider.errorMessage!);
-    }
-  }
-
-  Future<void> _signInWithApple(BuildContext context) async {
-    HapticFeedback.lightImpact();
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.signInWithApple();
-    if (success && context.mounted) {
-      if (authProvider.requiresEmailVerification) {
-        Navigator.of(context).pushReplacementNamed('/email-verification');
-      } else {
-        Navigator.of(context).pushReplacementNamed('/home');
-      }
-    } else if (context.mounted && authProvider.errorMessage != null) {
-      HapticFeedback.heavyImpact();
-      _showErrorSnackBar(context, authProvider.errorMessage!);
     }
   }
 
@@ -1072,7 +926,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   void _skipAuth(BuildContext context) {
     context.read<AuthProvider>().skipAuth();
-    Navigator.of(context).pushReplacementNamed('/home');
+
+    // If this auth screen was pushed on top of an existing screen (e.g. from
+    // a login gate), just pop back. Otherwise replace with home.
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
 
     // Show feedback to user
     ScaffoldMessenger.of(context).showSnackBar(

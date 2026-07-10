@@ -663,6 +663,24 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <span class="text-sm tracking-wide font-headline">Live Feeds</span>
     </a>
     {% endif %}
+
+    {% if 'facts_list' in allowed_sections %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'fact' in url_name and 'category' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:facts_list' %}">
+      <span class="material-symbols-outlined">lightbulb</span>
+      <span class="text-sm tracking-wide font-headline">Facts & Quotes</span>
+    </a>
+    <a class="flex items-center gap-4 px-4 py-3 pl-12 transition-all duration-300 {% if 'fact_category' in url_name or 'fact_categories' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:fact_categories_list' %}">
+      <span class="material-symbols-outlined text-[18px]">category</span>
+      <span class="text-sm tracking-wide font-headline">Fact Categories</span>
+    </a>
+    {% endif %}
+
+    {% if 'about_features_list' in allowed_sections %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'about_feature' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:about_features_list' %}">
+      <span class="material-symbols-outlined">info</span>
+      <span class="text-sm tracking-wide font-headline">About Features</span>
+    </a>
+    {% endif %}
 {% comment %}
     A/B Tests link hidden until end-to-end wiring exists
     (DRF endpoint + Flutter variant assignment + conversion reporting).
@@ -916,6 +934,13 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'youth_dialogue' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:youth_dialogue_list' %}">
       <span class="material-symbols-outlined">forum</span>
       <span class="text-sm tracking-wide font-headline">Continental Dialogue</span>
+    </a>
+    {% endif %}
+
+    {% if 'qr_scan_log' in allowed_sections %}
+    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'qr_scan_log' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:qr_scan_log' %}">
+      <span class="material-symbols-outlined">qr_code_scanner</span>
+      <span class="text-sm tracking-wide font-headline">QR Scan Log</span>
     </a>
     {% endif %}
 
@@ -1805,182 +1830,7 @@ function toggleDarkMode() {
 </script>
 {% endif %}
 
-<!-- Bilingual Auto-fill Helper -->
 <script>
-(function() {
-  'use strict';
-
-  function initBilingualAutofill() {
-    var allFields = document.querySelectorAll('input[name], textarea[name]');
-    var processed = {};
-
-    allFields.forEach(function(field) {
-      var name = field.getAttribute('name');
-      if (!name || processed[name]) return;
-
-      var pairField = null;
-      var isEnField = false;
-
-      // Handle array-style names like kp_text[] / kp_text_fr[]
-      if (name.endsWith('_fr[]')) {
-        var enName = name.replace(/_fr\[\]$/, '[]');
-        // For array fields, find the matching pair in the same row/container
-        var container = field.closest('.dynamic-row') || field.closest('.grid') || field.closest('div');
-        if (container) {
-          pairField = container.querySelector('[name="' + enName + '"]');
-        }
-        if (!pairField) pairField = document.querySelector('[name="' + enName + '"]');
-        isEnField = false;
-      } else if (name.endsWith('[]')) {
-        var frName = name.replace(/\[\]$/, '_fr[]');
-        var container = field.closest('.dynamic-row') || field.closest('.grid') || field.closest('div');
-        if (container) {
-          pairField = container.querySelector('[name="' + frName + '"]');
-        }
-        if (!pairField) pairField = document.querySelector('[name="' + frName + '"]');
-        isEnField = true;
-      } else if (name.endsWith('_fr')) {
-        var enName = name.replace(/_fr$/, '');
-        pairField = document.querySelector('[name="' + enName + '"]');
-        isEnField = false;
-      } else {
-        pairField = document.querySelector('[name="' + name + '_fr"]');
-        isEnField = true;
-      }
-
-      if (pairField && pairField !== field) {
-        // For array fields, don't mark as processed (multiple rows have same name)
-        if (!name.endsWith('[]') && !name.endsWith('_fr[]')) {
-          processed[name] = true;
-          processed[pairField.getAttribute('name')] = true;
-        }
-
-        // Skip file inputs, selects, checkboxes, etc.
-        var fieldType = field.getAttribute('type');
-        var pairType = pairField.getAttribute('type');
-        if (fieldType === 'file' || fieldType === 'checkbox' || fieldType === 'radio' ||
-            fieldType === 'color' || fieldType === 'hidden' ||
-            pairType === 'file' || pairType === 'checkbox' || pairType === 'radio' ||
-            pairType === 'color' || pairType === 'hidden') {
-          return;
-        }
-
-        addCopyButton(field, pairField, isEnField);
-        addCopyButton(pairField, field, !isEnField);
-      }
-    });
-  }
-
-  function addCopyButton(sourceField, targetField, sourceIsEn) {
-    var label = null;
-    var wrapper = sourceField.closest('div');
-    if (wrapper) {
-      label = wrapper.querySelector('label');
-    }
-    if (!label) return;
-
-    // Don't add duplicate buttons
-    if (label.querySelector('.bilingual-copy-btn')) return;
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'bilingual-copy-btn ml-2 px-2 py-0.5 text-[10px] font-semibold rounded bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50';
-    btn.textContent = sourceIsEn ? '\u2192 Translate to FR' : '\u2192 Translate to EN';
-    btn.title = sourceIsEn ? 'Auto-translate English to French' : 'Auto-translate French to English';
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!sourceField.value.trim()) {
-        sourceField.style.backgroundColor = '#fee2e2';
-        setTimeout(function() { sourceField.style.backgroundColor = ''; }, 800);
-        return;
-      }
-      // Show translating state
-      var origText = btn.textContent;
-      btn.textContent = 'Translating...';
-      btn.disabled = true;
-      btn.style.opacity = '0.6';
-
-      var formData = new FormData();
-      formData.append('text', sourceField.value);
-      formData.append('source', sourceIsEn ? 'en' : 'fr');
-      formData.append('target', sourceIsEn ? 'fr' : 'en');
-
-      var controller = new AbortController();
-      var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
-
-      fetch('{% url "custom_admin:auto_translate" %}', {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCsrfToken() },
-        body: formData,
-        signal: controller.signal
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.translated) {
-          targetField.value = data.translated;
-          targetField.focus();
-          targetField.style.backgroundColor = '#d1fae5';
-          setTimeout(function() { targetField.style.backgroundColor = ''; }, 1200);
-        } else {
-          btn.textContent = 'Failed!';
-          btn.style.color = '#dc2626';
-          setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
-        }
-      })
-      .catch(function(err) {
-        btn.textContent = err.name === 'AbortError' ? 'Timeout!' : 'Failed!';
-        btn.style.color = '#dc2626';
-        setTimeout(function() { btn.textContent = origText; btn.style.color = ''; }, 2000);
-      })
-      .finally(function() {
-        clearTimeout(timeoutId);
-        btn.disabled = false;
-        btn.style.opacity = '';
-      });
-    });
-
-    label.style.display = 'flex';
-    label.style.alignItems = 'center';
-    label.style.flexWrap = 'wrap';
-    label.appendChild(btn);
-  }
-
-  // Initialize on DOMContentLoaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(initBilingualAutofill, 500);
-    });
-  } else {
-    setTimeout(initBilingualAutofill, 500);
-  }
-
-  // Also re-initialize when dynamic rows are added (MutationObserver)
-  var observer = new MutationObserver(function(mutations) {
-    var shouldReinit = false;
-    mutations.forEach(function(mutation) {
-      if (mutation.addedNodes.length > 0) {
-        mutation.addedNodes.forEach(function(node) {
-          if (node.nodeType === 1 && (node.classList.contains('dynamic-row') || node.querySelector && node.querySelector('.dynamic-row'))) {
-            shouldReinit = true;
-          }
-        });
-      }
-    });
-    if (shouldReinit) {
-      setTimeout(initBilingualAutofill, 100);
-    }
-  });
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      observer.observe(document.body, { childList: true, subtree: true });
-    });
-  } else {
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-})();
-
 // Auto-fill date fields from calendar prefill_date
 (function() {
   var prefillDate = '{{ prefill_date|default:"" }}';

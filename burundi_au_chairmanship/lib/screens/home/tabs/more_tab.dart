@@ -358,12 +358,12 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF4CAF50).withValues(alpha: 0.1),
+                                    color: AppColors.burundiGreen.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: const Icon(
                                     Icons.language_rounded,
-                                    color: Color(0xFF4CAF50),
+                                    color: AppColors.burundiGreen,
                                     size: 24,
                                   ),
                                 ),
@@ -423,14 +423,14 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFFB74D).withValues(alpha: 0.1),
+                                    color: AppColors.burundiGreen.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Icon(
                                     themeProvider.isDarkMode
                                         ? Icons.dark_mode_rounded
                                         : Icons.light_mode_rounded,
-                                    color: const Color(0xFFFFB74D),
+                                    color: AppColors.burundiGreen,
                                     size: 24,
                                   ),
                                 ),
@@ -509,7 +509,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         _buildMenuItem(
                           context: context,
                           icon: Icons.info_outline_rounded,
-                          iconBgColor: const Color(0xFF5C6BC0),
+                          iconBgColor: AppColors.burundiGreen,
                           title: l10n.translate('about'),
                           subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
                           isDark: isDark,
@@ -519,7 +519,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         _buildMenuItem(
                           context: context,
                           icon: Icons.help_outline_rounded,
-                          iconBgColor: const Color(0xFF26A69A),
+                          iconBgColor: AppColors.burundiGreen,
                           title: l10n.appGuide,
                           subtitle: l10n.appGuideSubtitle,
                           isDark: isDark,
@@ -533,7 +533,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         _buildMenuItem(
                           context: context,
                           icon: Icons.privacy_tip_outlined,
-                          iconBgColor: const Color(0xFF8D6E63),
+                          iconBgColor: AppColors.burundiGreen,
                           title: l10n.translate('privacy_policy'),
                           isDark: isDark,
                           onTap: () => launchUrl(
@@ -546,12 +546,12 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           secondary: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF66BB6A).withValues(alpha: 0.1),
+                              color: AppColors.burundiGreen.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: const Icon(
                               Icons.data_saver_on,
-                              color: Color(0xFF66BB6A),
+                              color: AppColors.burundiGreen,
                               size: 22,
                             ),
                           ),
@@ -581,7 +581,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         _buildMenuItem(
                           context: context,
                           icon: Icons.description_outlined,
-                          iconBgColor: const Color(0xFF78909C),
+                          iconBgColor: AppColors.burundiGreen,
                           title: l10n.translate('terms_of_service'),
                           isDark: isDark,
                           onTap: () => launchUrl(
@@ -594,7 +594,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             return _buildMenuItem(
                               context: context,
                               icon: Icons.headset_mic_rounded,
-                              iconBgColor: const Color(0xFFEF5350),
+                              iconBgColor: AppColors.burundiGreen,
                               title: l10n.translate('contact_support'),
                               subtitle: 'Get help and support',
                               isDark: isDark,
@@ -644,7 +644,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             _buildMenuItem(
                               context: context,
                               icon: Icons.lock_rounded,
-                              iconBgColor: const Color(0xFF8D6E63),
+                              iconBgColor: AppColors.burundiGreen,
                               title: l10n.translate('change_password'),
                               isDark: isDark,
                               onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ChangePasswordScreen())),
@@ -652,7 +652,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           _buildMenuItem(
                             context: context,
                             icon: Icons.history_rounded,
-                            iconBgColor: const Color(0xFF78909C),
+                            iconBgColor: AppColors.burundiGreen,
                             title: l10n.translate('login_history'),
                             isDark: isDark,
                             onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const LoginHistoryScreen())),
@@ -660,7 +660,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           _buildMenuItem(
                             context: context,
                             icon: Icons.devices_rounded,
-                            iconBgColor: const Color(0xFF546E7A),
+                            iconBgColor: AppColors.burundiGreen,
                             title: l10n.translate('active_sessions'),
                             isDark: isDark,
                             onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ActiveSessionsScreen())),
@@ -669,7 +669,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         _buildMenuItem(
                           context: context,
                           icon: Icons.share_rounded,
-                          iconBgColor: const Color(0xFF66BB6A),
+                          iconBgColor: AppColors.burundiGreen,
                           title: l10n.translate('share_app'),
                           isDark: isDark,
                           itemKey: _shareMenuKey,
@@ -695,7 +695,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         _buildMenuItem(
                           context: context,
                           icon: Icons.star_rounded,
-                          iconBgColor: const Color(0xFFFFB74D),
+                          iconBgColor: AppColors.burundiGreen,
                           title: l10n.translate('rate_app'),
                           isDark: isDark,
                           isLast: !isLoggedIn,
@@ -709,7 +709,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: const Text('Thank you for your support!'),
-                                      backgroundColor: const Color(0xFFFFB74D),
+                                      backgroundColor: AppColors.burundiGreen,
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
@@ -721,7 +721,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: const Text('Rating will be available once the app is on the App Store'),
-                                      backgroundColor: const Color(0xFFFFB74D),
+                                      backgroundColor: AppColors.burundiGreen,
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
@@ -734,7 +734,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: const Text('Rating will be available once the app is on the App Store'),
-                                    backgroundColor: const Color(0xFFFFB74D),
+                                    backgroundColor: AppColors.burundiGreen,
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
@@ -1042,7 +1042,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       return _buildMenuItem(
         context: context,
         icon: Icons.hourglass_top_rounded,
-        iconBgColor: const Color(0xFFFF9800),
+        iconBgColor: AppColors.burundiGreen,
         title: 'Verification Pending',
         subtitle: 'Your request is being processed',
         isDark: isDark,
@@ -1060,7 +1060,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       return _buildMenuItem(
         context: context,
         icon: Icons.hourglass_top_rounded,
-        iconBgColor: const Color(0xFFFF9800),
+        iconBgColor: AppColors.burundiGreen,
         title: 'Verification In Review',
         subtitle: 'Still being processed',
         isDark: isDark,
@@ -1079,7 +1079,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       return _buildMenuItem(
         context: context,
         icon: Icons.verified_rounded,
-        iconBgColor: const Color(0xFF42A5F5),
+        iconBgColor: AppColors.burundiGreen,
         title: l10n.translate('get_verified'),
         subtitle: l10n.translate('get_verified_desc'),
         isDark: isDark,
@@ -1592,11 +1592,20 @@ class _AboutPageState extends State<_AboutPage> {
   String _summitTheme = AppConstants.summitTheme;
   String _developerName = 'Eyosias Tamene';
   String _developerUrl = 'https://eyosias.dev';
+  String _developerRole = 'Lead Developer';
+  String _ownershipText = 'Property of Burundi Embassy in Addis Ababa';
+  String _missionTitle = 'Our Mission';
+  String _featuresTitle = 'Key Features';
+  String _contactWebsite = 'burundi4africa.com';
+  String _contactWebsiteUrl = 'https://burundi4africa.com';
+  String _contactEmail = 'info@burundi4africa.com';
+  List<Map<String, dynamic>>? _aboutFeatures;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadAboutFeatures();
   }
 
   Future<void> _loadSettings() async {
@@ -1617,9 +1626,61 @@ class _AboutPageState extends State<_AboutPage> {
           if (settings.developerUrl.isNotEmpty) {
             _developerUrl = settings.developerUrl;
           }
+          if (settings.developerRole.isNotEmpty) {
+            _developerRole = settings.developerRole;
+          }
+          if (settings.appOwnershipText.isNotEmpty) {
+            _ownershipText = settings.appOwnershipText;
+          }
+          _missionTitle = settings.getMissionTitle(langCode);
+          _featuresTitle = settings.getFeaturesTitle(langCode);
+          if (settings.contactWebsite.isNotEmpty) {
+            _contactWebsite = settings.contactWebsite;
+          }
+          if (settings.contactWebsiteUrl.isNotEmpty) {
+            _contactWebsiteUrl = settings.contactWebsiteUrl;
+          }
+          if (settings.contactEmail.isNotEmpty) {
+            _contactEmail = settings.contactEmail;
+          }
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadAboutFeatures() async {
+    try {
+      final features = await ApiService().getAboutFeatures();
+      if (mounted && features.isNotEmpty) {
+        setState(() {
+          _aboutFeatures = features;
+        });
+      }
+    } catch (_) {}
+  }
+
+  static IconData _mapIconName(String iconName) {
+    const iconMap = <String, IconData>{
+      'article': Icons.article_rounded,
+      'event': Icons.event_rounded,
+      'auto_stories': Icons.auto_stories_rounded,
+      'translate': Icons.translate_rounded,
+      'wb_sunny': Icons.wb_sunny_rounded,
+      'account_balance': Icons.account_balance_rounded,
+      'public': Icons.public_rounded,
+      'group': Icons.group_rounded,
+      'school': Icons.school_rounded,
+      'gavel': Icons.gavel_rounded,
+    };
+    return iconMap[iconName] ?? Icons.star_rounded;
+  }
+
+  static Color _parseColor(String hex) {
+    try {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return const Color(0xFF1EB53A);
+    }
   }
 
   @override
@@ -1769,7 +1830,7 @@ class _AboutPageState extends State<_AboutPage> {
                             Icon(Icons.flag_rounded, size: 20, color: AppColors.burundiGreen),
                             const SizedBox(width: 8),
                             Text(
-                              widget.l10n.locale.languageCode == 'fr' ? 'Notre Mission' : 'Our Mission',
+                              _missionTitle,
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -1794,7 +1855,7 @@ class _AboutPageState extends State<_AboutPage> {
 
                   // Key features grid
                   Text(
-                    widget.l10n.locale.languageCode == 'fr' ? 'Fonctionnalites' : 'Key Features',
+                    _featuresTitle,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -1810,10 +1871,10 @@ class _AboutPageState extends State<_AboutPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : Colors.grey.shade50,
+                      color: isDark ? AppColors.darkSurface : AppColors.burundiGreen.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
+                        color: isDark ? AppColors.darkDivider : AppColors.burundiGreen.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -1841,7 +1902,36 @@ class _AboutPageState extends State<_AboutPage> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _developerRole,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? Colors.white54 : AppColors.burundiGreen.withValues(alpha: 0.7),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Ownership / property line
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : AppColors.burundiGreen.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _ownershipText,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.8),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -1849,16 +1939,16 @@ class _AboutPageState extends State<_AboutPage> {
                   // Website link
                   _buildLinkTile(
                     icon: Icons.language_rounded,
-                    title: 'burundi4africa.com',
-                    url: 'https://burundi4africa.com',
+                    title: _contactWebsite,
+                    url: _contactWebsiteUrl,
                     color: AppColors.burundiGreen,
                     isDark: isDark,
                   ),
                   const SizedBox(height: 8),
                   _buildLinkTile(
                     icon: Icons.mail_outline_rounded,
-                    title: 'info@burundi4africa.com',
-                    url: 'mailto:info@burundi4africa.com',
+                    title: _contactEmail,
+                    url: 'mailto:$_contactEmail',
                     color: AppColors.auGold,
                     isDark: isDark,
                   ),
@@ -1879,18 +1969,11 @@ class _AboutPageState extends State<_AboutPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'African Union',
+                          'B4Africa',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: isDark ? Colors.white54 : AppColors.burundiGreen,
-                          ),
-                        ),
-                        Text(
-                          'Chairmanship 2025-2026',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.white38 : AppColors.burundiGreen.withValues(alpha: 0.6),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -1915,14 +1998,31 @@ class _AboutPageState extends State<_AboutPage> {
   }
 
   Widget _buildFeaturesGrid(bool isDark) {
-    final features = [
-      {'icon': Icons.article_rounded, 'title': 'News', 'color': AppColors.burundiGreen},
-      {'icon': Icons.event_rounded, 'title': 'Events Calendar', 'color': AppColors.burundiRed},
-      {'icon': Icons.auto_stories_rounded, 'title': 'Magazine', 'color': AppColors.auGold},
-      {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': AppColors.burundiGreen},
-      {'icon': Icons.wb_sunny_rounded, 'title': 'Weather', 'color': AppColors.auGold},
-      {'icon': Icons.account_balance_rounded, 'title': 'Diplomacy', 'color': AppColors.burundiRed},
-    ];
+    final langCode = widget.l10n.locale.languageCode;
+
+    // Use API features if available, otherwise fall back to defaults
+    final List<Map<String, dynamic>> features;
+    if (_aboutFeatures != null && _aboutFeatures!.isNotEmpty) {
+      features = _aboutFeatures!.map((f) {
+        final title = (langCode == 'fr' && (f['title_fr'] as String? ?? '').isNotEmpty)
+            ? f['title_fr'] as String
+            : f['title'] as String? ?? '';
+        return {
+          'icon': _mapIconName(f['icon_name'] as String? ?? 'star'),
+          'title': title,
+          'color': _parseColor(f['color'] as String? ?? '#1EB53A'),
+        };
+      }).toList();
+    } else {
+      features = [
+        {'icon': Icons.article_rounded, 'title': 'News', 'color': AppColors.burundiGreen},
+        {'icon': Icons.event_rounded, 'title': 'Events Calendar', 'color': AppColors.burundiRed},
+        {'icon': Icons.auto_stories_rounded, 'title': 'Magazine', 'color': AppColors.auGold},
+        {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': AppColors.burundiGreen},
+        {'icon': Icons.wb_sunny_rounded, 'title': 'Weather', 'color': AppColors.auGold},
+        {'icon': Icons.account_balance_rounded, 'title': 'Diplomacy', 'color': AppColors.burundiRed},
+      ];
+    }
 
     return GridView.builder(
       shrinkWrap: true,

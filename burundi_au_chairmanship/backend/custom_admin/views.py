@@ -76,12 +76,17 @@ from core.models import (
     YouthDialogueApplication,
     YouthDialogueDocument,
     YouthDialogueActivityLog,
+    YouthDialogueSideEvent,
     YouthDialogueRole,
     YouthDialogueMedia,
     EventPhoto,
     DeviceBan,
+    YouthDialogueDeviceBan,
     EmergencyContact,
     FactCategory, Fact,
+    AboutFeature,
+    PhrasebookEntry,
+    QRScanLog,
 )
 
 # Email-related views live in custom_admin/email_views.py. Re-exported here so
@@ -986,11 +991,21 @@ def event_delete(request, pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def notifications_list(request):
-    notifications = Notification.objects.all().order_by('-created_at')
-    paginator = Paginator(notifications, 20)
-    page = request.GET.get('page')
-    notifications = paginator.get_page(page)
-    return render(request, 'custom_admin/notifications/list.html', {'notifications': notifications})
+    manual_qs = Notification.objects.filter(source='manual').order_by('-created_at')
+    system_qs = Notification.objects.filter(source='system').order_by('-created_at')
+
+    manual_paginator = Paginator(manual_qs, 20)
+    system_paginator = Paginator(system_qs, 20)
+
+    manual_notifications = manual_paginator.get_page(request.GET.get('page'))
+    system_notifications = system_paginator.get_page(request.GET.get('sys_page'))
+
+    return render(request, 'custom_admin/notifications/list.html', {
+        'manual_notifications': manual_notifications,
+        'system_notifications': system_notifications,
+        'manual_count': manual_paginator.count,
+        'system_count': system_paginator.count,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -1745,12 +1760,19 @@ def user_edit(request, pk):
     verification_requests = VerificationRequest.objects.filter(user=target_user).order_by('-created_at')
     from core.models import ProfanityStrikeLog, NATIONALITY_CHOICES
     strike_logs = ProfanityStrikeLog.objects.filter(user=target_user).order_by('-created_at')[:20]
+    # Continental Dialogue ban context
+    is_yd_banned = YouthDialogueApplication.objects.filter(
+        user=target_user, is_revoked=True, allow_reapply=False
+    ).exists()
+    yd_device_bans = YouthDialogueDeviceBan.objects.filter(user=target_user).order_by('-banned_at')
     return render(request, 'custom_admin/users/form.html', {
         'target_user': target_user,
         'profile': profile,
         'verification_requests': verification_requests,
         'strike_logs': strike_logs,
         'nationality_choices': NATIONALITY_CHOICES,
+        'is_yd_banned': is_yd_banned,
+        'yd_device_bans': yd_device_bans,
         'action': 'Edit',
     })
 
@@ -3647,12 +3669,15 @@ def app_settings(request):
         settings.app_description_fr = request.POST.get('app_description_fr', '')
         settings.developer_name = request.POST.get('developer_name', '')
         settings.developer_url = request.POST.get('developer_url', '')
+        settings.developer_role = request.POST.get('developer_role', '') or 'Lead Developer'
+        settings.app_ownership_text = request.POST.get('app_ownership_text', '') or 'Property of Burundi Embassy in Addis Ababa'
         settings.live_agent_online = request.POST.get('live_agent_online') == 'on'
         settings.bookmarks_enabled = request.POST.get('bookmarks_enabled') == 'on'
         settings.discussions_enabled = request.POST.get('discussions_enabled') == 'on'
         settings.polls_enabled = request.POST.get('polls_enabled') == 'on'
         settings.newsletter_enabled = request.POST.get('newsletter_enabled') == 'on'
         settings.facts_enabled = request.POST.get('facts_enabled') == 'on'
+        settings.live_feeds_enabled = request.POST.get('live_feeds_enabled') == 'on'
         settings.app_store_url = request.POST.get('app_store_url', '')
         settings.play_store_url = request.POST.get('play_store_url', '')
         settings.app_store_id = request.POST.get('app_store_id', '')
@@ -3661,6 +3686,30 @@ def app_settings(request):
         settings.countdown_label = request.POST.get('countdown_label', '')
         settings.countdown_label_fr = request.POST.get('countdown_label_fr', '')
         settings.countdown_target_date = request.POST.get('countdown_target_date') or None
+        # Section titles
+        settings.section_title_news = request.POST.get('section_title_news', '') or 'News'
+        settings.section_title_news_fr = request.POST.get('section_title_news_fr', '') or 'Actualités'
+        settings.section_title_events = request.POST.get('section_title_events', '') or 'Upcoming Events'
+        settings.section_title_events_fr = request.POST.get('section_title_events_fr', '') or 'Prochains Événements'
+        settings.section_title_magazines = request.POST.get('section_title_magazines', '') or 'Latest Magazines'
+        settings.section_title_magazines_fr = request.POST.get('section_title_magazines_fr', '') or 'Derniers Magazines'
+        settings.section_title_trending = request.POST.get('section_title_trending', '') or 'Trending'
+        settings.section_title_trending_fr = request.POST.get('section_title_trending_fr', '') or 'Tendances'
+        settings.section_title_facts = request.POST.get('section_title_facts', '') or 'Discover Africa'
+        settings.section_title_facts_fr = request.POST.get('section_title_facts_fr', '') or "Découvrir l'Afrique"
+        settings.section_title_agendas = request.POST.get('section_title_agendas', '') or 'Priority Agendas'
+        settings.section_title_agendas_fr = request.POST.get('section_title_agendas_fr', '') or 'Agendas Prioritaires'
+        # About page extra fields
+        settings.about_mission_title = request.POST.get('about_mission_title', '') or 'Our Mission'
+        settings.about_mission_title_fr = request.POST.get('about_mission_title_fr', '') or 'Notre Mission'
+        settings.about_features_title = request.POST.get('about_features_title', '') or 'Key Features'
+        settings.about_features_title_fr = request.POST.get('about_features_title_fr', '') or 'Fonctionnalit\u00e9s'
+        settings.contact_website = request.POST.get('contact_website', '') or 'burundi4africa.com'
+        settings.contact_website_url = request.POST.get('contact_website_url', '') or 'https://burundi4africa.com'
+        settings.contact_email = request.POST.get('contact_email', '') or 'info@burundi4africa.com'
+        # QR Scanner titles
+        settings.qr_scanner_title = request.POST.get('qr_scanner_title', '') or 'QR Scanner'
+        settings.qr_scanner_title_fr = request.POST.get('qr_scanner_title_fr', '') or 'Scanner QR'
         settings.save()
         messages.success(request, 'App settings saved successfully!')
         return redirect('custom_admin:app_settings')
@@ -3737,9 +3786,8 @@ def fact_create(request):
             fact.image = request.FILES['image']
         fact.save()
         AuditLogEntry.objects.create(
-            user=request.user, action='create',
-            content_type='fact', object_id=str(fact.pk),
-            description=f'Created {fact.get_fact_type_display()}: {fact.title}',
+            user=request.user, action='CREATE',
+            entity_type='Fact', entity_label=f'Created {fact.get_fact_type_display()}: {fact.title}',
         )
         messages.success(request, f'{fact.get_fact_type_display()} created successfully!')
         return redirect('custom_admin:facts_list')
@@ -3770,9 +3818,8 @@ def fact_edit(request, pk):
             fact.image = request.FILES['image']
         fact.save()
         AuditLogEntry.objects.create(
-            user=request.user, action='update',
-            content_type='fact', object_id=str(fact.pk),
-            description=f'Updated {fact.get_fact_type_display()}: {fact.title}',
+            user=request.user, action='UPDATE',
+            entity_type='Fact', entity_label=f'Updated {fact.get_fact_type_display()}: {fact.title}',
         )
         messages.success(request, f'{fact.get_fact_type_display()} updated successfully!')
         return redirect('custom_admin:facts_list')
@@ -3785,9 +3832,8 @@ def fact_edit(request, pk):
 def fact_delete(request, pk):
     fact = get_object_or_404(Fact, pk=pk)
     AuditLogEntry.objects.create(
-        user=request.user, action='delete',
-        content_type='fact', object_id=str(fact.pk),
-        description=f'Deleted {fact.get_fact_type_display()}: {fact.title}',
+        user=request.user, action='DELETE',
+        entity_type='Fact', entity_label=f'Deleted {fact.get_fact_type_display()}: {fact.title}',
     )
     fact.delete()
     messages.success(request, 'Fact/Quote deleted successfully!')
@@ -3858,6 +3904,69 @@ def fact_category_delete(request, pk):
     category.delete()
     messages.success(request, 'Category deleted successfully!')
     return redirect('custom_admin:fact_categories_list')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ABOUT FEATURES
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def about_features_list(request):
+    features = AboutFeature.objects.all()
+    return render(request, 'custom_admin/about_features/list.html', {'features': features})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def about_feature_create(request):
+    if request.method == 'POST':
+        AboutFeature.objects.create(
+            title=request.POST.get('title', ''),
+            title_fr=request.POST.get('title_fr', ''),
+            icon_name=request.POST.get('icon_name', 'article'),
+            color=request.POST.get('color', '#1EB53A'),
+            order=request.POST.get('order', 0) or 0,
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'About feature created successfully!')
+        return redirect('custom_admin:about_features_list')
+    return render(request, 'custom_admin/about_features/form.html', {
+        'feature': None,
+        'icon_choices': AboutFeature.ICON_CHOICES,
+        'color_choices': AboutFeature.COLOR_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def about_feature_edit(request, pk):
+    feature = get_object_or_404(AboutFeature, pk=pk)
+    if request.method == 'POST':
+        feature.title = request.POST.get('title', '')
+        feature.title_fr = request.POST.get('title_fr', '')
+        feature.icon_name = request.POST.get('icon_name', 'article')
+        feature.color = request.POST.get('color', '#1EB53A')
+        feature.order = request.POST.get('order', 0) or 0
+        feature.is_active = request.POST.get('is_active') == 'on'
+        feature.save()
+        messages.success(request, 'About feature updated successfully!')
+        return redirect('custom_admin:about_features_list')
+    return render(request, 'custom_admin/about_features/form.html', {
+        'feature': feature,
+        'icon_choices': AboutFeature.ICON_CHOICES,
+        'color_choices': AboutFeature.COLOR_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def about_feature_delete(request, pk):
+    feature = get_object_or_404(AboutFeature, pk=pk)
+    feature.delete()
+    messages.success(request, 'About feature deleted successfully!')
+    return redirect('custom_admin:about_features_list')
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -5012,7 +5121,14 @@ def maintenance_delete(request, pk):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def promotional_splash_list(request):
     splashes = PromotionalSplash.objects.all().order_by('-priority', '-created_at')
-    return render(request, 'custom_admin/promotional_splash/list.html', {'splashes': splashes})
+    from zoneinfo import ZoneInfo
+    app_tz = ZoneInfo('Africa/Bujumbura')
+    now = timezone.now()
+    server_time_local = now.astimezone(app_tz)
+    return render(request, 'custom_admin/promotional_splash/list.html', {
+        'splashes': splashes,
+        'server_time_local': server_time_local,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -5021,17 +5137,26 @@ def promotional_splash_create(request):
     if request.method == 'POST':
         from django.utils.dateparse import parse_datetime
         from django.utils.timezone import make_aware, is_naive
-        starts_at_str = request.POST.get('starts_at', '').replace('T', ' ')
+        from zoneinfo import ZoneInfo
+        app_tz = ZoneInfo('Africa/Bujumbura')
+        start_now = request.POST.get('start_now') == 'on'
         ends_at_str = request.POST.get('ends_at', '').replace('T', ' ')
-        starts_at_dt = parse_datetime(starts_at_str)
         ends_at_dt = parse_datetime(ends_at_str)
-        if not starts_at_dt or not ends_at_dt:
-            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+        if not ends_at_dt:
+            messages.error(request, 'Invalid date format for ends_at.')
             return render(request, 'custom_admin/promotional_splash/form.html', {'action': 'Create'})
-        if is_naive(starts_at_dt):
-            starts_at_dt = make_aware(starts_at_dt)
         if is_naive(ends_at_dt):
-            ends_at_dt = make_aware(ends_at_dt)
+            ends_at_dt = make_aware(ends_at_dt, timezone=app_tz)
+        if start_now:
+            starts_at_dt = timezone.now()
+        else:
+            starts_at_str = request.POST.get('starts_at', '').replace('T', ' ')
+            starts_at_dt = parse_datetime(starts_at_str)
+            if not starts_at_dt:
+                messages.error(request, 'Invalid date format for starts_at.')
+                return render(request, 'custom_admin/promotional_splash/form.html', {'action': 'Create'})
+            if is_naive(starts_at_dt):
+                starts_at_dt = make_aware(starts_at_dt, timezone=app_tz)
         if not request.FILES.get('image'):
             messages.error(request, 'An image is required for promotional splashes.')
             return render(request, 'custom_admin/promotional_splash/form.html', {'action': 'Create'})
@@ -5061,17 +5186,26 @@ def promotional_splash_edit(request, pk):
     if request.method == 'POST':
         from django.utils.dateparse import parse_datetime
         from django.utils.timezone import make_aware, is_naive
-        starts_at_str = request.POST.get('starts_at', '').replace('T', ' ')
+        from zoneinfo import ZoneInfo
+        app_tz = ZoneInfo('Africa/Bujumbura')
+        start_now = request.POST.get('start_now') == 'on'
         ends_at_str = request.POST.get('ends_at', '').replace('T', ' ')
-        starts_at_dt = parse_datetime(starts_at_str)
         ends_at_dt = parse_datetime(ends_at_str)
-        if not starts_at_dt or not ends_at_dt:
-            messages.error(request, 'Invalid date format for starts_at or ends_at.')
+        if not ends_at_dt:
+            messages.error(request, 'Invalid date format for ends_at.')
             return render(request, 'custom_admin/promotional_splash/form.html', {'splash': splash, 'action': 'Edit'})
-        if is_naive(starts_at_dt):
-            starts_at_dt = make_aware(starts_at_dt)
         if is_naive(ends_at_dt):
-            ends_at_dt = make_aware(ends_at_dt)
+            ends_at_dt = make_aware(ends_at_dt, timezone=app_tz)
+        if start_now:
+            starts_at_dt = timezone.now()
+        else:
+            starts_at_str = request.POST.get('starts_at', '').replace('T', ' ')
+            starts_at_dt = parse_datetime(starts_at_str)
+            if not starts_at_dt:
+                messages.error(request, 'Invalid date format for starts_at.')
+                return render(request, 'custom_admin/promotional_splash/form.html', {'splash': splash, 'action': 'Edit'})
+            if is_naive(starts_at_dt):
+                starts_at_dt = make_aware(starts_at_dt, timezone=app_tz)
         splash.title = request.POST.get('title', '')
         splash.title_fr = request.POST.get('title_fr', '')
         splash.action_url = request.POST.get('action_url', '')
@@ -5092,6 +5226,18 @@ def promotional_splash_edit(request, pk):
         messages.success(request, f'Promotional splash "{splash.title}" updated successfully!')
         return redirect('custom_admin:promotional_splash_list')
     return render(request, 'custom_admin/promotional_splash/form.html', {'splash': splash, 'action': 'Edit'})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def promotional_splash_activate_now(request, pk):
+    splash = get_object_or_404(PromotionalSplash, pk=pk)
+    splash.starts_at = timezone.now()
+    splash.is_active = True
+    splash.save(update_fields=['starts_at', 'is_active'])
+    messages.success(request, f'Promotional splash "{splash.title}" activated! Starts at: now.')
+    return redirect('custom_admin:promotional_splash_list')
 
 
 @login_required(login_url='custom_admin:login')
@@ -5189,6 +5335,90 @@ def admin_audit_log(request):
         'current_model_filter': model_filter,
         'current_date_from': date_from,
         'current_date_to': date_to,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  QR SCAN LOG
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def qr_scan_log(request):
+    """View all QR code scan logs with filtering, pagination, and CSV export."""
+    logs = QRScanLog.objects.all().select_related('scanned_by').order_by('-scanned_at')
+
+    # Filters
+    scanner_filter = request.GET.get('scanner', '').strip()
+    qr_type_filter = request.GET.get('qr_type', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    duplicates_only = request.GET.get('duplicates_only', '').strip()
+
+    if scanner_filter:
+        logs = logs.filter(
+            Q(scanned_by__username__icontains=scanner_filter) |
+            Q(scanned_by__email__icontains=scanner_filter) |
+            Q(scanned_by__first_name__icontains=scanner_filter) |
+            Q(scanned_by__last_name__icontains=scanner_filter)
+        )
+    if qr_type_filter:
+        logs = logs.filter(qr_type=qr_type_filter)
+    if date_from:
+        try:
+            from django.utils.dateparse import parse_date
+            d = parse_date(date_from)
+            if d:
+                logs = logs.filter(scanned_at__date__gte=d)
+        except (ValueError, TypeError):
+            pass
+    if date_to:
+        try:
+            from django.utils.dateparse import parse_date
+            d = parse_date(date_to)
+            if d:
+                logs = logs.filter(scanned_at__date__lte=d)
+        except (ValueError, TypeError):
+            pass
+    if duplicates_only:
+        logs = logs.filter(is_duplicate=True)
+
+    # Stats (computed from filtered queryset)
+    total_scans = logs.count()
+    duplicate_scans = logs.filter(is_duplicate=True).count()
+
+    # Export CSV if requested
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="qr_scan_log_export.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Timestamp', 'Scanner', 'Scanner Email', 'QR Type', 'Reference ID', 'Duplicate', 'IP Address'])
+        for log in logs[:5000]:
+            writer.writerow(_sanitize_csv_row([
+                log.scanned_at.strftime('%Y-%m-%d %H:%M:%S') if log.scanned_at else '',
+                log.scanned_by.get_full_name() if log.scanned_by else '',
+                log.scanned_by.email if log.scanned_by else '',
+                log.get_qr_type_display(),
+                log.reference_id,
+                'Yes' if log.is_duplicate else 'No',
+                log.ip_address or '',
+            ]))
+        return response
+
+    paginator = Paginator(logs, 30)
+    page = request.GET.get('page')
+    logs = paginator.get_page(page)
+
+    return render(request, 'custom_admin/scan_log/list.html', {
+        'logs': logs,
+        'total_scans': total_scans,
+        'duplicate_scans': duplicate_scans,
+        'qr_type_choices': QRScanLog.QR_TYPE_CHOICES,
+        'current_scanner_filter': scanner_filter,
+        'current_qr_type_filter': qr_type_filter,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'current_duplicates_only': duplicates_only,
     })
 
 
@@ -8797,9 +9027,19 @@ def youth_dialogue_event_form(request, event_pk=None):
         end_date = request.POST.get('end_date', '').strip()
         yd_event.start_date = start_date or None
         yd_event.end_date = end_date or None
+        # Key dates
+        registration_start_date = request.POST.get('registration_start_date', '').strip()
+        registration_end_date = request.POST.get('registration_end_date', '').strip()
+        event_start_date = request.POST.get('event_start_date', '').strip()
+        event_end_date = request.POST.get('event_end_date', '').strip()
+        yd_event.registration_start_date = registration_start_date or None
+        yd_event.registration_end_date = registration_end_date or None
+        yd_event.event_start_date = event_start_date or None
+        yd_event.event_end_date = event_end_date or None
         # Visibility & Quick Access
         yd_event.is_visible = request.POST.get('is_visible') == 'on'
         yd_event.is_registration_open = request.POST.get('is_registration_open') == 'on'
+        yd_event.min_app_version = request.POST.get('min_app_version', '').strip()
         yd_event.quick_access_title_en = request.POST.get('quick_access_title_en', 'Continental Dialogue')
         yd_event.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
         yd_event.registration_closed_message = request.POST.get('registration_closed_message', '')
@@ -8838,6 +9078,8 @@ def youth_dialogue_event_form(request, event_pk=None):
             yd_event.quick_access_icon = request.FILES['quick_access_icon']
         if request.FILES.get('banner_image'):
             yd_event.banner_image = request.FILES['banner_image']
+        if request.FILES.get('sponsors_image'):
+            yd_event.sponsors_image = request.FILES['sponsors_image']
         # Parse required documents from form
         req_docs = []
         idx = 0
@@ -8853,9 +9095,22 @@ def youth_dialogue_event_form(request, event_pk=None):
             })
             idx += 1
         yd_event.required_documents = req_docs
+
+        # Parse credential field visibility checkboxes
+        id_card_all_keys = ['photo', 'organization', 'role', 'position', 'nationality',
+                            'event_dates', 'qr_code', 'participant_code', 'email', 'allow_pdf_download']
+        id_card_visible = [k for k in id_card_all_keys if request.POST.get(f'idf_{k}')]
+        yd_event.id_card_visible_fields = [] if len(id_card_visible) == len(id_card_all_keys) else id_card_visible
+
+        scan_result_all_keys = ['photo', 'role', 'nationality', 'organization', 'email',
+                                'event_dates', 'event_location', 'participant_code', 'reference_id', 'credential_issued_at']
+        scan_result_visible = [k for k in scan_result_all_keys if request.POST.get(f'srf_{k}')]
+        yd_event.scan_result_visible_fields = [] if len(scan_result_visible) == len(scan_result_all_keys) else scan_result_visible
+
         yd_event.save()
         _save_yd_form_fields(request, yd_event)
         _save_yd_roles(request, yd_event)
+        _save_yd_side_events(request, yd_event)
         messages.success(request, f'Continental Dialogue event {"updated" if event_pk else "created"} successfully!')
         return redirect('custom_admin:youth_dialogue_event_edit', event_pk=yd_event.pk)
 
@@ -8874,12 +9129,27 @@ def youth_dialogue_event_form(request, event_pk=None):
     if yd_event:
         existing_roles = list(yd_event.roles.values('id', 'name', 'name_fr', 'color', 'order'))
 
+    # Prepare side events data for template JS
+    existing_side_events = []
+    if yd_event:
+        existing_side_events = list(yd_event.side_events.values(
+            'id', 'name', 'name_fr', 'description', 'description_fr',
+            'event_date', 'event_time', 'is_active', 'order',
+        ))
+        # Serialize date/time fields to strings
+        for se in existing_side_events:
+            if se.get('event_date'):
+                se['event_date'] = se['event_date'].isoformat()
+            if se.get('event_time'):
+                se['event_time'] = se['event_time'].strftime('%H:%M')
+
     return render(request, 'custom_admin/youth_dialogue/event_form.html', {
         'yd_event': yd_event,
         'is_edit': event_pk is not None,
         'existing_fields_json': json.dumps(existing_fields).replace('<', '\\u003c'),
         'field_type_choices': json.dumps(field_type_choices).replace('<', '\\u003c'),
         'existing_roles_json': json.dumps(existing_roles).replace('<', '\\u003c'),
+        'existing_side_events_json': json.dumps(existing_side_events).replace('<', '\\u003c'),
     })
 
 
@@ -8997,6 +9267,52 @@ def _save_yd_roles(request, yd_event):
     to_delete = existing_ids - kept_ids
     if to_delete:
         YouthDialogueRole.objects.filter(pk__in=to_delete).delete()
+
+
+def _save_yd_side_events(request, yd_event):
+    """Parse and save inline side events from the Continental Dialogue event form."""
+    existing_ids = set(yd_event.side_events.values_list('id', flat=True))
+    kept_ids = set()
+    idx = 0
+    while True:
+        name = request.POST.get(f'side_event_{idx}_name')
+        if name is None:
+            break
+        name = name.strip()
+        if not name:
+            idx += 1
+            continue
+        se_id = request.POST.get(f'side_event_{idx}_id', '').strip()
+        name_fr = request.POST.get(f'side_event_{idx}_name_fr', '').strip()
+        description = request.POST.get(f'side_event_{idx}_description', '').strip()
+        description_fr = request.POST.get(f'side_event_{idx}_description_fr', '').strip()
+        event_date = request.POST.get(f'side_event_{idx}_date', '').strip() or None
+        event_time = request.POST.get(f'side_event_{idx}_time', '').strip() or None
+        order = idx
+
+        data = {
+            'name': name,
+            'name_fr': name_fr,
+            'description': description,
+            'description_fr': description_fr,
+            'event_date': event_date,
+            'event_time': event_time,
+            'order': order,
+            'is_active': True,
+        }
+
+        if se_id and se_id.isdigit():
+            sid = int(se_id)
+            YouthDialogueSideEvent.objects.filter(pk=sid, event=yd_event).update(**data)
+            kept_ids.add(sid)
+        else:
+            obj = YouthDialogueSideEvent.objects.create(event=yd_event, **data)
+            kept_ids.add(obj.pk)
+        idx += 1
+
+    to_delete = existing_ids - kept_ids
+    if to_delete:
+        YouthDialogueSideEvent.objects.filter(pk__in=to_delete).delete()
 
 
 @login_required(login_url='custom_admin:login')
@@ -9216,7 +9532,8 @@ def _auto_finalize_docs(request, application):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_review(request, pk):
     application = get_object_or_404(
-        YouthDialogueApplication.objects.select_related('user', 'reviewed_by', 'documents_reviewed_by', 'event'),
+        YouthDialogueApplication.objects.select_related('user', 'reviewed_by', 'documents_reviewed_by', 'event')
+        .prefetch_related('selected_side_events'),
         pk=pk,
     )
     documents = application.documents.select_related('reviewed_by').order_by('uploaded_at')
@@ -9429,14 +9746,30 @@ def youth_dialogue_review(request, pk):
         elif action == 'revoke_credential':
             if application.status == 'credential_issued' and not application.is_revoked:
                 reason = request.POST.get('revoke_reason', '').strip()
+                allow_reapply = request.POST.get('permanent_revoke') != 'on'
                 application.is_revoked = True
                 application.revoked_at = timezone.now()
                 application.revoked_reason = reason
-                application.save(update_fields=['is_revoked', 'revoked_at', 'revoked_reason'])
+                application.allow_reapply = allow_reapply
+                application.save(update_fields=['is_revoked', 'revoked_at', 'revoked_reason', 'allow_reapply'])
+                # Auto-create device bans on permanent revocation
+                if not allow_reapply:
+                    from core.models import YouthDialogueDeviceBan
+                    if application.device_id:
+                        YouthDialogueDeviceBan.objects.get_or_create(
+                            device_id=application.device_id,
+                            defaults={'user': application.user, 'reason': f'Permanent revocation: {reason}'}
+                        )
+                    profile = getattr(application.user, 'profile', None)
+                    if profile and profile.device_id and profile.device_id != application.device_id:
+                        YouthDialogueDeviceBan.objects.get_or_create(
+                            device_id=profile.device_id,
+                            defaults={'user': application.user, 'reason': f'Permanent revocation: {reason}'}
+                        )
                 log_admin_action(
                     request, 'revoke', 'YouthDialogueApplication', object_id=pk,
                     object_repr=f'{application.first_name} {application.last_name}',
-                    changes={'is_revoked': True, 'reason': reason},
+                    changes={'is_revoked': True, 'reason': reason, 'allow_reapply': allow_reapply},
                 )
                 from core.views import _notify_yd
                 _notify_yd(application, 'credential_revoked')
@@ -9515,6 +9848,24 @@ def youth_dialogue_export_csv(request, event_pk):
 
     log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'CSV export of {qs.count()} applications')
 
+    return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_export_excel(request, event_pk):
+    """Export Youth Dialogue applications as a styled Excel file."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    status_filter = request.GET.get('status', '')
+    from custom_admin.reports import generate_youth_dialogue_excel
+    buf = generate_youth_dialogue_excel(yd_event, status_filter=status_filter or None)
+    safe_title = yd_event.slug or 'youth_dialogue'
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}_participants.xlsx"'
+    log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'Excel export ({safe_title})')
     return response
 
 
@@ -9701,6 +10052,74 @@ def user_toggle_comment_ban(request, pk):
             changes={'is_comment_banned': {'old': 'False', 'new': 'True'}}
         )
         messages.success(request, f'User "{target_user.username}" has been banned from commenting.')
+
+    return redirect('custom_admin:user_edit', pk=pk)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTINENTAL DIALOGUE BAN MANAGEMENT
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def user_toggle_yd_ban(request, pk):
+    """Toggle Continental Dialogue ban on a user + create/lift device bans."""
+    target_user = get_object_or_404(User, pk=pk)
+    profile = target_user.profile
+
+    # Check current ban status
+    is_banned = YouthDialogueApplication.objects.filter(
+        user=target_user, is_revoked=True, allow_reapply=False
+    ).exists()
+
+    if is_banned:
+        # Lift ban: set allow_reapply=True on all permanently revoked apps
+        YouthDialogueApplication.objects.filter(
+            user=target_user, is_revoked=True, allow_reapply=False
+        ).update(allow_reapply=True)
+        # Lift device bans for this user
+        YouthDialogueDeviceBan.objects.filter(user=target_user, is_active=True).update(
+            is_active=False,
+            unbanned_at=timezone.now(),
+            unbanned_by=request.user,
+        )
+        log_admin_action(
+            request, 'status_change', 'User', object_id=pk,
+            object_repr=target_user.username,
+            changes={'yd_ban': {'old': 'Banned', 'new': 'Lifted'}},
+        )
+        messages.success(request, f'Continental Dialogue ban lifted for "{target_user.username}".')
+    else:
+        # Ban: mark all active YD apps as permanently revoked
+        apps = YouthDialogueApplication.objects.filter(user=target_user, is_revoked=False)
+        for app in apps:
+            app.is_revoked = True
+            app.revoked_at = timezone.now()
+            app.revoked_reason = 'Banned by admin from user management'
+            app.allow_reapply = False
+            app.save(update_fields=['is_revoked', 'revoked_at', 'revoked_reason', 'allow_reapply'])
+        # Also change already-revoked apps with allow_reapply=True to False
+        YouthDialogueApplication.objects.filter(
+            user=target_user, is_revoked=True, allow_reapply=True
+        ).update(allow_reapply=False)
+        # Create device bans
+        device_ids = set()
+        for app in YouthDialogueApplication.objects.filter(user=target_user).exclude(device_id=''):
+            device_ids.add(app.device_id)
+        if profile.device_id:
+            device_ids.add(profile.device_id)
+        for did in device_ids:
+            YouthDialogueDeviceBan.objects.get_or_create(
+                device_id=did,
+                defaults={'user': target_user, 'reason': f'Manual ban by {request.user.username}'},
+            )
+        log_admin_action(
+            request, 'status_change', 'User', object_id=pk,
+            object_repr=target_user.username,
+            changes={'yd_ban': {'old': 'Not banned', 'new': 'Banned'}},
+        )
+        messages.success(request, f'User "{target_user.username}" has been banned from Continental Dialogue.')
 
     return redirect('custom_admin:user_edit', pk=pk)
 
@@ -9951,4 +10370,78 @@ def push_diagnostics(request):
         'checks': checks,
         'test_result': test_result,
     })
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PHRASEBOOK
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def phrasebook_list(request):
+    entries = PhrasebookEntry.objects.all().order_by('category', 'display_order', 'id')
+    category_filter = request.GET.get('category')
+    if category_filter:
+        entries = entries.filter(category=category_filter)
+    paginator = Paginator(entries, 50)
+    page = request.GET.get('page')
+    entries = paginator.get_page(page)
+    return render(request, 'custom_admin/phrasebook/list.html', {
+        'entries': entries,
+        'categories': PhrasebookEntry.CATEGORY_CHOICES,
+        'current_category': category_filter or '',
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def phrasebook_create(request):
+    if request.method == 'POST':
+        PhrasebookEntry.objects.create(
+            category=request.POST.get('category', 'greetings'),
+            category_icon=request.POST.get('category_icon', ''),
+            kirundi=request.POST.get('kirundi', ''),
+            english=request.POST.get('english', ''),
+            french=request.POST.get('french', ''),
+            display_order=int(request.POST.get('display_order', 0)),
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'Phrase created successfully!')
+        return redirect('custom_admin:phrasebook_list')
+    return render(request, 'custom_admin/phrasebook/form.html', {
+        'action': 'Create',
+        'categories': PhrasebookEntry.CATEGORY_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def phrasebook_edit(request, pk):
+    entry = get_object_or_404(PhrasebookEntry, pk=pk)
+    if request.method == 'POST':
+        entry.category = request.POST.get('category', 'greetings')
+        entry.category_icon = request.POST.get('category_icon', '')
+        entry.kirundi = request.POST.get('kirundi', '')
+        entry.english = request.POST.get('english', '')
+        entry.french = request.POST.get('french', '')
+        entry.display_order = int(request.POST.get('display_order', 0))
+        entry.is_active = request.POST.get('is_active') == 'on'
+        entry.save()
+        messages.success(request, 'Phrase updated successfully!')
+        return redirect('custom_admin:phrasebook_list')
+    return render(request, 'custom_admin/phrasebook/form.html', {
+        'entry': entry,
+        'action': 'Edit',
+        'categories': PhrasebookEntry.CATEGORY_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def phrasebook_delete(request, pk):
+    entry = get_object_or_404(PhrasebookEntry, pk=pk)
+    entry.delete()
+    messages.success(request, 'Phrase deleted successfully!')
+    return redirect('custom_admin:phrasebook_list')
 

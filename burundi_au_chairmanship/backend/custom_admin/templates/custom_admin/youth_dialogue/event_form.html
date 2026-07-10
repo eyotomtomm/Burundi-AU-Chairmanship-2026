@@ -44,6 +44,31 @@
           <input type="date" name="end_date" value="{{ yd_event.end_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
         </div>
       </div>
+      <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider pt-2">Key Dates (shown on landing page)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Registration Start</label>
+          <input type="date" name="registration_start_date" value="{{ yd_event.registration_start_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <p class="text-xs text-slate-500 mt-1">When registration opens</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Registration Deadline</label>
+          <input type="date" name="registration_end_date" value="{{ yd_event.registration_end_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <p class="text-xs text-slate-500 mt-1">Registration deadline</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event Start</label>
+          <input type="date" name="event_start_date" value="{{ yd_event.event_start_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <p class="text-xs text-slate-500 mt-1">First day of the event</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event End</label>
+          <input type="date" name="event_end_date" value="{{ yd_event.event_end_date|date:'Y-m-d'|default:'' }}" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <p class="text-xs text-slate-500 mt-1">Last day of the event</p>
+        </div>
+      </div>
       <div>
         <label class="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" name="is_active" {% if yd_event.is_active %}checked{% endif %} class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-5 h-5">
@@ -79,6 +104,12 @@
             <p class="text-xs text-slate-500">When unchecked, the icon appears greyed out and users see the closed message</p>
           </div>
         </label>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Minimum App Version</label>
+        <input type="text" name="min_app_version" value="{{ yd_event.min_app_version|default:'' }}" placeholder="e.g. 1.2.16" class="w-48 border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent font-mono">
+        <p class="text-xs text-slate-500 mt-1">Users on older versions will be blocked from registering and prompted to update. Leave blank to allow all versions.</p>
       </div>
 
       {% if is_edit %}
@@ -254,6 +285,18 @@
         <p class="text-xs text-slate-500 mt-1">Hero banner image for the landing page (recommended: 1200×400)</p>
       </div>
 
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Sponsors / Partners Image</label>
+        <input type="file" name="sponsors_image" accept="image/*" class="w-full border border-slate-200 bg-slate-50 rounded-lg py-2.5 px-4 text-sm">
+        {% if yd_event.sponsors_image %}
+          <div class="mt-2 flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <img src="{{ yd_event.sponsors_image.url }}" alt="Sponsors" class="h-16 object-contain rounded-lg">
+            <span class="text-xs text-slate-500">{{ yd_event.sponsors_image.name }}</span>
+          </div>
+        {% endif %}
+        <p class="text-xs text-slate-500 mt-1">A single wide image with all sponsor/partner logos arranged together. Shown below the banner on the landing page.</p>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-semibold text-slate-700 mb-1.5">Event Tagline (EN)</label>
@@ -418,6 +461,23 @@
       <div id="roles-container" class="space-y-3"></div>
     </div>
 
+    <!-- Side Events Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span class="material-symbols-outlined text-orange-600">event</span>
+          Side Events
+        </h2>
+        <button type="button" onclick="addSideEventRow()" class="bg-orange-600 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-orange-700 transition-all shadow-sm inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sm">add</span>
+          Add Side Event
+        </button>
+      </div>
+      <p class="text-sm text-slate-500 -mt-2">Define side events that applicants can select during registration.</p>
+
+      <div id="side-events-container" class="space-y-3"></div>
+    </div>
+
     {% if is_edit %}
     <!-- Media Gallery Card -->
     <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100">
@@ -456,6 +516,119 @@
 
       <div id="formFieldsContainer" class="space-y-3">
         <!-- Dynamic fields will be added here by JS -->
+      </div>
+    </div>
+
+    <!-- Credential Field Visibility Section -->
+    <div class="bg-white rounded-xl shadow-sm p-8 border border-slate-100 space-y-6">
+      <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <span class="material-symbols-outlined text-teal-600">id_card</span>
+        Credential Field Visibility
+      </h2>
+      <p class="text-sm text-slate-500 -mt-2">Control which fields appear on the Digital ID Card and QR Scan Result screens. Name is always shown. Unchecked fields are hidden from users.</p>
+
+      <!-- Digital ID Card fields -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider">Digital ID Card</h3>
+          <button type="button" onclick="toggleAllCheckboxes('idf_', this)" class="text-xs text-teal-600 hover:text-teal-800 font-semibold">Select All / Deselect All</button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {% with idf=yd_event.get_id_card_visible_fields %}
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_photo" value="1" {% if 'photo' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Photo</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_organization" value="1" {% if 'organization' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Organization</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_role" value="1" {% if 'role' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Role</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_position" value="1" {% if 'position' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Position</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_nationality" value="1" {% if 'nationality' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Nationality</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_event_dates" value="1" {% if 'event_dates' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Event Dates</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_qr_code" value="1" {% if 'qr_code' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">QR Code</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_participant_code" value="1" {% if 'participant_code' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Participant Code</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_email" value="1" {% if 'email' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Email</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_allow_pdf_download" value="1" {% if 'allow_pdf_download' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">PDF Download</span>
+          </label>
+          {% endwith %}
+        </div>
+      </div>
+
+      <!-- QR Scan Result fields -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-600 uppercase tracking-wider">QR Scan Result</h3>
+          <button type="button" onclick="toggleAllCheckboxes('srf_', this)" class="text-xs text-teal-600 hover:text-teal-800 font-semibold">Select All / Deselect All</button>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {% with srf=yd_event.get_scan_result_visible_fields %}
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_photo" value="1" {% if 'photo' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Photo</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_role" value="1" {% if 'role' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Role</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_nationality" value="1" {% if 'nationality' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Nationality</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_organization" value="1" {% if 'organization' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Organization</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_email" value="1" {% if 'email' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Email</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_event_dates" value="1" {% if 'event_dates' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Event Dates</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_event_location" value="1" {% if 'event_location' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Event Location</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_participant_code" value="1" {% if 'participant_code' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Participant Code</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_reference_id" value="1" {% if 'reference_id' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Reference ID</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_credential_issued_at" value="1" {% if 'credential_issued_at' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Credential Issued</span>
+          </label>
+          {% endwith %}
+        </div>
       </div>
     </div>
 
@@ -525,6 +698,13 @@
     }
 </style>
 <script>
+/* ── Select All / Deselect All for field visibility checkboxes ── */
+function toggleAllCheckboxes(prefix, btn) {
+    const checkboxes = document.querySelectorAll('input[name^="' + prefix + '"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
 let fieldCounter = 0;
 const existingFieldsJson = {{ existing_fields_json|safe|default:"[]" }};
 const fieldTypeChoices = {{ field_type_choices|safe|default:"[]" }};
@@ -727,6 +907,50 @@ function addRoleRow(role) {
 document.addEventListener('DOMContentLoaded', function() {
     const roles = existingRolesJson && existingRolesJson.length > 0 ? existingRolesJson : DEFAULT_ROLES;
     roles.forEach(r => addRoleRow(r));
+});
+
+/* ── Side Events ── */
+const existingSideEventsJson = {{ existing_side_events_json|safe|default:"[]" }};
+const sideEventsContainer = document.getElementById('side-events-container');
+let sideEventCounter = 0;
+
+function addSideEventRow(se) {
+    se = se || {id: '', name: '', name_fr: '', description: '', description_fr: '', event_date: '', event_time: ''};
+    const idx = sideEventCounter++;
+    const div = document.createElement('div');
+    div.className = 'p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3';
+    div.innerHTML = `
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-slate-400 text-base">drag_indicator</span>
+            <input type="hidden" name="side_event_${idx}_id" value="${se.id || ''}">
+            <input type="text" name="side_event_${idx}_name" value="${escapeAttr(se.name)}" placeholder="Side Event Name (EN)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm" required>
+            <input type="text" name="side_event_${idx}_name_fr" value="${escapeAttr(se.name_fr)}" placeholder="Side Event Name (FR)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
+            <button type="button" onclick="this.closest('.space-y-3').remove()" class="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                <span class="material-symbols-outlined text-base">delete</span>
+            </button>
+        </div>
+        <div class="flex items-center gap-3 ml-8">
+            <input type="text" name="side_event_${idx}_description" value="${escapeAttr(se.description || '')}" placeholder="Description (EN)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
+            <input type="text" name="side_event_${idx}_description_fr" value="${escapeAttr(se.description_fr || '')}" placeholder="Description (FR)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
+        </div>
+        <div class="flex items-center gap-3 ml-8">
+            <label class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap">
+                <span>Date</span>
+                <input type="date" name="side_event_${idx}_date" value="${escapeAttr(se.event_date || '')}" class="border border-slate-200 rounded-lg py-2 px-3 text-sm">
+            </label>
+            <label class="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap">
+                <span>Time</span>
+                <input type="time" name="side_event_${idx}_time" value="${escapeAttr(se.event_time || '')}" class="border border-slate-200 rounded-lg py-2 px-3 text-sm">
+            </label>
+        </div>
+    `;
+    sideEventsContainer.appendChild(div);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (existingSideEventsJson && existingSideEventsJson.length > 0) {
+        existingSideEventsJson.forEach(se => addSideEventRow(se));
+    }
 });
 </script>
 {% endblock %}

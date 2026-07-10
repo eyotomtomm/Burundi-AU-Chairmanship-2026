@@ -185,6 +185,20 @@
     </div>
     {% endif %}
 
+    {% if application.selected_side_events.all %}
+    <div class="mt-6 pt-6 border-t border-slate-100">
+      <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-3">Selected Side Events</label>
+      <div class="flex flex-wrap gap-2">
+        {% for side_event in application.selected_side_events.all %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-orange-50 text-orange-800 border border-orange-200">
+          <span class="material-symbols-outlined" style="font-size:14px;">event</span>
+          {{ side_event.name }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if application.additional_data %}
     <div class="mt-6 pt-6 border-t border-slate-100">
       <label class="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-3">Additional Fields</label>
@@ -407,6 +421,9 @@
       {% if application.revoked_reason %}
       <p class="text-sm text-red-700 mt-2">{{ application.revoked_reason }}</p>
       {% endif %}
+      <p class="text-sm mt-2 font-medium {% if application.allow_reapply %}text-emerald-700{% else %}text-red-800{% endif %}">
+        Re-application: {% if application.allow_reapply %}Allowed{% else %}Permanently blocked{% endif %}
+      </p>
     </div>
     {% endif %}
 
@@ -455,6 +472,10 @@
       <textarea name="revoke_reason" rows="3" required
                 class="w-full bg-white border border-red-200 rounded-lg py-3 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent text-slate-800 mb-4"
                 placeholder="Provide a reason for revoking this credential..."></textarea>
+      <label class="flex items-center gap-2 mb-4 cursor-pointer">
+        <input type="checkbox" name="permanent_revoke" class="w-4 h-4 text-red-600 border-red-300 rounded focus:ring-red-500">
+        <span class="text-sm font-medium text-red-800">Permanently revoked (cannot re-apply)</span>
+      </label>
       <button type="submit"
               class="bg-red-600 text-white font-semibold rounded-lg py-2.5 px-6 text-sm hover:bg-red-700 transition-all"
               onclick="return confirm('Are you sure you want to revoke this credential? This cannot be undone.')">

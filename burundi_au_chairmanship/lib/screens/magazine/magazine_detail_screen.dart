@@ -492,23 +492,27 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
 
                           // Like — tappable
                           GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: _toggleLike,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _magazine.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  size: 22,
-                                  color: _magazine.isLiked ? AppColors.burundiRed : textSecondary,
-                                ),
-                                const SizedBox(width: 5),
-                                Text('${_magazine.likeCount}',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-                                    color: _magazine.isLiked ? AppColors.burundiRed : textSecondary)),
-                                const SizedBox(width: 4),
-                                Text(l10n.translate('like'),
-                                  style: TextStyle(fontSize: 14,
-                                    color: _magazine.isLiked ? AppColors.burundiRed : textSecondary)),
-                              ],
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _magazine.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                    size: 22,
+                                    color: _magazine.isLiked ? AppColors.burundiRed : textSecondary,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text('${_magazine.likeCount}',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                                      color: _magazine.isLiked ? AppColors.burundiRed : textSecondary)),
+                                  const SizedBox(width: 4),
+                                  Text(l10n.translate('like'),
+                                    style: TextStyle(fontSize: 14,
+                                      color: _magazine.isLiked ? AppColors.burundiRed : textSecondary)),
+                                ],
+                              ),
                             ),
                           ),
 

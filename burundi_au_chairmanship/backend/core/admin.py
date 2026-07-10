@@ -416,7 +416,7 @@ class QuickAccessAdmin(admin.ModelAdmin):
         ('Menu Item', {
             'fields': [
                 ('title_en', 'title_fr'),
-                'icon_name',
+                ('icon_name', 'icon_image'),
                 'action_value',
                 ('order', 'is_active'),
             ],

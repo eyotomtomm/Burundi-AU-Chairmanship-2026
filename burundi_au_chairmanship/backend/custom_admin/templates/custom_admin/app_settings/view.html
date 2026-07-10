@@ -242,6 +242,135 @@
                             />
                         </div>
                     </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label for="developer_role" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Developer Role / Title
+                            </label>
+                            <input
+                                type="text"
+                                id="developer_role"
+                                name="developer_role"
+                                value="{{ settings.developer_role }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="e.g. Lead Developer"
+                            />
+                        </div>
+                        <div>
+                            <label for="app_ownership_text" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Ownership / Property Text
+                            </label>
+                            <input
+                                type="text"
+                                id="app_ownership_text"
+                                name="app_ownership_text"
+                                value="{{ settings.app_ownership_text }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="e.g. Property of Burundi Embassy in Addis Ababa"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Mission & Features Section Titles -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label for="about_mission_title" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Mission Title (English)
+                            </label>
+                            <input
+                                type="text"
+                                id="about_mission_title"
+                                name="about_mission_title"
+                                value="{{ settings.about_mission_title }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="Our Mission"
+                            />
+                        </div>
+                        <div>
+                            <label for="about_mission_title_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Mission Title (French)
+                            </label>
+                            <input
+                                type="text"
+                                id="about_mission_title_fr"
+                                name="about_mission_title_fr"
+                                value="{{ settings.about_mission_title_fr }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="Notre Mission"
+                            />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label for="about_features_title" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Features Title (English)
+                            </label>
+                            <input
+                                type="text"
+                                id="about_features_title"
+                                name="about_features_title"
+                                value="{{ settings.about_features_title }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="Key Features"
+                            />
+                        </div>
+                        <div>
+                            <label for="about_features_title_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Features Title (French)
+                            </label>
+                            <input
+                                type="text"
+                                id="about_features_title_fr"
+                                name="about_features_title_fr"
+                                value="{{ settings.about_features_title_fr }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="Fonctionnalités"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Contact Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label for="contact_website" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Contact Website (display name)
+                            </label>
+                            <input
+                                type="text"
+                                id="contact_website"
+                                name="contact_website"
+                                value="{{ settings.contact_website }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="burundi4africa.com"
+                            />
+                        </div>
+                        <div>
+                            <label for="contact_website_url" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                                Contact Website URL
+                            </label>
+                            <input
+                                type="url"
+                                id="contact_website_url"
+                                name="contact_website_url"
+                                value="{{ settings.contact_website_url }}"
+                                class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                                placeholder="https://burundi4africa.com"
+                            />
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label for="contact_email" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">
+                            Contact Email
+                        </label>
+                        <input
+                            type="email"
+                            id="contact_email"
+                            name="contact_email"
+                            value="{{ settings.contact_email }}"
+                            class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body text-on-surface"
+                            placeholder="info@burundi4africa.com"
+                        />
+                    </div>
                 </div>
 
 
@@ -334,6 +463,106 @@
                     </label>
                 </div>
 
+                <!-- Section Titles -->
+                <div class="pt-6 border-t border-outline-variant mt-6">
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Section Titles</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">Customize the section headings shown on the home screen. Provide both English and French versions.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                        <div>
+                            <label for="section_title_news" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">News (EN)</label>
+                            <input type="text" id="section_title_news" name="section_title_news"
+                                value="{{ settings.section_title_news|default:'News' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="section_title_news_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">News (FR)</label>
+                            <input type="text" id="section_title_news_fr" name="section_title_news_fr"
+                                value="{{ settings.section_title_news_fr|default:'Actualités' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div>
+                            <label for="section_title_events" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Events (EN)</label>
+                            <input type="text" id="section_title_events" name="section_title_events"
+                                value="{{ settings.section_title_events|default:'Upcoming Events' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="section_title_events_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Events (FR)</label>
+                            <input type="text" id="section_title_events_fr" name="section_title_events_fr"
+                                value="{{ settings.section_title_events_fr|default:'Prochains Événements' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div>
+                            <label for="section_title_magazines" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Magazines (EN)</label>
+                            <input type="text" id="section_title_magazines" name="section_title_magazines"
+                                value="{{ settings.section_title_magazines|default:'Latest Magazines' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="section_title_magazines_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Magazines (FR)</label>
+                            <input type="text" id="section_title_magazines_fr" name="section_title_magazines_fr"
+                                value="{{ settings.section_title_magazines_fr|default:'Derniers Magazines' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div>
+                            <label for="section_title_trending" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Trending (EN)</label>
+                            <input type="text" id="section_title_trending" name="section_title_trending"
+                                value="{{ settings.section_title_trending|default:'Trending' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="section_title_trending_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Trending (FR)</label>
+                            <input type="text" id="section_title_trending_fr" name="section_title_trending_fr"
+                                value="{{ settings.section_title_trending_fr|default:'Tendances' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div>
+                            <label for="section_title_facts" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Facts & Quotes (EN)</label>
+                            <input type="text" id="section_title_facts" name="section_title_facts"
+                                value="{{ settings.section_title_facts|default:'Discover Africa' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="section_title_facts_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Facts & Quotes (FR)</label>
+                            <input type="text" id="section_title_facts_fr" name="section_title_facts_fr"
+                                value="{{ settings.section_title_facts_fr|default:'Découvrir l&#39;Afrique' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div>
+                            <label for="section_title_agendas" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Priority Agendas (EN)</label>
+                            <input type="text" id="section_title_agendas" name="section_title_agendas"
+                                value="{{ settings.section_title_agendas|default:'Priority Agendas' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="section_title_agendas_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">Priority Agendas (FR)</label>
+                            <input type="text" id="section_title_agendas_fr" name="section_title_agendas_fr"
+                                value="{{ settings.section_title_agendas_fr|default:'Agendas Prioritaires' }}"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="qr_scanner_title" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">QR Scanner (EN)</label>
+                            <input type="text" id="qr_scanner_title" name="qr_scanner_title"
+                                value="{{ settings.qr_scanner_title|default:'QR Scanner' }}"
+                                placeholder="QR Scanner"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                        <div>
+                            <label for="qr_scanner_title_fr" class="block font-label text-xs uppercase tracking-wider text-on-surface-variant font-bold mb-2">QR Scanner (FR)</label>
+                            <input type="text" id="qr_scanner_title_fr" name="qr_scanner_title_fr"
+                                value="{{ settings.qr_scanner_title_fr|default:'Scanner QR' }}"
+                                placeholder="Scanner QR"
+                                class="w-full rounded-xl border border-outline bg-surface-container-low px-4 py-2.5 text-on-surface font-body placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Feature Toggles -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Feature Toggles</h3>
@@ -424,6 +653,24 @@
                                 <span class="font-body text-on-surface font-medium">Facts & Quotes</span>
                             </span>
                             {% if settings.facts_enabled %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                            {% else %}
+                            <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                            {% endif %}
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <input
+                                type="checkbox"
+                                name="live_feeds_enabled"
+                                {% if settings.live_feeds_enabled %}checked{% endif %}
+                                class="w-5 h-5 rounded border-outline-variant text-red-600 focus:ring-red-600"
+                            />
+                            <span class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-lg text-red-600">live_tv</span>
+                                <span class="font-body text-on-surface font-medium">Live Feeds</span>
+                            </span>
+                            {% if settings.live_feeds_enabled %}
                             <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
                             {% else %}
                             <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>

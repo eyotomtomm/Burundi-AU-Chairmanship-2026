@@ -81,6 +81,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   List<Fact>? _apiFacts;
   Map<String, String>? _heroTextContent;
   List<Map<String, dynamic>>? _quickAccessItems;
+  Map<String, String> _quickAccessBadges = {};
   int _unreadBadgeCount = 0;
   Timer? _badgeTimer;
   bool _isLoading = true;
@@ -239,15 +240,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     try {
       final banners = await ApiService().getAnnouncementBanners();
       if (!mounted) return;
-      // Merge: keep showing existing banners that the API still returns,
-      // add any new ones, and remove ones the backend deactivated.
-      final newIds = banners.map((b) => b['id']).toSet();
-      // Remove dismissed IDs that no longer exist in the API response
-      final sizeBefore = _dismissedAnnouncementIds.length;
-      _dismissedAnnouncementIds.removeWhere((id) => !newIds.contains(id));
-      if (_dismissedAnnouncementIds.length != sizeBefore) {
-        _saveDismissedAnnouncementIds();
-      }
       setState(() => _announcementBanners = banners);
     } catch (_) {}
   }
@@ -282,6 +274,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         preloaded.priorityAgendas,
         preloaded.heroTextContent,
         preloaded.quickAccessMenu,
+        quickAccessBadges: preloaded.quickAccessBadges,
       );
       _fetchYouthDialogueData();
       return;
@@ -303,17 +296,19 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         api.getHomeFeed(),
         api.getPriorityAgendas().catchError((_) => <Map<String, dynamic>>[]),
         api.getHeroTextContent().catchError((_) => <Map<String, dynamic>>[]),
-        api.getQuickAccessMenu().catchError((_) => <Map<String, dynamic>>[]),
+        api.getQuickAccessMenuWithBadges().catchError((_) => <String, dynamic>{'items': <Map<String, dynamic>>[], 'badges': <String, String>{}}),
       ]).timeout(const Duration(seconds: 20));
       if (!mounted) return;
 
       final homeFeed = results[0] as Map<String, dynamic>;
       _cacheHomeFeed(homeFeed);
+      final qaData = results[3] as Map<String, dynamic>;
       _applyHomeFeedData(
         homeFeed,
         results[1] as List<Map<String, dynamic>>,
         results[2] as List<Map<String, dynamic>>,
-        results[3] as List<Map<String, dynamic>>,
+        (qaData['items'] as List<dynamic>).cast<Map<String, dynamic>>(),
+        quickAccessBadges: Map<String, String>.from(qaData['badges'] as Map? ?? {}),
       );
       _fetchYouthDialogueData();
     } catch (e, stack) {
@@ -374,8 +369,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     Map<String, dynamic> homeFeed,
     List<Map<String, dynamic>> priorityAgendas,
     List<Map<String, dynamic>> heroTextData,
-    List<Map<String, dynamic>> quickAccessMenu,
-  ) {
+    List<Map<String, dynamic>> quickAccessMenu, {
+    Map<String, String> quickAccessBadges = const {},
+  }) {
     final heroSlides = (homeFeed['hero_slides'] as List<dynamic>?)
         ?.map((j) => HeroSlide.fromJson(j as Map<String, dynamic>))
         .toList();
@@ -458,6 +454,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       _apiFacts = facts;
       _heroTextContent = heroTextMap;
       _quickAccessItems = quickAccessMenu;
+      _quickAccessBadges = quickAccessBadges;
       _isLoading = false;
       _hasError = false;
     });
@@ -607,12 +604,27 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               ),
             ),
           ),
+          if (_apiFacts != null && _apiFacts!.isNotEmpty && _appSettings?['facts_enabled'] == true) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
+                child: SectionTitle(
+                  title: _appSettings?[langCode == 'fr' ? 'section_title_facts_fr' : 'section_title_facts'] ?? (langCode == 'fr' ? "Découvrir l'Afrique" : 'Discover Africa'),
+                  showSeeAll: true,
+                  onSeeAll: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const FactsListScreen())),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _FactsCarousel(facts: _apiFacts!, langCode: langCode),
+            ),
+          ],
           if (_apiEventCards != null && _apiEventCards!.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
                 child: SectionTitle(
-                  title: langCode == 'fr' ? 'Prochains Événements' : 'Upcoming Events',
+                  title: _appSettings?[langCode == 'fr' ? 'section_title_events_fr' : 'section_title_events'] ?? (langCode == 'fr' ? 'Prochains Événements' : 'Upcoming Events'),
                   showSeeAll: true,
                   onSeeAll: () => Navigator.pushNamed(context, '/events'),
                 ),
@@ -634,6 +646,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       final event = _apiEventCards![index];
                       return EventCard(event: event, langCode: langCode,
                         onTap: () {
+                          if (!isAuth) {
+                            Navigator.pushNamed(context, '/auth');
+                            return;
+                          }
                           if (event.isYouthDialogue) {
                             Navigator.push(context, CupertinoPageRoute(builder: (_) => const YouthDialogueMainScreen()));
                           } else {
@@ -650,7 +666,11 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-                child: MagazineSectionTitle(langCode: langCode, onSeeAll: () => widget.onSwitchTab?.call(2)),
+                child: MagazineSectionTitle(
+                  langCode: langCode,
+                  onSeeAll: () => widget.onSwitchTab?.call(2),
+                  customTitle: _appSettings?[langCode == 'fr' ? 'section_title_magazines_fr' : 'section_title_magazines'],
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -677,7 +697,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-                child: SectionTitle(title: langCode == 'fr' ? 'Tendances' : 'Trending'),
+                child: SectionTitle(title: _appSettings?[langCode == 'fr' ? 'section_title_trending_fr' : 'section_title_trending'] ?? (langCode == 'fr' ? 'Tendances' : 'Trending')),
               ),
             ),
             SliverToBoxAdapter(
@@ -698,31 +718,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                     },
                   );
                 }),
-              ),
-            ),
-          ],
-          if (_apiFacts != null && _apiFacts!.isNotEmpty && _appSettings?['facts_enabled'] == true) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-                child: SectionTitle(
-                  title: langCode == 'fr' ? 'Faits & Citations' : 'Facts & Quotes',
-                  showSeeAll: true,
-                  onSeeAll: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const FactsListScreen())),
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 170,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _apiFacts!.length,
-                  itemBuilder: (context, index) {
-                    return FactCard(fact: _apiFacts![index], langCode: langCode);
-                  },
-                ),
               ),
             ),
           ],
@@ -760,7 +755,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
                 child: SectionTitle(
-                  title: langCode == 'fr' ? 'Actualités' : 'News',
+                  title: _appSettings?[langCode == 'fr' ? 'section_title_news_fr' : 'section_title_news'] ?? (langCode == 'fr' ? 'Actualités' : 'News'),
                   showSeeAll: true,
                   onSeeAll: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ArticlesScreen())),
                 ),
@@ -792,7 +787,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-                child: SectionTitle(title: 'Priority Agendas'),
+                child: SectionTitle(title: _appSettings?[langCode == 'fr' ? 'section_title_agendas_fr' : 'section_title_agendas'] ?? (langCode == 'fr' ? 'Agendas Prioritaires' : 'Priority Agendas')),
               ),
             ),
             SliverToBoxAdapter(
@@ -822,7 +817,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
     final showVerification = isLoggedIn && !isVerified;
     final List<Map<String, dynamic>> items = [];
 
-    if (_ydSettings != null && _ydSettings!['is_visible'] == true) {
+    // Auto-inject Continental Dialogue into Quick Access based on settings
+    // Hide entirely if device is banned from Continental Dialogue
+    if (_ydSettings != null && _ydSettings!['is_visible'] == true && _ydSettings!['is_device_banned'] != true) {
       final ydIsOpen = _ydSettings!['is_registration_open'] == true;
       final ydTitle = langCode == 'fr'
           ? (_ydSettings!['quick_access_title_fr'] as String? ?? '').isNotEmpty
@@ -835,24 +832,57 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
               ? _ydSettings!['registration_closed_message_fr'] as String
               : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.'
           : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.';
+
+      final isUsher = authProvider.isUsher;
       items.add(<String, dynamic>{
         'title': ydTitle,
         'icon': Icons.groups_rounded,
         'iconImageUrl': ydIconUrl.isNotEmpty ? Environment.fixMediaUrl(ydIconUrl) : '',
         'hasLiveDot': false,
-        'badgeText': !isLoggedIn ? (langCode == 'fr' ? 'Connexion' : 'Sign in') : '',
-        'badgeColor': !isLoggedIn ? '#9E9E9E' : '',
-        'locked': !isLoggedIn || !ydIsOpen,
+        'badgeText': !isLoggedIn
+            ? (langCode == 'fr' ? 'Connexion' : 'Sign in')
+            : isUsher
+                ? (langCode == 'fr' ? 'Scanner' : 'Scan Only')
+                : '',
+        'badgeColor': !isLoggedIn ? '#9E9E9E' : isUsher ? '#9E9E9E' : '',
+        'locked': !isLoggedIn || isUsher || !ydIsOpen,
         'onTap': !isLoggedIn
             ? () => Navigator.pushNamed(context, '/auth')
-            : ydIsOpen
-                ? () => Navigator.pushNamed(context, '/youth-dialogue')
-                : () => ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(ydClosedMsg), backgroundColor: AppColors.auGold)),
+            : isUsher
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(langCode == 'fr'
+                            ? 'Vous avez le rôle scanner. L\'inscription n\'est pas disponible.'
+                            : 'You have the scanner role. Registration is not available.'),
+                        backgroundColor: Colors.grey.shade700,
+                      ),
+                    );
+                  }
+                : ydIsOpen
+                    ? () => Navigator.pushNamed(context, '/youth-dialogue')
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ydClosedMsg),
+                            backgroundColor: AppColors.auGold,
+                          ),
+                        );
+                      },
       });
     }
 
     if (_quickAccessItems != null && _quickAccessItems!.isNotEmpty) {
+      // Youth Dialogue registration state (used for /youth-dialogue items)
+      final ydIsOpen = _ydSettings?['is_registration_open'] == true;
+      final ydClosedMsg = _ydSettings != null
+          ? (langCode == 'fr'
+              ? (_ydSettings!['registration_closed_message_fr'] as String? ?? '').isNotEmpty
+                  ? _ydSettings!['registration_closed_message_fr'] as String
+                  : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.'
+              : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.')
+          : 'Registration is currently closed.';
+
       final filtered = _quickAccessItems!.where((m) {
         final rule = m['visibility_rule'] as String? ?? '';
         if (rule.isEmpty) return true;
@@ -862,11 +892,36 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       items.addAll(filtered.map((m) {
         final title = langCode == 'fr' && m['title_fr'] != null && (m['title_fr'] as String).isNotEmpty
             ? m['title_fr'] as String : m['title_en'] as String;
-        final icon = _getIconFromName(m['icon_name'] as String);
+        final iconName = m['icon_name'] as String? ?? '';
+        final icon = iconName.isNotEmpty ? _getIconFromName(iconName) : Icons.apps_rounded;
+        final iconImageUrl = m['icon_image_url'] as String? ?? '';
         final actionType = m['action_type'] as String;
         final actionValue = m['action_value'] as String;
+        final isYdRoute = actionValue == '/youth-dialogue';
+
+        // Youth Dialogue items get special locked/sign-in behavior
+        if (isYdRoute) {
+          return <String, dynamic>{
+            'title': title, 'icon': icon,
+            'iconImageUrl': iconImageUrl.isNotEmpty ? Environment.fixMediaUrl(iconImageUrl) : '',
+            'hasLiveDot': m['has_live_indicator'] as bool? ?? false,
+            'badgeText': !isLoggedIn
+                ? (langCode == 'fr' ? 'Connexion' : 'Sign in')
+                : (m['badge_text'] as String? ?? ''),
+            'badgeColor': !isLoggedIn ? '#9E9E9E' : (m['badge_color'] as String? ?? ''),
+            'locked': !isLoggedIn || !ydIsOpen,
+            'onTap': !isLoggedIn
+                ? () => Navigator.pushNamed(context, '/auth')
+                : ydIsOpen
+                    ? () => Navigator.pushNamed(context, '/youth-dialogue')
+                    : () => ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(ydClosedMsg), backgroundColor: AppColors.auGold)),
+          };
+        }
+
         return <String, dynamic>{
           'title': title, 'icon': icon,
+          'iconImageUrl': iconImageUrl.isNotEmpty ? Environment.fixMediaUrl(iconImageUrl) : '',
           'hasLiveDot': m['has_live_indicator'] as bool? ?? false,
           'badgeText': m['badge_text'] as String? ?? '',
           'badgeColor': m['badge_color'] as String? ?? '',
@@ -901,11 +956,19 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         existingActionValues.contains(av) || existingTitles.contains(en.toLowerCase()) || existingTitles.contains(fr.toLowerCase());
 
     // Staff-only QR Scanner
+    final qrScannerTitle = langCode == 'fr'
+        ? (_appSettings?['qr_scanner_title_fr'] as String? ?? '').isNotEmpty
+            ? _appSettings!['qr_scanner_title_fr'] as String
+            : 'Scanner QR'
+        : (_appSettings?['qr_scanner_title'] as String? ?? '').isNotEmpty
+            ? _appSettings!['qr_scanner_title'] as String
+            : 'QR Scanner';
     if (authProvider.isStaff && !dup('/qr-scanner', 'QR Scanner', 'Scanner QR')) {
       items.add(<String, dynamic>{
-        'title': langCode == 'fr' ? 'Scanner QR' : 'QR Scanner',
+        'title': qrScannerTitle,
         'icon': Icons.qr_code_scanner_rounded,
-        'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Staff' : 'Staff', 'badgeColor': '#409843',
+        'isScanner': true,
+        'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Staff' : 'Staff', 'badgeColor': '#CE1126',
         'onTap': () => Navigator.pushNamed(context, '/qr-scanner'),
       });
     }
@@ -921,42 +984,130 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
           : 'Continental Dialogue';
       items.add(<String, dynamic>{
         'title': langCode == 'fr' ? 'Scanner $ydScannerName' : '$ydScannerName Scanner',
-        'icon': Icons.badge_rounded,
-        'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Staff' : 'Staff', 'badgeColor': '#409843',
+        'icon': Icons.qr_code_scanner_rounded,
+        'isScanner': true,
+        'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Staff' : 'Staff', 'badgeColor': '#CE1126',
         'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => QrScannerScreen(mode: 'youth_dialogue', programmeName: ydScannerName))),
       });
     }
 
+    // Look up auto-badge from server for a given route
+    String badge(String route) => _quickAccessBadges[route] ?? '';
+    String badgeColor(String route) => badge(route).isNotEmpty ? '#E53935' : '';
+
     final hardcoded = <Map<String, dynamic>>[
       if (!dup('/magazine', 'Magazine', 'Magazine'))
-        {'title': langCode == 'fr' ? 'Magazines' : 'Magazines', 'icon': Icons.menu_book_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => widget.onSwitchTab?.call(2)},
+        {'title': langCode == 'fr' ? 'Magazines' : 'Magazines', 'icon': Icons.menu_book_rounded, 'hasLiveDot': false, 'badgeText': badge('/magazine'), 'badgeColor': badgeColor('/magazine'), 'onTap': () => widget.onSwitchTab?.call(2)},
       if (!dup('/live-feeds', 'Live Feeds', 'En direct'))
-        {'title': langCode == 'fr' ? 'En direct' : 'Live Feeds', 'icon': Icons.live_tv_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/live-feeds')},
+        {'title': langCode == 'fr' ? 'En direct' : 'Live Feeds', 'icon': Icons.live_tv_rounded, 'hasLiveDot': false, 'badgeText': badge('/live-feeds'), 'badgeColor': badgeColor('/live-feeds'), 'onTap': () => Navigator.pushNamed(context, '/live-feeds')},
       if (!dup('/events', 'Events', 'Événements'))
-        {'title': langCode == 'fr' ? 'Événements' : 'Events', 'icon': Icons.event_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/events')},
+        {'title': langCode == 'fr' ? 'Événements' : 'Events', 'icon': Icons.event_rounded, 'hasLiveDot': false, 'badgeText': badge('/calendar'), 'badgeColor': badgeColor('/calendar'), 'onTap': () => Navigator.pushNamed(context, '/events')},
       if (!dup('/resources', 'Resources', 'Ressources'))
-        {'title': langCode == 'fr' ? 'Ressources' : 'Resources', 'icon': Icons.folder_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/resources')},
+        {'title': langCode == 'fr' ? 'Ressources' : 'Resources', 'icon': Icons.folder_rounded, 'hasLiveDot': false, 'badgeText': badge('/resources'), 'badgeColor': badgeColor('/resources'), 'onTap': () => Navigator.pushNamed(context, '/resources')},
       if (showVerification && verificationRequestStatus != 'pending' && !dup('/verification-request', 'Get Verified', 'Vérification'))
         {'title': langCode == 'fr' ? 'Vérification' : 'Get Verified', 'icon': Icons.verified_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/verification-request')},
       if (!dup('/support', 'Support', 'Assistance'))
         {'title': langCode == 'fr' ? 'Assistance' : 'Support', 'icon': Icons.support_agent_rounded, 'hasLiveDot': false, 'badgeText': isLoggedIn ? '' : (langCode == 'fr' ? 'Connexion' : 'Sign in'), 'badgeColor': isLoggedIn ? '' : '#9E9E9E', 'locked': !isLoggedIn, 'onTap': isLoggedIn ? () => showSupportOptionsModal(context) : () => Navigator.pushNamed(context, '/auth')},
       if (!dup('/news', 'News', 'Actualités'))
-        {'title': langCode == 'fr' ? 'Actualités' : 'News', 'icon': Icons.article_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => widget.onSwitchTab?.call(2)},
+        {'title': langCode == 'fr' ? 'Actualités' : 'News', 'icon': Icons.article_rounded, 'hasLiveDot': false, 'badgeText': badge('/news'), 'badgeColor': badgeColor('/news'), 'onTap': () => widget.onSwitchTab?.call(2)},
       if (!dup('/translate', 'Phrasebook', 'Guide'))
         {'title': langCode == 'fr' ? 'Guide' : 'Phrasebook', 'icon': Icons.menu_book_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/translate')},
       if (!dup('/weather', 'Weather', 'Météo'))
         {'title': langCode == 'fr' ? 'Météo' : 'Weather', 'icon': Icons.cloud_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/weather')},
       if (!dup('/calendar', 'Calendar', 'Calendrier'))
-        {'title': langCode == 'fr' ? 'Calendrier' : 'Calendar', 'icon': Icons.calendar_month_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/events')},
+        {'title': langCode == 'fr' ? 'Calendrier' : 'Calendar', 'icon': Icons.calendar_month_rounded, 'hasLiveDot': false, 'badgeText': badge('/calendar'), 'badgeColor': badgeColor('/calendar'), 'onTap': () => Navigator.pushNamed(context, '/events')},
       if (!dup('/gallery', 'Gallery', 'Galerie'))
-        {'title': langCode == 'fr' ? 'Galerie' : 'Gallery', 'icon': Icons.photo_library_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/gallery')},
+        {'title': langCode == 'fr' ? 'Galerie' : 'Gallery', 'icon': Icons.photo_library_rounded, 'hasLiveDot': false, 'badgeText': badge('/gallery'), 'badgeColor': badgeColor('/gallery'), 'onTap': () => Navigator.pushNamed(context, '/gallery')},
       if (!dup('/videos', 'Videos', 'Vidéos'))
-        {'title': langCode == 'fr' ? 'Vidéos' : 'Videos', 'icon': Icons.play_circle_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/videos')},
+        {'title': langCode == 'fr' ? 'Vidéos' : 'Videos', 'icon': Icons.play_circle_rounded, 'hasLiveDot': false, 'badgeText': badge('/videos'), 'badgeColor': badgeColor('/videos'), 'onTap': () => Navigator.pushNamed(context, '/videos')},
       if (!dup('/social-media', 'Follow Us', 'Suivez-nous'))
         {'title': langCode == 'fr' ? 'Suivez-nous' : 'Follow Us', 'icon': Icons.share_rounded, 'hasLiveDot': false, 'badgeText': '', 'badgeColor': '', 'onTap': () => Navigator.pushNamed(context, '/social-media')},
+      if (!dup('/emergency', 'SOS', 'SOS'))
+        {'title': 'SOS', 'icon': Icons.sos_rounded, 'isEmergency': true, 'hasLiveDot': false, 'badgeText': langCode == 'fr' ? 'Urgence' : 'Emergency', 'badgeColor': '#E53935', 'onTap': () => Navigator.pushNamed(context, '/emergency')},
     ];
     items.addAll(hardcoded);
 
     return QuickAccessGrid(items: items);
+  }
+}
+
+/// Full-width auto-sliding carousel for the Discover Africa / Facts section.
+class _FactsCarousel extends StatefulWidget {
+  final List<Fact> facts;
+  final String langCode;
+
+  const _FactsCarousel({required this.facts, required this.langCode});
+
+  @override
+  State<_FactsCarousel> createState() => _FactsCarouselState();
+}
+
+class _FactsCarouselState extends State<_FactsCarousel> {
+  late final PageController _controller;
+  Timer? _autoSlide;
+  int _current = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(viewportFraction: 0.88);
+    _startAutoSlide();
+  }
+
+  void _startAutoSlide() {
+    if (widget.facts.length <= 1) return;
+    _autoSlide = Timer.periodic(const Duration(seconds: 14), (_) {
+      if (!mounted) return;
+      final next = (_current + 1) % widget.facts.length;
+      _controller.animateToPage(next, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoSlide?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 200,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.facts.length,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: FactCard(fact: widget.facts[index], langCode: widget.langCode, index: index),
+              );
+            },
+          ),
+        ),
+        if (widget.facts.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(widget.facts.length, (i) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: _current == i ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _current == i ? AppColors.burundiGreen : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
+    );
   }
 }

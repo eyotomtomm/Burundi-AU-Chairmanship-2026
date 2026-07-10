@@ -15,6 +15,10 @@ class YouthDialogueApplication {
   final bool hasCredential;
   final List<YouthDialogueDocument> documents;
   final DateTime? createdAt;
+  final bool isRevoked;
+  final String? revokedReason;
+  final DateTime? revokedAt;
+  final bool allowReapply;
 
   YouthDialogueApplication({
     required this.id,
@@ -33,6 +37,10 @@ class YouthDialogueApplication {
     this.hasCredential = false,
     this.documents = const [],
     this.createdAt,
+    this.isRevoked = false,
+    this.revokedReason,
+    this.revokedAt,
+    this.allowReapply = true,
   });
 
   factory YouthDialogueApplication.fromJson(Map<String, dynamic> json) {
@@ -56,6 +64,10 @@ class YouthDialogueApplication {
               .toList() ??
           [],
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+      isRevoked: json['is_revoked'] ?? false,
+      revokedReason: json['revoked_reason'],
+      revokedAt: json['revoked_at'] != null ? DateTime.tryParse(json['revoked_at']) : null,
+      allowReapply: json['allow_reapply'] ?? true,
     );
   }
 }
@@ -97,6 +109,52 @@ class YouthDialogueDocument {
     );
   }
 }
+
+class YouthDialogueSideEvent {
+  final int id;
+  final String name;
+  final String nameFr;
+  final String description;
+  final String descriptionFr;
+  final String? eventDate;
+  final String? eventTime;
+  final int order;
+
+  YouthDialogueSideEvent({
+    required this.id,
+    this.name = '',
+    this.nameFr = '',
+    this.description = '',
+    this.descriptionFr = '',
+    this.eventDate,
+    this.eventTime,
+    this.order = 0,
+  });
+
+  factory YouthDialogueSideEvent.fromJson(Map<String, dynamic> json) {
+    return YouthDialogueSideEvent(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      nameFr: json['name_fr'] ?? '',
+      description: json['description'] ?? '',
+      descriptionFr: json['description_fr'] ?? '',
+      eventDate: json['event_date'],
+      eventTime: json['event_time'],
+      order: json['order'] ?? 0,
+    );
+  }
+
+  String getName(String langCode) {
+    if (langCode == 'fr' && nameFr.isNotEmpty) return nameFr;
+    return name;
+  }
+
+  String getDescription(String langCode) {
+    if (langCode == 'fr' && descriptionFr.isNotEmpty) return descriptionFr;
+    return description;
+  }
+}
+
 
 class YouthDialogueRole {
   final int id;
@@ -197,6 +255,12 @@ class YouthDialogueCredential {
   /// Extra logo URLs from admin
   final List<String> extraLogos;
 
+  /// Visible fields on the ID card (empty = all visible)
+  final List<String> idCardVisibleFields;
+
+  /// Selected side event name (null if none)
+  final String sideEvent;
+
   YouthDialogueCredential({
     this.firstName = '',
     this.lastName = '',
@@ -218,6 +282,8 @@ class YouthDialogueCredential {
     this.allowPdfDownload = false,
     this.extraFields = const [],
     this.extraLogos = const [],
+    this.idCardVisibleFields = const [],
+    this.sideEvent = '',
   });
 
   factory YouthDialogueCredential.fromJson(Map<String, dynamic> json) {
@@ -268,6 +334,18 @@ class YouthDialogueCredential {
       allowPdfDownload: json['allow_pdf_download'] ?? false,
       extraFields: extraFields,
       extraLogos: extraLogos,
+      idCardVisibleFields: (json['id_card_visible_fields'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList() ?? [],
+      sideEvent: json['side_event'] is Map
+          ? (json['side_event']['name'] ?? '').toString()
+          : (json['side_event'] ?? '').toString(),
     );
+  }
+
+  /// Returns true if the given field should be visible on the ID card.
+  /// Empty list means all fields are visible (backward compatible).
+  bool isIdCardFieldVisible(String key) {
+    return idCardVisibleFields.isEmpty || idCardVisibleFields.contains(key);
   }
 }

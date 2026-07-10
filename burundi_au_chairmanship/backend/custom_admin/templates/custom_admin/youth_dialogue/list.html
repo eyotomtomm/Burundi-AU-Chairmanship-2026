@@ -22,6 +22,11 @@
       </div>
     </div>
     <div class="flex items-center gap-3">
+      <a href="{% url 'custom_admin:youth_dialogue_export_excel' event_pk=yd_event.pk %}"
+         class="inline-flex items-center gap-2 bg-green-600 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-green-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">table_view</span>
+        Export Excel
+      </a>
       <a href="{% url 'custom_admin:youth_dialogue_export_csv' event_pk=yd_event.pk %}"
          class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
         <span class="material-symbols-outlined text-sm">download</span>

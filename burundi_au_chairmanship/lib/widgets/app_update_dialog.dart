@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:play_in_app_update/play_in_app_update.dart';
 import '../config/app_colors.dart';
+import '../config/app_constants.dart';
 import '../services/remote_config_service.dart';
 
 /// Shows an app update dialog based on Firebase Remote Config values.
@@ -25,6 +26,26 @@ class AppUpdateDialog {
     const rest = 'gle.com';
     const path = '/store/apps/details?id=com.b4africa.app';
     return 'https://$host$rest$path';
+  }
+
+  /// Returns true if the app version is OK, false if an update is required.
+  ///
+  /// When [minVersion] is empty, always returns true.
+  /// When the current app version is below [minVersion], shows the blocking
+  /// force-update dialog and returns false.
+  static Future<bool> checkMinVersion(BuildContext context, String minVersion) async {
+    if (minVersion.isEmpty) return true;
+    final current = _parseVersion(AppConstants.appVersion);
+    final min = _parseVersion(minVersion);
+    if (current >= min) return true;
+    final langCode = Localizations.localeOf(context).languageCode;
+    await _showDialog(
+      context: context,
+      forceUpdate: true,
+      latestVersion: minVersion,
+      langCode: langCode,
+    );
+    return false;
   }
 
   /// Check for updates via Remote Config and show the appropriate dialog.

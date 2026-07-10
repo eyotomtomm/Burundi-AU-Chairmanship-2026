@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import 'manual_lookup_screen.dart';
 import 'qr_scan_result_screen.dart';
 import 'yd_scan_history_screen.dart';
 
@@ -138,7 +141,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           ),
           // Bottom instruction
           Positioned(
-            bottom: 60,
+            bottom: 40,
             left: 0,
             right: 0,
             child: Column(
@@ -157,6 +160,35 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                // Staff-only manual lookup button
+                if (context.watch<AuthProvider>().isStaff) ...[
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ManualLookupScreen(
+                            mode: widget.mode,
+                            programmeName: widget.programmeName,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: Icon(
+                      Icons.keyboard_rounded,
+                      color: Colors.white.withValues(alpha: 0.7),
+                      size: 18,
+                    ),
+                    label: Text(
+                      "Can't scan? Look up manually",
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

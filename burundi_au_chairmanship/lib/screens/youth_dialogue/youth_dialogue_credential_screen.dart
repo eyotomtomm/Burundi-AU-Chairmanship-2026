@@ -225,25 +225,30 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
               pw.SizedBox(height: 24),
 
               // Photo
-              if (photoBytes != null)
+              if (cred.isIdCardFieldVisible('photo') && photoBytes != null)
                 pw.ClipOval(
                   child: pw.Image(pw.MemoryImage(photoBytes), width: 100, height: 100, fit: pw.BoxFit.cover),
                 ),
               pw.SizedBox(height: 16),
 
-              // Name
+              // Name (always visible)
               pw.Text('${cred.firstName} ${cred.lastName}',
                 style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 12),
 
-              // Info table
-              _pdfInfoRow('Organization', cred.organization),
-              _pdfInfoRow('Role', cred.role),
-              _pdfInfoRow('Position', cred.position),
-              if (cred.nationalityDisplay.isNotEmpty)
+              // Info table (respects visibility config)
+              if (cred.isIdCardFieldVisible('organization'))
+                _pdfInfoRow('Organization', cred.organization),
+              if (cred.isIdCardFieldVisible('role'))
+                _pdfInfoRow('Role', cred.role),
+              if (cred.isIdCardFieldVisible('position'))
+                _pdfInfoRow('Position', cred.position),
+              if (cred.isIdCardFieldVisible('nationality') && cred.nationalityDisplay.isNotEmpty)
                 _pdfInfoRow('Nationality', '${cred.nationalityFlag} ${cred.nationalityDisplay}'),
-              if (eventDates.isNotEmpty)
+              if (cred.isIdCardFieldVisible('event_dates') && eventDates.isNotEmpty)
                 _pdfInfoRow('Event Date', eventDates),
+              if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty)
+                _pdfInfoRow('Email', cred.email),
 
               // Extra fields from admin
               ...cred.extraFields.map((f) => _pdfInfoRow(f['label']!, f['value']!)),
@@ -251,21 +256,22 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
               pw.SizedBox(height: 20),
 
               // Participant code
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: pdfRoleColor, width: 2),
-                  borderRadius: pw.BorderRadius.circular(8),
+              if (cred.isIdCardFieldVisible('participant_code'))
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: pdfRoleColor, width: 2),
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Text(cred.participantCode,
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                      letterSpacing: 4,
+                      color: pdfRoleColor,
+                      font: pw.Font.courier(),
+                    )),
                 ),
-                child: pw.Text(cred.participantCode,
-                  style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                    letterSpacing: 4,
-                    color: pdfRoleColor,
-                    font: pw.Font.courier(),
-                  )),
-              ),
 
               pw.SizedBox(height: 20),
 
@@ -523,39 +529,41 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   child: Column(
                     children: [
                       // Photo
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.auGold, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: roleColor.withValues(alpha: 0.2),
-                              blurRadius: 16,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Container(
-                          width: 110,
-                          height: 110,
+                      if (cred.isIdCardFieldVisible('photo'))
+                        Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: roleColor, width: 3),
+                            border: Border.all(color: AppColors.auGold, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: roleColor.withValues(alpha: 0.2),
+                                blurRadius: 16,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
-                          child: ClipOval(
-                            child: cred.idPhotoUrl.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: cred.idPhotoUrl,
-                                    fit: BoxFit.cover,
-                                    placeholder: (_, __) => _photoPlaceholder(isDark),
-                                    errorWidget: (_, __, ___) => _photoPlaceholder(isDark),
-                                  )
-                                : _photoPlaceholder(isDark),
+                          child: Container(
+                            width: 110,
+                            height: 110,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: roleColor, width: 3),
+                            ),
+                            child: ClipOval(
+                              child: cred.idPhotoUrl.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: cred.idPhotoUrl,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => _photoPlaceholder(isDark),
+                                      errorWidget: (_, __, ___) => _photoPlaceholder(isDark),
+                                    )
+                                  : _photoPlaceholder(isDark),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      // Name
+                      if (cred.isIdCardFieldVisible('photo'))
+                        const SizedBox(height: 18),
+                      // Name (always visible)
                       Text(
                         '${cred.firstName} ${cred.lastName}',
                         style: TextStyle(
@@ -570,51 +578,52 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
                 ),
 
-                // Info fields: Organization + Role + Event Date + extra fields
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF222222) : const Color(0xFFF8F9FA),
-                      borderRadius: BorderRadius.circular(14),
+                // Info fields: build visible rows list and interleave dividers
+                Builder(builder: (context) {
+                  final dividerColor = isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06);
+                  final List<Widget> visibleRows = [];
+                  if (cred.isIdCardFieldVisible('organization') && cred.organization.isNotEmpty)
+                    visibleRows.add(_detailRow(Icons.business_rounded, 'Organization', cred.organization, isDark, accentColor: roleColor));
+                  if (cred.isIdCardFieldVisible('role'))
+                    visibleRows.add(_detailRow(Icons.badge_rounded, 'Role', cred.role, isDark, accentColor: roleColor));
+                  if (cred.isIdCardFieldVisible('position') && cred.position.isNotEmpty)
+                    visibleRows.add(_detailRow(Icons.work_rounded, 'Position', cred.position, isDark, accentColor: roleColor));
+                  if (cred.isIdCardFieldVisible('nationality') && cred.nationalityDisplay.isNotEmpty)
+                    visibleRows.add(_detailRow(Icons.flag_rounded, 'Nationality',
+                      '${cred.nationalityFlag} ${cred.nationalityDisplay}', isDark, accentColor: roleColor));
+                  if (cred.isIdCardFieldVisible('event_dates') && eventDates.isNotEmpty)
+                    visibleRows.add(_detailRow(Icons.calendar_today_rounded, 'Event Date', eventDates, isDark, accentColor: roleColor));
+                  if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty)
+                    visibleRows.add(_detailRow(Icons.email_rounded, 'Email', cred.email, isDark, accentColor: roleColor));
+                  if (cred.isIdCardFieldVisible('side_event') && cred.sideEvent.isNotEmpty)
+                    visibleRows.add(_detailRow(Icons.event_rounded, 'Side Event', cred.sideEvent, isDark, accentColor: roleColor));
+                  // Extra fields from admin
+                  for (final f in cred.extraFields) {
+                    visibleRows.add(_detailRow(Icons.info_outline_rounded, f['label']!, f['value']!, isDark, accentColor: roleColor));
+                  }
+                  if (visibleRows.isEmpty) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF222222) : const Color(0xFFF8F9FA),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          for (int i = 0; i < visibleRows.length; i++) ...[
+                            if (i > 0) Divider(height: 20, color: dividerColor),
+                            visibleRows[i],
+                          ],
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        if (cred.organization.isNotEmpty)
-                          _detailRow(Icons.business_rounded, 'Organization', cred.organization, isDark, accentColor: roleColor),
-                        if (cred.organization.isNotEmpty)
-                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                        _detailRow(Icons.badge_rounded, 'Role', cred.role, isDark, accentColor: roleColor),
-                        if (cred.position.isNotEmpty) ...[
-                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                          _detailRow(Icons.work_rounded, 'Position', cred.position, isDark, accentColor: roleColor),
-                        ],
-                        if (cred.nationalityDisplay.isNotEmpty) ...[
-                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                          _detailRow(Icons.flag_rounded, 'Nationality',
-                            '${cred.nationalityFlag} ${cred.nationalityDisplay}', isDark, accentColor: roleColor),
-                        ],
-                        if (eventDates.isNotEmpty) ...[
-                          Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                          _detailRow(Icons.calendar_today_rounded, 'Event Date', eventDates, isDark, accentColor: roleColor),
-                        ],
-                        // Extra fields from admin
-                        ...cred.extraFields.map((f) {
-                          return Column(
-                            children: [
-                              Divider(height: 20, color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06)),
-                              _detailRow(Icons.info_outline_rounded, f['label']!, f['value']!, isDark, accentColor: roleColor),
-                            ],
-                          );
-                        }),
-                      ],
-                    ),
-                  ),
-                ),
+                  );
+                }),
 
                 // QR Code section
-                if (qrData.isNotEmpty)
+                if (cred.isIdCardFieldVisible('qr_code') && qrData.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                     child: Column(
@@ -656,32 +665,33 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                   ),
 
                 // Participant code badge
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          roleColor.withValues(alpha: 0.1),
-                          roleColor.withValues(alpha: 0.05),
-                        ],
+                if (cred.isIdCardFieldVisible('participant_code'))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            roleColor.withValues(alpha: 0.1),
+                            roleColor.withValues(alpha: 0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: roleColor.withValues(alpha: 0.2)),
                       ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: roleColor.withValues(alpha: 0.2)),
-                    ),
-                    child: Text(
-                      cred.participantCode,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        fontFamily: 'monospace',
-                        color: roleColor,
-                        letterSpacing: 4,
+                      child: Text(
+                        cred.participantCode,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'monospace',
+                          color: roleColor,
+                          letterSpacing: 4,
+                        ),
                       ),
                     ),
                   ),
-                ),
 
                 // Footer with multiple logos
                 Padding(
@@ -728,7 +738,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
           const SizedBox(height: 24),
 
           // Download PDF button (admin-controlled)
-          if (cred.allowPdfDownload)
+          if (cred.allowPdfDownload && cred.isIdCardFieldVisible('allow_pdf_download'))
             SizedBox(
               width: double.infinity,
               height: 52,

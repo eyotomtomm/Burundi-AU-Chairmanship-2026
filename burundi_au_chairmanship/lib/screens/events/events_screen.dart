@@ -27,6 +27,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   bool _isLoading = true;
   String? _error;
   String? _ydBannerUrl;
+  bool _isYdBanned = false;
   late TabController _tabController;
 
   @override
@@ -67,6 +68,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       events = results[0] as List<EventRegistrationModel>;
       final ydSettings = results[1] as Map<String, dynamic>;
       final bannerUrl = ydSettings['banner_image_url']?.toString() ?? '';
+      final ydBanned = ydSettings['is_device_banned'] == true;
 
       if (!mounted) return;
       // Cache on success
@@ -74,6 +76,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       setState(() {
         _allEvents = events;
         _ydBannerUrl = bannerUrl.isNotEmpty ? Environment.fixMediaUrl(bannerUrl) : null;
+        _isYdBanned = ydBanned;
         _isLoading = false;
       });
     } catch (e) {
@@ -93,7 +96,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   }
 
   List<EventRegistrationModel> get _upcomingEvents =>
-      _allEvents.where((e) => !e.isEventPast).toList()
+      _allEvents.where((e) => !e.isEventPast && !(_isYdBanned && e.isYouthDialogue)).toList()
         ..sort((a, b) {
           if (a.isYouthDialogue != b.isYouthDialogue) {
             return a.isYouthDialogue ? -1 : 1;
@@ -102,7 +105,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
         });
 
   List<EventRegistrationModel> get _pastEvents =>
-      _allEvents.where((e) => e.isEventPast).toList()
+      _allEvents.where((e) => e.isEventPast && !(_isYdBanned && e.isYouthDialogue)).toList()
         ..sort((a, b) => (b.eventDate ?? DateTime(2000)).compareTo(a.eventDate ?? DateTime(2000)));
 
   @override
@@ -192,6 +195,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   }
 
   Widget _buildEventCard(EventRegistrationModel event, String lang, bool isDark) {
+    final isAuth = context.read<AuthProvider>().isAuthenticated;
     final cardBg = isDark ? AppColors.darkSurface : Colors.white;
     final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
     final isPast = event.isEventPast;
@@ -252,6 +256,10 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
     return GestureDetector(
       onTap: () {
         HapticService.light();
+        if (!isAuth) {
+          Navigator.pushNamed(context, '/auth');
+          return;
+        }
         if (event.isYouthDialogue) {
           Navigator.push(
             context,

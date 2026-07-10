@@ -1215,6 +1215,12 @@ class Notification(models.Model):
     message_fr = models.TextField(blank=True, help_text='French message')
     notification_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='general')
 
+    SOURCE_CHOICES = [
+        ('manual', 'Manual'),
+        ('system', 'System'),
+    ]
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='manual')
+
     # Optional link to content
     action_type = models.CharField(
         max_length=10,
@@ -1580,7 +1586,8 @@ class AppSettings(models.Model):
     app_description_fr = models.TextField(blank=True, default='Application officielle de la Présidence de l\'Union Africaine du Burundi 2026.', help_text='Description shown in the About dialog (French)')
     developer_name = models.CharField(max_length=100, blank=True, default='Eyosias Tamene', help_text='Developer/company name shown in About dialog')
     developer_url = models.URLField(blank=True, default='https://eyosias.dev', help_text='Developer website URL')
-
+    developer_role = models.CharField(max_length=100, blank=True, default='Lead Developer', help_text='Developer role/title shown in About dialog')
+    app_ownership_text = models.CharField(max_length=300, blank=True, default='Property of Burundi Embassy in Addis Ababa', help_text='Ownership line shown in About dialog')
 
     # Live agent support toggle
     live_agent_online = models.BooleanField(default=False, help_text='When ON, users see Live Agent chat option in support')
@@ -1597,12 +1604,36 @@ class AppSettings(models.Model):
     polls_enabled = models.BooleanField(default=True, help_text='Show Polls feature in the app')
     newsletter_enabled = models.BooleanField(default=True, help_text='Show Weekly Newsletter toggle in the app')
     facts_enabled = models.BooleanField(default=True, help_text='Show Facts & Quotes section in the app')
+    live_feeds_enabled = models.BooleanField(default=True, help_text='Show Live Feeds feature in the app')
+
+    # Editable section titles (home screen)
+    section_title_news = models.CharField(max_length=100, blank=True, default='News', help_text='Home section title for News (English)')
+    section_title_news_fr = models.CharField(max_length=100, blank=True, default='Actualités', help_text='Home section title for News (French)')
+    section_title_events = models.CharField(max_length=100, blank=True, default='Upcoming Events', help_text='Home section title for Events (English)')
+    section_title_events_fr = models.CharField(max_length=100, blank=True, default='Prochains Événements', help_text='Home section title for Events (French)')
+    section_title_magazines = models.CharField(max_length=100, blank=True, default='Latest Magazines', help_text='Home section title for Magazines (English)')
+    section_title_magazines_fr = models.CharField(max_length=100, blank=True, default='Derniers Magazines', help_text='Home section title for Magazines (French)')
+    section_title_trending = models.CharField(max_length=100, blank=True, default='Trending', help_text='Home section title for Trending (English)')
+    section_title_trending_fr = models.CharField(max_length=100, blank=True, default='Tendances', help_text='Home section title for Trending (French)')
+    section_title_facts = models.CharField(max_length=100, blank=True, default='Discover Africa', help_text='Home section title for Facts & Quotes (English)')
+    section_title_facts_fr = models.CharField(max_length=100, blank=True, default="Découvrir l'Afrique", help_text='Home section title for Facts & Quotes (French)')
+    section_title_agendas = models.CharField(max_length=100, blank=True, default='Priority Agendas', help_text='Home section title for Priority Agendas (English)')
+    section_title_agendas_fr = models.CharField(max_length=100, blank=True, default='Agendas Prioritaires', help_text='Home section title for Priority Agendas (French)')
 
     # Home countdown (shown next to greeting)
     countdown_target_date = models.DateTimeField(null=True, blank=True, help_text='Target date/time for the home screen countdown')
     countdown_label = models.CharField(max_length=100, blank=True, help_text='Countdown label in English (e.g. "AU Summit")')
     countdown_label_fr = models.CharField(max_length=100, blank=True, help_text='Countdown label in French')
     countdown_enabled = models.BooleanField(default=False, help_text='Show countdown on the home screen')
+
+    # About page – extra editable fields
+    about_mission_title = models.CharField(max_length=100, blank=True, default='Our Mission', help_text='About page mission section title (English)')
+    about_mission_title_fr = models.CharField(max_length=100, blank=True, default='Notre Mission', help_text='About page mission section title (French)')
+    about_features_title = models.CharField(max_length=100, blank=True, default='Key Features', help_text='About page features section title (English)')
+    about_features_title_fr = models.CharField(max_length=100, blank=True, default='Fonctionnalit\u00e9s', help_text='About page features section title (French)')
+    contact_website = models.CharField(max_length=200, blank=True, default='burundi4africa.com', help_text='Contact website display name')
+    contact_website_url = models.URLField(blank=True, default='https://burundi4africa.com', help_text='Contact website URL')
+    contact_email = models.EmailField(blank=True, default='info@burundi4africa.com', help_text='Contact email address')
 
     # QR code configuration
     QR_CODE_MODE_CHOICES = [
@@ -1615,6 +1646,10 @@ class AppSettings(models.Model):
         default='url',
         help_text='How QR codes encode data: "url" embeds a web verification link; "raw" embeds just the token',
     )
+
+    # QR Scanner quick access title
+    qr_scanner_title = models.CharField(max_length=100, blank=True, default='QR Scanner', help_text='QR Scanner quick access title (English)')
+    qr_scanner_title_fr = models.CharField(max_length=100, blank=True, default='Scanner QR', help_text='QR Scanner quick access title (French)')
 
     class Meta:
         verbose_name = 'App Settings'
@@ -1639,6 +1674,33 @@ class AppSettings(models.Model):
 
     def __str__(self):
         return f"App Settings ({self.summit_year})"
+
+
+class AboutFeature(models.Model):
+    """Editable feature items shown in the About page grid."""
+    ICON_CHOICES = [
+        ('article', 'News'), ('event', 'Events'), ('auto_stories', 'Magazine'),
+        ('translate', 'Translation'), ('wb_sunny', 'Weather'),
+        ('account_balance', 'Diplomacy'), ('public', 'Globe'),
+        ('group', 'Community'), ('school', 'Education'), ('gavel', 'Governance'),
+    ]
+    COLOR_CHOICES = [
+        ('#1EB53A', 'Green'), ('#CE1126', 'Red'), ('#D4A017', 'Gold'),
+    ]
+    title = models.CharField(max_length=100)
+    title_fr = models.CharField(max_length=100, blank=True)
+    icon_name = models.CharField(max_length=50, choices=ICON_CHOICES)
+    color = models.CharField(max_length=10, choices=COLOR_CHOICES, default='#1EB53A')
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'About Feature'
+        verbose_name_plural = 'About Features'
+
+    def __str__(self):
+        return self.title
 
 
 class FactCategory(models.Model):
@@ -2040,7 +2102,8 @@ class QuickAccessMenuItem(models.Model):
 
     title_en = models.CharField(max_length=100)
     title_fr = models.CharField(max_length=100, blank=True)
-    icon_name = models.CharField(max_length=50, help_text='Flutter icon name (e.g. live_tv, menu_book, article)')
+    icon_name = models.CharField(max_length=50, blank=True, help_text='Flutter icon name (e.g. live_tv, menu_book, article). Ignored when icon_image is set.')
+    icon_image = models.ImageField(upload_to='quick_access_icons/', blank=True, null=True, help_text='Custom icon image. Takes priority over icon_name.')
     action_type = models.CharField(max_length=10, choices=ACTION_TYPE_CHOICES)
     action_value = models.CharField(max_length=200, help_text='Route name (e.g. /live-feeds) or URL')
     order = models.IntegerField(default=0)
@@ -4657,6 +4720,12 @@ class YouthDialogueEvent(models.Model):
     start_date = models.DateField(null=True, blank=True, help_text='Event start date')
     end_date = models.DateField(null=True, blank=True, help_text='Event end date')
 
+    # Key dates (shown on the landing page)
+    registration_start_date = models.DateField(null=True, blank=True, help_text='When registration opens')
+    registration_end_date = models.DateField(null=True, blank=True, help_text='Registration deadline')
+    event_start_date = models.DateField(null=True, blank=True, help_text='First day of the event')
+    event_end_date = models.DateField(null=True, blank=True, help_text='Last day of the event')
+
     # Branding
     logo_light = models.ImageField(upload_to='youth_dialogue/', blank=True, validators=[validate_image_file],
                                    help_text='Programme logo — English (light mode)')
@@ -4684,6 +4753,7 @@ class YouthDialogueEvent(models.Model):
 
     # Registration control
     is_registration_open = models.BooleanField(default=True, help_text='Whether new applications are accepted')
+    min_app_version = models.CharField(max_length=20, blank=True, default='', help_text='Minimum app version required to register (e.g. 1.2.16). Leave blank to allow all versions.')
     registration_closed_message = models.TextField(blank=True, default='Registration is currently closed. Please check back later.')
     registration_closed_message_fr = models.TextField(blank=True, default='Les inscriptions sont actuellement fermées. Veuillez réessayer plus tard.')
 
@@ -4733,6 +4803,20 @@ class YouthDialogueEvent(models.Model):
         help_text='List of required document types. Each item: {"key": "passport", "label": "Passport Copy", "label_fr": "Copie du Passeport"}',
     )
 
+    # Credential field visibility — empty list means all fields visible (backward-compatible)
+    ID_CARD_ALL_FIELDS = [
+        'photo', 'organization', 'role', 'position', 'nationality',
+        'event_dates', 'qr_code', 'participant_code', 'email', 'allow_pdf_download',
+    ]
+    SCAN_RESULT_ALL_FIELDS = [
+        'photo', 'role', 'nationality', 'organization', 'email',
+        'event_dates', 'event_location', 'participant_code',
+        'reference_id', 'credential_issued_at',
+    ]
+
+    id_card_visible_fields = models.JSONField(blank=True, default=list)
+    scan_result_visible_fields = models.JSONField(blank=True, default=list)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -4764,6 +4848,14 @@ class YouthDialogueEvent(models.Model):
             return active
         obj, _ = cls.objects.get_or_create(pk=1, defaults={'slug': 'youth-dialogue-default', 'is_active': True})
         return obj
+
+    def get_id_card_visible_fields(self):
+        """Return visible ID card fields; empty list means all fields visible."""
+        return self.id_card_visible_fields if self.id_card_visible_fields else list(self.ID_CARD_ALL_FIELDS)
+
+    def get_scan_result_visible_fields(self):
+        """Return visible scan result fields; empty list means all fields visible."""
+        return self.scan_result_visible_fields if self.scan_result_visible_fields else list(self.SCAN_RESULT_ALL_FIELDS)
 
 
 # Backward-compat alias so existing imports keep working
@@ -4858,6 +4950,27 @@ class YouthDialogueFormField(models.Model):
         return f"{self.field_label} ({self.get_field_type_display()})"
 
 
+class YouthDialogueSideEvent(models.Model):
+    """Selectable side events for Continental Dialogue registration."""
+    event = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='side_events')
+    name = models.CharField(max_length=200, help_text='Side event name in English')
+    name_fr = models.CharField(max_length=200, blank=True, help_text='Side event name in French')
+    description = models.TextField(blank=True, help_text='Brief description in English')
+    description_fr = models.TextField(blank=True, help_text='Brief description in French')
+    event_date = models.DateField(null=True, blank=True, help_text='Date of the side event')
+    event_time = models.TimeField(null=True, blank=True, help_text='Start time of the side event')
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = 'Continental Dialogue Side Event'
+        verbose_name_plural = 'Continental Dialogue Side Events'
+
+    def __str__(self):
+        return f"{self.name} ({self.event.programme_title})"
+
+
 class YouthDialogueRole(models.Model):
     """Backend-configurable roles for Continental Dialogue credentials (e.g. Participant, Moderator)."""
     event = models.ForeignKey(YouthDialogueEvent, on_delete=models.CASCADE, related_name='roles')
@@ -4937,6 +5050,9 @@ class YouthDialogueApplication(models.Model):
     motivation = models.TextField(blank=True, help_text='Why the applicant wants to participate')
     additional_data = models.JSONField(default=dict, blank=True, help_text='Flexible extra fields')
 
+    # Side events
+    selected_side_events = models.ManyToManyField('YouthDialogueSideEvent', blank=True, related_name='applications')
+
     # Status pipeline
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='submitted')
 
@@ -4960,6 +5076,9 @@ class YouthDialogueApplication(models.Model):
     is_revoked = models.BooleanField(default=False)
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoked_reason = models.TextField(blank=True, default='')
+    allow_reapply = models.BooleanField(default=True, help_text='If False, user is permanently revoked and cannot re-apply.')
+
+    device_id = models.CharField(max_length=255, blank=True, db_index=True, help_text='Device UUID captured at application time')
 
     admin_notes = models.TextField(blank=True, default='', help_text='Internal admin notes (not visible to applicant)')
     reference_id = models.CharField(max_length=20, unique=True, blank=True, null=True, db_index=True,
@@ -4977,7 +5096,11 @@ class YouthDialogueApplication(models.Model):
             models.Index(fields=['email']),
         ]
         constraints = [
-            models.UniqueConstraint(fields=['user', 'event'], name='unique_user_event_application'),
+            models.UniqueConstraint(
+                fields=['user', 'event'],
+                condition=models.Q(is_revoked=False),
+                name='unique_user_event_application',
+            ),
         ]
 
     def save(self, *args, **kwargs):
@@ -5154,6 +5277,33 @@ class DeviceBan(models.Model):
         return f"Device {self.device_id[:12]}… — {status}"
 
 
+class YouthDialogueDeviceBan(models.Model):
+    """Device-level ban from Continental Dialogue that persists across accounts."""
+    device_id = models.CharField(max_length=255, unique=True, db_index=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='yd_device_bans',
+        help_text='The user whose revocation triggered this device ban'
+    )
+    reason = models.CharField(max_length=255, default='Permanently revoked from Continental Dialogue')
+    banned_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    unbanned_at = models.DateTimeField(null=True, blank=True)
+    unbanned_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='yd_device_unbans'
+    )
+
+    class Meta:
+        ordering = ['-banned_at']
+        verbose_name = 'YD Device Ban'
+        verbose_name_plural = 'YD Device Bans'
+
+    def __str__(self):
+        status = 'Active' if self.is_active else 'Lifted'
+        return f"YD Device {self.device_id[:12]}… — {status}"
+
+
 class ProfanityStrikeLog(models.Model):
     """Logs every profanity violation so admins can review what was written before deciding to unban."""
     CONTENT_TYPE_CHOICES = [
@@ -5180,6 +5330,51 @@ class ProfanityStrikeLog(models.Model):
 
     def __str__(self):
         return f"Strike #{self.strike_number} by {self.user} — {'BAN' if self.resulted_in_ban else 'warning'}"
+
+
+class PhrasebookEntry(models.Model):
+    """A Kirundi/English/French phrase for the phrasebook (translate) screen."""
+    CATEGORY_CHOICES = [
+        ('greetings', 'Greetings'),
+        ('directions', 'Directions'),
+        ('diplomacy', 'Diplomacy'),
+        ('numbers', 'Numbers'),
+        ('food', 'Food & Drink'),
+        ('travel', 'Travel'),
+        ('culture', 'Culture'),
+        ('business', 'Business'),
+    ]
+    CATEGORY_ICON_DEFAULTS = {
+        'greetings': 'waving_hand',
+        'directions': 'explore',
+        'diplomacy': 'account_balance',
+        'numbers': 'tag',
+        'food': 'restaurant',
+        'travel': 'flight',
+        'culture': 'theater_comedy',
+        'business': 'business_center',
+    }
+
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, db_index=True)
+    category_icon = models.CharField(max_length=50, blank=True, help_text='Material icon name (auto-filled if blank)')
+    kirundi = models.CharField(max_length=300)
+    english = models.CharField(max_length=300)
+    french = models.CharField(max_length=300)
+    display_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['category', 'display_order', 'id']
+        verbose_name_plural = 'Phrasebook entries'
+
+    def __str__(self):
+        return f'{self.kirundi} — {self.english}'
+
+    def save(self, *args, **kwargs):
+        if not self.category_icon:
+            self.category_icon = self.CATEGORY_ICON_DEFAULTS.get(self.category, 'translate')
+        super().save(*args, **kwargs)
 
 
 # Connect to all core models with image fields

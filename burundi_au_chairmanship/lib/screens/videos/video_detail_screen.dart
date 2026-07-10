@@ -568,8 +568,11 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                         ),
                         const SizedBox(width: 16),
                         GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: _toggleLike,
-                          child: Row(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
                             children: [
                               Icon(
                                 likeState.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -594,6 +597,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ),
                               ),
                             ],
+                          ),
                           ),
                         ),
                         if (likeState.recentLikers.isNotEmpty) ...[

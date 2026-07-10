@@ -36,7 +36,15 @@ class AuthProvider extends ChangeNotifier {
   /// Await this in the splash screen to avoid race conditions.
   Future<void> get initialized => _initCompleter.future;
 
-  bool _isAuthenticated = false;
+  bool __isAuthenticated = false;
+  bool get _isAuthenticated => __isAuthenticated;
+  set _isAuthenticated(bool value) {
+    __isAuthenticated = value;
+    if (value) {
+      // Clear guest mode when user actually authenticates
+      SharedPreferences.getInstance().then((p) => p.remove('guest_mode'));
+    }
+  }
   int? _userId;
   String? _userName;
   String? _userEmail;
@@ -62,7 +70,7 @@ class AuthProvider extends ChangeNotifier {
   bool _receivesNewsletter = false;
   List<String> _adminSections = [];
 
-  bool get isAuthenticated => _isAuthenticated;
+  bool get isAuthenticated => __isAuthenticated;
   int? get userId => _userId;
   String? get userName => _userName;
   String? get userEmail => _userEmail;
@@ -200,22 +208,32 @@ class AuthProvider extends ChangeNotifier {
         await _loadLocalUserData();
 
         // Load cached requiresEmailVerification as a safe default.
-        // If backend sync succeeds, it will override with the fresh value.
-        // If backend sync fails/times out, the cached value ensures
-        // unverified users still get routed to the verification screen.
         final prefs = await SharedPreferences.getInstance();
         _requiresEmailVerification = prefs.getBool('requires_email_verification') ?? false;
 
-        notifyListeners();
+        // If the app was closed during a pending signup (OTP not yet verified),
+        // abandon the incomplete signup. The user must start over to prevent
+        // OTP spam from the verification screen auto-sending on every app open.
+        // The zombie Firebase account will be recovered on the next signup attempt.
+        if (_requiresEmailVerification && _userId == null) {
+          if (kDebugMode) print('Auth init: abandoning incomplete signup');
+          try { await FirebaseAuth.instance.currentUser?.delete(); } catch (_) {}
+          try { await _firebaseAuth.signOut(); } catch (_) {}
+          await _persistEmailVerificationFlag(false);
+          _isAuthenticated = false;
+          // Fall through to _hasInitialized / _initCompleter below
+        } else {
+          notifyListeners();
 
-        // Sync with backend and wait for it so user data (userId, email) is populated.
-        // Use a timeout so slow networks don't block startup forever.
-        try {
-          await _syncWithBackend().timeout(const Duration(seconds: 8));
-        } catch (e) {
-          // Sync failed or timed out — user stays authenticated with cached data.
-          // If we have cached userId, that's enough for the app to function.
-          if (kDebugMode) print('Auth init: backend sync failed/timed out: $e');
+          // Sync with backend and wait for it so user data (userId, email) is populated.
+          // Use a timeout so slow networks don't block startup forever.
+          try {
+            await _syncWithBackend().timeout(const Duration(seconds: 8));
+          } catch (e) {
+            // Sync failed or timed out — user stays authenticated with cached data.
+            // If we have cached userId, that's enough for the app to function.
+            if (kDebugMode) print('Auth init: backend sync failed/timed out: $e');
+          }
         }
       } else {
         // No Firebase user — check for legacy JWT auth (backward compatibility)
@@ -371,16 +389,13 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
-      // 2. Send email verification
-      await _firebaseAuth.sendEmailVerification();
-
-      // 3. Get Firebase ID token
+      // 2. Get Firebase ID token
       final idToken = await credential.user?.getIdToken();
       if (idToken == null) {
         throw Exception('Failed to get Firebase ID token');
       }
 
-      // 4. Register with Django backend (idempotent — safe to retry)
+      // 3. Register with Django backend (idempotent — safe to retry)
       final data = await _api.firebaseRegister(
         idToken: idToken,
         name: name,
@@ -389,6 +404,10 @@ class AuthProvider extends ChangeNotifier {
         gender: gender,
         honeypot: honeypot ?? '',
       );
+
+      if (data.isEmpty) {
+        throw Exception('Empty response from server. Please try again.');
+      }
 
       if (data['status'] == 'pending_verification') {
         // No Django user created yet — route to OTP verification screen
@@ -401,6 +420,9 @@ class AuthProvider extends ChangeNotifier {
       }
 
       // Email already verified (Google/Apple) — normal flow
+      if (data['user'] == null) {
+        throw Exception('Registration succeeded but no user data returned. Please sign in.');
+      }
       await _storeUserData(data['user']);
       await _persistEmailVerificationFlag(data['requires_email_verification'] == true);
 
@@ -581,11 +603,20 @@ class AuthProvider extends ChangeNotifier {
         throw Exception('Failed to get Firebase ID token');
       }
 
-      // 3. Login or register with backend (backend auto-creates if new)
+      // 3. Get the best available name for this Apple user.
+      // Apple only provides name on the first authorization, so we
+      // fall back to: Firebase displayName → cached Apple name.
+      String appleName = credential.user?.displayName ?? '';
+      if (appleName.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        appleName = prefs.getString('apple_display_name') ?? '';
+      }
+
+      // 4. Login or register with backend (backend auto-creates if new)
       //    If login returns 404, auto-register the user
       final data = await _firebaseLoginOrRegister(
         idToken: idToken,
-        name: credential.user?.displayName ?? '',
+        name: appleName,
         email: credential.user?.email ?? '',
       );
       await _storeUserData(data['user']);
@@ -633,6 +664,7 @@ class AuthProvider extends ChangeNotifier {
       final deviceName = await _getDeviceName();
       return await _api.firebaseLogin(
         idToken: idToken,
+        name: name.isNotEmpty ? name : null,
         deviceName: deviceName,
         deviceType: Platform.operatingSystem,
         appVersion: AppConstants.appVersion,
@@ -1186,7 +1218,15 @@ class AuthProvider extends ChangeNotifier {
 
   /// Skip authentication (continue as guest)
   Future<void> skipAuth() async {
-    _isAuthenticated = false;
+    __isAuthenticated = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('guest_mode', true);
     notifyListeners();
+  }
+
+  /// Whether the user has previously chosen to continue as guest.
+  static Future<bool> isGuestMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('guest_mode') ?? false;
   }
 }

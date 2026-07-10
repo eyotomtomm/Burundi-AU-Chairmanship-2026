@@ -237,6 +237,10 @@ urlpatterns = [
     path('promotional-splashes/create/', views.promotional_splash_create, name='promotional_splash_create'),
     path('promotional-splashes/<int:pk>/edit/', views.promotional_splash_edit, name='promotional_splash_edit'),
     path('promotional-splashes/<int:pk>/delete/', views.promotional_splash_delete, name='promotional_splash_delete'),
+    path('promotional-splashes/<int:pk>/activate-now/', views.promotional_splash_activate_now, name='promotional_splash_activate_now'),
+
+    # QR Scan Log
+    path('scan-log/', views.qr_scan_log, name='qr_scan_log'),
 
     # Audit Log
     path('audit-log/', views.admin_audit_log, name='audit_log'),
@@ -355,8 +359,15 @@ urlpatterns = [
     path('youth-dialogue/<int:event_pk>/media/<int:pk>/delete/', views.youth_dialogue_media_delete, name='youth_dialogue_media_delete'),
     path('youth-dialogue/applications/<int:pk>/review/', views.youth_dialogue_review, name='youth_dialogue_review'),
     path('youth-dialogue/<int:event_pk>/export-csv/', views.youth_dialogue_export_csv, name='youth_dialogue_export_csv'),
+    path('youth-dialogue/<int:event_pk>/export-excel/', views.youth_dialogue_export_excel, name='youth_dialogue_export_excel'),
     path('youth-dialogue/applications/<int:pk>/id-card-pdf/', views.youth_dialogue_id_card_pdf, name='youth_dialogue_id_card_pdf'),
     path('youth-dialogue/verify/', views.youth_dialogue_verify_qr, name='youth_dialogue_verify_qr'),
+
+    # About Features
+    path('about-features/', views.about_features_list, name='about_features_list'),
+    path('about-features/create/', views.about_feature_create, name='about_feature_create'),
+    path('about-features/<int:pk>/edit/', views.about_feature_edit, name='about_feature_edit'),
+    path('about-features/<int:pk>/delete/', views.about_feature_delete, name='about_feature_delete'),
 
     # Facts & Quotes
     path('facts/', views.facts_list, name='facts_list'),
@@ -369,9 +380,18 @@ urlpatterns = [
     path('fact-categories/<int:pk>/edit/', views.fact_category_edit, name='fact_category_edit'),
     path('fact-categories/<int:pk>/delete/', views.fact_category_delete, name='fact_category_delete'),
 
+    # Phrasebook
+    path('phrasebook/', views.phrasebook_list, name='phrasebook_list'),
+    path('phrasebook/create/', views.phrasebook_create, name='phrasebook_create'),
+    path('phrasebook/<int:pk>/edit/', views.phrasebook_edit, name='phrasebook_edit'),
+    path('phrasebook/<int:pk>/delete/', views.phrasebook_delete, name='phrasebook_delete'),
+
     # Comment Ban Management
     path('users/<int:pk>/toggle-comment-ban/', views.user_toggle_comment_ban, name='user_toggle_comment_ban'),
     path('device-bans/', views.device_bans_list, name='device_bans_list'),
     path('device-bans/<int:pk>/unban/', views.device_ban_unban, name='device_ban_unban'),
+
+    # Continental Dialogue Ban Management
+    path('users/<int:pk>/toggle-yd-ban/', views.user_toggle_yd_ban, name='user_toggle_yd_ban'),
 
 ]

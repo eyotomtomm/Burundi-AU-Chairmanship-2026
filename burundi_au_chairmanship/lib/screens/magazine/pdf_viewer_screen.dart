@@ -948,8 +948,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   children: [
                     // Like button
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: _toggleLike,
-                      child: Row(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -964,6 +967,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                           ),
                         ],
                       ),
+                    ),
                     ),
                     Container(
                       width: 1, height: 24,

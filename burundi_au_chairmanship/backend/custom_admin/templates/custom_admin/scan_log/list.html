@@ -1,0 +1,212 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}QR Scan Log - Diplomatic Portal{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-on-surface font-headline flex items-center gap-3">
+          <span class="material-symbols-outlined text-4xl text-blue-600">qr_code_scanner</span>
+          QR Scan Log
+        </h1>
+        <p class="mt-2 text-sm text-on-surface-variant">Track all QR code scans performed by staff and ushers</p>
+      </div>
+      <div>
+        <a href="?export=csv{% if current_scanner_filter %}&scanner={{ current_scanner_filter }}{% endif %}{% if current_qr_type_filter %}&qr_type={{ current_qr_type_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_duplicates_only %}&duplicates_only=1{% endif %}"
+           class="inline-flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg py-2.5 px-5 font-medium transition-colors text-sm">
+          <span class="material-symbols-outlined text-sm">download</span>
+          Export CSV
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 flex items-center gap-4">
+      <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
+        <span class="material-symbols-outlined text-2xl text-blue-500">qr_code_scanner</span>
+      </div>
+      <div>
+        <p class="text-2xl font-bold text-on-surface">{{ total_scans }}</p>
+        <p class="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Total Scans</p>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm p-5 flex items-center gap-4">
+      <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+        <span class="material-symbols-outlined text-2xl text-red-500">content_copy</span>
+      </div>
+      <div>
+        <p class="text-2xl font-bold text-on-surface">{{ duplicate_scans }}</p>
+        <p class="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Duplicate Scans</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm p-6 mb-6">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <!-- Scanner Name -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Scanner</label>
+        <input
+          type="text"
+          name="scanner"
+          value="{{ current_scanner_filter }}"
+          placeholder="Name or email..."
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- QR Type -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">QR Type</label>
+        <select name="qr_type" class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm">
+          <option value="">All Types</option>
+          {% for code, label in qr_type_choices %}
+          <option value="{{ code }}" {% if current_qr_type_filter == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Date From -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">From Date</label>
+        <input
+          type="date"
+          name="date_from"
+          value="{{ current_date_from }}"
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- Date To -->
+      <div>
+        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">To Date</label>
+        <input
+          type="date"
+          name="date_to"
+          value="{{ current_date_to }}"
+          class="w-full bg-surface-container-low border-0 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-secondary text-sm"
+        />
+      </div>
+
+      <!-- Duplicates Only -->
+      <div class="flex items-end">
+        <label class="flex items-center gap-2 cursor-pointer pb-2.5">
+          <input type="checkbox" name="duplicates_only" value="1" {% if current_duplicates_only %}checked{% endif %}
+                 class="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500" />
+          <span class="text-sm text-on-surface-variant font-medium">Duplicates Only</span>
+        </label>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex items-end gap-2">
+        <button type="submit" class="bg-primary-container text-white hover:bg-primary rounded-lg py-2.5 px-6 font-medium transition-colors text-sm">
+          <span class="material-symbols-outlined text-sm align-middle mr-1">filter_list</span>
+          Filter
+        </button>
+        <a href="{% url 'custom_admin:qr_scan_log' %}" class="bg-surface-container-low text-on-surface hover:bg-surface-container rounded-lg py-2.5 px-4 font-medium transition-colors text-sm">
+          Clear
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Scan Log Table -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    {% if logs %}
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-surface-container-low border-b border-outline-variant">
+          <tr>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Timestamp</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Scanner</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">QR Type</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Reference ID</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">Duplicate</th>
+            <th class="text-left py-4 px-6 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-wider">IP Address</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-outline-variant">
+          {% for log in logs %}
+          <tr class="hover:bg-surface-container-low transition-colors align-top">
+            <td class="py-4 px-6 text-sm text-on-surface-variant whitespace-nowrap">
+              {{ log.scanned_at|date:"M d, Y" }}<br/>
+              <span class="text-xs text-slate-400">{{ log.scanned_at|date:"g:i:s A" }}</span>
+            </td>
+            <td class="py-4 px-6">
+              {% if log.scanned_by %}
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-primary-container/30 flex items-center justify-center text-xs font-bold text-primary-container">{% if log.scanned_by.first_name %}{{ log.scanned_by.first_name|first|upper }}{% else %}{{ log.scanned_by.username|first|upper }}{% endif %}</div>
+                <div>
+                  <p class="text-sm font-medium text-on-surface">{{ log.scanned_by.get_full_name|default:log.scanned_by.username }}</p>
+                  <p class="text-xs text-slate-400">{{ log.scanned_by.email }}</p>
+                </div>
+              </div>
+              {% else %}
+              <span class="text-sm text-slate-400 italic">Unknown</span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6">
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold
+                {% if log.qr_type == 'youth_dialogue' %}bg-amber-100 text-amber-700
+                {% elif log.qr_type == 'event' %}bg-blue-100 text-blue-700
+                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                {{ log.get_qr_type_display }}
+              </span>
+            </td>
+            <td class="py-4 px-6 text-sm text-on-surface font-mono">{{ log.reference_id }}</td>
+            <td class="py-4 px-6">
+              {% if log.is_duplicate %}
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                <span class="material-symbols-outlined text-sm">content_copy</span>
+                Duplicate
+              </span>
+              {% else %}
+              <span class="text-xs text-slate-400">-</span>
+              {% endif %}
+            </td>
+            <td class="py-4 px-6 text-xs text-slate-400 font-mono whitespace-nowrap">{{ log.ip_address|default:"-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+      <span class="material-symbols-outlined text-6xl text-on-surface-variant mb-4">qr_code_scanner</span>
+      <p class="text-on-surface-variant text-lg">No scan log entries found</p>
+      <p class="text-sm text-slate-400 mt-2">Try adjusting your filters or wait for QR scans to be recorded</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Pagination -->
+  {% if logs.has_other_pages %}
+  <div class="flex items-center justify-center gap-2 mt-8">
+    {% if logs.has_previous %}
+    <a href="?page={{ logs.previous_page_number }}{% if current_scanner_filter %}&scanner={{ current_scanner_filter }}{% endif %}{% if current_qr_type_filter %}&qr_type={{ current_qr_type_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_duplicates_only %}&duplicates_only=1{% endif %}"
+       class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">
+      <span class="material-symbols-outlined text-sm align-middle mr-1">chevron_left</span>
+      Previous
+    </a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm font-bold text-on-surface-variant">
+      Page {{ logs.number }} of {{ logs.paginator.num_pages }}
+      <span class="font-normal text-slate-400">({{ logs.paginator.count }} entries)</span>
+    </span>
+    {% if logs.has_next %}
+    <a href="?page={{ logs.next_page_number }}{% if current_scanner_filter %}&scanner={{ current_scanner_filter }}{% endif %}{% if current_qr_type_filter %}&qr_type={{ current_qr_type_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_duplicates_only %}&duplicates_only=1{% endif %}"
+       class="px-4 py-2 bg-surface-container-lowest rounded-lg shadow-sm hover:bg-surface-container-low text-sm font-medium">
+      Next
+      <span class="material-symbols-outlined text-sm align-middle ml-1">chevron_right</span>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

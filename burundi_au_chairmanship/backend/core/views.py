@@ -56,9 +56,11 @@ from .models import (
     GalleryCommentLike, EventCommentLike, DiscussionReplyLike,
     # Youth Dialogue
     YouthDialogueEvent, YouthDialogueSettings, YouthDialogueApplication, YouthDialogueDocument, YouthDialogueActivityLog,
-    YouthDialogueRole, YouthDialogueMedia,
+    YouthDialogueSideEvent, YouthDialogueRole, YouthDialogueMedia,
     QRScanLog,
     FactCategory, Fact,
+    AboutFeature,
+    PhrasebookEntry,
 )
 from .serializers import (
     get_recent_likers,
@@ -100,6 +102,7 @@ from .serializers import (
     PromotionalSplashSerializer,
     EmergencyContactSerializer,
     FactCategorySerializer, FactListSerializer, FactDetailSerializer,
+    AboutFeatureSerializer,
 )
 
 
@@ -753,8 +756,10 @@ def firebase_register(request):
                     )
 
         if existing_user:
-            # Update name if provided (split into first/last for long social names)
-            if name and not existing_user.first_name:
+            # Update name if missing or auto-generated from email prefix
+            if name and (not existing_user.first_name or (
+                    existing_user.email and '@' in existing_user.email and
+                    existing_user.first_name == existing_user.email.split('@')[0])):
                 first_name, last_name = _split_display_name(name)
                 existing_user.first_name = first_name
                 existing_user.last_name = last_name
@@ -861,7 +866,11 @@ def firebase_login(request):
         decoded_token = verify_firebase_token(id_token)
         firebase_uid = decoded_token['uid']
         email = decoded_token.get('email', '')
-        name = decoded_token.get('name', email.split('@')[0] if email else 'User')
+        # Prefer name from request body (Flutter sends cached Apple name),
+        # then from decoded token, then fall back to email prefix.
+        name = (request.data.get('name') or
+                decoded_token.get('name') or
+                (email.split('@')[0] if email else 'User'))
 
         # Find or create user by Firebase UID, then by email
         is_new_user = False
@@ -949,8 +958,10 @@ def firebase_login(request):
                     if new_username != firebase_uid:
                         user.username = new_username
                         user_changed = True
-            # Update name if missing
-            if name and not user.first_name:
+            # Update name if missing or auto-generated from email prefix
+            if name and (not user.first_name or (
+                    user.email and '@' in user.email and
+                    user.first_name == user.email.split('@')[0])):
                 first_name, last_name = _split_display_name(name)
                 user.first_name = first_name
                 user.last_name = last_name
@@ -3009,6 +3020,17 @@ def _annotated_event_registrations(request):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  ABOUT FEATURES
+# ═══════════════════════════════════════════════════════════════
+
+class AboutFeatureViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AboutFeatureSerializer
+    permission_classes = [AllowAny]
+    queryset = AboutFeature.objects.filter(is_active=True)
+    pagination_class = None
+
+
+# ═══════════════════════════════════════════════════════════════
 #  FACTS & QUOTES
 # ═══════════════════════════════════════════════════════════════
 
@@ -3320,18 +3342,51 @@ class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for quick access menu items.
     Returns active menu items ordered by order field.
+    Also includes a ``badges`` map with new-content indicators for well-known
+    routes so that hardcoded Flutter fallback items can show "NEW" badges
+    without requiring admin-created QuickAccessMenuItem records.
     """
     queryset = QuickAccessMenuItem.objects.filter(is_active=True)
     serializer_class = QuickAccessMenuItemSerializer
     permission_classes = [AllowAny]
 
+    @staticmethod
+    def _compute_new_content_badges(days=3):
+        """Return {route: badge_text} for every well-known route with fresh content."""
+        from datetime import timedelta
+        cutoff = timezone.now() - timedelta(days=days)
+        badges = {}
+        checks = {
+            '/news': lambda: Article.objects.filter(publish_date__gte=cutoff).exists(),
+            '/magazine': lambda: MagazineEdition.objects.filter(publish_date__gte=cutoff).exists(),
+            '/gallery': lambda: GalleryAlbum.objects.filter(created_at__gte=cutoff).exists(),
+            '/videos': lambda: Video.objects.filter(created_at__gte=cutoff).exists(),
+            '/resources': lambda: Resource.objects.filter(created_at__gte=cutoff).exists(),
+            '/live-feeds': lambda: LiveFeed.objects.filter(status='live').exists(),
+            '/calendar': lambda: Event.objects.filter(
+                event_date__gte=timezone.now(), created_at__gte=cutoff,
+            ).exists(),
+        }
+        for route, check in checks.items():
+            if check():
+                badges[route] = 'NEW'
+        return badges
+
     def list(self, request, *args, **kwargs):
-        cached = cache.get('quick_access_menu:v1')
+        cached = cache.get('quick_access_menu:v2')
         if cached is not None:
             return Response(cached)
         response = super().list(request, *args, **kwargs)
-        cache.set('quick_access_menu:v1', response.data, django_settings.CACHE_TTL_MEDIUM)
-        return response
+        # response.data may be paginated {'count':…, 'results':[…]} or a plain list
+        items = response.data
+        if isinstance(items, dict) and 'results' in items:
+            items = items['results']
+        data = {
+            'results': items,
+            'badges': self._compute_new_content_badges(),
+        }
+        cache.set('quick_access_menu:v2', data, django_settings.CACHE_TTL_MEDIUM)
+        return Response(data)
 
 
 class EmergencyContactViewSet(viewsets.ReadOnlyModelViewSet):
@@ -6860,6 +6915,7 @@ def _notify_yd(application, event_key):
             message=config['push_body'],
             message_fr=config['push_body'] if is_fr else config['push_body'],
             notification_type='system',
+            source='system',
             is_global=False,
             action_type='route',
             action_value=config.get('push_route', '/youth-dialogue'),
@@ -6972,25 +7028,39 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def yd_settings(self, request):
         """Return Continental Dialogue branding, texts, and support contact info for the active event."""
         cached = cache.get('yd_settings:v1')
-        if cached is not None:
-            return Response(cached)
+        if cached is None:
+            from core.serializers import YouthDialogueSettingsSerializer
+            from django.db.models import Prefetch
+            active_event = YouthDialogueEvent.get_active()
+            if not active_event:
+                active_event = YouthDialogueEvent.load()
+            if active_event:
+                # Re-fetch with prefetch to avoid N+1 queries in serializer
+                active_event = YouthDialogueEvent.objects.prefetch_related(
+                    'roles',
+                    'side_events',
+                    'form_fields',
+                    Prefetch('media_items', queryset=YouthDialogueMedia.objects.filter(is_published=True).order_by('display_order', '-created_at')),
+                ).get(pk=active_event.pk)
 
-        from core.serializers import YouthDialogueSettingsSerializer
-        from django.db.models import Prefetch
-        active_event = YouthDialogueEvent.get_active()
-        if not active_event:
-            active_event = YouthDialogueEvent.load()
-        if active_event:
-            # Re-fetch with prefetch to avoid N+1 queries in serializer
-            active_event = YouthDialogueEvent.objects.prefetch_related(
-                'roles',
-                'form_fields',
-                Prefetch('media_items', queryset=YouthDialogueMedia.objects.filter(is_published=True).order_by('display_order', '-created_at')),
-            ).get(pk=active_event.pk)
+            cached = YouthDialogueSettingsSerializer(active_event, context={'request': request}).data
+            cache.set('yd_settings:v1', cached, django_settings.CACHE_TTL_MEDIUM)
 
-        data = YouthDialogueSettingsSerializer(active_event, context={'request': request}).data
-        cache.set('yd_settings:v1', data, django_settings.CACHE_TTL_MEDIUM)
-        return Response(data)
+        # Per-request device ban check (not cached)
+        from core.models import YouthDialogueDeviceBan
+        response_data = dict(cached)
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned = False
+        if device_id:
+            is_banned = YouthDialogueDeviceBan.objects.filter(
+                device_id=device_id, is_active=True
+            ).exists()
+        if not is_banned and request.user.is_authenticated:
+            is_banned = YouthDialogueApplication.objects.filter(
+                user=request.user, is_revoked=True, allow_reapply=False
+            ).exists()
+        response_data['is_device_banned'] = is_banned
+        return Response(response_data)
 
     # Known field names that map directly to YouthDialogueApplication model columns
     _KNOWN_FIELD_NAMES = {
@@ -7008,13 +7078,31 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
           - Legacy flat format: {field_name: value, ...}
         Known field names map to model columns; extras go to additional_data JSON.
         """
+        # Block banned devices from applying
+        from core.models import YouthDialogueDeviceBan
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        if device_id and YouthDialogueDeviceBan.objects.filter(device_id=device_id, is_active=True).exists():
+            return Response({'detail': 'You are not eligible to apply.'}, status=status.HTTP_403_FORBIDDEN)
+        # Also block permanently revoked users
+        if YouthDialogueApplication.objects.filter(
+            user=request.user, is_revoked=True, allow_reapply=False
+        ).exists():
+            return Response({'detail': 'You are not eligible to apply.'}, status=status.HTTP_403_FORBIDDEN)
+
         # Backward compat: unwrap form_data or use flat request.data
         raw = request.data.get('form_data', request.data)
+
+        # Extract selected side events before field separation
+        selected_side_event_ids = raw.pop('selected_side_events', None)
+        if isinstance(raw, dict) is False:
+            selected_side_event_ids = None
 
         # Separate known model fields from custom/extra fields
         model_data = {}
         additional_data = {}
         for key, value in raw.items():
+            if key == 'selected_side_events':
+                continue
             if key in self._KNOWN_FIELD_NAMES:
                 model_data[key] = value
             else:
@@ -7074,6 +7162,24 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             event=active_event,
         )
 
+        # Save selected side event (M2M) — only one allowed
+        if selected_side_event_ids and active_event:
+            try:
+                ids = [int(i) for i in selected_side_event_ids if str(i).isdigit()]
+                # Enforce single side event: take only the first valid one
+                valid_side_events = YouthDialogueSideEvent.objects.filter(
+                    pk__in=ids[:1], event=active_event, is_active=True
+                )
+                app.selected_side_events.set(valid_side_events)
+            except (TypeError, ValueError):
+                pass
+
+        # Save the device ID from the request header
+        app_device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        if app_device_id:
+            app.device_id = app_device_id
+            app.save(update_fields=['device_id'])
+
         # Log activity
         YouthDialogueActivityLog.objects.create(
             user=request.user, event=active_event, application=app,
@@ -7127,16 +7233,32 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def get_status(self, request):
         """Return the user's application status for the active event."""
         active_event = YouthDialogueEvent.get_active()
-        try:
-            lookup = {'user': request.user}
-            if active_event:
-                lookup['event'] = active_event
-            app = YouthDialogueApplication.objects.prefetch_related('documents').get(**lookup)
-        except YouthDialogueApplication.DoesNotExist:
-            return Response({'has_application': False})
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        qs = YouthDialogueApplication.objects.prefetch_related('documents').filter(**lookup)
+        # Prefer non-revoked application; fall back to revoked
+        app = qs.filter(is_revoked=False).first() or qs.first()
+
+        # Per-request device ban check
+        from core.models import YouthDialogueDeviceBan
+        device_id = request.META.get('HTTP_X_DEVICE_ID', '')
+        is_banned = False
+        if device_id:
+            is_banned = YouthDialogueDeviceBan.objects.filter(
+                device_id=device_id, is_active=True
+            ).exists()
+        if not is_banned:
+            is_banned = YouthDialogueApplication.objects.filter(
+                user=request.user, is_revoked=True, allow_reapply=False
+            ).exists()
+
+        if app is None:
+            return Response({'has_application': False, 'is_device_banned': is_banned})
 
         data = YouthDialogueApplicationStatusSerializer(app, context={'request': request}).data
         data['has_application'] = True
+        data['is_device_banned'] = is_banned
         return Response(data)
 
     @action(detail=False, methods=['post'], url_path='upload-document',
@@ -7144,12 +7266,11 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def upload_document(self, request):
         """Upload a document for the user's Continental Dialogue application."""
         active_event = YouthDialogueEvent.get_active()
-        try:
-            lookup = {'user': request.user}
-            if active_event:
-                lookup['event'] = active_event
-            app = YouthDialogueApplication.objects.get(**lookup)
-        except YouthDialogueApplication.DoesNotExist:
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        app = YouthDialogueApplication.objects.filter(**lookup).filter(is_revoked=False).first()
+        if app is None:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
 
         allowed_statuses = ('accepted', 'documents_pending', 'documents_rejected')
@@ -7253,12 +7374,11 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def submit_documents(self, request):
         """Mark documents as submitted for review."""
         active_event = YouthDialogueEvent.get_active()
-        try:
-            lookup = {'user': request.user}
-            if active_event:
-                lookup['event'] = active_event
-            app = YouthDialogueApplication.objects.get(**lookup)
-        except YouthDialogueApplication.DoesNotExist:
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        app = YouthDialogueApplication.objects.filter(**lookup).filter(is_revoked=False).first()
+        if app is None:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
 
         if app.status not in ('documents_pending', 'documents_rejected'):
@@ -7292,13 +7412,19 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def credential(self, request):
         """Return credential data for the user's issued ID card."""
         active_event = YouthDialogueEvent.get_active()
-        try:
-            lookup = {'user': request.user}
-            if active_event:
-                lookup['event'] = active_event
-            app = YouthDialogueApplication.objects.get(**lookup)
-        except YouthDialogueApplication.DoesNotExist:
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        qs = YouthDialogueApplication.objects.filter(**lookup)
+        app = qs.filter(is_revoked=False).first() or qs.first()
+        if app is None:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if app.is_revoked:
+            return Response(
+                {'detail': 'Your credential has been revoked.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         if app.status != 'credential_issued' or not app.participant_code:
             return Response(
@@ -7314,13 +7440,19 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def credential_pdf(self, request):
         """Generate and return a PDF ID card for the authenticated user's credential."""
         active_event = YouthDialogueEvent.get_active()
-        try:
-            lookup = {'user': request.user}
-            if active_event:
-                lookup['event'] = active_event
-            app = YouthDialogueApplication.objects.get(**lookup)
-        except YouthDialogueApplication.DoesNotExist:
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        qs = YouthDialogueApplication.objects.filter(**lookup)
+        app = qs.filter(is_revoked=False).first() or qs.first()
+        if app is None:
             return Response({'detail': 'No application found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if app.is_revoked:
+            return Response(
+                {'detail': 'Your credential has been revoked.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         if app.status != 'credential_issued' or not app.participant_code:
             return Response({'detail': 'Credential not yet issued.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -7335,26 +7467,33 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
     def eligibility(self, request):
         """Check if the user is eligible for Continental Dialogue features (Quick Access filtering)."""
         active_event = YouthDialogueEvent.get_active()
-        try:
-            lookup = {'user': request.user}
-            if active_event:
-                lookup['event'] = active_event
-            app = YouthDialogueApplication.objects.get(**lookup)
-            eligible_statuses = (
-                'accepted', 'documents_pending', 'documents_submitted',
-                'documents_under_review', 'documents_rejected', 'credential_issued',
-            )
-            return Response({
-                'eligible': app.status in eligible_statuses,
-                'status': app.status,
-                'has_credential': app.status == 'credential_issued' and bool(app.participant_code),
-            })
-        except YouthDialogueApplication.DoesNotExist:
+        lookup = {'user': request.user}
+        if active_event:
+            lookup['event'] = active_event
+        qs = YouthDialogueApplication.objects.filter(**lookup)
+        app = qs.filter(is_revoked=False).first() or qs.first()
+        if app is None:
             return Response({
                 'eligible': False,
                 'status': None,
                 'has_credential': False,
             })
+        eligible_statuses = (
+            'accepted', 'documents_pending', 'documents_submitted',
+            'documents_under_review', 'documents_rejected', 'credential_issued',
+        )
+        data = {
+            'eligible': app.status in eligible_statuses and not app.is_revoked,
+            'status': app.status,
+            'has_credential': (
+                app.status == 'credential_issued'
+                and bool(app.participant_code)
+                and not app.is_revoked
+            ),
+        }
+        if app.is_revoked:
+            data['is_revoked'] = True
+        return Response(data)
 
     @action(detail=False, methods=['get'], url_path='verify-qr', permission_classes=[AllowAny])
     def verify_qr(self, request):
@@ -7692,6 +7831,14 @@ def track_promotional_splash_click(request, pk):
 #  QR CODE VERIFICATION
 # ═══════════════════════════════════════════════════════════
 
+def _get_side_event_name(app):
+    """Return the name of the participant's selected side event, or empty string."""
+    se = app.selected_side_events.first()
+    if se:
+        return se.name
+    return ''
+
+
 def _parse_qr_code(raw_data):
     """Parse QR data string and return (qr_type, ref_id, qr_hash) or None.
 
@@ -7841,6 +7988,8 @@ def verify_qr(request):
                     'nationality': app.get_nationality_display(),
                     'nationality_flag': app.nationality_flag,
                     'credential_issued_at': app.credential_issued_at.isoformat() if app.credential_issued_at else None,
+                    'scan_result_visible_fields': app.event.get_scan_result_visible_fields() if app.event else [],
+                    'side_event': _get_side_event_name(app),
                 }
             return Response(result)
 
@@ -7875,10 +8024,232 @@ def verify_qr(request):
                 'event_end_date': app.event.end_date.isoformat() if app.event and app.event.end_date else None,
                 'event_location': app.event.location if app.event else '',
                 'reference_id': app.reference_id or '',
+                'scan_result_visible_fields': app.event.get_scan_result_visible_fields() if app.event else [],
+                'side_event': _get_side_event_name(app),
             }
         return Response(result)
 
     return Response({'valid': False, 'detail': 'Unknown QR type.'}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_manual(request):
+    """Manual credential/ticket lookup for staff when QR scanning isn't possible.
+
+    Accepts JSON:
+      {"lookup_type": "code", "code": "YD-2026-0001"}
+      {"lookup_type": "code", "code": "42"}            # EventSubmission PK
+      {"lookup_type": "name_email", "name": "John", "email": "john@example.com"}
+
+    Returns the same response shape as verify_qr() so QrScanResultScreen works unchanged.
+    """
+    if not request.user.is_staff:
+        return Response({'detail': 'Staff access required.'}, status=403)
+
+    lookup_type = request.data.get('lookup_type', '').strip()
+    if lookup_type not in ('code', 'name_email'):
+        return Response({'detail': 'lookup_type must be "code" or "name_email".'}, status=400)
+
+    ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', ''))
+    if ip_address and ',' in ip_address:
+        ip_address = ip_address.split(',')[0].strip()
+
+    if lookup_type == 'code':
+        code = request.data.get('code', '').strip()
+        if not code:
+            return Response({'detail': 'code is required.'}, status=400)
+
+        # Try YouthDialogueApplication by participant_code first
+        try:
+            app = YouthDialogueApplication.objects.select_related('event').get(participant_code=code)
+            return _manual_yd_result(request, app, ip_address)
+        except YouthDialogueApplication.DoesNotExist:
+            pass
+
+        # Try EventSubmission by numeric PK
+        try:
+            sub_id = int(code)
+            submission = EventSubmission.objects.select_related('event_registration', 'user').get(pk=sub_id)
+            return _manual_event_result(request, submission, ip_address)
+        except (ValueError, TypeError):
+            pass
+        except EventSubmission.DoesNotExist:
+            pass
+
+        return Response({'valid': False, 'detail': 'No credential or ticket found for that code.'}, status=404)
+
+    # lookup_type == 'name_email'
+    name = request.data.get('name', '').strip()
+    email = request.data.get('email', '').strip()
+    if not name or not email:
+        return Response({'detail': 'Both name and email are required.'}, status=400)
+
+    name_parts = name.split(None, 1)
+    first_name = name_parts[0]
+    last_name = name_parts[1] if len(name_parts) > 1 else ''
+
+    matches = []
+
+    # Search YouthDialogueApplication
+    yd_qs = YouthDialogueApplication.objects.select_related('event').filter(email__iexact=email)
+    if last_name:
+        yd_qs = yd_qs.filter(first_name__iexact=first_name, last_name__iexact=last_name)
+    else:
+        yd_qs = yd_qs.filter(
+            Q(first_name__iexact=first_name) | Q(last_name__iexact=first_name)
+        )
+    for app in yd_qs[:10]:
+        matches.append({
+            'match_type': 'youth_dialogue',
+            'id': app.participant_code,
+            'name': f'{app.first_name} {app.last_name}',
+            'email': app.email,
+            'event': app.event.name if app.event else '',
+            '_obj': app,
+        })
+
+    # Search EventSubmission
+    evt_qs = EventSubmission.objects.select_related('event_registration', 'user').filter(
+        user__email__iexact=email,
+    )
+    if last_name:
+        evt_qs = evt_qs.filter(user__first_name__iexact=first_name, user__last_name__iexact=last_name)
+    else:
+        evt_qs = evt_qs.filter(
+            Q(user__first_name__iexact=first_name) | Q(user__last_name__iexact=first_name)
+        )
+    for sub in evt_qs[:10]:
+        attendee_name = sub.proxy_name if sub.is_proxy else (
+            f'{sub.user.first_name} {sub.user.last_name}'.strip() or sub.user.username
+        )
+        matches.append({
+            'match_type': 'event',
+            'id': str(sub.pk),
+            'name': attendee_name,
+            'email': sub.proxy_email if sub.is_proxy else sub.user.email,
+            'event': sub.event_registration.event_title,
+            '_obj': sub,
+        })
+
+    if not matches:
+        return Response({'valid': False, 'detail': 'No matches found for that name and email.'}, status=404)
+
+    if len(matches) == 1:
+        m = matches[0]
+        if m['match_type'] == 'youth_dialogue':
+            return _manual_yd_result(request, m['_obj'], ip_address)
+        else:
+            return _manual_event_result(request, m['_obj'], ip_address)
+
+    # Multiple matches — return pick list (without ORM objects)
+    pick_list = []
+    for m in matches:
+        pick_list.append({
+            'match_type': m['match_type'],
+            'id': m['id'],
+            'name': m['name'],
+            'email': m['email'],
+            'event': m['event'],
+        })
+    return Response({'multiple': True, 'matches': pick_list})
+
+
+def _manual_yd_result(request, app, ip_address):
+    """Build a verify_qr-compatible response for a YouthDialogueApplication (staff view)."""
+    scanned_by = request.user
+    ref_id = app.participant_code
+
+    scan_count = QRScanLog.objects.filter(qr_type='youth_dialogue', reference_id=ref_id).count()
+    is_duplicate = scan_count > 0
+    QRScanLog.objects.create(
+        qr_type='youth_dialogue', reference_id=ref_id,
+        scanned_by=scanned_by, ip_address=ip_address, is_duplicate=is_duplicate,
+    )
+    scan_count += 1
+
+    _role_color = '#4CAF50'
+    _position = app.position or 'Participant'
+    try:
+        _role_obj = YouthDialogueRole.objects.get(event=app.event, name__iexact=_position, is_active=True)
+        _role_color = _role_obj.color
+    except YouthDialogueRole.DoesNotExist:
+        pass
+
+    id_photo_url = ''
+    if app.id_photo:
+        try:
+            id_photo_url = request.build_absolute_uri(app.id_photo.url)
+        except Exception:
+            pass
+
+    is_valid = not app.is_revoked
+    result = {
+        'valid': is_valid,
+        'type': 'youth_dialogue',
+        'person_name': f'{app.first_name} {app.last_name}',
+        'programme': 'Continental Dialogue',
+        'status': 'revoked' if app.is_revoked else 'valid',
+        'detail': 'This credential has been revoked.' if app.is_revoked else '',
+        'is_duplicate': is_duplicate,
+        'scan_count': scan_count,
+        'details': {
+            'participant_code': app.participant_code,
+            'nationality': app.get_nationality_display(),
+            'nationality_flag': app.nationality_flag,
+            'organization': app.organization,
+            'position': app.position,
+            'credential_issued_at': app.credential_issued_at.isoformat() if app.credential_issued_at else None,
+            'id_photo_url': id_photo_url,
+            'email': app.email,
+            'role': _position,
+            'role_color': _role_color,
+            'event_start_date': app.event.start_date.isoformat() if app.event and app.event.start_date else None,
+            'event_end_date': app.event.end_date.isoformat() if app.event and app.event.end_date else None,
+            'event_location': app.event.location if app.event else '',
+            'reference_id': app.reference_id or '',
+            'scan_result_visible_fields': app.event.get_scan_result_visible_fields() if app.event else [],
+            'side_event': _get_side_event_name(app),
+        },
+    }
+    if app.is_revoked:
+        result['details']['revoked_at'] = app.revoked_at.isoformat() if app.revoked_at else None
+        result['details']['revoked_reason'] = app.revoked_reason
+    return Response(result)
+
+
+def _manual_event_result(request, submission, ip_address):
+    """Build a verify_qr-compatible response for an EventSubmission (staff view)."""
+    scanned_by = request.user
+    ref_id = str(submission.pk)
+
+    scan_count = QRScanLog.objects.filter(qr_type='event', reference_id=ref_id).count()
+    is_duplicate = scan_count > 0
+    QRScanLog.objects.create(
+        qr_type='event', reference_id=ref_id,
+        scanned_by=scanned_by, ip_address=ip_address, is_duplicate=is_duplicate,
+    )
+    scan_count += 1
+
+    attendee_name = submission.proxy_name if submission.is_proxy else (
+        submission.user.first_name or submission.user.username
+    )
+    return Response({
+        'valid': True,
+        'type': 'event',
+        'person_name': attendee_name,
+        'event_title': submission.event_registration.event_title,
+        'status': submission.status,
+        'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
+        'is_duplicate': is_duplicate,
+        'scan_count': scan_count,
+        'details': {
+            'email': submission.proxy_email if submission.is_proxy else submission.user.email,
+            'is_proxy': submission.is_proxy,
+            'is_waitlisted': submission.is_waitlisted,
+            'submission_id': submission.id,
+        },
+    })
 
 
 def verify_qr_web(request):
@@ -7962,3 +8333,31 @@ def verify_qr_web(request):
 
     html = render_to_string('core/verify_qr.html', context)
     return DjangoHttpResponse(html)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PHRASEBOOK
+# ═══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def phrasebook_list_api(request):
+    """Return all active phrasebook entries grouped by category."""
+    entries = PhrasebookEntry.objects.filter(is_active=True).order_by('category', 'display_order', 'id')
+    categories = {}
+    for entry in entries:
+        cat = entry.category
+        if cat not in categories:
+            categories[cat] = {
+                'category': cat,
+                'label': entry.get_category_display(),
+                'icon': entry.category_icon or PhrasebookEntry.CATEGORY_ICON_DEFAULTS.get(cat, 'translate'),
+                'phrases': [],
+            }
+        categories[cat]['phrases'].append({
+            'id': entry.id,
+            'kirundi': entry.kirundi,
+            'english': entry.english,
+            'french': entry.french,
+        })
+    return Response(list(categories.values()))

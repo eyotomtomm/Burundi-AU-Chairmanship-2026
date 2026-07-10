@@ -45,7 +45,15 @@ class QuickAccessGrid extends StatelessWidget {
         final iconImageUrl = item['iconImageUrl'] as String? ?? '';
 
         final isLocked = item['locked'] == true;
-        final itemColor = isLocked ? Colors.grey : AppColors.burundiGreen;
+        final isEmergency = item['isEmergency'] == true;
+        final isScanner = item['isScanner'] == true;
+        final itemColor = isLocked
+            ? Colors.grey
+            : isEmergency
+                ? AppColors.burundiRed
+                : isScanner
+                    ? AppColors.scannerBlue
+                    : AppColors.burundiGreen;
 
         // Determine icon content: network image or fallback Icon widget
         Widget iconContent;
@@ -150,15 +158,23 @@ class QuickAccessGrid extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  item['title'] as String,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: itemWidth),
+                    child: Text(
+                      item['title'] as String,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: isEmergency ? FontWeight.w800 : FontWeight.w600,
+                        color: isEmergency
+                            ? AppColors.burundiRed
+                            : Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

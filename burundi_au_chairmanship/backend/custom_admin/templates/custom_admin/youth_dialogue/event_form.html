@@ -434,16 +434,15 @@
 
     function addDocRow(doc) {
       doc = doc || {key: '', label: '', label_fr: '', camera_only: false};
-      const idx = container.children.length;
       const div = document.createElement('div');
       div.className = 'flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200';
       div.innerHTML = `
         <span class="material-symbols-outlined text-slate-400 cursor-grab drag-handle">drag_indicator</span>
-        <input type="text" name="doc_${idx}_key" value="${doc.key}" placeholder="key (e.g. passport)" class="w-32 border border-slate-200 rounded-lg py-2 px-3 text-sm font-mono" required>
-        <input type="text" name="doc_${idx}_label" value="${doc.label}" placeholder="Label (EN)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm" required>
-        <input type="text" name="doc_${idx}_label_fr" value="${doc.label_fr}" placeholder="Label (FR)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
+        <input type="text" data-field="key" value="${doc.key.replace(/"/g, '&quot;')}" placeholder="key (e.g. passport)" class="w-32 border border-slate-200 rounded-lg py-2 px-3 text-sm font-mono" required>
+        <input type="text" data-field="label" value="${doc.label.replace(/"/g, '&quot;')}" placeholder="Label (EN)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm" required>
+        <input type="text" data-field="label_fr" value="${doc.label_fr.replace(/"/g, '&quot;')}" placeholder="Label (FR)" class="flex-1 border border-slate-200 rounded-lg py-2 px-3 text-sm">
         <label class="flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap" title="Require live camera capture (no file upload)">
-          <input type="checkbox" name="doc_${idx}_camera_only" value="1" ${doc.camera_only ? 'checked' : ''} class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+          <input type="checkbox" data-field="camera_only" value="1" ${doc.camera_only ? 'checked' : ''} class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
           <span class="material-symbols-outlined text-sm">photo_camera</span>
           Live only
         </label>
@@ -455,6 +454,18 @@
     }
 
     existingDocs.forEach(d => addDocRow(d));
+
+    // Re-index all doc rows sequentially before form submission so the
+    // backend parser (which stops at the first index gap) always gets
+    // a continuous 0, 1, 2, ... sequence.
+    document.querySelector('form').addEventListener('submit', function() {
+      const rows = container.querySelectorAll(':scope > div');
+      rows.forEach(function(row, idx) {
+        row.querySelectorAll('input[data-field]').forEach(function(input) {
+          input.name = 'doc_' + idx + '_' + input.dataset.field;
+        });
+      });
+    });
     </script>
 
     <!-- Credential Roles Section -->

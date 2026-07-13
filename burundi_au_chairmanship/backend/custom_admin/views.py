@@ -128,6 +128,25 @@ def _get_existing_or_uploaded(request, field_name):
     return None
 
 
+def _surface_notif_results(request, results):
+    """Show notification delivery status to the admin."""
+    parts = []
+    if results.get('email'):
+        parts.append('email sent')
+    if results.get('push'):
+        parts.append(f'push sent to {results.get("push_detail", "?")}')
+    elif results.get('push_detail'):
+        parts.append(f'push skipped — {results["push_detail"]}')
+    if results.get('in_app'):
+        parts.append('in-app notification created')
+    elif results.get('in_app_detail'):
+        parts.append(f'in-app failed — {results["in_app_detail"]}')
+    if parts:
+        has_warning = not results.get('push') or not results.get('in_app')
+        msg_func = messages.warning if has_warning else messages.info
+        msg_func(request, f'Notifications: {", ".join(parts)}')
+
+
 def _extract_youtube_id(url):
     """Extract the video ID from a YouTube URL, or return None."""
     patterns = [
@@ -9181,7 +9200,7 @@ def youth_dialogue_event_form(request, event_pk=None):
 
         # Parse credential field visibility checkboxes
         id_card_all_keys = ['photo', 'organization', 'role', 'position', 'nationality',
-                            'event_dates', 'qr_code', 'participant_code', 'email', 'allow_pdf_download']
+                            'event_dates', 'qr_code', 'participant_code', 'email', 'side_event', 'allow_pdf_download']
         id_card_visible = [k for k in id_card_all_keys if request.POST.get(f'idf_{k}')]
         yd_event.id_card_visible_fields = [] if len(id_card_visible) == len(id_card_all_keys) else id_card_visible
 
@@ -9569,8 +9588,10 @@ def _auto_finalize_docs(request, application):
             changes={'status': {'old': 'documents_under_review', 'new': 'documents_rejected'}},
         )
         from core.views import _notify_yd
-        _notify_yd(application, 'documents_rejected')
+        notif_results = _notify_yd(application, 'documents_rejected')
         messages.info(request, 'All documents reviewed — applicant notified about rejected documents.')
+        if notif_results:
+            _surface_notif_results(request, notif_results)
 
     elif all_approved:
         # All latest docs approved — auto-issue credential if all required types present
@@ -9600,8 +9621,10 @@ def _auto_finalize_docs(request, application):
                 changes={'status': {'old': 'documents_under_review', 'new': 'credential_issued'}},
             )
             from core.views import _notify_yd
-            _notify_yd(application, 'credential_issued')
+            notif_results = _notify_yd(application, 'credential_issued')
             messages.success(request, f'All documents approved — credential issued for {application.first_name} {application.last_name}!')
+            if notif_results:
+                _surface_notif_results(request, notif_results)
         else:
             # All reviewed docs approved but some required types missing
             application.status = 'documents_under_review'
@@ -9639,8 +9662,10 @@ def youth_dialogue_review(request, pk):
                 changes={'status': {'old': old_status, 'new': 'accepted'}},
             )
             from core.views import _notify_yd
-            _notify_yd(application, 'accepted')
+            notif_results = _notify_yd(application, 'accepted')
             messages.success(request, f'Application from {application.first_name} {application.last_name} accepted.')
+            if notif_results:
+                _surface_notif_results(request, notif_results)
 
         elif action == 'reject' and application.status in ('submitted', 'under_review'):
             reason = request.POST.get('rejection_reason', '')
@@ -9655,8 +9680,10 @@ def youth_dialogue_review(request, pk):
                 changes={'status': {'old': old_status, 'new': 'rejected'}, 'reason': reason},
             )
             from core.views import _notify_yd
-            _notify_yd(application, 'rejected')
+            notif_results = _notify_yd(application, 'rejected')
             messages.success(request, f'Application from {application.first_name} {application.last_name} rejected.')
+            if notif_results:
+                _surface_notif_results(request, notif_results)
 
         elif action == 'approve_document':
             doc_id = request.POST.get('document_id')
@@ -9736,8 +9763,10 @@ def youth_dialogue_review(request, pk):
                 changes={'status': {'old': old_status, 'new': 'documents_rejected'}},
             )
             from core.views import _notify_yd
-            _notify_yd(application, 'documents_rejected')
+            notif_results = _notify_yd(application, 'documents_rejected')
             messages.success(request, f'All documents rejected. Applicant notified.')
+            if notif_results:
+                _surface_notif_results(request, notif_results)
 
         elif action == 'reject_documents':
             # Finalize with existing rejections — also reject any remaining pending docs
@@ -9779,8 +9808,10 @@ def youth_dialogue_review(request, pk):
                 changes={'status': {'old': old_status, 'new': 'documents_rejected'}},
             )
             from core.views import _notify_yd
-            _notify_yd(application, 'documents_rejected')
+            notif_results = _notify_yd(application, 'documents_rejected')
             messages.success(request, 'Documents rejected. Applicant notified.')
+            if notif_results:
+                _surface_notif_results(request, notif_results)
 
         elif action == 'save_admin_notes':
             application.admin_notes = request.POST.get('admin_notes', '')
@@ -9836,8 +9867,10 @@ def youth_dialogue_review(request, pk):
                     except Exception:
                         pass
                     from core.views import _notify_yd
-                    _notify_yd(application, 'credential_issued')
+                    notif_results = _notify_yd(application, 'credential_issued')
                     messages.success(request, f'Credential issued: {application.participant_code}')
+                    if notif_results:
+                        _surface_notif_results(request, notif_results)
                 except Exception as e:
                     logger.exception('Failed to issue credential for application %s', pk)
                     messages.error(request, f'Failed to issue credential: {e}')
@@ -9873,8 +9906,10 @@ def youth_dialogue_review(request, pk):
                     changes={'is_revoked': True, 'reason': reason, 'allow_reapply': allow_reapply},
                 )
                 from core.views import _notify_yd
-                _notify_yd(application, 'credential_revoked')
+                notif_results = _notify_yd(application, 'credential_revoked')
                 messages.success(request, f'Credential {application.participant_code} has been revoked.')
+                if notif_results:
+                    _surface_notif_results(request, notif_results)
             else:
                 messages.error(request, 'Cannot revoke: credential not issued or already revoked.')
 

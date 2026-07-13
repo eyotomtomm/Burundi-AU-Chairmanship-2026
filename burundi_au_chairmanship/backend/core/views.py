@@ -6536,6 +6536,8 @@ def _notify_yd(application, event_key):
     """
     lang = _get_yd_user_lang(application)
     is_fr = lang == 'fr'
+    event = application.event
+    _support_email = (event.support_email if event and event.support_email else 'info@burundi4africa.com')
 
     EVENT_CONFIG = {
         'submitted': {
@@ -6556,14 +6558,14 @@ def _notify_yd(application, event_key):
               a été acceptée.
             </p>
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              La prochaine étape consiste à télécharger vos documents requis via l'application Be 4 Africa.
+              La prochaine étape consiste à télécharger vos documents requis via l'application B4Africa.
               Veuillez soumettre vos documents dans les plus brefs délais.
             </p>''' if is_fr else '''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
               We are pleased to inform you that your application for the <strong>Continental Dialogue Programme</strong>
               has been accepted.
             </p>
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
-              The next step is to upload your required documents through the Be 4 Africa app.
+              The next step is to upload your required documents through the B4Africa app.
               Please submit your documents at your earliest convenience.
             </p>'''),
             'push_title': 'Candidature acceptée !' if is_fr else 'Application Accepted!',
@@ -6679,7 +6681,6 @@ def _notify_yd(application, event_key):
               {'<p style="color:#2d3748;font-size:14px;margin:0;">' + pin_emoji + ' ' + event_location + '</p>' if event_location else ''}
             </div>'''
 
-        support_email = event.support_email or 'youth@burundiauchairmanship.org' if event else 'youth@burundiauchairmanship.org'
         if is_fr:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
                   Merci d'avoir soumis votre candidature pour le <strong>{event_name}</strong>.
@@ -6704,10 +6705,10 @@ def _notify_yd(application, event_key):
                 </div>
 
                 <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 8px;">
-                  Vous pouvez vérifier le statut de votre candidature à tout moment via l'application <strong>Be 4 Africa</strong>.
+                  Vous pouvez vérifier le statut de votre candidature à tout moment via l'application <strong>B4Africa</strong>.
                 </p>
                 <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-                  Si vous avez des questions, contactez-nous à <a href="mailto:{support_email}" style="color:#3182ce;">{support_email}</a>
+                  Si vous avez des questions, contactez-nous à <a href="mailto:{_support_email}" style="color:#409843;font-weight:600;">{_support_email}</a>
                 </p>'''
         else:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -6733,10 +6734,10 @@ def _notify_yd(application, event_key):
                 </div>
 
                 <p style="color:#4a5568;font-size:14px;line-height:1.6;margin:0 0 8px;">
-                  You can check your application status at any time through the <strong>Be 4 Africa</strong> app.
+                  You can check your application status at any time through the <strong>B4Africa</strong> app.
                 </p>
                 <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-                  If you have any questions, please contact us at <a href="mailto:{support_email}" style="color:#3182ce;">{support_email}</a>
+                  If you have any questions, please contact us at <a href="mailto:{_support_email}" style="color:#409843;font-weight:600;">{_support_email}</a>
                 </p>'''
     elif event_key == 'rejected':
         reason = application.rejection_reason or ''
@@ -6747,7 +6748,7 @@ def _notify_yd(application, event_key):
               n'a pas été retenue.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-              Si vous avez des questions, contactez-nous à info@burundi4africa.com
+              Si vous avez des questions, contactez-nous à <a href="mailto:{_support_email}" style="color:#409843;font-weight:600;">{_support_email}</a>
             </p>'''
         else:
             reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
@@ -6756,7 +6757,7 @@ def _notify_yd(application, event_key):
               has not been accepted at this time.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-              If you have questions, please contact us at info@burundi4africa.com
+              If you have questions, please contact us at <a href="mailto:{_support_email}" style="color:#409843;font-weight:600;">{_support_email}</a>
             </p>'''
     elif event_key == 'documents_rejected':
         rejected_docs = application.documents.filter(status='rejected')
@@ -6769,14 +6770,14 @@ def _notify_yd(application, event_key):
         if is_fr:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
               Certains de vos documents nécessitent une attention particulière. Veuillez consulter les détails
-              ci-dessous et recharger les documents nécessaires via l'application Be 4 Africa.
+              ci-dessous et recharger les documents nécessaires via l'application B4Africa.
             </p>
             <p style="color:#4a5568;font-size:13px;font-weight:600;margin:0 0 12px;">Documents à corriger :</p>
             {docs_html}'''
         else:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
               Some of your uploaded documents require attention. Please review the details
-              below and re-upload the necessary documents through the Be 4 Africa app.
+              below and re-upload the necessary documents through the B4Africa app.
             </p>
             <p style="color:#4a5568;font-size:13px;font-weight:600;margin:0 0 12px;">Documents to fix:</p>
             {docs_html}'''
@@ -6790,7 +6791,7 @@ def _notify_yd(application, event_key):
               <p style="color:#2b6cb0;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{application.participant_code}</p>
             </div>
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-              Vous pouvez consulter votre carte d'identité numérique et votre QR code dans l'application Be 4 Africa.
+              Vous pouvez consulter votre carte d'identité numérique et votre QR code dans l'application B4Africa.
             </p>'''
         else:
             body_html = f'''<p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -6801,7 +6802,7 @@ def _notify_yd(application, event_key):
               <p style="color:#2b6cb0;font-size:24px;font-weight:900;margin:0;font-family:monospace;">{application.participant_code}</p>
             </div>
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-              You can view your digital ID card and QR code in the Be 4 Africa app.
+              You can view your digital ID card and QR code in the B4Africa app.
             </p>'''
     elif event_key == 'credential_revoked':
         reason = application.revoked_reason or ''
@@ -6811,7 +6812,7 @@ def _notify_yd(application, event_key):
               Votre accréditation de participant au Programme Dialogue Continental a été révoquée.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-              Si vous pensez qu'il s'agit d'une erreur, contactez-nous à info@burundi4africa.com
+              Si vous pensez qu'il s'agit d'une erreur, contactez-nous à <a href="mailto:{_support_email}" style="color:#409843;font-weight:600;">{_support_email}</a>
             </p>'''
         else:
             reason_html = f'<div style="background:#fff5f5;border-left:4px solid #e53e3e;padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 24px;"><p style="color:#742a2a;font-size:13px;margin:0 0 4px;font-weight:600;">Reason:</p><p style="color:#742a2a;font-size:14px;line-height:1.6;margin:0;">{reason}</p></div>' if reason else ''
@@ -6819,8 +6820,10 @@ def _notify_yd(application, event_key):
               Your participant credential for the Continental Dialogue Programme has been revoked.
             </p>{reason_html}
             <p style="color:#4a5568;font-size:15px;line-height:1.6;margin:0;">
-              If you believe this was done in error, please contact us at info@burundi4africa.com
+              If you believe this was done in error, please contact us at <a href="mailto:{_support_email}" style="color:#409843;font-weight:600;">{_support_email}</a>
             </p>'''
+
+    results = {'email': False, 'push': False, 'in_app': False, 'push_detail': '', 'in_app_detail': ''}
 
     # 1. Send email (best-effort, threaded)
     try:
@@ -6832,51 +6835,58 @@ def _notify_yd(application, event_key):
             body_html,
             lang=lang,
         )
+        results['email'] = True
     except Exception:
         logger.exception('Continental Dialogue email notification failed for user %s', application.user_id)
 
-    # 2. Send push notification via Celery (best-effort, non-blocking)
-    #    Falls back to synchronous send if Redis/Celery broker is unavailable.
-    def _send_push():
+    # 2. Send push notification — check tokens first, then dispatch
+    from core.models import UserProfile, DeviceToken
+    try:
+        device_tokens = list(
+            DeviceToken.objects.filter(
+                user_id=application.user_id,
+                is_active=True,
+            ).values_list('token', flat=True).distinct()
+        )
+        legacy_tokens = list(
+            UserProfile.objects.filter(
+                user_id=application.user_id,
+                fcm_token__isnull=False,
+            ).exclude(fcm_token='').values_list('fcm_token', flat=True)
+        )
+        all_tokens = list(set(device_tokens + [t for t in legacy_tokens if t]))
+    except Exception:
+        logger.exception('Failed to look up FCM tokens for user %s', application.user_id)
+        all_tokens = []
+
+    if not all_tokens:
+        results['push_detail'] = 'No FCM tokens registered for this user'
+        logger.warning('No FCM tokens for Continental Dialogue user %s — push notification skipped', application.user_id)
+    else:
         push_data = {
             'type': 'youth_dialogue',
             'action_type': 'route',
             'action_value': config.get('push_route', '/youth-dialogue'),
         }
-        try:
-            from core.tasks import send_push_notification_async
-            send_push_notification_async.delay(
-                [application.user_id],
-                config['push_title'],
-                config['push_body'],
-                push_data,
-            )
-        except Exception:
-            # Celery/Redis unavailable — send synchronously as fallback
+
+        def _send_push():
             try:
-                from core.models import UserProfile, DeviceToken
-                from config.firebase import initialize_firebase
-                initialize_firebase()
-                import firebase_admin.messaging as messaging
-
-                # Collect tokens from both DeviceToken and legacy UserProfile
-                device_tokens = list(
-                    DeviceToken.objects.filter(
-                        user_id=application.user_id,
-                        is_active=True,
-                    ).values_list('token', flat=True).distinct()
+                from core.tasks import send_push_notification_async
+                send_push_notification_async.delay(
+                    [application.user_id],
+                    config['push_title'],
+                    config['push_body'],
+                    push_data,
                 )
-                legacy_tokens = list(
-                    UserProfile.objects.filter(
-                        user_id=application.user_id,
-                        fcm_token__isnull=False,
-                    ).exclude(fcm_token='').values_list('fcm_token', flat=True)
-                )
-                tokens = list(set(device_tokens + [t for t in legacy_tokens if t]))
-
-                if tokens:
+                logger.info('Push dispatched via Celery for Continental Dialogue user %s (%d tokens)', application.user_id, len(all_tokens))
+            except Exception:
+                # Celery/Redis unavailable — send synchronously as fallback
+                try:
+                    from config.firebase import initialize_firebase
+                    initialize_firebase()
+                    import firebase_admin.messaging as messaging
                     msg = messaging.MulticastMessage(
-                        tokens=tokens,
+                        tokens=all_tokens,
                         notification=messaging.Notification(
                             title=config['push_title'],
                             body=config['push_body'],
@@ -6902,20 +6912,54 @@ def _notify_yd(application, event_key):
                             ),
                         ),
                     )
-                    messaging.send_each_for_multicast(msg)
-            except Exception:
-                logger.exception('Push notification failed for Continental Dialogue user %s', application.user_id)
-    threading.Thread(target=_send_push, daemon=True).start()
+                    resp = messaging.send_each_for_multicast(msg)
+                    logger.info('Push sent synchronously for user %s: %d success, %d failed', application.user_id, resp.success_count, resp.failure_count)
+                except Exception:
+                    logger.exception('Push notification failed for Continental Dialogue user %s', application.user_id)
+        threading.Thread(target=_send_push, daemon=True).start()
+        results['push'] = True
+        results['push_detail'] = f'{len(all_tokens)} device(s)'
 
     # 3. Create in-app Notification record (bilingual)
+    # Build both EN and FR text so users see the correct language regardless
+    _BILINGUAL_PUSH = {
+        'submitted': ('Application Received!', 'Candidature reçue !',
+                      'Your Continental Dialogue application has been submitted successfully. Check your email for confirmation details.',
+                      'Votre candidature au Dialogue Continental a été soumise avec succès.'),
+        'accepted': ('Application Accepted!', 'Candidature acceptée !',
+                     'Congratulations! Your Continental Dialogue application has been accepted. Please upload your documents.',
+                     'Félicitations ! Votre candidature a été acceptée. Veuillez télécharger vos documents.'),
+        'rejected': ('Application Update', 'Mise à jour de la candidature',
+                     'Your Continental Dialogue application status has been updated.',
+                     'Le statut de votre candidature au Dialogue Continental a été mis à jour.'),
+        'documents_submitted': ('Documents Received', 'Documents reçus',
+                                'Your Continental Dialogue documents are now under verification.',
+                                'Vos documents du Dialogue Continental sont en cours de vérification.'),
+        'documents_rejected': ('Documents Need Attention', 'Documents à corriger',
+                               'Some of your Continental Dialogue documents need to be re-uploaded.',
+                               'Certains de vos documents du Dialogue Continental doivent être rechargés.'),
+        'documents_resubmitted': ('Documents Resubmitted', 'Documents resoumis',
+                                  'Your resubmitted documents are now under review.',
+                                  'Vos documents resoumis sont en cours d\'examen.'),
+        'credential_issued': ('Credential Issued!', 'Accréditation émise !',
+                              'Your Continental Dialogue participant credential is ready. View your digital ID in the app.',
+                              'Votre accréditation de participant est prête. Consultez votre ID numérique dans l\'application.'),
+        'credential_revoked': ('Credential Revoked', 'Accréditation révoquée',
+                               'Your Continental Dialogue credential has been revoked. Contact support for details.',
+                               'Votre accréditation a été révoquée. Contactez le support pour plus de détails.'),
+    }
     try:
-        # For FR notifications, use the FR text; for EN notifications provide both
-        en_config = EVENT_CONFIG.get(event_key, config)
+        bi = _BILINGUAL_PUSH.get(event_key)
+        if bi:
+            title_en, title_fr, msg_en, msg_fr = bi
+        else:
+            title_en = title_fr = config['push_title']
+            msg_en = msg_fr = config['push_body']
         notif = Notification.objects.create(
-            title=config['push_title'],
-            title_fr=config['push_title'] if is_fr else config['push_title'],
-            message=config['push_body'],
-            message_fr=config['push_body'] if is_fr else config['push_body'],
+            title=title_en,
+            title_fr=title_fr,
+            message=msg_en,
+            message_fr=msg_fr,
             notification_type='system',
             source='system',
             is_global=False,
@@ -6923,8 +6967,13 @@ def _notify_yd(application, event_key):
             action_value=config.get('push_route', '/youth-dialogue'),
         )
         notif.target_users.add(application.user)
+        results['in_app'] = True
+        logger.info('In-app notification %s created for Continental Dialogue user %s (event: %s)', notif.pk, application.user_id, event_key)
     except Exception:
         logger.exception('In-app notification creation failed for Continental Dialogue user %s', application.user_id)
+        results['in_app_detail'] = 'Failed to create notification record'
+
+    return results
 
 
 def _yd_logo_absolute_url(image_field):
@@ -6935,9 +6984,14 @@ def _yd_logo_absolute_url(image_field):
         url = image_field.url
         if url.startswith('http'):
             return url
-        # Make relative URL absolute
-        from django.contrib.sites.models import Site
+        # Make relative URL absolute using SITE_URL from settings
+        from django.conf import settings as _settings
+        site_url = getattr(_settings, 'SITE_URL', '')
+        if site_url:
+            return f'{site_url.rstrip("/")}{url}'
+        # Fallback: try Django Sites framework
         try:
+            from django.contrib.sites.models import Site
             domain = Site.objects.get_current().domain
             return f'https://{domain}{url}'
         except Exception:
@@ -6947,7 +7001,7 @@ def _yd_logo_absolute_url(image_field):
 
 
 def _send_yd_applicant_email(application, subject, heading, badge_color, body_html, lang='en'):
-    """Send branded email to Continental Dialogue applicant with both logos."""
+    """Send branded email to Continental Dialogue applicant with embedded logos."""
     try:
         if not application.email:
             return
@@ -6955,68 +7009,152 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
         is_fr = lang == 'fr'
         event = application.event
 
-        # Build logo HTML — programme logo (language-specific) + secondary logo (B4 Africa)
+        # Collect images to embed via CID
+        cid_images = []  # list of (cid_name, image_field)
+
+        # Build logo HTML — use CID references for reliable rendering
         logo_html = ''
         if event:
-            # Pick the correct language logo
+            primary_field = None
             if is_fr:
-                primary_url = _yd_logo_absolute_url(event.logo_light_fr) or _yd_logo_absolute_url(event.logo_light)
+                primary_field = event.logo_light_fr if event.logo_light_fr else event.logo_light
             else:
-                primary_url = _yd_logo_absolute_url(event.logo_light)
+                primary_field = event.logo_light
 
-            secondary_url = _yd_logo_absolute_url(event.secondary_logo)
-
-            logos = []
-            if primary_url:
-                logos.append(
-                    f'<img src="{primary_url}" alt="Continental Dialogue" '
-                    f'style="height:50px;width:auto;display:inline-block;vertical-align:middle;">'
-                )
-            if secondary_url:
-                logos.append(
-                    f'<img src="{secondary_url}" alt="B4 Africa" '
-                    f'style="height:50px;width:auto;display:inline-block;vertical-align:middle;">'
+            if primary_field and primary_field.name:
+                cid_images.append(('logo', primary_field))
+                logo_html = (
+                    '<div style="text-align:center;margin-bottom:8px;">'
+                    '<div style="background:#ffffff;border-radius:24px;padding:20px 32px;display:inline-block;margin:0 auto;">'
+                    '<img src="cid:logo" alt="Continental Dialogue" '
+                    'width="200" height="200" style="width:200px;height:200px;display:block;">'
+                    '</div></div>'
                 )
 
-            if logos:
-                separator = '<span style="display:inline-block;width:20px;"></span>'
-                logo_html = f'<div style="text-align:center;margin-bottom:16px;">{separator.join(logos)}</div>'
+            if event.secondary_logo and event.secondary_logo.name:
+                cid_images.append(('secondary_logo', event.secondary_logo))
+                logo_html += (
+                    '<div style="text-align:center;margin-top:14px;">'
+                    '<div style="background:#ffffff;border-radius:10px;padding:6px 14px;display:inline-block;margin:0 auto;">'
+                    '<img src="cid:secondary_logo" alt="B4Africa" '
+                    'style="height:36px;width:auto;display:block;">'
+                    '</div></div>'
+                )
+
+        # Sponsors image
+        sponsors_html = ''
+        if event and event.sponsors_image and event.sponsors_image.name:
+            cid_images.append(('sponsors', event.sponsors_image))
+            sponsors_label = 'Partenaires' if is_fr else 'Partners'
+            sponsors_html = (
+                f'<div style="text-align:center;padding:20px 32px 0;">'
+                f'<p style="color:#a0aec0;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;'
+                f'font-weight:700;margin:0 0 12px;">{sponsors_label}</p>'
+                f'<img src="cid:sponsors" alt="{sponsors_label}" '
+                f'style="max-width:80%;height:auto;max-height:50px;display:inline-block;opacity:0.7;">'
+                f'</div>'
+            )
 
         greeting = f'Cher(e) <strong>{application.first_name}</strong>,' if is_fr else f'Dear <strong>{application.first_name}</strong>,'
         programme_label = 'Programme Dialogue Continental' if is_fr else 'Continental Dialogue Programme'
-        footer_text = 'Be 4 Africa 2026'
+        footer_year = '2026'
 
-        fallback_logo = ('<div style="width:60px;height:60px;background:white;border-radius:12px;'
-                         'margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">'
-                         '<span style="font-size:28px;font-weight:900;color:#101c2e;">B</span></div>')
+        # Brand colors
+        brand_green = '#409843'
+        brand_green_dark = '#357a38'
+        brand_red = '#E11C23'
+
+        fallback_logo = (
+            '<div style="width:100px;height:100px;background:#ffffff;border-radius:50%;'
+            'margin:0 auto 12px;line-height:100px;text-align:center;">'
+            '<span style="font-size:42px;font-weight:900;color:#409843;">CD</span></div>'
+        )
+
+        # Smart app link — detects iOS/Android and opens the right store
+        from django.conf import settings as _settings
+        site_url = getattr(_settings, 'SITE_URL', 'https://burundi4africa.com')
+        app_link = f'{site_url.rstrip("/")}/app'
+        app_btn_label = "Ouvrir l'application B4Africa" if is_fr else 'Open B4Africa App'
+
+        # Support email
+        support_email = (event.support_email if event and event.support_email else 'info@burundi4africa.com')
 
         html_message = f'''<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-    <div style="background:linear-gradient(135deg,#101c2e 0%,#1a2d47 100%);padding:40px 32px;text-align:center;">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f0f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+<div style="max-width:600px;margin:0 auto;padding:32px 16px;">
+
+  <!-- Card -->
+  <div style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.1);">
+
+    <!-- Header with green gradient -->
+    <div style="background:linear-gradient(135deg,{brand_green} 0%,{brand_green_dark} 50%,#2d6e30 100%);padding:44px 32px 36px;text-align:center;">
       {logo_html if logo_html else fallback_logo}
-      <h1 style="color:white;font-size:22px;margin:16px 0 8px;">{heading}</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">{programme_label}</p>
+      <h1 style="color:#ffffff;font-size:26px;font-weight:800;margin:16px 0 6px;letter-spacing:-0.3px;">{heading}</h1>
+      <p style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:500;margin:0;letter-spacing:0.3px;">{programme_label}</p>
     </div>
-    <div style="padding:32px;">
-      <div style="display:inline-block;background:{badge_color};color:white;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;margin:0 0 20px;">{application.get_status_display().upper()}</div>
-      <p style="color:#2d3748;font-size:16px;margin:0 0 20px;">{greeting}</p>
+
+    <!-- Status badge + body -->
+    <div style="padding:32px 32px 28px;">
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;"><tr><td>
+        <div style="display:inline-block;background:{brand_red};color:white;padding:6px 20px;border-radius:20px;font-size:12px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;">{application.get_status_display()}</div>
+      </td></tr></table>
+      <p style="color:#1a202c;font-size:16px;line-height:1.5;margin:0 0 24px;">{greeting}</p>
       {body_html}
     </div>
-    <div style="background:#f7fafc;padding:20px 32px;text-align:center;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">{footer_text}</p>
+
+    <!-- Open App button -->
+    <div style="padding:0 32px 8px;text-align:center;">
+      <a href="{app_link}" style="display:inline-block;background:{brand_red};color:#ffffff;padding:14px 40px;border-radius:10px;font-size:15px;font-weight:800;text-decoration:none;letter-spacing:0.3px;">{app_btn_label}</a>
     </div>
+
+    <!-- Green accent bar -->
+    <div style="height:4px;background:linear-gradient(90deg,{brand_green},{brand_red},{brand_green});margin-top:24px;"></div>
+
+    <!-- Sponsors -->
+    {sponsors_html}
+
+    <!-- Footer -->
+    <div style="background:#fafafa;padding:24px 32px 28px;text-align:center;">
+      <p style="color:#a0aec0;font-size:11px;margin:0 0 6px;">
+        &copy; {footer_year} B4Africa &middot;
+        <a href="mailto:{support_email}" style="color:{brand_green};text-decoration:none;font-weight:600;">{support_email}</a>
+      </p>
+      <p style="color:#cbd5e0;font-size:10px;margin:0;">
+        B4Africa {footer_year}
+      </p>
+    </div>
+
   </div>
 </div>
 </body></html>'''
 
         def _send():
-            send_mail(
-                subject, '', django_settings.DEFAULT_FROM_EMAIL,
-                [application.email], html_message=html_message, fail_silently=True,
+            from email.mime.image import MIMEImage
+            from django.core.mail import EmailMessage
+            email = EmailMessage(
+                subject=subject,
+                body=html_message,
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                to=[application.email],
             )
+            email.content_subtype = 'html'
+
+            # Embed images as CID attachments
+            for cid_name, image_field in cid_images:
+                try:
+                    image_field.open('rb')
+                    img_data = image_field.read()
+                    image_field.close()
+                    mime_img = MIMEImage(img_data)
+                    mime_img.add_header('Content-ID', f'<{cid_name}>')
+                    mime_img.add_header('Content-Disposition', 'inline', filename=f'{cid_name}.png')
+                    email.attach(mime_img)
+                except Exception:
+                    logger.warning('Failed to embed image %s for email', cid_name)
+
+            email.send(fail_silently=True)
+
         threading.Thread(target=_send, daemon=True).start()
     except Exception:
         logger.exception('Continental Dialogue applicant email failed')

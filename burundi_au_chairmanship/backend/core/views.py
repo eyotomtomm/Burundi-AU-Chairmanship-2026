@@ -5310,11 +5310,13 @@ def maintenance_status(request):
         is_active=True, show_banner=True, starts_at__gt=now
     ).order_by('starts_at').first()
     ctx = {'request': request}
-    return Response({
+    resp = Response({
         'in_maintenance': active is not None,
         'active': ScheduledMaintenanceSerializer(active, context=ctx).data if active else None,
         'upcoming': ScheduledMaintenanceSerializer(upcoming, context=ctx).data if upcoming else None,
     })
+    resp['Cache-Control'] = 'no-store'
+    return resp
 
 
 @api_view(['GET'])

@@ -643,6 +643,36 @@
   </div>
   {% endif %}
 
+  <!-- Delete Application -->
+  <div class="bg-white rounded-xl shadow-sm border border-red-200 p-8 mb-6">
+    <h2 class="text-xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+      <span class="material-symbols-outlined text-red-600">delete_forever</span>
+      Danger Zone
+    </h2>
+    <p class="text-sm text-slate-500 mb-4">
+      Permanently delete this application and all associated documents. The applicant will be able to re-apply from scratch.
+    </p>
+    <button type="button" onclick="document.getElementById('delete-app-form').classList.toggle('hidden')"
+            class="inline-flex items-center gap-2 bg-red-600 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-red-700 transition-all">
+      <span class="material-symbols-outlined text-sm">delete_forever</span>
+      Delete Application
+    </button>
+    <form method="post" id="delete-app-form" class="hidden mt-4 bg-red-50 border border-red-200 rounded-xl p-6">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_application">
+      <p class="text-sm text-red-800 font-semibold mb-2">Are you sure?</p>
+      <p class="text-xs text-red-600 mb-4">
+        This will permanently delete the application for <strong>{{ application.first_name }} {{ application.last_name }}</strong>,
+        including all uploaded documents and activity logs. This action cannot be undone.
+      </p>
+      <button type="submit"
+              class="bg-red-700 text-white font-semibold rounded-lg py-2.5 px-6 text-sm hover:bg-red-800 transition-all"
+              onclick="return confirm('FINAL WARNING: This will permanently delete this application and all its data. Continue?')">
+        Yes, Delete Permanently
+      </button>
+    </form>
+  </div>
+
   <!-- Activity Timeline -->
   {% if activity_logs %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 mb-6">

@@ -178,8 +178,14 @@ class ApiService {
       final response = await execute(headers);
       final status = response.statusCode;
 
-      // Maintenance 503 — redirect and stop, never retry
+      // Maintenance 503 — redirect and stop, never retry.
+      // Check header first (survives Cloudflare HTML replacement),
+      // then fall back to JSON body check.
       if (status == 503) {
+        if (response.headers['x-maintenance-mode'] == '1') {
+          _redirectToMaintenance();
+          throw ApiException('App is under maintenance', 503);
+        }
         try {
           final data = json.decode(response.body);
           if (data is Map && data['code'] == 'maintenance_mode') {

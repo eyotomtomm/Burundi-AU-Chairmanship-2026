@@ -52,13 +52,18 @@ class MaintenanceMiddleware:
         # Check maintenance status (cached for 10 seconds to avoid
         # hitting the DB on every single request)
         if self._is_maintenance_active():
-            return JsonResponse(
+            response = JsonResponse(
                 {
                     'detail': 'The app is currently under maintenance. Please try again later.',
                     'code': 'maintenance_mode',
                 },
                 status=503,
             )
+            # Custom header so the app can detect maintenance even if a
+            # proxy (e.g. Cloudflare) replaces the JSON body with HTML.
+            response['X-Maintenance-Mode'] = '1'
+            response['Cache-Control'] = 'no-store'
+            return response
 
         return self.get_response(request)
 

@@ -9862,6 +9862,22 @@ def youth_dialogue_review(request, pk):
             else:
                 messages.error(request, 'Cannot revoke: credential not issued or already revoked.')
 
+        elif action == 'delete_application':
+            applicant_name = f'{application.first_name} {application.last_name}'
+            event = application.event
+            log_admin_action(
+                request, 'delete', 'YouthDialogueApplication', object_id=pk,
+                object_repr=applicant_name,
+                changes={'status': application.status, 'deleted': True},
+            )
+            application.documents.all().delete()
+            application.activity_logs.all().delete()
+            application.delete()
+            messages.success(request, f'Application for {applicant_name} has been deleted. The user can now re-apply.')
+            if event:
+                return redirect('custom_admin:youth_dialogue_applications_list', event_pk=event.pk)
+            return redirect('custom_admin:youth_dialogue_list')
+
         return redirect('custom_admin:youth_dialogue_review', pk=pk)
 
     return render(request, 'custom_admin/youth_dialogue/review.html', {

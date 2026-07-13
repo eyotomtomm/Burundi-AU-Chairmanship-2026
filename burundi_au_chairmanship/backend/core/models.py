@@ -1142,8 +1142,8 @@ class RegistrationFormField(models.Model):
     is_active = models.BooleanField(default=True, help_text='Show/hide this field')
     options = models.JSONField(default=list, blank=True, help_text='For select/radio/multi_checkbox: ["Option 1", "Option 2"]')
     validation_regex = models.CharField(max_length=500, blank=True, help_text='Optional regex for validation')
-    help_text = models.CharField(max_length=300, blank=True)
-    help_text_fr = models.CharField(max_length=300, blank=True)
+    help_text = models.TextField(blank=True, default='')
+    help_text_fr = models.TextField(blank=True, default='')
     max_length = models.IntegerField(null=True, blank=True, help_text='Maximum character length (for textarea)')
     min_length = models.IntegerField(null=True, blank=True, help_text='Minimum character length (for textarea)')
 
@@ -4804,9 +4804,9 @@ class YouthDialogueEvent(models.Model):
     banner_image = models.ImageField(upload_to='youth_dialogue/banners/', blank=True, null=True,
                                       validators=[validate_image_file],
                                       help_text='Hero banner image for the landing page')
-    event_tagline = models.CharField(max_length=300, blank=True, default='',
+    event_tagline = models.TextField(blank=True, default='',
                                       help_text='Short tagline shown below title')
-    event_tagline_fr = models.CharField(max_length=300, blank=True, default='')
+    event_tagline_fr = models.TextField(blank=True, default='')
     venue_name = models.CharField(max_length=200, blank=True, default='',
                                    help_text='Venue name (e.g. Palais des Congrès)')
     venue_name_fr = models.CharField(max_length=200, blank=True, default='')
@@ -4969,8 +4969,8 @@ class YouthDialogueFormField(models.Model):
     is_active = models.BooleanField(default=True, help_text='Show/hide this field')
     options = models.JSONField(default=list, blank=True, help_text='For select/radio/multi_checkbox: ["Option 1", "Option 2"]')
     validation_regex = models.CharField(max_length=500, blank=True, help_text='Optional regex for validation')
-    help_text = models.CharField(max_length=300, blank=True)
-    help_text_fr = models.CharField(max_length=300, blank=True)
+    help_text = models.TextField(blank=True, default='')
+    help_text_fr = models.TextField(blank=True, default='')
     max_length = models.IntegerField(null=True, blank=True)
     min_length = models.IntegerField(null=True, blank=True)
 

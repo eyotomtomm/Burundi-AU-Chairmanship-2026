@@ -58,6 +58,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   }
 
   Future<void> _loadNotifications() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
@@ -73,6 +74,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       } else {
         items = [];
       }
+      if (!mounted) return;
       setState(() {
         _notifications = items;
         _isLoading = false;
@@ -81,6 +83,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       _markAllAsRead();
     } catch (e) {
       if (kDebugMode) debugPrint('Notifications load error: $e');
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -92,6 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     // Optimistic update — clear dots immediately, sync to server in background.
     // If the API call fails the visual state is still correct for this session;
     // the next fetch will bring the server state back.
+    if (!mounted) return;
     setState(() {
       for (final n in _notifications) {
         n['is_read'] = true;
@@ -106,6 +110,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
   Future<void> _markAsRead(int notificationId) async {
     // Optimistic update — remove the dot before the server round-trip.
+    if (!mounted) return;
     setState(() {
       final index = _notifications.indexWhere((n) => n['id'] == notificationId);
       if (index != -1) {

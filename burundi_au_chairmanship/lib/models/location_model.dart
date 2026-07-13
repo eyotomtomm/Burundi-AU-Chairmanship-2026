@@ -5,8 +5,7 @@ class EventLocation {
   final String description;
   final String descriptionFr;
   final String address;
-  final double latitude;
-  final double longitude;
+  final String mapUrl;
   final DateTime eventDate;
   final String imageUrl;
 
@@ -17,8 +16,7 @@ class EventLocation {
     required this.description,
     required this.descriptionFr,
     required this.address,
-    required this.latitude,
-    required this.longitude,
+    this.mapUrl = '',
     required this.eventDate,
     required this.imageUrl,
   });
@@ -31,8 +29,7 @@ class EventLocation {
       description: json['description'] ?? '',
       descriptionFr: json['description_fr'] ?? '',
       address: json['address'] ?? '',
-      latitude: (json['latitude'] ?? 0).toDouble(),
-      longitude: (json['longitude'] ?? 0).toDouble(),
+      mapUrl: json['map_url'] ?? '',
       eventDate: DateTime.tryParse(json['event_date'] ?? '') ?? DateTime.now(),
       imageUrl: json['image'] ?? '',
     );

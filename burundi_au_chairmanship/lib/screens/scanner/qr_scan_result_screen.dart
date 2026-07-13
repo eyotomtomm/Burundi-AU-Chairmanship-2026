@@ -50,129 +50,11 @@ class QrScanResultScreen extends StatelessWidget {
 
             if (showYdCredential)
               _buildYdCredentialCard(context, isDark, isValid, personName, qrStatus, details, detail)
-            else ...[
-              // Generic status icon
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isValid
-                      ? AppColors.burundiGreen.withValues(alpha: 0.1)
-                      : Colors.red.withValues(alpha: 0.1),
-                ),
-                child: Icon(
-                  isValid ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                  size: 64,
-                  color: isValid ? AppColors.burundiGreen : Colors.red.shade700,
-                ),
+            else
+              _buildEventTicketCard(
+                context, isDark, isValid, personName, eventTitle, programme,
+                qrType, qrStatus, checkedInAt, detail, details,
               ),
-              const SizedBox(height: 20),
-
-              // Status text
-              Text(
-                isValid ? 'VERIFIED' : 'INVALID',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: isValid ? AppColors.burundiGreen : Colors.red.shade700,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              if (!isValid && detail.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    detail,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: isDark ? Colors.white54 : Colors.black54,
-                    ),
-                  ),
-                ),
-
-              if (personName.isNotEmpty) ...[
-                Text(
-                  personName,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-
-              if (eventTitle.isNotEmpty)
-                Text(
-                  eventTitle,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
-                ),
-
-              if (programme.isNotEmpty)
-                Text(
-                  programme,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-
-              // Generic info card
-              if (isValid || personName.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      if (qrType.isNotEmpty)
-                        _infoRow('Type', qrType == 'event' ? 'Event Ticket' : (programmeName ?? 'Continental Dialogue'), isDark),
-                      if (qrStatus.isNotEmpty)
-                        _infoRow('Status', qrStatus.toUpperCase(), isDark,
-                            valueColor: _statusColor(qrStatus)),
-                      if (checkedInAt != null)
-                        _infoRow('Checked In', _formatDateTime(checkedInAt), isDark),
-                      if (details != null) ...[
-                        if (details['email'] != null)
-                          _infoRow('Email', details['email'] as String, isDark),
-                        if (details['organization'] != null)
-                          _infoRow('Organization', details['organization'] as String, isDark),
-                        if (details['participant_code'] != null)
-                          _infoRow('Code', details['participant_code'] as String, isDark),
-                        if (details['nationality'] != null)
-                          _infoRow('Nationality',
-                              '${details['nationality_flag'] ?? ''} ${details['nationality']}', isDark),
-                        if (details['is_proxy'] == true)
-                          _infoRow('Registration', 'Proxy', isDark, valueColor: Colors.orange),
-                        if (details['is_waitlisted'] == true)
-                          _infoRow('Waitlist', 'Yes', isDark, valueColor: Colors.orange),
-                      ],
-                    ],
-                  ),
-                ),
-            ],
 
             // Scan count badge
             if (scanCount > 0) ...[
@@ -279,6 +161,220 @@ class QrScanResultScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildEventTicketCard(
+    BuildContext context,
+    bool isDark,
+    bool isValid,
+    String personName,
+    String eventTitle,
+    String programme,
+    String qrType,
+    String qrStatus,
+    String? checkedInAt,
+    String detail,
+    Map<String, dynamic>? details,
+  ) {
+    final organization = details?['organization'] as String? ?? '';
+    final nationality = details?['nationality'] as String? ?? '';
+    final title = details?['title'] as String? ?? '';
+    final phone = details?['phone'] as String? ?? '';
+    final email = details?['email'] as String? ?? '';
+    final eventVenue = details?['event_venue'] as String? ?? '';
+    final eventDate = details?['event_date'] as String?;
+    final eventEndDate = details?['event_end_date'] as String?;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header with status
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isValid
+                    ? [AppColors.burundiGreen, AppColors.burundiGreen.withValues(alpha: 0.8)]
+                    : [Colors.red.shade700, Colors.red.shade400],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isValid ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isValid ? 'VERIFIED' : 'INVALID',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                if (!isValid && detail.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      detail,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                // Person name
+                if (personName.isNotEmpty) ...[
+                  Text(
+                    personName,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+
+                // Title / Position badge
+                if (title.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 4, bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.burundiGreen : const Color(0xFF2E7D32),
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+
+                // Event title
+                if (eventTitle.isNotEmpty)
+                  Text(
+                    eventTitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+
+                if (programme.isNotEmpty && programme != eventTitle)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      programme,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white54 : Colors.black45,
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _statusColor(qrStatus).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _statusColor(qrStatus).withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    qrStatus.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                      color: _statusColor(qrStatus),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                Divider(color: isDark ? Colors.white12 : Colors.black12),
+                const SizedBox(height: 12),
+
+                // Info rows
+                if (organization.isNotEmpty)
+                  _credentialRow(Icons.business_rounded, 'Organization', organization, isDark),
+                if (nationality.isNotEmpty)
+                  _credentialRow(Icons.flag_rounded, 'Nationality', nationality, isDark),
+                if (email.isNotEmpty)
+                  _credentialRow(Icons.email_rounded, 'Email', email, isDark),
+                if (phone.isNotEmpty)
+                  _credentialRow(Icons.phone_rounded, 'Phone', phone, isDark),
+                if (eventVenue.isNotEmpty)
+                  _credentialRow(Icons.location_on_rounded, 'Venue', eventVenue, isDark),
+                if (eventDate != null || eventEndDate != null)
+                  _credentialRow(Icons.calendar_today_rounded, 'Date',
+                      _formatEventDates(eventDate, eventEndDate), isDark),
+                if (checkedInAt != null)
+                  _credentialRow(Icons.login_rounded, 'Checked In', _formatDateTime(checkedInAt), isDark,
+                      valueColor: AppColors.burundiGreen),
+                if (details?['is_proxy'] == true)
+                  _credentialRow(Icons.person_add_rounded, 'Registration', 'Proxy', isDark,
+                      valueColor: Colors.orange),
+                if (details?['is_waitlisted'] == true)
+                  _credentialRow(Icons.hourglass_top_rounded, 'Waitlisted', 'Yes', isDark,
+                      valueColor: Colors.orange),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -504,35 +600,6 @@ class QrScanResultScreen extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: valueColor ?? (isDark ? Colors.white : Colors.black87),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value, bool isDark, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark ? Colors.white38 : Colors.black45,
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

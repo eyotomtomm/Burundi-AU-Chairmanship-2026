@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -251,8 +252,13 @@ void main() async {
   // Global error handler: catch all uncaught async errors to prevent random crashes
   PlatformDispatcher.instance.onError = (error, stack) {
     if (kDebugMode) print('Uncaught error: $error\n$stack');
+    // Network/timeout errors are expected transient failures, not real crashes.
+    // Mark them as non-fatal so they don't inflate the Crashlytics crash rate.
+    final isTransient = error is TimeoutException ||
+        error is SocketException ||
+        (error is ApiException && error.statusCode == 0);
     try {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: !isTransient);
     } catch (_) {}
     if (Environment.sentryDsn.isNotEmpty) {
       Sentry.captureException(error, stackTrace: stack);

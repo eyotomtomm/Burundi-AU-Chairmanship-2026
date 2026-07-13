@@ -249,6 +249,8 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                 _pdfInfoRow('Event Date', eventDates),
               if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty)
                 _pdfInfoRow('Email', cred.email),
+              if (cred.isIdCardFieldVisible('side_event') && cred.sideEvent.isNotEmpty)
+                _pdfInfoRow('Side Event', cred.sideEvent),
 
               // Extra fields from admin
               ...cred.extraFields.map((f) => _pdfInfoRow(f['label']!, f['value']!)),
@@ -278,7 +280,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
               // Footer
               pw.Divider(color: PdfColors.grey300),
               pw.SizedBox(height: 8),
-              pw.Text('Burundi Be 4 Africa 2026',
+              pw.Text('Burundi AU Chairmanship 2025-2026',
                 style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
             ],
           );
@@ -452,9 +454,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _buildHeaderLogo('assets/images/youth_dialogue/dialogue_logo_en.png', Icons.groups),
-                          const SizedBox(width: 12),
-                          _buildHeaderLogo('assets/images/youth_dialogue/b4_africa_logo.png', Icons.public),
-                          // Extra logos from admin
+                          // Partner logos from admin
                           ...cred.extraLogos.map((url) => Padding(
                             padding: const EdgeInsets.only(left: 12),
                             child: Container(
@@ -574,6 +574,28 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                         ),
                         textAlign: TextAlign.center,
                       ),
+                      // Role badge
+                      if (cred.isIdCardFieldVisible('role'))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: roleColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: roleColor.withValues(alpha: 0.3), width: 1),
+                            ),
+                            child: Text(
+                              cred.role.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: roleColor,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -595,8 +617,6 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     visibleRows.add(_detailRow(Icons.calendar_today_rounded, 'Event Date', eventDates, isDark, accentColor: roleColor));
                   if (cred.isIdCardFieldVisible('email') && cred.email.isNotEmpty)
                     visibleRows.add(_detailRow(Icons.email_rounded, 'Email', cred.email, isDark, accentColor: roleColor));
-                  if (cred.isIdCardFieldVisible('side_event') && cred.sideEvent.isNotEmpty)
-                    visibleRows.add(_detailRow(Icons.event_rounded, 'Side Event', cred.sideEvent, isDark, accentColor: roleColor));
                   // Extra fields from admin
                   for (final f in cred.extraFields) {
                     visibleRows.add(_detailRow(Icons.info_outline_rounded, f['label']!, f['value']!, isDark, accentColor: roleColor));
@@ -621,6 +641,72 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                     ),
                   );
                 }),
+
+                // Side Events section
+                if (cred.isIdCardFieldVisible('side_event') && cred.sideEvent.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            roleColor.withValues(alpha: 0.08),
+                            roleColor.withValues(alpha: 0.03),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: roleColor.withValues(alpha: 0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: roleColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(Icons.event_rounded, size: 18, color: roleColor),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'SIDE EVENT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                  color: isDark ? Colors.white38 : Colors.black38,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              cred.sideEvent,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF1a1a1a),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 // QR Code section
                 if (cred.isIdCardFieldVisible('qr_code') && qrData.isNotEmpty)
@@ -668,28 +754,42 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                 if (cred.isIdCardFieldVisible('participant_code'))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            roleColor.withValues(alpha: 0.1),
-                            roleColor.withValues(alpha: 0.05),
-                          ],
+                    child: Column(
+                      children: [
+                        Text(
+                          'PARTICIPANT ID',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                            color: isDark ? Colors.white30 : Colors.black26,
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: roleColor.withValues(alpha: 0.2)),
-                      ),
-                      child: Text(
-                        cred.participantCode,
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
-                          color: roleColor,
-                          letterSpacing: 4,
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                roleColor.withValues(alpha: 0.12),
+                                roleColor.withValues(alpha: 0.06),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: roleColor.withValues(alpha: 0.25), width: 1.5),
+                          ),
+                          child: Text(
+                            cred.participantCode,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'monospace',
+                              color: roleColor,
+                              letterSpacing: 6,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
 
@@ -709,16 +809,9 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
                             height: 20,
                             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                           ),
-                          const SizedBox(width: 6),
-                          Image.asset(
-                            'assets/images/youth_dialogue/b4_africa_logo.png',
-                            width: 20,
-                            height: 20,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                          ),
                           const SizedBox(width: 8),
                           Text(
-                            'Burundi Be 4 Africa 2026',
+                            'Burundi AU Chairmanship 2025-2026',
                             style: TextStyle(
                               fontSize: 11,
                               color: isDark ? Colors.white30 : Colors.black26,
@@ -838,17 +931,35 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
 
   Widget _detailRow(IconData icon, String label, String value, bool isDark, {Color? accentColor}) {
     final accent = accentColor ?? AppColors.burundiGreen;
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: accent.withValues(alpha: 0.7)),
-        const SizedBox(width: 10),
-        Text(label, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38, fontWeight: FontWeight.w500)),
-        const Spacer(),
-        Flexible(
-          child: Text(value, textAlign: TextAlign.end,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
-        ),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 15, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                  style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+                const SizedBox(height: 2),
+                Text(value,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -457,7 +457,9 @@
     // Re-index all doc rows sequentially before form submission so the
     // backend parser (which stops at the first index gap) always gets
     // a continuous 0, 1, 2, ... sequence.
-    document.querySelector('form').addEventListener('submit', function() {
+    // Use closest('form') to target the event form, not the search form
+    // in the base template header.
+    container.closest('form').addEventListener('submit', function() {
       const rows = container.querySelectorAll(':scope > div');
       rows.forEach(function(row, idx) {
         row.querySelectorAll('input[data-field]').forEach(function(input) {

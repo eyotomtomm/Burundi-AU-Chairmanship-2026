@@ -612,6 +612,7 @@ class EmbassyLocationSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     thumbnail_url = serializers.CharField(read_only=True)
     medium_url = serializers.CharField(read_only=True)
+    map_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -619,6 +620,9 @@ class EventSerializer(serializers.ModelSerializer):
                   'address', 'map_url', 'event_date', 'image',
                   'thumbnail_url', 'medium_url',
                   'recurrence_type', 'recurrence_end_date']
+
+    def get_map_url(self, obj):
+        return getattr(obj, 'map_url', '')
 
 
 class LiveFeedCommentSerializer(serializers.ModelSerializer):

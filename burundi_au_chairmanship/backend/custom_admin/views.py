@@ -9798,6 +9798,15 @@ def youth_dialogue_review(request, pk):
             )
             event_docs = application.event.required_documents if application.event and application.event.required_documents else []
             required_types = {d['key'] for d in event_docs} if event_docs else {'passport', 'national_id', 'photo', 'cv'}
+            # Foreigners don't need national_id (only passport + photo);
+            # Burundians can use either passport or national_id.
+            is_burundian = application.nationality == 'BI'
+            if not is_burundian:
+                required_types.discard('national_id')
+            elif is_burundian and ('passport' in approved_types or 'national_id' in approved_types):
+                # Burundian with either ID doc approved — don't require both
+                required_types.discard('passport')
+                required_types.discard('national_id')
             missing_types = required_types - approved_types
             if missing_types and application.status in ('accepted', 'documents_submitted', 'documents_under_review'):
                 doc_labels = {d['key']: d.get('label', d['key']) for d in event_docs}

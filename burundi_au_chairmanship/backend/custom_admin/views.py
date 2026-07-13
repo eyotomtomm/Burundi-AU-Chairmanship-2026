@@ -9204,7 +9204,7 @@ def youth_dialogue_event_form(request, event_pk=None):
         id_card_visible = [k for k in id_card_all_keys if request.POST.get(f'idf_{k}')]
         yd_event.id_card_visible_fields = [] if len(id_card_visible) == len(id_card_all_keys) else id_card_visible
 
-        scan_result_all_keys = ['photo', 'role', 'nationality', 'organization', 'email',
+        scan_result_all_keys = ['photo', 'role', 'nationality', 'side_event', 'organization', 'email',
                                 'event_dates', 'event_location', 'participant_code', 'reference_id', 'credential_issued_at']
         scan_result_visible = [k for k in scan_result_all_keys if request.POST.get(f'srf_{k}')]
         yd_event.scan_result_visible_fields = [] if len(scan_result_visible) == len(scan_result_all_keys) else scan_result_visible

@@ -4846,7 +4846,7 @@ class YouthDialogueEvent(models.Model):
         'event_dates', 'qr_code', 'participant_code', 'email', 'side_event', 'allow_pdf_download',
     ]
     SCAN_RESULT_ALL_FIELDS = [
-        'photo', 'role', 'nationality', 'organization', 'email',
+        'photo', 'role', 'nationality', 'side_event', 'organization', 'email',
         'event_dates', 'event_location', 'participant_code',
         'reference_id', 'credential_issued_at',
     ]

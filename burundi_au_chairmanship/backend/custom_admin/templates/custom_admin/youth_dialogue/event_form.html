@@ -629,6 +629,10 @@
             <span class="text-sm text-slate-700">Nationality</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="srf_side_event" value="1" {% if 'side_event' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Side Event</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
             <input type="checkbox" name="srf_organization" value="1" {% if 'organization' in srf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
             <span class="text-sm text-slate-700">Organization</span>
           </label>

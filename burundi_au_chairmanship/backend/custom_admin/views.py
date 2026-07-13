@@ -9816,27 +9816,31 @@ def youth_dialogue_review(request, pk):
                 messages.error(request, f'Cannot issue credential. Missing approved documents: {", ".join(missing_names)}')
                 return redirect('custom_admin:youth_dialogue_review', pk=pk)
             if application.status in ('accepted', 'documents_submitted', 'documents_under_review') and all_docs_approved and not has_rejected and not missing_types:
-                application.generate_participant_code()
-                application.generate_qr_hash()
-                application.status = 'credential_issued'
-                application.credential_issued_at = timezone.now()
-                application.save()
-                log_admin_action(
-                    request, 'approve', 'YouthDialogueApplication', object_id=pk,
-                    object_repr=f'{application.first_name} {application.last_name}',
-                    changes={'status': {'old': old_status, 'new': 'credential_issued'}, 'participant_code': application.participant_code},
-                )
-                # Copy approved photo doc to id_photo field
                 try:
-                    photo_doc = application.documents.filter(document_type='photo', status='approved').last()
-                    if photo_doc and photo_doc.file:
-                        application.id_photo = photo_doc.file
-                        application.save(update_fields=['id_photo'])
-                except Exception:
-                    pass
-                from core.views import _notify_yd
-                _notify_yd(application, 'credential_issued')
-                messages.success(request, f'Credential issued: {application.participant_code}')
+                    application.generate_participant_code()
+                    application.generate_qr_hash()
+                    application.status = 'credential_issued'
+                    application.credential_issued_at = timezone.now()
+                    application.save()
+                    log_admin_action(
+                        request, 'approve', 'YouthDialogueApplication', object_id=pk,
+                        object_repr=f'{application.first_name} {application.last_name}',
+                        changes={'status': {'old': old_status, 'new': 'credential_issued'}, 'participant_code': application.participant_code},
+                    )
+                    # Copy approved photo doc to id_photo field
+                    try:
+                        photo_doc = application.documents.filter(document_type='photo', status='approved').last()
+                        if photo_doc and photo_doc.file:
+                            application.id_photo = photo_doc.file
+                            application.save(update_fields=['id_photo'])
+                    except Exception:
+                        pass
+                    from core.views import _notify_yd
+                    _notify_yd(application, 'credential_issued')
+                    messages.success(request, f'Credential issued: {application.participant_code}')
+                except Exception as e:
+                    logger.exception('Failed to issue credential for application %s', pk)
+                    messages.error(request, f'Failed to issue credential: {e}')
             else:
                 messages.error(request, 'Cannot issue credential. Ensure all documents are approved and none are rejected.')
 

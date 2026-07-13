@@ -611,8 +611,10 @@ class Event(models.Model):
     description = models.TextField()
     description_fr = models.TextField(blank=True)
     address = models.CharField(max_length=300)
-    latitude = models.FloatField()
-    longitude = models.FloatField()
+    latitude = models.FloatField(default=0, blank=True)
+    longitude = models.FloatField(default=0, blank=True)
+    map_url = models.URLField(max_length=500, blank=True, default='',
+                              help_text='Google Maps link for the venue')
     event_date = models.DateTimeField()
     image = models.ImageField(upload_to='events/', blank=True, validators=[validate_image_file])
     is_active = models.BooleanField(default=True, help_text='When off, event is hidden from the app')
@@ -5160,13 +5162,22 @@ class YouthDialogueApplication(models.Model):
     def generate_participant_code(self):
         """Generate sequential participant code scoped to event: YD-YYYY-NNNN"""
         from django.utils import timezone as tz
+        from django.db.models import Max
         year = tz.now().year
         prefix = f'YD-{year}-'
         qs = YouthDialogueApplication.objects.filter(participant_code__startswith=prefix)
         if self.event_id:
             qs = qs.filter(event=self.event)
-        existing = qs.count()
-        self.participant_code = f'{prefix}{existing + 1:04d}'
+        # Find the highest existing number to avoid collisions from deleted records
+        last_code = qs.aggregate(max_code=Max('participant_code'))['max_code']
+        if last_code:
+            try:
+                last_num = int(last_code.replace(prefix, ''))
+            except ValueError:
+                last_num = qs.count()
+        else:
+            last_num = 0
+        self.participant_code = f'{prefix}{last_num + 1:04d}'
         return self.participant_code
 
     def generate_qr_hash(self):

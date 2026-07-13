@@ -52,11 +52,31 @@ NATIONALITY_CHOICES = [
     ('ZA', 'South Africa'), ('SS', 'South Sudan'), ('SD', 'Sudan'),
     ('TZ', 'Tanzania'), ('TG', 'Togo'), ('TN', 'Tunisia'), ('UG', 'Uganda'),
     ('ZM', 'Zambia'), ('ZW', 'Zimbabwe'),
-    # Key international
-    ('BE', 'Belgium'), ('BR', 'Brazil'), ('CA', 'Canada'), ('CN', 'China'),
-    ('FR', 'France'), ('DE', 'Germany'), ('IN', 'India'), ('JP', 'Japan'),
-    ('RU', 'Russia'), ('SA', 'Saudi Arabia'), ('TR', 'Turkey'), ('AE', 'UAE'),
-    ('GB', 'United Kingdom'), ('US', 'United States'),
+    # Americas
+    ('AR', 'Argentina'), ('BO', 'Bolivia'), ('BR', 'Brazil'), ('CA', 'Canada'),
+    ('CL', 'Chile'), ('CO', 'Colombia'), ('CR', 'Costa Rica'), ('CU', 'Cuba'),
+    ('EC', 'Ecuador'), ('GT', 'Guatemala'), ('HT', 'Haiti'), ('HN', 'Honduras'),
+    ('JM', 'Jamaica'), ('MX', 'Mexico'), ('PA', 'Panama'), ('PY', 'Paraguay'),
+    ('PE', 'Peru'), ('US', 'United States'), ('UY', 'Uruguay'), ('VE', 'Venezuela'),
+    # Europe
+    ('AT', 'Austria'), ('BE', 'Belgium'), ('BG', 'Bulgaria'), ('HR', 'Croatia'),
+    ('CZ', 'Czech Republic'), ('DK', 'Denmark'), ('FI', 'Finland'), ('FR', 'France'),
+    ('DE', 'Germany'), ('GR', 'Greece'), ('HU', 'Hungary'), ('IE', 'Ireland'),
+    ('IT', 'Italy'), ('NL', 'Netherlands'), ('NO', 'Norway'), ('PL', 'Poland'),
+    ('PT', 'Portugal'), ('RO', 'Romania'), ('RU', 'Russia'), ('RS', 'Serbia'),
+    ('ES', 'Spain'), ('SE', 'Sweden'), ('CH', 'Switzerland'), ('UA', 'Ukraine'),
+    ('GB', 'United Kingdom'),
+    # Asia & Middle East
+    ('AF', 'Afghanistan'), ('BD', 'Bangladesh'), ('KH', 'Cambodia'), ('CN', 'China'),
+    ('HK', 'Hong Kong'), ('IN', 'India'), ('ID', 'Indonesia'), ('IR', 'Iran'),
+    ('IQ', 'Iraq'), ('IL', 'Israel'), ('JP', 'Japan'), ('JO', 'Jordan'),
+    ('KZ', 'Kazakhstan'), ('KW', 'Kuwait'), ('LB', 'Lebanon'), ('MY', 'Malaysia'),
+    ('MM', 'Myanmar'), ('NP', 'Nepal'), ('OM', 'Oman'), ('PK', 'Pakistan'),
+    ('PH', 'Philippines'), ('QA', 'Qatar'), ('SA', 'Saudi Arabia'), ('SG', 'Singapore'),
+    ('KR', 'South Korea'), ('LK', 'Sri Lanka'), ('TH', 'Thailand'), ('TR', 'Turkey'),
+    ('AE', 'UAE'), ('VN', 'Vietnam'), ('YE', 'Yemen'),
+    # Oceania
+    ('AU', 'Australia'), ('FJ', 'Fiji'), ('NZ', 'New Zealand'), ('PG', 'Papua New Guinea'),
     ('OTHER', 'Other'),
 ]
 

@@ -7146,9 +7146,11 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
             title_map = {
                 'Mr.': 'mr', 'Mrs.': 'mrs', 'Ms.': 'ms', 'Dr.': 'dr',
                 'Prof.': 'prof', 'H.E.': 'he', 'H.E. (His/Her Excellency)': 'he',
-                'Ambassador': 'amb', 'Honorable': 'hon', 'Other': 'other',
+                'Ambassador': 'amb', 'Amb.': 'amb',
+                'Honorable': 'hon', 'Hon.': 'hon',
+                'Other': 'other',
             }
-            model_data['title'] = title_map.get(title_val, title_val.lower())
+            model_data['title'] = title_map.get(title_val, title_val.lower().rstrip('.'))
 
         # Normalize position to match model POSITION_CHOICES codes
         if 'position' in model_data and model_data['position']:

@@ -3232,6 +3232,10 @@ def home_feed(request):
         )[:10]
         facts_data = FactListSerializer(featured_facts, many=True, context={'request': request}).data
 
+    # Hero text content — bundled here so it's cached with the rest of the feed
+    hero_text_qs = HeroTextContent.objects.filter(is_active=True)
+    hero_text_data = HeroTextContentSerializer(hero_text_qs, many=True).data
+
     data = {
         'hero_slides': HeroSlideSerializer(hero_slides, many=True, context={'request': request}).data,
         'featured_articles': ArticleSerializer(featured_articles, many=True, context={'request': request}).data,
@@ -3244,6 +3248,7 @@ def home_feed(request):
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
         'facts': facts_data,
+        'hero_text_content': hero_text_data,
     }
     cache.set(cache_key, data, django_settings.CACHE_TTL_SHORT)
     return Response(data)

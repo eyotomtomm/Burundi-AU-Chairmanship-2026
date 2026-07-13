@@ -4843,7 +4843,7 @@ class YouthDialogueEvent(models.Model):
     # Credential field visibility — empty list means all fields visible (backward-compatible)
     ID_CARD_ALL_FIELDS = [
         'photo', 'organization', 'role', 'position', 'nationality',
-        'event_dates', 'qr_code', 'participant_code', 'email', 'allow_pdf_download',
+        'event_dates', 'qr_code', 'participant_code', 'email', 'side_event', 'allow_pdf_download',
     ]
     SCAN_RESULT_ALL_FIELDS = [
         'photo', 'role', 'nationality', 'organization', 'email',

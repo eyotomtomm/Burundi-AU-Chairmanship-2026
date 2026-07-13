@@ -597,6 +597,10 @@
             <span class="text-sm text-slate-700">Email</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
+            <input type="checkbox" name="idf_side_event" value="1" {% if 'side_event' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
+            <span class="text-sm text-slate-700">Side Event</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer p-2 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 transition-colors">
             <input type="checkbox" name="idf_allow_pdf_download" value="1" {% if 'allow_pdf_download' in idf %}checked{% elif not is_edit %}checked{% endif %} class="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4">
             <span class="text-sm text-slate-700">PDF Download</span>
           </label>

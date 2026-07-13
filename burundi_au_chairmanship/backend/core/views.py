@@ -5196,10 +5196,11 @@ class AnnouncementBannerViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         now = timezone.now()
+        today = now.date()
         return AnnouncementBanner.objects.filter(
             is_active=True
         ).filter(
-            Q(starts_at__isnull=True) | Q(starts_at__lte=now)
+            Q(starts_at__isnull=True) | Q(starts_at__date__lte=today)
         ).filter(
             Q(expires_at__isnull=True) | Q(expires_at__gt=now)
         )
@@ -7070,10 +7071,8 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
             '<span style="font-size:42px;font-weight:900;color:#409843;">CD</span></div>'
         )
 
-        # Smart app link — detects iOS/Android and opens the right store
-        from django.conf import settings as _settings
-        site_url = getattr(_settings, 'SITE_URL', 'https://burundi4africa.com')
-        app_link = f'{site_url.rstrip("/")}/app'
+        # Universal app link (OneLink — routes to correct app store / opens app)
+        app_link = 'https://onelink.to/trmfd2'
         app_btn_label = "Ouvrir l'application B4Africa" if is_fr else 'Open B4Africa App'
 
         # Support email

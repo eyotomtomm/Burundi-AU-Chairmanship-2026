@@ -616,7 +616,7 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ['id', 'name', 'name_fr', 'description', 'description_fr',
-                  'address', 'latitude', 'longitude', 'event_date', 'image',
+                  'address', 'map_url', 'event_date', 'image',
                   'thumbnail_url', 'medium_url',
                   'recurrence_type', 'recurrence_end_date']
 
@@ -1790,6 +1790,15 @@ class AnnouncementBannerSerializer(serializers.ModelSerializer):
                   'banner_type', 'link_url', 'action_url', 'action_text',
                   'action_text_fr', 'is_dismissible', 'is_active', 'starts_at',
                   'ends_at', 'priority']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Return null for empty translation fields so the Flutter ?? operator
+        # falls back to the English value instead of using empty string
+        for key in ('title_fr', 'message_fr', 'action_text_fr'):
+            if not data.get(key):
+                data[key] = None
+        return data
 
 
 class ContactDirectorySerializer(serializers.ModelSerializer):

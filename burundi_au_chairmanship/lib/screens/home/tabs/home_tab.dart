@@ -127,13 +127,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   }
 
   List<Article> get _articles {
-    if (_apiArticles != null && _apiArticles!.isNotEmpty) return _apiArticles!;
-    return [];
-  }
-
-  List<Article> get _newsItems {
-    if (_apiNewsItems != null && _apiNewsItems!.isNotEmpty) return _apiNewsItems!;
-    return [];
+    return [
+      ...?_apiNewsItems,
+      ...?_apiArticles,
+    ];
   }
 
   String _getHeroText(String key) {
@@ -433,8 +430,13 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       };
     }).toList();
 
+    // Use hero text from separate API call, or fall back to home feed bundle
+    final heroTextSource = heroTextData.isNotEmpty
+        ? heroTextData
+        : (homeFeed['hero_text_content'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>();
     final heroTextMap = <String, String>{};
-    for (final item in heroTextData) {
+    for (final item in heroTextSource) {
       final key = item['key'] as String?;
       if (key == null) continue;
       heroTextMap[key] = langCode == 'fr' && item['text_fr'] != null && (item['text_fr'] as String).isNotEmpty
@@ -731,35 +733,6 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       if (!isAuth && index == freeShown) return const LoginGateCarouselCard(width: 240, height: 110);
                       return TrendingCard(item: _trendingItems![index], rank: index + 1, langCode: langCode,
                         onTap: () => Navigator.pushNamed(context, '/trending'));
-                    },
-                  );
-                }),
-              ),
-            ),
-          ],
-          if (_newsItems.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 25, 16, 10),
-                child: SectionTitle(title: l10n.translate('latest_news'), showSeeAll: true),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 260,
-                child: Builder(builder: (context) {
-                  final total = _newsItems.length;
-                  final freeShown = isAuth ? total : (total < 2 ? total : 2);
-                  final itemCount = isAuth ? total : freeShown + 1;
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: itemCount,
-                    itemBuilder: (context, index) {
-                      if (!isAuth && index == freeShown) return const LoginGateCarouselCard(width: 280, height: 260);
-                      final article = _newsItems[index];
-                      return NewsCard(article: article, langCode: langCode,
-                        onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article, scrollToComments: false))));
                     },
                   );
                 }),

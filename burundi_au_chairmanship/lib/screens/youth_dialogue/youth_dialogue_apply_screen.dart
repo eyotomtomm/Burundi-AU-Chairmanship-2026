@@ -741,36 +741,78 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: widget.sideEvents.map((se) {
-              final isSelected = _selectedSideEventIds.contains(se.id);
-              final label = se.getName(langCode);
-              return ChoiceChip(
-                label: Text(label),
-                selected: isSelected,
-                onSelected: (val) {
+          ...widget.sideEvents.map((se) {
+            final isSelected = _selectedSideEventIds.contains(se.id);
+            final label = se.getName(langCode);
+            final desc = se.getDescription(langCode);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: () {
                   setState(() {
                     _selectedSideEventIds.clear();
-                    if (val) {
+                    if (!isSelected) {
                       _selectedSideEventIds.add(se.id);
                     }
                   });
                 },
-                selectedColor: AppColors.burundiGreen.withValues(alpha: 0.2),
-                checkmarkColor: AppColors.burundiGreen,
-                labelStyle: TextStyle(
-                  color: isSelected ? AppColors.burundiGreen : textColor,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.burundiGreen.withValues(alpha: 0.08)
+                        : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.burundiGreen
+                          : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                        size: 20,
+                        color: isSelected ? AppColors.burundiGreen : (isDark ? const Color(0xFF666666) : const Color(0xFFAAAAAA)),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                color: isSelected ? AppColors.burundiGreen : textColor,
+                              ),
+                            ),
+                            if (desc.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                desc,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white38 : Colors.black38,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                side: BorderSide(
-                  color: isSelected ? AppColors.burundiGreen : (isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC)),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              );
-            }).toList(),
-          ),
+              ),
+            );
+          }),
         ],
       ),
     );

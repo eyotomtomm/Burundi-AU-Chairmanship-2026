@@ -913,17 +913,13 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 130,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: events.length,
-              itemBuilder: (context, index) {
-                final event = events[index];
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: events.map((event) {
                 return Container(
-                  width: 220,
-                  margin: EdgeInsets.only(right: index < events.length - 1 ? 12 : 0),
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -933,7 +929,7 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                       color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
                     ),
                   ),
-                  child: Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
@@ -945,36 +941,37 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
                         ),
                         child: const Icon(Icons.celebration_rounded, size: 16, color: AppColors.burundiGreen),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        event.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (event.description.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Expanded(
-                          child: Text(
-                            event.description,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.white54 : Colors.black45,
-                              height: 1.3,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              event.title,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            if (event.description.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                event.description,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white54 : Colors.black45,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 );
-              },
+              }).toList(),
             ),
           ),
         ],

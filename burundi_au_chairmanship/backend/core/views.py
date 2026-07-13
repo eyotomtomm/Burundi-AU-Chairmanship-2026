@@ -3332,10 +3332,29 @@ class HeroTextContentViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for hero text content.
     Returns active hero text items ordered by order field.
+    Auto-recovers if all items are inactive or missing.
     """
-    queryset = HeroTextContent.objects.filter(is_active=True)
     serializer_class = HeroTextContentSerializer
     permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        qs = HeroTextContent.objects.filter(is_active=True)
+        if qs.exists():
+            return qs
+        # Re-activate any inactive records first
+        reactivated = HeroTextContent.objects.filter(is_active=False).update(is_active=True)
+        if reactivated:
+            return HeroTextContent.objects.filter(is_active=True)
+        # No records at all — create defaults
+        defaults = [
+            {'key': 'badge', 'text_en': 'BURUNDI', 'text_fr': 'BURUNDI', 'order': 0},
+            {'key': 'title_line1', 'text_en': 'African Union', 'text_fr': 'Union Africaine', 'order': 1},
+            {'key': 'title_line2', 'text_en': 'Chairmanship', 'text_fr': 'Présidence', 'order': 2},
+            {'key': 'year', 'text_en': '2026', 'text_fr': '2026', 'order': 3},
+        ]
+        for d in defaults:
+            HeroTextContent.objects.get_or_create(key=d['key'], defaults=d)
+        return HeroTextContent.objects.filter(is_active=True)
 
 
 class QuickAccessMenuViewSet(viewsets.ReadOnlyModelViewSet):

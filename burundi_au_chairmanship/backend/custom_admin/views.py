@@ -5705,50 +5705,70 @@ def admin_global_search(request):
     if query and len(query) >= 2:
         results['menus'] = _search_admin_menus(query, request.user, limit=20)
 
+        # Each category is wrapped in try/except so a missing migration or
+        # schema mismatch in one model doesn't crash the entire search page.
         if allowed is None or 'users_list' in allowed:
-            results['users'] = User.objects.filter(
-                Q(username__icontains=query) |
-                Q(email__icontains=query) |
-                Q(first_name__icontains=query) |
-                Q(last_name__icontains=query)
-            ).select_related('profile')[:20]
+            try:
+                results['users'] = User.objects.filter(
+                    Q(username__icontains=query) |
+                    Q(email__icontains=query) |
+                    Q(first_name__icontains=query) |
+                    Q(last_name__icontains=query)
+                ).select_related('profile')[:20]
+            except Exception:
+                logger.exception('Global search: users query failed')
 
         if allowed is None or 'articles_list' in allowed:
-            results['articles'] = Article.objects.filter(
-                Q(title__icontains=query) |
-                Q(title_fr__icontains=query) |
-                Q(content__icontains=query) |
-                Q(author__icontains=query)
-            )[:20]
+            try:
+                results['articles'] = Article.objects.filter(
+                    Q(title__icontains=query) |
+                    Q(title_fr__icontains=query) |
+                    Q(content__icontains=query) |
+                    Q(author__icontains=query)
+                )[:20]
+            except Exception:
+                logger.exception('Global search: articles query failed')
 
         if allowed is None or 'events_list' in allowed:
-            results['events'] = Event.objects.filter(
-                Q(name__icontains=query) |
-                Q(name_fr__icontains=query) |
-                Q(description__icontains=query) |
-                Q(address__icontains=query)
-            )[:20]
+            try:
+                results['events'] = Event.objects.filter(
+                    Q(name__icontains=query) |
+                    Q(name_fr__icontains=query) |
+                    Q(description__icontains=query) |
+                    Q(address__icontains=query)
+                )[:20]
+            except Exception:
+                logger.exception('Global search: events query failed')
 
         if allowed is None or 'magazines_list' in allowed:
-            results['magazines'] = MagazineEdition.objects.filter(
-                Q(title__icontains=query) |
-                Q(title_fr__icontains=query) |
-                Q(description__icontains=query)
-            )[:20]
+            try:
+                results['magazines'] = MagazineEdition.objects.filter(
+                    Q(title__icontains=query) |
+                    Q(title_fr__icontains=query) |
+                    Q(description__icontains=query)
+                )[:20]
+            except Exception:
+                logger.exception('Global search: magazines query failed')
 
         if allowed is None or 'support_tickets_list' in allowed:
-            results['tickets'] = SupportTicket.objects.filter(
-                Q(subject__icontains=query) |
-                Q(user__username__icontains=query) |
-                Q(user__email__icontains=query)
-            ).select_related('user')[:20]
+            try:
+                results['tickets'] = SupportTicket.objects.filter(
+                    Q(subject__icontains=query) |
+                    Q(user__username__icontains=query) |
+                    Q(user__email__icontains=query)
+                ).select_related('user')[:20]
+            except Exception:
+                logger.exception('Global search: tickets query failed')
 
         if allowed is None or 'videos_list' in allowed:
-            results['videos'] = Video.objects.filter(
-                Q(title__icontains=query) |
-                Q(title_fr__icontains=query) |
-                Q(description__icontains=query)
-            )[:20]
+            try:
+                results['videos'] = Video.objects.filter(
+                    Q(title__icontains=query) |
+                    Q(title_fr__icontains=query) |
+                    Q(description__icontains=query)
+                )[:20]
+            except Exception:
+                logger.exception('Global search: videos query failed')
 
     total_results = sum(len(v) for v in results.values())
 
@@ -5783,124 +5803,145 @@ def admin_global_search_api(request):
         categories.append({'category': 'Navigation', 'items': menu_items})
         total_count += len(menu_items)
 
+    # Each category is wrapped in try/except so a missing migration or
+    # schema mismatch in one model doesn't crash the entire search.
+
     # --- Users ---
     if allowed is None or 'users_list' in allowed:
-        users = User.objects.filter(
-            Q(username__icontains=query) |
-            Q(email__icontains=query) |
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query)
-        )[:max_per_category]
-        if users:
-            items = []
-            for u in users:
-                full_name = f"{u.first_name} {u.last_name}".strip()
-                items.append({
-                    'title': u.username,
-                    'subtitle': full_name if full_name else u.email,
-                    'url': f'/admin/users/{u.pk}/edit/',
-                    'icon': 'person',
-                })
-            categories.append({'category': 'Users', 'items': items})
-            total_count += len(items)
+        try:
+            users = User.objects.filter(
+                Q(username__icontains=query) |
+                Q(email__icontains=query) |
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query)
+            )[:max_per_category]
+            if users:
+                items = []
+                for u in users:
+                    full_name = f"{u.first_name} {u.last_name}".strip()
+                    items.append({
+                        'title': u.username,
+                        'subtitle': full_name if full_name else u.email,
+                        'url': f'/admin/users/{u.pk}/edit/',
+                        'icon': 'person',
+                    })
+                categories.append({'category': 'Users', 'items': items})
+                total_count += len(items)
+        except Exception:
+            logger.exception('Global search API: users query failed')
 
     # --- Articles ---
     if total_count < max_total and (allowed is None or 'articles_list' in allowed):
-        articles = Article.objects.filter(
-            Q(title__icontains=query) |
-            Q(title_fr__icontains=query)
-        )[:max_per_category]
-        if articles:
-            items = []
-            for a in articles:
-                items.append({
-                    'title': a.title,
-                    'subtitle': f"By {a.author}" if a.author else (a.title_fr or ''),
-                    'url': f'/admin/articles/{a.pk}/edit/',
-                    'icon': 'article',
-                })
-            categories.append({'category': 'Articles', 'items': items})
-            total_count += len(items)
+        try:
+            articles = Article.objects.filter(
+                Q(title__icontains=query) |
+                Q(title_fr__icontains=query)
+            )[:max_per_category]
+            if articles:
+                items = []
+                for a in articles:
+                    items.append({
+                        'title': a.title,
+                        'subtitle': f"By {a.author}" if a.author else (a.title_fr or ''),
+                        'url': f'/admin/articles/{a.pk}/edit/',
+                        'icon': 'article',
+                    })
+                categories.append({'category': 'Articles', 'items': items})
+                total_count += len(items)
+        except Exception:
+            logger.exception('Global search API: articles query failed')
 
     # --- Events ---
     if total_count < max_total and (allowed is None or 'events_list' in allowed):
-        events = Event.objects.filter(
-            Q(name__icontains=query) |
-            Q(name_fr__icontains=query)
-        )[:max_per_category]
-        if events:
-            items = []
-            for e in events:
-                date_str = e.event_date.strftime('%b %d, %Y') if e.event_date else ''
-                items.append({
-                    'title': e.name,
-                    'subtitle': date_str,
-                    'url': f'/admin/events/{e.pk}/edit/',
-                    'icon': 'event',
-                })
-            categories.append({'category': 'Events', 'items': items})
-            total_count += len(items)
+        try:
+            events = Event.objects.filter(
+                Q(name__icontains=query) |
+                Q(name_fr__icontains=query)
+            )[:max_per_category]
+            if events:
+                items = []
+                for e in events:
+                    date_str = e.event_date.strftime('%b %d, %Y') if e.event_date else ''
+                    items.append({
+                        'title': e.name,
+                        'subtitle': date_str,
+                        'url': f'/admin/events/{e.pk}/edit/',
+                        'icon': 'event',
+                    })
+                categories.append({'category': 'Events', 'items': items})
+                total_count += len(items)
+        except Exception:
+            logger.exception('Global search API: events query failed')
 
     # --- Magazines ---
     if total_count < max_total and (allowed is None or 'magazines_list' in allowed):
-        magazines = MagazineEdition.objects.filter(
-            Q(title__icontains=query) |
-            Q(title_fr__icontains=query)
-        )[:max_per_category]
-        if magazines:
-            items = []
-            for m in magazines:
-                subtitle = m.title_fr or ''
-                if not subtitle and m.publish_date:
-                    subtitle = f"Published {m.publish_date.strftime('%b %Y')}"
-                items.append({
-                    'title': m.title,
-                    'subtitle': subtitle,
-                    'url': f'/admin/magazines/{m.pk}/edit/',
-                    'icon': 'menu_book',
-                })
-            categories.append({'category': 'Magazines', 'items': items})
-            total_count += len(items)
+        try:
+            magazines = MagazineEdition.objects.filter(
+                Q(title__icontains=query) |
+                Q(title_fr__icontains=query)
+            )[:max_per_category]
+            if magazines:
+                items = []
+                for m in magazines:
+                    subtitle = m.title_fr or ''
+                    if not subtitle and m.publish_date:
+                        subtitle = f"Published {m.publish_date.strftime('%b %Y')}"
+                    items.append({
+                        'title': m.title,
+                        'subtitle': subtitle,
+                        'url': f'/admin/magazines/{m.pk}/edit/',
+                        'icon': 'menu_book',
+                    })
+                categories.append({'category': 'Magazines', 'items': items})
+                total_count += len(items)
+        except Exception:
+            logger.exception('Global search API: magazines query failed')
 
     # --- Support Tickets ---
     if total_count < max_total and (allowed is None or 'support_tickets_list' in allowed):
-        tickets = SupportTicket.objects.filter(
-            Q(subject__icontains=query) |
-            Q(user__username__icontains=query) |
-            Q(user__email__icontains=query)
-        ).select_related('user')[:max_per_category]
-        if tickets:
-            items = []
-            for t in tickets:
-                items.append({
-                    'title': t.subject,
-                    'subtitle': f"{t.get_status_display()} - {t.user.username}",
-                    'url': f'/admin/support/{t.pk}/',
-                    'icon': 'support_agent',
-                })
-            categories.append({'category': 'Support Tickets', 'items': items})
-            total_count += len(items)
+        try:
+            tickets = SupportTicket.objects.filter(
+                Q(subject__icontains=query) |
+                Q(user__username__icontains=query) |
+                Q(user__email__icontains=query)
+            ).select_related('user')[:max_per_category]
+            if tickets:
+                items = []
+                for t in tickets:
+                    items.append({
+                        'title': t.subject,
+                        'subtitle': f"{t.get_status_display()} - {t.user.username}",
+                        'url': f'/admin/support/{t.pk}/',
+                        'icon': 'support_agent',
+                    })
+                categories.append({'category': 'Support Tickets', 'items': items})
+                total_count += len(items)
+        except Exception:
+            logger.exception('Global search API: tickets query failed')
 
     # --- Videos ---
     if total_count < max_total and (allowed is None or 'videos_list' in allowed):
-        videos = Video.objects.filter(
-            Q(title__icontains=query) |
-            Q(title_fr__icontains=query)
-        )[:max_per_category]
-        if videos:
-            items = []
-            for v in videos:
-                subtitle = v.title_fr or ''
-                if not subtitle and hasattr(v, 'get_category_display'):
-                    subtitle = v.get_category_display()
-                items.append({
-                    'title': v.title,
-                    'subtitle': subtitle,
-                    'url': f'/admin/videos/{v.pk}/edit/',
-                    'icon': 'videocam',
-                })
-            categories.append({'category': 'Videos', 'items': items})
-            total_count += len(items)
+        try:
+            videos = Video.objects.filter(
+                Q(title__icontains=query) |
+                Q(title_fr__icontains=query)
+            )[:max_per_category]
+            if videos:
+                items = []
+                for v in videos:
+                    subtitle = v.title_fr or ''
+                    if not subtitle and hasattr(v, 'get_category_display'):
+                        subtitle = v.get_category_display()
+                    items.append({
+                        'title': v.title,
+                        'subtitle': subtitle,
+                        'url': f'/admin/videos/{v.pk}/edit/',
+                        'icon': 'videocam',
+                    })
+                categories.append({'category': 'Videos', 'items': items})
+                total_count += len(items)
+        except Exception:
+            logger.exception('Global search API: videos query failed')
 
     return JsonResponse({'results': categories})
 

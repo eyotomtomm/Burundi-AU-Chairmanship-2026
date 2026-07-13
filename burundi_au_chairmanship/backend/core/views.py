@@ -8117,23 +8117,51 @@ def verify_qr(request):
         attendee_name = submission.proxy_name if submission.is_proxy else (
             submission.user.first_name or submission.user.username
         )
+        reg = submission.event_registration
+        form_data = submission.form_data or {}
+
+        # Extract useful fields from form_data (dynamic form submissions)
+        def _fd(keys):
+            """Return the first non-empty value matching any of the given keys."""
+            for k in keys:
+                v = form_data.get(k, '')
+                if v:
+                    return str(v).strip()
+            return ''
+
+        fd_organization = _fd(['organization', 'institution', 'company', 'organisation', 'org'])
+        fd_nationality = _fd(['nationality', 'country', 'pays', 'nationalite'])
+        fd_title = _fd(['title', 'titre', 'position', 'role', 'function', 'fonction'])
+        fd_phone = _fd(['phone', 'phone_number', 'telephone', 'tel', 'mobile'])
+        fd_full_name = _fd(['full_name', 'name', 'nom_complet', 'nom'])
+
+        # Build a fuller attendee name from form_data if available
+        if fd_full_name and not submission.is_proxy:
+            attendee_name = fd_full_name
+
         result = {
             'valid': True,
             'type': 'event',
             'person_name': attendee_name,
-            'event_title': submission.event_registration.event_title,
+            'event_title': reg.event_title,
             'status': submission.status,
             'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
             'is_duplicate': is_duplicate,
             'scan_count': scan_count,
-        }
-        if is_staff:
-            result['details'] = {
+            'details': {
                 'email': submission.proxy_email if submission.is_proxy else submission.user.email,
+                'organization': fd_organization,
+                'nationality': fd_nationality,
+                'title': fd_title,
+                'phone': fd_phone,
                 'is_proxy': submission.is_proxy,
                 'is_waitlisted': submission.is_waitlisted,
+                'event_venue': reg.venue or '',
+                'event_date': reg.event_date.isoformat() if reg.event_date else None,
+                'event_end_date': reg.event_end_date.isoformat() if reg.event_end_date else None,
                 'submission_id': submission.id,
-            }
+            },
+        }
         return Response(result)
 
     elif qr_type == 'youth_dialogue':
@@ -8476,22 +8504,45 @@ def _manual_event_result(request, submission, ip_address):
     )
     scan_count += 1
 
+    reg = submission.event_registration
+    form_data = submission.form_data or {}
+
+    def _fd(keys):
+        for k in keys:
+            v = form_data.get(k, '')
+            if v:
+                return str(v).strip()
+        return ''
+
+    fd_organization = _fd(['organization', 'institution', 'company', 'organisation', 'org'])
+    fd_nationality = _fd(['nationality', 'country', 'pays', 'nationalite'])
+    fd_title = _fd(['title', 'titre', 'position', 'role', 'function', 'fonction'])
+    fd_phone = _fd(['phone', 'phone_number', 'telephone', 'tel', 'mobile'])
+    fd_full_name = _fd(['full_name', 'name', 'nom_complet', 'nom'])
+
     attendee_name = submission.proxy_name if submission.is_proxy else (
-        submission.user.first_name or submission.user.username
+        fd_full_name or submission.user.first_name or submission.user.username
     )
     return Response({
         'valid': True,
         'type': 'event',
         'person_name': attendee_name,
-        'event_title': submission.event_registration.event_title,
+        'event_title': reg.event_title,
         'status': submission.status,
         'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
         'is_duplicate': is_duplicate,
         'scan_count': scan_count,
         'details': {
             'email': submission.proxy_email if submission.is_proxy else submission.user.email,
+            'organization': fd_organization,
+            'nationality': fd_nationality,
+            'title': fd_title,
+            'phone': fd_phone,
             'is_proxy': submission.is_proxy,
             'is_waitlisted': submission.is_waitlisted,
+            'event_venue': reg.venue or '',
+            'event_date': reg.event_date.isoformat() if reg.event_date else None,
+            'event_end_date': reg.event_end_date.isoformat() if reg.event_end_date else None,
             'submission_id': submission.id,
         },
     })

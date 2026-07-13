@@ -18,6 +18,18 @@ django_asgi_app = get_asgi_application()
 
 from core import routing  # noqa: E402 — must be imported after Django setup
 
+
+async def lifespan(scope, receive, send):
+    """Handle ASGI lifespan protocol so uvicorn doesn't log warnings."""
+    while True:
+        message = await receive()
+        if message["type"] == "lifespan.startup":
+            await send({"type": "lifespan.startup.complete"})
+        elif message["type"] == "lifespan.shutdown":
+            await send({"type": "lifespan.shutdown.complete"})
+            return
+
+
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
     'websocket': AllowedHostsOriginValidator(
@@ -25,4 +37,5 @@ application = ProtocolTypeRouter({
             URLRouter(routing.websocket_urlpatterns)
         ),
     ),
+    'lifespan': lifespan,
 })

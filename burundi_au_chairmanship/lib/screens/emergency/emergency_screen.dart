@@ -69,8 +69,11 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       'local_police': Icons.local_police,
       'local_fire_department': Icons.local_fire_department,
       'medical_services': Icons.medical_services,
+      'local_hospital': Icons.local_hospital,
+      'health_and_safety': Icons.health_and_safety,
       'support_agent': Icons.support_agent,
       'emergency': Icons.emergency,
+      'shield': Icons.shield,
       'phone': Icons.phone,
       'sos': Icons.sos,
     };
@@ -143,18 +146,32 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     }
   }
 
-  String _categoryLabel(String? category) {
+  String _categoryLabel(String? category, [String langCode = 'en']) {
+    if (langCode == 'fr') {
+      switch (category) {
+        case 'police':
+          return 'Police';
+        case 'fire':
+          return 'Pompiers';
+        case 'medical':
+          return 'Services Médicaux';
+        case 'support':
+          return 'Assistance';
+        default:
+          return 'Autres Services';
+      }
+    }
     switch (category) {
       case 'police':
         return 'Police';
       case 'fire':
         return 'Fire';
       case 'medical':
-        return 'Medical';
+        return 'Medical Services';
       case 'support':
         return 'Support';
       default:
-        return 'Other';
+        return 'Other Services';
     }
   }
 
@@ -298,8 +315,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                                 Expanded(
                                   child: Text(
                                     langCode == 'fr'
-                                        ? 'En cas d\'urgence, contactez immédiatement les services ci-dessous.'
-                                        : 'In case of emergency, immediately contact the services below.',
+                                        ? 'Services d\'urgence au Burundi. En cas d\'urgence, contactez immédiatement les services ci-dessous.'
+                                        : 'Emergency services in Burundi. In case of emergency, immediately contact the services below.',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: isDark
@@ -484,7 +501,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           sliver: SliverToBoxAdapter(
             child: Text(
-              _categoryLabel(entry.key),
+              _categoryLabel(entry.key, langCode),
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

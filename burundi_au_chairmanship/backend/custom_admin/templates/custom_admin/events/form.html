@@ -103,7 +103,7 @@
             <div class="space-y-6">
                 <div class="border-l-4 border-primary-container pl-4">
                     <h2 class="text-xl font-headline font-bold text-on-surface">Location Details</h2>
-                    <p class="text-sm text-on-surface-variant mt-1">Event venue and coordinates</p>
+                    <p class="text-sm text-on-surface-variant mt-1">Event venue and map link</p>
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
@@ -120,32 +120,18 @@
                                placeholder="Enter event venue address">
                     </div>
 
-                    <!-- Latitude & Longitude -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="latitude" class="block text-sm font-body font-medium text-on-surface mb-2">
-                                Latitude
-                            </label>
-                            <input type="number"
-                                   id="latitude"
-                                   name="latitude"
-                                   step="any"
-                                   value="{% if event %}{{ event.latitude }}{% endif %}"
-                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
-                                   placeholder="e.g., -3.3731">
-                        </div>
-                        <div>
-                            <label for="longitude" class="block text-sm font-body font-medium text-on-surface mb-2">
-                                Longitude
-                            </label>
-                            <input type="number"
-                                   id="longitude"
-                                   name="longitude"
-                                   step="any"
-                                   value="{% if event %}{{ event.longitude }}{% endif %}"
-                                   class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
-                                   placeholder="e.g., 29.3644">
-                        </div>
+                    <!-- Google Maps URL -->
+                    <div>
+                        <label for="map_url" class="block text-sm font-body font-medium text-on-surface mb-2">
+                            Google Maps Link
+                        </label>
+                        <input type="url"
+                               id="map_url"
+                               name="map_url"
+                               value="{% if event %}{{ event.map_url|default:'' }}{% endif %}"
+                               class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant py-3 px-0 focus:ring-0 focus:border-secondary font-body"
+                               placeholder="https://maps.google.com/?q=...">
+                        <p class="text-xs text-on-surface-variant mt-1">Paste a Google Maps link for the venue. Users can tap to open directions.</p>
                     </div>
                 </div>
             </div>

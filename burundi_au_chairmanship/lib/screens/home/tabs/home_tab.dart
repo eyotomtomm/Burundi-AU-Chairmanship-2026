@@ -520,8 +520,11 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       'sos': Icons.sos, 'local_police': Icons.local_police,
       'local_fire_department': Icons.local_fire_department,
       'medical_services': Icons.medical_services,
+      'local_hospital': Icons.local_hospital,
+      'health_and_safety': Icons.health_and_safety,
       'support_agent': Icons.support_agent,
-      'emergency': Icons.emergency, 'phone': Icons.phone,
+      'emergency': Icons.emergency, 'shield': Icons.shield,
+      'phone': Icons.phone,
     };
     return iconMap[iconName] ?? Icons.stars;
   }

@@ -1679,8 +1679,8 @@ class AppSettings(models.Model):
     qr_scanner_title_fr = models.CharField(max_length=100, blank=True, default='Scanner QR', help_text='QR Scanner quick access title (French)')
 
     # SOS screen title
-    sos_title = models.CharField(max_length=100, blank=True, default='Emergency / SOS', help_text='SOS screen title (English)')
-    sos_title_fr = models.CharField(max_length=100, blank=True, default='Urgence / SOS', help_text='SOS screen title (French)')
+    sos_title = models.CharField(max_length=100, blank=True, default='SOS Burundi', help_text='SOS screen title (English)')
+    sos_title_fr = models.CharField(max_length=100, blank=True, default='SOS Burundi', help_text='SOS screen title (French)')
 
     class Meta:
         verbose_name = 'App Settings'

@@ -9791,15 +9791,18 @@ def youth_dialogue_review(request, pk):
         elif action == 'issue_credential':
             all_docs_approved = not application.documents.filter(status='pending').exists()
             has_rejected = application.documents.filter(status='rejected').exists()
-            # Verify all 4 required document types exist and are approved
+            # Verify all required document types (from event config) exist and are approved
             approved_types = set(
                 application.documents.filter(status='approved')
                 .values_list('document_type', flat=True)
             )
-            required_types = {'passport', 'national_id', 'photo', 'cv'}
+            event_docs = application.event.required_documents if application.event and application.event.required_documents else []
+            required_types = {d['key'] for d in event_docs} if event_docs else {'passport', 'national_id', 'photo', 'cv'}
             missing_types = required_types - approved_types
             if missing_types and application.status in ('accepted', 'documents_submitted', 'documents_under_review'):
+                doc_labels = {d['key']: d.get('label', d['key']) for d in event_docs}
                 labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
+                labels.update(doc_labels)
                 missing_names = [labels.get(m, m) for m in missing_types]
                 messages.error(request, f'Cannot issue credential. Missing approved documents: {", ".join(missing_names)}')
                 return redirect('custom_admin:youth_dialogue_review', pk=pk)

@@ -423,8 +423,7 @@
 
     let existingDocs = [];
     try {
-      const raw = '{{ yd_event.required_documents|escapejs }}';
-      existingDocs = JSON.parse(raw || '[]');
+      existingDocs = JSON.parse('{{ existing_docs_json|escapejs }}' || '[]');
     } catch(e) {}
 
     // If no docs configured yet, use defaults

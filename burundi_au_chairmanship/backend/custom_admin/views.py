@@ -893,8 +893,7 @@ def event_create(request):
             description=request.POST.get('description', ''),
             description_fr=request.POST.get('description_fr', ''),
             address=request.POST.get('address'),
-            latitude=request.POST.get('latitude', 0),
-            longitude=request.POST.get('longitude', 0),
+            map_url=request.POST.get('map_url', ''),
             event_date=request.POST.get('event_date'),
             image=_get_existing_or_uploaded(request, 'image'),
             is_active=request.POST.get('is_active') == 'on',
@@ -933,8 +932,7 @@ def event_edit(request, pk):
         event.description = new_values['description']
         event.description_fr = request.POST.get('description_fr', '')
         event.address = new_values['address']
-        event.latitude = request.POST.get('latitude', 0)
-        event.longitude = request.POST.get('longitude', 0)
+        event.map_url = request.POST.get('map_url', '')
         event.event_date = request.POST.get('event_date')
         _img = _get_existing_or_uploaded(request, 'image')
         if _img:
@@ -9228,6 +9226,7 @@ def youth_dialogue_event_form(request, event_pk=None):
             if se.get('event_time'):
                 se['event_time'] = se['event_time'].strftime('%H:%M')
 
+    existing_docs = yd_event.required_documents if yd_event and yd_event.required_documents else []
     return render(request, 'custom_admin/youth_dialogue/event_form.html', {
         'yd_event': yd_event,
         'is_edit': event_pk is not None,
@@ -9235,6 +9234,7 @@ def youth_dialogue_event_form(request, event_pk=None):
         'field_type_choices': json.dumps(field_type_choices).replace('<', '\\u003c'),
         'existing_roles_json': json.dumps(existing_roles).replace('<', '\\u003c'),
         'existing_side_events_json': json.dumps(existing_side_events).replace('<', '\\u003c'),
+        'existing_docs_json': json.dumps(existing_docs).replace('<', '\\u003c'),
     })
 
 

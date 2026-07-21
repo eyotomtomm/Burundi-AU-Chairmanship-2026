@@ -7518,6 +7518,12 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
         doc.save()
 
+        # Copy photo to application's id_photo field for credential/ID card generation
+        if doc_type == 'photo':
+            uploaded_file.seek(0)
+            app.id_photo.save(uploaded_file.name, uploaded_file, save=False)
+            app.save(update_fields=['id_photo', 'updated_at'])
+
         # Auto-transition to documents_pending
         if app.status in ('accepted', 'documents_rejected'):
             app.status = 'documents_pending'

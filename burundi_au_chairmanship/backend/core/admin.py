@@ -1806,10 +1806,21 @@ class LinkedAccountAdmin(admin.ModelAdmin):
 class YouthDialogueDocumentInline(admin.TabularInline):
     model = YouthDialogueDocument
     extra = 0
-    fields = ['document_type', 'file_link', 'original_filename', 'file_size_display',
+    fields = ['document_type', 'thumbnail', 'file_link', 'original_filename', 'file_size_display',
               'status', 'rejection_reason', 'is_resubmission', 'uploaded_at']
-    readonly_fields = ['file_link', 'original_filename', 'file_size_display',
+    readonly_fields = ['thumbnail', 'file_link', 'original_filename', 'file_size_display',
                        'is_resubmission', 'uploaded_at']
+
+    def thumbnail(self, obj):
+        if obj.file and obj.original_filename:
+            ext = obj.original_filename.lower().rsplit('.', 1)[-1] if '.' in obj.original_filename else ''
+            if ext in ('jpg', 'jpeg', 'png'):
+                return format_html(
+                    '<a href="{}" target="_blank"><img src="{}" style="max-height:60px;max-width:80px;border-radius:4px;"/></a>',
+                    obj.file.url, obj.file.url,
+                )
+        return '-'
+    thumbnail.short_description = 'Preview'
 
     def file_link(self, obj):
         if obj.file:
@@ -1866,7 +1877,7 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
             'classes': ['collapse'],
         }),
         ('ID Photo', {
-            'fields': ['id_photo'],
+            'fields': ['id_photo_preview', 'id_photo'],
         }),
         ('Credential', {
             'fields': ['participant_code', 'qr_hash', 'credential_issued_at', 'id_card_pdf_link'],
@@ -1878,7 +1889,16 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ['user', 'created_at', 'updated_at', 'qr_hash', 'credential_issued_at',
-                       'id_card_pdf_link', 'participant_code']
+                       'id_card_pdf_link', 'participant_code', 'id_photo_preview']
+
+    def id_photo_preview(self, obj):
+        if obj.id_photo:
+            return format_html(
+                '<img src="{}" style="max-height:150px;max-width:120px;border-radius:8px;border:1px solid #ddd;"/>',
+                obj.id_photo.url,
+            )
+        return 'No photo uploaded yet'
+    id_photo_preview.short_description = 'Photo Preview'
 
     def full_name(self, obj):
         return f'{obj.first_name} {obj.last_name}'
@@ -1986,6 +2006,12 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
                     obj.credential_issued_at = timezone.now()
                     obj.documents_reviewed_by = request.user
                     obj.documents_reviewed_at = timezone.now()
+                    # Copy photo document to id_photo if not already set
+                    if not obj.id_photo:
+                        photo_doc = obj.documents.filter(document_type='photo').order_by('-uploaded_at').first()
+                        if photo_doc and photo_doc.file:
+                            from django.core.files.base import ContentFile
+                            obj.id_photo.save(photo_doc.original_filename or 'photo.jpg', ContentFile(photo_doc.file.read()), save=False)
                     _send_yd_applicant_email(
                         obj,
                         'Continental Dialogue: Your ID Card is Ready',
@@ -2048,6 +2074,12 @@ class YouthDialogueApplicationAdmin(admin.ModelAdmin):
             app.documents.filter(status='pending').update(
                 status='approved', reviewed_by=request.user, reviewed_at=timezone.now()
             )
+            # Copy photo document to id_photo if not already set
+            if not app.id_photo:
+                photo_doc = app.documents.filter(document_type='photo', status='approved').order_by('-uploaded_at').first()
+                if photo_doc and photo_doc.file:
+                    from django.core.files.base import ContentFile
+                    app.id_photo.save(photo_doc.original_filename or 'photo.jpg', ContentFile(photo_doc.file.read()), save=False)
             # Issue credential
             app.generate_participant_code()
             app.generate_qr_hash()

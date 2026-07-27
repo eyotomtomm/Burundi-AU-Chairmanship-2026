@@ -1581,6 +1581,39 @@ class ApiService {
     return _extractResults(data).cast<Map<String, dynamic>>();
   }
 
+  Future<Map<String, dynamic>?> getWeatherForCity(int cityId) async {
+    try {
+      final data = await _get('weather-cities/$cityId/weather/');
+      return data is Map<String, dynamic> ? data : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getWeatherByCoordinates(double lat, double lon) async {
+    try {
+      final data = await _get('weather/', queryParams: {
+        'lat': lat.toStringAsFixed(4),
+        'lon': lon.toStringAsFixed(4),
+      });
+      return data is Map<String, dynamic> ? data : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchWeatherCities(String query) async {
+    try {
+      final data = await _get('weather/search/', queryParams: {'q': query});
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   // ── Event Reminders ───────────────────────────────────────
   Future<Map<String, dynamic>> setEventReminder(int eventId, int minutesBefore) async {
     return await _post('event-reminders/', {
@@ -1830,8 +1863,8 @@ class ApiService {
     int? replacesId,
   }) async {
     _validateUploadFile(file,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
-      maxSizeBytes: 10 * 1024 * 1024,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      maxSizeBytes: 5 * 1024 * 1024,
     );
     try {
       final uri = Uri.parse('$_baseUrl/youth-dialogue/upload-document/');

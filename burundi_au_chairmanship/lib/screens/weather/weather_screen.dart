@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
-import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_colors.dart';
@@ -68,6 +67,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
         name: d.name,
         lat: d.latitude,
         lon: d.longitude,
+        cityId: d.id > 0 ? d.id : null,
         backgroundImageUrl: (d.backgroundImage != null && d.backgroundImage!.isNotEmpty) ? d.backgroundImage : null,
       ));
     }
@@ -105,6 +105,35 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   bool _isDefaultCity(int index) => index < _defaultCities.length;
 
+  /// Apply normalized weather API response to a city object.
+  void _applyWeatherData(_CityWeather city, Map<String, dynamic> data) {
+    final current = data['current'] as Map<String, dynamic>? ?? {};
+    city.currentTemp = (current['temp_c'] as num?)?.toDouble() ?? 0;
+    city.feelsLike = (current['feels_like_c'] as num?)?.toDouble() ?? 0;
+    city.humidity = (current['humidity'] as num?)?.toInt() ?? 0;
+    city.windSpeed = (current['wind_kph'] as num?)?.toDouble() ?? 0;
+    city.uvIndex = (current['uv'] as num?)?.toDouble() ?? 0;
+    city.weatherCode = (current['weather_code'] as num?)?.toInt() ?? 0;
+    city.conditionText = (current['condition_text'] as String?) ?? '';
+    city.conditionIcon = (current['condition_icon'] as String?) ?? '';
+
+    city.sunrise = (data['sunrise'] as String?) ?? '';
+    city.sunset = (data['sunset'] as String?) ?? '';
+
+    final forecastList = data['forecast'] as List<dynamic>? ?? [];
+    city.forecast = forecastList.map((f) {
+      final fm = f as Map<String, dynamic>;
+      return _DayForecast(
+        date: (fm['date'] as String?) ?? '',
+        maxTemp: (fm['max_temp_c'] as num?)?.toDouble() ?? 0,
+        minTemp: (fm['min_temp_c'] as num?)?.toDouble() ?? 0,
+        weatherCode: (fm['weather_code'] as num?)?.toInt() ?? 0,
+        conditionText: (fm['condition_text'] as String?) ?? '',
+        chanceOfRain: (fm['chance_of_rain'] as num?)?.toInt() ?? 0,
+      );
+    }).toList();
+  }
+
   Future<void> _fetchWeather() async {
     setState(() {
       _isLoading = true;
@@ -113,36 +142,14 @@ class _WeatherScreenState extends State<WeatherScreen> {
     int failCount = 0;
     for (final city in _cities) {
       try {
-        final url = Uri.parse(
-          'https://api.open-meteo.com/v1/forecast'
-          '?latitude=${city.lat}&longitude=${city.lon}'
-          '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature,uv_index'
-          '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset'
-          '&timezone=auto&forecast_days=3',
-        );
-        final response = await http.get(url).timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          city.currentTemp = (data['current']['temperature_2m'] as num).toDouble();
-          city.humidity = (data['current']['relative_humidity_2m'] as num).toInt();
-          city.windSpeed = (data['current']['wind_speed_10m'] as num).toDouble();
-          city.weatherCode = (data['current']['weather_code'] as num).toInt();
-          city.feelsLike = (data['current']['apparent_temperature'] as num).toDouble();
-          city.uvIndex = (data['current']['uv_index'] as num).toDouble();
-
-          final daily = data['daily'];
-          city.sunrise = daily['sunrise'][0] as String;
-          city.sunset = daily['sunset'][0] as String;
-
-          city.forecast = [];
-          for (int i = 0; i < 3; i++) {
-            city.forecast.add(_DayForecast(
-              date: daily['time'][i] as String,
-              maxTemp: (daily['temperature_2m_max'][i] as num).toDouble(),
-              minTemp: (daily['temperature_2m_min'][i] as num).toDouble(),
-              weatherCode: (daily['weather_code'][i] as num).toInt(),
-            ));
-          }
+        Map<String, dynamic>? data;
+        if (city.cityId != null) {
+          data = await ApiService().getWeatherForCity(city.cityId!);
+        } else {
+          data = await ApiService().getWeatherByCoordinates(city.lat, city.lon);
+        }
+        if (data != null) {
+          _applyWeatherData(city, data);
         } else {
           failCount++;
         }
@@ -162,36 +169,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   Future<void> _fetchWeatherForCity(_CityWeather city) async {
     try {
-      final url = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast'
-        '?latitude=${city.lat}&longitude=${city.lon}'
-        '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature,uv_index'
-        '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset'
-        '&timezone=auto&forecast_days=3',
-      );
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        city.currentTemp = (data['current']['temperature_2m'] as num).toDouble();
-        city.humidity = (data['current']['relative_humidity_2m'] as num).toInt();
-        city.windSpeed = (data['current']['wind_speed_10m'] as num).toDouble();
-        city.weatherCode = (data['current']['weather_code'] as num).toInt();
-        city.feelsLike = (data['current']['apparent_temperature'] as num).toDouble();
-        city.uvIndex = (data['current']['uv_index'] as num).toDouble();
-
-        final daily = data['daily'];
-        city.sunrise = daily['sunrise'][0] as String;
-        city.sunset = daily['sunset'][0] as String;
-
-        city.forecast = [];
-        for (int i = 0; i < 3; i++) {
-          city.forecast.add(_DayForecast(
-            date: daily['time'][i] as String,
-            maxTemp: (daily['temperature_2m_max'][i] as num).toDouble(),
-            minTemp: (daily['temperature_2m_min'][i] as num).toDouble(),
-            weatherCode: (daily['weather_code'][i] as num).toInt(),
-          ));
-        }
+      final data = await ApiService().getWeatherByCoordinates(city.lat, city.lon);
+      if (data != null) {
+        _applyWeatherData(city, data);
       }
     } catch (_) {
       // Use fallback data
@@ -534,7 +514,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                       const SizedBox(height: 2),
                                       // Description
                                       Text(
-                                        _getWeatherDescription(primary.weatherCode),
+                                        _getWeatherDescription(primary.weatherCode, primary.conditionText),
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.white.withValues(alpha: 0.85),
@@ -681,7 +661,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _getWeatherDescription(city.weatherCode),
+                      _getWeatherDescription(city.weatherCode, city.conditionText),
                       style: TextStyle(
                         fontSize: 14,
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -869,13 +849,23 @@ class _WeatherScreenState extends State<WeatherScreen> {
     );
   }
 
+  /// WeatherAPI.com rain condition codes:
+  /// 1063-1201: rain/drizzle/freezing rain variants
+  /// 1240-1252: rain showers
+  /// 1273+: thunderstorm with rain
   bool _isRainyCode(int code) {
-    return (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95;
+    return (code >= 1063 && code <= 1201) ||
+        (code >= 1240 && code <= 1252) ||
+        code >= 1273;
   }
 
   ({IconData icon, Color color, Color bgColor, String text}) _getRainAdvisory(_CityWeather city, bool isDark) {
     final currentRain = _isRainyCode(city.weatherCode);
     final forecastRain = city.forecast.any((d) => _isRainyCode(d.weatherCode));
+    // Use the highest chance_of_rain from the forecast
+    final maxChance = city.forecast.isEmpty
+        ? 0
+        : city.forecast.map((d) => d.chanceOfRain).reduce((a, b) => a > b ? a : b);
 
     if (currentRain) {
       return (
@@ -885,12 +875,14 @@ class _WeatherScreenState extends State<WeatherScreen> {
         text: 'Rain right now — carry an umbrella!',
       );
     }
-    if (forecastRain) {
+    if (forecastRain || maxChance >= 50) {
       return (
         icon: Icons.umbrella_rounded,
         color: AppColors.warning,
         bgColor: AppColors.warning.withValues(alpha: isDark ? 0.12 : 0.08),
-        text: 'Rain expected in the next few days — pack an umbrella.',
+        text: maxChance > 0
+            ? '$maxChance% chance of rain in the next few days — pack an umbrella.'
+            : 'Rain expected in the next few days — pack an umbrella.',
       );
     }
     return (
@@ -934,17 +926,32 @@ class _WeatherScreenState extends State<WeatherScreen> {
     return '$h:$m';
   }
 
-  String _formatSunTime(String isoTime) {
-    if (isoTime.isEmpty) return '--:--';
+  /// Parse WeatherAPI.com sun time format ("06:15 AM" or "06:30 PM")
+  /// into 24-hour display ("06:15" / "18:30").
+  String _formatSunTime(String timeStr) {
+    if (timeStr.isEmpty) return '--:--';
     try {
-      final dt = DateTime.parse(isoTime);
-      final h = dt.hour.toString().padLeft(2, '0');
-      final m = dt.minute.toString().padLeft(2, '0');
-      return '$h:$m';
+      // WeatherAPI.com format: "06:15 AM" or "06:30 PM"
+      final upper = timeStr.trim().toUpperCase();
+      final isPM = upper.endsWith('PM');
+      final isAM = upper.endsWith('AM');
+      if (isPM || isAM) {
+        final timePart = upper.replaceAll(RegExp(r'\s*(AM|PM)\s*$'), '').trim();
+        final parts = timePart.split(':');
+        if (parts.length == 2) {
+          var hour = int.parse(parts[0]);
+          final minute = int.parse(parts[1]);
+          if (isPM && hour != 12) hour += 12;
+          if (isAM && hour == 12) hour = 0;
+          return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+        }
+      }
+      // Fallback: try ISO parse
+      final dt = DateTime.parse(timeStr);
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {
-      // Fallback: extract time from ISO string like "2026-02-24T06:15"
-      final parts = isoTime.split('T');
-      return parts.length > 1 ? parts[1].substring(0, 5) : '--:--';
+      // Last resort: return as-is if it looks like a time
+      return timeStr.length <= 8 ? timeStr : '--:--';
     }
   }
 
@@ -961,36 +968,57 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
   }
 
+  /// Map WeatherAPI.com condition codes to Material icons.
+  /// See https://www.weatherapi.com/docs/weather_conditions.json
   IconData _getWeatherIcon(int code) {
-    if (code == 0 || code == 1) return Icons.wb_sunny_rounded;
-    if (code == 2) return Icons.cloud_rounded;
-    if (code == 3) return Icons.cloud_rounded;
-    if (code >= 45 && code <= 48) return Icons.foggy;
-    if (code >= 51 && code <= 67) return Icons.grain_rounded;
-    if (code >= 71 && code <= 77) return Icons.ac_unit_rounded;
-    if (code >= 80 && code <= 82) return Icons.water_drop_rounded;
-    if (code >= 95) return Icons.thunderstorm_rounded;
+    // Sunny / Clear
+    if (code == 1000) return Icons.wb_sunny_rounded;
+    // Partly cloudy
+    if (code == 1003) return Icons.cloud_rounded;
+    // Cloudy / Overcast
+    if (code == 1006 || code == 1009) return Icons.cloud_rounded;
+    // Mist / Fog / Freezing fog
+    if (code == 1030 || code == 1135 || code == 1147) return Icons.foggy;
+    // Drizzle variants (1150-1171) and light rain
+    if (code >= 1150 && code <= 1171) return Icons.grain_rounded;
+    // Rain variants (1180-1201)
+    if (code >= 1180 && code <= 1201) return Icons.water_drop_rounded;
+    // Snow / sleet / ice (1066, 1069, 1072, 1114, 1117, 1204-1237, 1255-1264)
+    if (code == 1066 || code == 1069 || code == 1072 ||
+        code == 1114 || code == 1117 ||
+        (code >= 1204 && code <= 1237) ||
+        (code >= 1255 && code <= 1264)) return Icons.ac_unit_rounded;
+    // Rain showers (1240-1246)
+    if (code >= 1240 && code <= 1246) return Icons.water_drop_rounded;
+    // Snow showers (1249-1258) — already covered above
+    // Thunderstorm (1087, 1273-1282)
+    if (code == 1087 || code >= 1273) return Icons.thunderstorm_rounded;
+    // Patchy rain/drizzle/snow possible (1063, 1066, etc.)
+    if (code == 1063) return Icons.grain_rounded;
     return Icons.cloud_rounded;
   }
 
-  String _getWeatherDescription(int code) {
-    if (code == 0) return 'Clear sky';
-    if (code == 1) return 'Mainly clear';
-    if (code == 2) return 'Partly cloudy';
-    if (code == 3) return 'Overcast';
-    if (code >= 45 && code <= 48) return 'Foggy';
-    if (code >= 51 && code <= 55) return 'Drizzle';
-    if (code >= 56 && code <= 57) return 'Freezing drizzle';
-    if (code >= 61 && code <= 65) return 'Rain';
-    if (code >= 66 && code <= 67) return 'Freezing rain';
-    if (code >= 71 && code <= 75) return 'Snow';
-    if (code >= 80 && code <= 82) return 'Rain showers';
-    if (code >= 95) return 'Thunderstorm';
+  /// Use condition_text from API when available, fall back to code-based description.
+  String _getWeatherDescription(int code, [String conditionText = '']) {
+    if (conditionText.isNotEmpty) return conditionText;
+    // Fallback mapping for WeatherAPI.com codes
+    if (code == 1000) return 'Clear';
+    if (code == 1003) return 'Partly cloudy';
+    if (code == 1006) return 'Cloudy';
+    if (code == 1009) return 'Overcast';
+    if (code == 1030) return 'Mist';
+    if (code == 1135 || code == 1147) return 'Foggy';
+    if (code >= 1150 && code <= 1171) return 'Drizzle';
+    if (code >= 1180 && code <= 1201) return 'Rain';
+    if (code >= 1204 && code <= 1237) return 'Snow';
+    if (code >= 1240 && code <= 1246) return 'Rain showers';
+    if (code >= 1255 && code <= 1264) return 'Snow showers';
+    if (code == 1087 || code >= 1273) return 'Thunderstorm';
     return 'Unknown';
   }
 }
 
-// --- Add City Dialog (stateful, with debounced geocoding search) ---
+// --- Add City Dialog (stateful, with debounced search via backend proxy) ---
 
 class _AddCityDialog extends StatefulWidget {
   final Future<void> Function(String name, double lat, double lon) onCitySelected;
@@ -1031,34 +1059,19 @@ class _AddCityDialogState extends State<_AddCityDialog> {
 
   Future<void> _search(String query) async {
     try {
-      final url = Uri.parse(
-        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(query)}&count=5',
-      );
-      final response = await http.get(url);
+      final results = await ApiService().searchWeatherCities(query);
       if (!mounted) return;
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<dynamic>? results = data['results'];
-        setState(() {
-          _isSearching = false;
-          _hasSearched = true;
-          _results = (results ?? []).map((r) => _GeoResult(
-            name: r['name'] as String,
-            country: (r['country'] as String?) ?? '',
-            admin1: (r['admin1'] as String?) ?? '',
-            lat: (r['latitude'] as num).toDouble(),
-            lon: (r['longitude'] as num).toDouble(),
-          )).toList();
-        });
-      } else {
-        if (mounted) {
-          setState(() {
-            _isSearching = false;
-            _hasSearched = true;
-            _results = [];
-          });
-        }
-      }
+      setState(() {
+        _isSearching = false;
+        _hasSearched = true;
+        _results = results.map((r) => _GeoResult(
+          name: (r['name'] as String?) ?? '',
+          country: (r['country'] as String?) ?? '',
+          admin1: (r['region'] as String?) ?? '',
+          lat: (r['lat'] as num?)?.toDouble() ?? 0,
+          lon: (r['lon'] as num?)?.toDouble() ?? 0,
+        )).toList();
+      });
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -1172,6 +1185,7 @@ class _CityWeather {
   final String name;
   final double lat;
   final double lon;
+  final int? cityId;
   final String? backgroundImageUrl;
   double currentTemp = 0;
   int humidity = 0;
@@ -1179,6 +1193,8 @@ class _CityWeather {
   int weatherCode = 0;
   double feelsLike = 0;
   double uvIndex = 0;
+  String conditionText = '';
+  String conditionIcon = '';
   String sunrise = '';
   String sunset = '';
   List<_DayForecast> forecast = [];
@@ -1187,6 +1203,7 @@ class _CityWeather {
     required this.name,
     required this.lat,
     required this.lon,
+    this.cityId,
     this.backgroundImageUrl,
   });
 }
@@ -1196,11 +1213,15 @@ class _DayForecast {
   final double maxTemp;
   final double minTemp;
   final int weatherCode;
+  final String conditionText;
+  final int chanceOfRain;
 
   _DayForecast({
     required this.date,
     required this.maxTemp,
     required this.minTemp,
     required this.weatherCode,
+    this.conditionText = '',
+    this.chanceOfRain = 0,
   });
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -41,11 +42,9 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     'recommendation': Icons.recommend_outlined,
   };
 
-  /// Returns true if this doc type requires a live camera capture (no gallery/files).
-  bool _isCameraOnly(Map<String, dynamic> doc) {
-    // Explicit backend flag
+  /// Returns true if this doc type is a photo (camera preferred, gallery allowed).
+  bool _isPhotoType(Map<String, dynamic> doc) {
     if (doc['camera_only'] == true) return true;
-    // Default: 'photo' key always requires live capture
     final key = _docKey(doc);
     return key == 'photo' || key.contains('photo');
   }
@@ -157,11 +156,10 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
   static const _maxFileSize = 5 * 1024 * 1024; // 5MB
 
   /// Main entry point for uploading a document.
-  /// If the doc is camera_only (e.g. photo), opens camera directly with preview.
-  /// Otherwise shows the source picker bottom sheet.
+  /// Photo types show camera + gallery. Other documents show camera/gallery/files.
   void _initiateUpload(String docType, Map<String, dynamic> docConfig, {int? replacesId}) {
-    if (_isCameraOnly(docConfig)) {
-      _capturePhoto(docType, replacesId: replacesId);
+    if (_isPhotoType(docConfig)) {
+      _showPhotoSourcePicker(docType, replacesId: replacesId);
     } else {
       _showSourcePicker(docType, replacesId: replacesId);
     }
@@ -173,12 +171,25 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     final picker = ImagePicker();
 
     while (mounted) {
-      final picked = await picker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        maxWidth: 1200,
-        imageQuality: 90,
-      );
+      XFile? picked;
+      try {
+        picked = await picker.pickImage(
+          source: ImageSource.camera,
+          preferredCameraDevice: CameraDevice.front,
+          maxWidth: 1200,
+          imageQuality: 90,
+        );
+      } on PlatformException catch (e) {
+        if (!mounted) return;
+        final isFr = _isFr() == 'fr';
+        final msg = e.code.contains('denied')
+            ? (isFr ? 'Caméra indisponible. Choisissez une photo de la galerie.' : 'Camera unavailable. Choose a photo from gallery instead.')
+            : (isFr ? 'Impossible d\'ouvrir la caméra. Choisissez de la galerie.' : 'Could not open camera. Choose from gallery instead.');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+        // Fall back to gallery
+        _pickFromGallery(docType, replacesId: replacesId);
+        return;
+      }
       // User cancelled the camera → exit
       if (picked == null || !mounted) return;
 
@@ -199,6 +210,78 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
       // accepted == null → user pressed back → exit
       if (accepted == null) return;
     }
+  }
+
+  /// Photo source picker — camera (preferred) + gallery fallback.
+  void _showPhotoSourcePicker(String docType, {int? replacesId}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isFr = _isFr() == 'fr';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isFr ? 'Photo d\'identité' : 'Passport Photo',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black87),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isFr ? 'Prenez une photo en direct ou choisissez de la galerie' : 'Take a live photo or choose from gallery',
+                style: TextStyle(fontSize: 13,
+                  color: isDark ? Colors.white38 : Colors.black45),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSourceOption(
+                      icon: Icons.camera_alt_rounded,
+                      label: isFr ? 'Caméra' : 'Camera',
+                      color: Colors.blue,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _capturePhoto(docType, replacesId: replacesId);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildSourceOption(
+                      icon: Icons.photo_library_rounded,
+                      label: isFr ? 'Galerie' : 'Gallery',
+                      color: AppColors.burundiGreen,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickFromGallery(docType, replacesId: replacesId);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showSourcePicker(String docType, {int? replacesId}) {
@@ -315,7 +398,18 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
 
   Future<void> _pickFromCamera(String docType, {int? replacesId}) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 2048);
+    XFile? picked;
+    try {
+      picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 2048);
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      final isFr = _isFr() == 'fr';
+      final msg = e.code.contains('denied')
+          ? (isFr ? 'Accès à la caméra refusé. Activez-le dans les Réglages.' : 'Camera access denied. Enable it in Settings.')
+          : (isFr ? 'Impossible d\'ouvrir la caméra' : 'Could not open camera');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+      return;
+    }
     if (picked == null) return;
     _uploadFile(File(picked.path), docType, replacesId: replacesId);
   }
@@ -896,11 +990,11 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     final isApproved = hasDoc && doc.status == 'approved';
     final isPending = hasDoc && doc.status == 'pending';
 
-    final cameraOnly = _isCameraOnly(docConfig);
+    final isPhoto = _isPhotoType(docConfig);
 
     Color statusColor = Colors.grey;
-    String statusText = cameraOnly ? 'Live photo required' : 'Not uploaded';
-    IconData statusIcon = cameraOnly ? Icons.camera_alt_outlined : Icons.radio_button_unchecked;
+    String statusText = isPhoto ? 'Photo required' : 'Not uploaded';
+    IconData statusIcon = isPhoto ? Icons.camera_alt_outlined : Icons.radio_button_unchecked;
     if (hasDoc) {
       switch (doc.status) {
         case 'pending':
@@ -1009,14 +1103,14 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
               else
                 TextButton.icon(
                   onPressed: () => _initiateUpload(type, docConfig, replacesId: isRejected ? doc.id : null),
-                  icon: cameraOnly && !hasDoc
+                  icon: isPhoto && !hasDoc
                       ? Icon(Icons.camera_alt_rounded, size: 16,
                           color: isRejected ? AppColors.burundiRed : AppColors.burundiGreen)
                       : const SizedBox.shrink(),
                   label: Text(
                     hasDoc
                         ? (isRejected ? 'Re-upload' : 'Replace')
-                        : (cameraOnly ? 'Take Photo' : 'Upload'),
+                        : (isPhoto ? 'Take Photo' : 'Upload'),
                     style: TextStyle(
                       color: isRejected ? AppColors.burundiRed : AppColors.burundiGreen,
                       fontWeight: FontWeight.w600,

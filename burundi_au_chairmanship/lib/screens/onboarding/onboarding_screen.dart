@@ -132,7 +132,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await _api.completeOnboarding();
       } catch (_) {}
     }
-    if (mounted) Navigator.pop(context, true);
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.pop(context, true);
+    }
   }
 
   /// Resolve the correct image URL based on dark/light mode.

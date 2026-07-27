@@ -9,7 +9,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from PIL import Image as PILImage
 
-from .validators import validate_image_file, validate_document_file, validate_video_file, validate_subtitle_file, validate_fcm_token, validate_professional_email
+from .validators import validate_image_file, validate_document_file, validate_document_or_image_file, validate_video_file, validate_subtitle_file, validate_fcm_token, validate_professional_email
 
 logger = logging.getLogger(__name__)
 
@@ -5207,7 +5207,7 @@ class YouthDialogueDocument(models.Model):
 
     application = models.ForeignKey(YouthDialogueApplication, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
-    file = models.FileField(upload_to='youth_dialogue/documents/', storage=_private_storage, validators=[validate_document_file])
+    file = models.FileField(upload_to='youth_dialogue/documents/', storage=_private_storage, validators=[validate_document_or_image_file])
     original_filename = models.CharField(max_length=255, blank=True)
     file_size = models.PositiveIntegerField(default=0, help_text='File size in bytes')
 

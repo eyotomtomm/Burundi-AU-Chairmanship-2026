@@ -97,6 +97,21 @@ def validate_document_file(file):
     return file
 
 
+def validate_document_or_image_file(file):
+    """
+    Validate files that may be either a document (PDF) or an image (JPG, PNG).
+    Used for YouthDialogueDocument where users upload both passport photos
+    and scanned documents through the same field.
+    """
+    ext = os.path.splitext(file.name)[1][1:].lower()
+    image_extensions = {'jpg', 'jpeg', 'png'}
+
+    if ext in image_extensions:
+        return validate_image_file(file)
+    else:
+        return validate_document_file(file)
+
+
 def validate_video_file(file):
     """
     Validate uploaded video file size and extension.

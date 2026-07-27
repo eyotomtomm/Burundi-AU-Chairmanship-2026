@@ -218,8 +218,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildTabContent(_adminNotifications, isDarkMode, langCode, loc, isSystem: false),
-          _buildTabContent(_systemNotifications, isDarkMode, langCode, loc, isSystem: true),
+          _buildTabContent(_adminNotifications, isDarkMode, langCode, loc, isSystem: false, storageKey: 'notif_admin'),
+          _buildTabContent(_systemNotifications, isDarkMode, langCode, loc, isSystem: true, storageKey: 'notif_system'),
         ],
       ),
     );
@@ -249,6 +249,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     String langCode,
     AppLocalizations? loc, {
     required bool isSystem,
+    String storageKey = 'notif',
   }) {
     if (_isLoading) {
       return const ShimmerListItemSkeleton();
@@ -347,6 +348,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         await _loadNotifications();
       },
       child: ListView.builder(
+        key: PageStorageKey<String>(storageKey),
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: notifications.length,
         itemBuilder: (context, index) {

@@ -139,6 +139,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               await _loadAlbums();
             },
             child: CustomScrollView(
+              key: const PageStorageKey<String>('gallery_scroll'),
               slivers: [
                 // App Bar
                 SliverAppBar(

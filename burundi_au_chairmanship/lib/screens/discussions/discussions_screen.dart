@@ -153,6 +153,7 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                           await _loadDiscussions();
                         },
                         child: ListView.builder(
+                          key: const PageStorageKey<String>('discussions_scroll'),
                           padding: const EdgeInsets.all(16),
                           itemCount: _discussions.length,
                           itemBuilder: (context, index) {

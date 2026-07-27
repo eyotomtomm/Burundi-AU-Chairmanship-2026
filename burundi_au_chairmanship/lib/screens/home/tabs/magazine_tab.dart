@@ -192,6 +192,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
 
     return Scaffold(
       body: NestedScrollView(
+        key: const PageStorageKey<String>('magazine_tab_scroll'),
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           // Gradient app bar — always visible
           SliverAppBar(

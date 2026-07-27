@@ -558,6 +558,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       },
       color: AppColors.burundiGreen,
       child: CustomScrollView(
+        key: const PageStorageKey<String>('home_tab_scroll'),
         slivers: [
           SliverToBoxAdapter(
             child: HeroSlideshow(

@@ -157,6 +157,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 _loadCategories();
               },
               child: CustomScrollView(
+                key: const PageStorageKey<String>('articles_scroll'),
                 slivers: [
                   _buildSliverAppBar(l10n, langCode),
 

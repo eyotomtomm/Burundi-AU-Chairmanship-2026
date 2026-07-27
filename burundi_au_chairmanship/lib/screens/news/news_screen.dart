@@ -164,6 +164,7 @@ class _NewsScreenState extends State<NewsScreen> {
                 _loadCategories();
               },
               child: CustomScrollView(
+                key: const PageStorageKey<String>('news_scroll'),
                 slivers: [
                   _buildSliverAppBar(l10n),
 

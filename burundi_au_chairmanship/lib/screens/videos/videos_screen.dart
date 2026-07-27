@@ -227,6 +227,7 @@ class _VideosScreenState extends State<VideosScreen> {
               await _loadVideos();
             },
             child: CustomScrollView(
+              key: const PageStorageKey<String>('videos_scroll'),
               slivers: [
                 // App Bar
                 SliverAppBar(

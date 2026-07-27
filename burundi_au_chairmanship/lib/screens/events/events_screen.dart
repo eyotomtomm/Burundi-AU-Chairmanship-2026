@@ -161,15 +161,15 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
               : TabBarView(
                   controller: _tabController,
                   children: [
-                    _buildEventList(_allEvents, lang, isDark, showEmpty: true),
-                    _buildEventList(_upcomingEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'De nouveaux événements arrivent bientôt' : 'New events coming soon'),
-                    _buildEventList(_pastEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'Les événements passés apparaîtront ici' : 'Past events will appear here'),
+                    _buildEventList(_allEvents, lang, isDark, showEmpty: true, storageKey: 'events_all'),
+                    _buildEventList(_upcomingEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'De nouveaux événements arrivent bientôt' : 'New events coming soon', storageKey: 'events_upcoming'),
+                    _buildEventList(_pastEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'Les événements passés apparaîtront ici' : 'Past events will appear here', storageKey: 'events_past'),
                   ],
                 ),
     );
   }
 
-  Widget _buildEventList(List<EventRegistrationModel> events, String lang, bool isDark, {bool showEmpty = false, String? emptyMessage}) {
+  Widget _buildEventList(List<EventRegistrationModel> events, String lang, bool isDark, {bool showEmpty = false, String? emptyMessage, String storageKey = 'events'}) {
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
     if (events.isEmpty && !isAuth) {
@@ -187,6 +187,7 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       },
       color: AppColors.burundiGreen,
       child: ListView.builder(
+        key: PageStorageKey<String>(storageKey),
         padding: const EdgeInsets.symmetric(vertical: 12),
         itemCount: events.length,
         itemBuilder: (context, index) => _buildEventCard(events[index], lang, isDark),

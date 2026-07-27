@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView, RedirectView
 from django.http import HttpResponse, HttpResponseRedirect
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-from core.views import verify_qr_web
+from core.views import verify_qr_web, register_web
 
 
 def open_app(request):
@@ -56,6 +56,8 @@ urlpatterns = [
     path('delete-account/', TemplateView.as_view(template_name='legal/delete_account.html'), name='delete-account'),
     # Public QR verification page (scanned by any phone camera)
     path('verify', verify_qr_web, name='verify-qr-web'),
+    # Public web registration for Continental Dialogue
+    path('register', register_web, name='register-web'),
     # Smart app redirect — detects iOS/Android and opens the right store
     path('app', open_app, name='open-app'),
 ]

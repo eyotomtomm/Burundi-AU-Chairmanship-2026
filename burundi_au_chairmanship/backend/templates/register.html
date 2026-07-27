@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | Continental Dialogue — B4Africa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        /* Flag stripe */
+        .flag-stripe {
+            height: 6px;
+            background: linear-gradient(90deg, #CE1126 33%, #FFFFFF 33%, #FFFFFF 66%, #1EB53A 66%);
+        }
+
+        /* Header */
+        .page-header {
+            background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #1B5E20 100%);
+            color: white;
+            text-align: center;
+            padding: 32px 24px 28px;
+        }
+        .emblems {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 16px;
+        }
+        .emblems img {
+            height: 56px;
+            width: auto;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+        }
+        .page-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        .page-header .subtitle {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+
+        /* Progress bar */
+        .progress-container {
+            background: white;
+            padding: 20px 24px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .progress-steps {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            border: 2px solid #ccc;
+            color: #999;
+            background: white;
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+        .step-circle.active {
+            border-color: #2E7D32;
+            background: #2E7D32;
+            color: white;
+        }
+        .step-circle.done {
+            border-color: #2E7D32;
+            background: #2E7D32;
+            color: white;
+        }
+        .step-line {
+            width: 40px;
+            height: 2px;
+            background: #ccc;
+            transition: background 0.3s;
+        }
+        .step-line.done { background: #2E7D32; }
+        .step-label {
+            font-size: 10px;
+            color: #999;
+            text-align: center;
+            margin-top: 4px;
+            white-space: nowrap;
+        }
+        .step-label.active { color: #2E7D32; font-weight: 600; }
+        .step-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Main content */
+        .main-content {
+            max-width: 560px;
+            margin: 24px auto;
+            padding: 0 16px 40px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            padding: 32px 28px;
+        }
+        .card h2 {
+            font-size: 20px;
+            color: #1B5E20;
+            margin-bottom: 4px;
+        }
+        .card .card-desc {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 24px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #444;
+            margin-bottom: 5px;
+        }
+        .form-group label .req {
+            color: #c62828;
+            margin-left: 2px;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group input[type="tel"],
+        .form-group input[type="number"],
+        .form-group input[type="date"],
+        .form-group input[type="time"],
+        .form-group input[type="url"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2E7D32;
+            box-shadow: 0 0 0 2px rgba(46,125,50,0.15);
+        }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .form-group .field-error {
+            font-size: 12px;
+            color: #c62828;
+            margin-top: 4px;
+            display: none;
+        }
+
+        /* Radio & Checkbox */
+        .radio-group, .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .radio-group label, .checkbox-group label {
+            font-weight: 400;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .radio-group input, .checkbox-group input {
+            accent-color: #2E7D32;
+        }
+        .single-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .single-checkbox input {
+            margin-top: 3px;
+            accent-color: #2E7D32;
+        }
+        .single-checkbox label {
+            font-weight: 400;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary {
+            background: #2E7D32;
+            color: white;
+            width: 100%;
+        }
+        .btn-primary:hover { background: #1B5E20; }
+        .btn-primary:disabled {
+            background: #a5d6a7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: transparent;
+            color: #2E7D32;
+            border: 1px solid #2E7D32;
+        }
+        .btn-secondary:hover { background: #e8f5e9; }
+        .btn-link {
+            background: none;
+            border: none;
+            color: #2E7D32;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px;
+        }
+        .btn-link:hover { text-decoration: underline; }
+        .btn-link:disabled { color: #999; cursor: not-allowed; text-decoration: none; }
+
+        /* Alerts */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .alert.show { display: block; }
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+        .alert-info {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #90caf9;
+        }
+        .alert-warning {
+            background: #fff8e1;
+            color: #f57f17;
+            border: 1px solid #ffe082;
+        }
+
+        /* OTP boxes */
+        .otp-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 24px 0;
+        }
+        .otp-input {
+            width: 46px;
+            height: 52px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .otp-input:focus {
+            border-color: #2E7D32;
+            box-shadow: 0 0 0 2px rgba(46,125,50,0.15);
+        }
+        .resend-row {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Document upload */
+        .doc-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .doc-section h4 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .doc-section .doc-status {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+        .doc-section .doc-status.uploaded { color: #2e7d32; }
+        .file-drop {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .file-drop:hover, .file-drop.dragover {
+            border-color: #2E7D32;
+            background: #f1f8e9;
+        }
+        .file-drop p {
+            font-size: 13px;
+            color: #888;
+        }
+        .file-drop .file-icon { font-size: 28px; margin-bottom: 6px; }
+        .file-preview {
+            margin-top: 10px;
+            text-align: center;
+        }
+        .file-preview img {
+            max-width: 100%;
+            max-height: 160px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .file-preview .file-name {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .upload-progress {
+            margin-top: 8px;
+            display: none;
+        }
+        .upload-progress .progress-bar-track {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .upload-progress .progress-bar-fill {
+            height: 100%;
+            background: #2E7D32;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.2s;
+        }
+        .upload-progress .progress-text {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* Success */
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #e8f5e9;
+            color: #2e7d32;
+            font-size: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        .ref-id {
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1B5E20;
+            letter-spacing: 1px;
+            margin: 16px 0;
+        }
+        .download-app {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .download-app a {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #1B5E20;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .download-app a:hover { background: #2E7D32; }
+        .download-app a svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        /* Language toggle */
+        .lang-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 100;
+            transition: background 0.2s;
+        }
+        .lang-toggle:hover { background: #f5f5f5; }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-overlay .spinner-lg {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #2E7D32;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        /* Registration closed */
+        .closed-banner {
+            text-align: center;
+            padding: 40px 24px;
+        }
+        .closed-banner .closed-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .closed-banner h2 {
+            color: #c62828;
+            margin-bottom: 8px;
+        }
+
+        /* Next-steps info (for submitted/under_review status) */
+        .info-section {
+            text-align: center;
+            padding: 20px 0;
+        }
+        .info-section .info-icon {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            background: #e3f2fd;
+            color: #1565c0;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            text-align: left;
+            margin-bottom: 12px;
+        }
+        .timeline-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2E7D32;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .timeline-dot.pending { background: #ccc; }
+        .timeline-text {
+            font-size: 14px;
+            color: #555;
+        }
+
+        /* Honeypot */
+        ._hp_wrap { position: absolute; left: -9999px; opacity: 0; height: 0; overflow: hidden; }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .page-header { padding: 24px 16px 20px; }
+            .page-header h1 { font-size: 18px; }
+            .emblems img { height: 44px; }
+            .emblems { gap: 16px; }
+            .card { padding: 24px 20px; }
+            .otp-input { width: 40px; height: 46px; font-size: 20px; }
+            .download-app { flex-direction: column; }
+            .step-line { width: 24px; }
+            .step-circle { width: 28px; height: 28px; font-size: 12px; }
+        }
+
+        /* Side events */
+        .side-events-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .side-event-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .side-event-card.selected {
+            border-color: #2E7D32;
+            background: #f1f8e9;
+        }
+        .side-event-card h5 {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 2px;
+        }
+        .side-event-card p {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Section hidden by default */
+        .step-section { display: none; }
+        .step-section.active { display: block; }
+
+        /* Footer */
+        .page-footer {
+            background: #1B5E20;
+            color: rgba(255,255,255,0.85);
+            text-align: center;
+            padding: 24px;
+            font-size: 13px;
+        }
+        .page-footer a {
+            color: white;
+            text-decoration: none;
+            margin: 0 12px;
+            font-weight: 500;
+        }
+        .page-footer a:hover { text-decoration: underline; }
+        .footer-links { margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="flag-stripe"></div>
+
+<!-- Header -->
+<header class="page-header">
+    <div class="emblems">
+        <img src="/static/img/au_emblem.svg" alt="African Union Emblem">
+        <img src="/static/img/burundi_coat_of_arms.svg" alt="Burundi Coat of Arms">
+    </div>
+    <h1 data-i18n="header_title">Continental Dialogue Registration</h1>
+    <p class="subtitle" data-i18n="header_subtitle">Be 4 Africa</p>
+</header>
+
+<!-- Progress Bar -->
+<div class="progress-container" id="progress-container">
+    <div class="progress-steps">
+        <div class="step-wrapper">
+            <div class="step-circle active" id="step-circle-1">1</div>
+            <div class="step-label active" id="step-label-1" data-i18n="step_account">Account</div>
+        </div>
+        <div class="step-line" id="step-line-1"></div>
+        <div class="step-wrapper">
+            <div class="step-circle" id="step-circle-2">2</div>
+            <div class="step-label" id="step-label-2" data-i18n="step_verify">Verify</div>
+        </div>
+        <div class="step-line" id="step-line-2"></div>
+        <div class="step-wrapper">
+            <div class="step-circle" id="step-circle-3">3</div>
+            <div class="step-label" id="step-label-3" data-i18n="step_apply">Apply</div>
+        </div>
+        <div class="step-line" id="step-line-3"></div>
+        <div class="step-wrapper">
+            <div class="step-circle" id="step-circle-4">4</div>
+            <div class="step-label" id="step-label-4" data-i18n="step_documents">Documents</div>
+        </div>
+        <div class="step-line" id="step-line-4"></div>
+        <div class="step-wrapper">
+            <div class="step-circle" id="step-circle-5">5</div>
+            <div class="step-label" id="step-label-5" data-i18n="step_done">Done</div>
+        </div>
+    </div>
+</div>
+
+<div class="main-content">
+
+    <!-- Registration Closed -->
+    <section class="step-section" id="section-closed">
+        <div class="card">
+            <div class="closed-banner">
+                <div class="closed-icon">&#128274;</div>
+                <h2 data-i18n="closed_title">Registration Closed</h2>
+                <p class="card-desc" id="closed-message" data-i18n="closed_desc">Registration for the Continental Dialogue is currently closed. Please check back later.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Step 1: Create Account -->
+    <section class="step-section" id="section-step1">
+        <div class="card">
+            <h2 data-i18n="s1_title">Create Your Account</h2>
+            <p class="card-desc" data-i18n="s1_desc">Enter your details to get started.</p>
+
+            <div class="alert alert-error" id="s1-error"></div>
+
+            <form id="signup-form" autocomplete="off">
+                <div class="_hp_wrap">
+                    <label for="_hp">Leave empty</label>
+                    <input type="text" id="_hp" name="_hp" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label data-i18n="s1_name">Full Name <span class="req">*</span></label>
+                    <input type="text" id="signup-name" required placeholder="e.g. Jean Ndayisaba">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="s1_email">Email Address <span class="req">*</span></label>
+                    <input type="email" id="signup-email" required placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="s1_password">Password <span class="req">*</span></label>
+                    <input type="password" id="signup-password" required minlength="8" placeholder="Minimum 8 characters">
+                </div>
+                <div class="form-group">
+                    <label data-i18n="s1_confirm_password">Confirm Password <span class="req">*</span></label>
+                    <input type="password" id="signup-password2" required minlength="8" placeholder="Re-enter your password">
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="signup-btn">
+                    <span data-i18n="s1_btn">Create Account</span>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Step 2: Verify Email -->
+    <section class="step-section" id="section-step2">
+        <div class="card">
+            <h2 data-i18n="s2_title">Verify Your Email</h2>
+            <p class="card-desc" id="s2-desc" data-i18n="s2_desc">We sent a 6-digit code to your email. Enter it below.</p>
+
+            <div class="alert alert-error" id="s2-error"></div>
+            <div class="alert alert-success" id="s2-success"></div>
+
+            <div class="otp-container" id="otp-container">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric" pattern="[0-9]">
+            </div>
+
+            <button class="btn btn-primary" id="verify-btn" disabled>
+                <span data-i18n="s2_btn">Verify</span>
+            </button>
+
+            <div class="resend-row">
+                <span data-i18n="s2_no_code">Didn't receive a code?</span>
+                <button class="btn-link" id="resend-btn" disabled data-i18n="s2_resend">Resend</button>
+                <span id="resend-countdown"></span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Step 3: Application Form -->
+    <section class="step-section" id="section-step3">
+        <div class="card">
+            <h2 data-i18n="s3_title">Application Form</h2>
+            <p class="card-desc" data-i18n="s3_desc">Complete the form below to apply for the Continental Dialogue.</p>
+
+            <div class="alert alert-error" id="s3-error"></div>
+
+            <form id="apply-form">
+                <div id="dynamic-fields"></div>
+
+                <div id="side-events-container" style="display:none;">
+                    <div class="form-group">
+                        <label data-i18n="s3_side_events">Side Event (optional)</label>
+                        <div class="side-events-list" id="side-events-list"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="apply-btn" style="margin-top: 8px;">
+                    <span data-i18n="s3_btn">Submit Application</span>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Step 4: Document Upload -->
+    <section class="step-section" id="section-step4">
+        <div class="card">
+            <h2 data-i18n="s4_title">Upload Documents</h2>
+            <p class="card-desc" data-i18n="s4_desc">Upload the required documents below. Accepted formats: PDF, JPG, PNG (max 5 MB).</p>
+
+            <div class="alert alert-error" id="s4-error"></div>
+            <div class="alert alert-success" id="s4-success"></div>
+            <div class="alert alert-warning" id="s4-rejection-notes" style="display:none;"></div>
+
+            <div id="doc-upload-sections"></div>
+
+            <button class="btn btn-primary" id="submit-docs-btn" disabled style="margin-top: 8px;">
+                <span data-i18n="s4_btn">Submit Documents</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Step 4 alternate: Application submitted/under review info -->
+    <section class="step-section" id="section-step4-info">
+        <div class="card">
+            <div class="info-section">
+                <div class="info-icon">&#9432;</div>
+                <h2 data-i18n="s4i_title">Application Under Review</h2>
+                <p class="card-desc" data-i18n="s4i_desc">Your application has been submitted and is being reviewed. Here's what happens next:</p>
+            </div>
+
+            <div id="timeline-items">
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-text" data-i18n="s4i_step1">Application submitted</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot pending"></div>
+                    <div class="timeline-text" data-i18n="s4i_step2">Review by the organising committee</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot pending"></div>
+                    <div class="timeline-text" data-i18n="s4i_step3">Decision notification via email</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot pending"></div>
+                    <div class="timeline-text" data-i18n="s4i_step4">Document upload (if accepted)</div>
+                </div>
+            </div>
+
+            <p style="font-size:14px;color:#666;margin-top:16px;text-align:center;" id="s4i-ref"></p>
+
+            <div style="margin-top:20px;">
+                <p style="font-size:13px;color:#888;text-align:center;" data-i18n="s4i_app_prompt">Download the app for real-time updates:</p>
+                <div class="download-app" style="margin-top:12px;">
+                    <a href="https://play.google.com/store/apps/details?id=com.b4africa.app" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734a1 1 0 0 1 .609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.4l2.456 1.421a1 1 0 0 1 0 1.744l-2.456 1.421-2.536-2.536 2.536-2.05zM5.864 3.471L16.8 9.804l-2.302 2.302-8.634-8.635z"/></svg>
+                        Google Play
+                    </a>
+                    <a href="https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                        App Store
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Step 5: Success -->
+    <section class="step-section" id="section-step5">
+        <div class="card" style="text-align:center;">
+            <div class="success-icon">&#10003;</div>
+            <h2 data-i18n="s5_title">Registration Complete</h2>
+            <p class="card-desc" data-i18n="s5_desc">Your documents have been submitted for review. You will receive a notification once your credential is ready.</p>
+
+            <div id="s5-ref-container" style="display:none;">
+                <p style="font-size:13px;color:#888;" data-i18n="s5_ref_label">Your reference ID:</p>
+                <div class="ref-id" id="s5-ref-id"></div>
+            </div>
+
+            <p style="font-size:14px;color:#555;margin-top:16px;" data-i18n="s5_app_prompt">Download the B4Africa app to view your credential, receive updates, and access event information.</p>
+
+            <div class="download-app" style="margin-top: 16px;">
+                <a href="https://play.google.com/store/apps/details?id=com.b4africa.app" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734a1 1 0 0 1 .609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-1.4l2.456 1.421a1 1 0 0 1 0 1.744l-2.456 1.421-2.536-2.536 2.536-2.05zM5.864 3.471L16.8 9.804l-2.302 2.302-8.634-8.635z"/></svg>
+                    Google Play
+                </a>
+                <a href="https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    App Store
+                </a>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<!-- Footer -->
+<footer class="page-footer">
+    <div class="footer-links">
+        <a href="/privacy-policy/">Privacy Policy</a>
+        <a href="/terms-of-service/">Terms of Service</a>
+        <a href="/support/">Support</a>
+    </div>
+    <div>&copy; 2026 B4Africa. All rights reserved.</div>
+</footer>
+
+<!-- Language toggle -->
+<button class="lang-toggle" id="lang-toggle">FR</button>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spinner-lg"></div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ─── Config ───────────────────────────────────────────────
+    var API = '{{ api_base }}';
+    var RECAPTCHA_KEY = '{{ recaptcha_site_key }}';
+    var STORAGE_ACCESS = 'b4a_access';
+    var STORAGE_REFRESH = 'b4a_refresh';
+
+    // ─── i18n ─────────────────────────────────────────────────
+    var STRINGS = {
+        en: {
+            header_title: 'Continental Dialogue Registration',
+            header_subtitle: 'Be 4 Africa',
+            step_account: 'Account',
+            step_verify: 'Verify',
+            step_apply: 'Apply',
+            step_documents: 'Documents',
+            step_done: 'Done',
+            closed_title: 'Registration Closed',
+            closed_desc: 'Registration for the Continental Dialogue is currently closed. Please check back later.',
+            s1_title: 'Create Your Account',
+            s1_desc: 'Enter your details to get started.',
+            s1_name: 'Full Name <span class="req">*</span>',
+            s1_email: 'Email Address <span class="req">*</span>',
+            s1_password: 'Password <span class="req">*</span>',
+            s1_confirm_password: 'Confirm Password <span class="req">*</span>',
+            s1_btn: 'Create Account',
+            s2_title: 'Verify Your Email',
+            s2_desc: 'We sent a 6-digit code to your email. Enter it below.',
+            s2_btn: 'Verify',
+            s2_no_code: "Didn't receive a code?",
+            s2_resend: 'Resend',
+            s2_sent: 'A new code has been sent.',
+            s3_title: 'Application Form',
+            s3_desc: 'Complete the form below to apply for the Continental Dialogue.',
+            s3_side_events: 'Side Event (optional)',
+            s3_btn: 'Submit Application',
+            s4_title: 'Upload Documents',
+            s4_desc: 'Upload the required documents below. Accepted formats: PDF, JPG, PNG (max 5 MB).',
+            s4_btn: 'Submit Documents',
+            s4_drop: 'Click or drag a file here',
+            s4_formats: 'PDF, JPG, PNG — max 5 MB',
+            s4_change: 'Change file',
+            s4i_title: 'Application Under Review',
+            s4i_desc: 'Your application has been submitted and is being reviewed. Here\u2019s what happens next:',
+            s4i_step1: 'Application submitted',
+            s4i_step2: 'Review by the organising committee',
+            s4i_step3: 'Decision notification via email',
+            s4i_step4: 'Document upload (if accepted)',
+            s4i_app_prompt: 'Download the app for real-time updates:',
+            s5_title: 'Registration Complete',
+            s5_desc: 'Your documents have been submitted for review. You will receive a notification once your credential is ready.',
+            s5_ref_label: 'Your reference ID:',
+            s5_app_prompt: 'Download the B4Africa app to view your credential, receive updates, and access event information.',
+            err_passwords: 'Passwords do not match.',
+            err_generic: 'Something went wrong. Please try again.',
+            err_file_size: 'File must be under 5 MB.',
+            err_file_type: 'Only PDF, JPG, and PNG files are accepted.',
+            err_upload_all: 'Please upload all required documents.',
+            doc_uploaded: 'Uploaded',
+            doc_not_uploaded: 'Not uploaded',
+            doc_uploading: 'Uploading...',
+            doc_rejected_label: 'Documents were returned for revision:',
+        },
+        fr: {
+            header_title: 'Inscription au Dialogue Continental',
+            header_subtitle: 'Be 4 Africa',
+            step_account: 'Compte',
+            step_verify: 'V\u00e9rifier',
+            step_apply: 'Postuler',
+            step_documents: 'Documents',
+            step_done: 'Termin\u00e9',
+            closed_title: 'Inscriptions Ferm\u00e9es',
+            closed_desc: 'Les inscriptions au Dialogue Continental sont actuellement ferm\u00e9es. Veuillez r\u00e9essayer plus tard.',
+            s1_title: 'Cr\u00e9er Votre Compte',
+            s1_desc: 'Entrez vos informations pour commencer.',
+            s1_name: 'Nom Complet <span class="req">*</span>',
+            s1_email: 'Adresse Email <span class="req">*</span>',
+            s1_password: 'Mot de Passe <span class="req">*</span>',
+            s1_confirm_password: 'Confirmer le Mot de Passe <span class="req">*</span>',
+            s1_btn: 'Cr\u00e9er le Compte',
+            s2_title: 'V\u00e9rifiez Votre Email',
+            s2_desc: 'Nous avons envoy\u00e9 un code \u00e0 6 chiffres \u00e0 votre adresse email.',
+            s2_btn: 'V\u00e9rifier',
+            s2_no_code: "Vous n'avez pas re\u00e7u de code\u00a0?",
+            s2_resend: 'Renvoyer',
+            s2_sent: 'Un nouveau code a \u00e9t\u00e9 envoy\u00e9.',
+            s3_title: 'Formulaire de Candidature',
+            s3_desc: 'Compl\u00e9tez le formulaire ci-dessous pour postuler au Dialogue Continental.',
+            s3_side_events: '\u00c9v\u00e9nement parall\u00e8le (optionnel)',
+            s3_btn: 'Soumettre la Candidature',
+            s4_title: 'T\u00e9l\u00e9charger les Documents',
+            s4_desc: 'T\u00e9l\u00e9chargez les documents requis. Formats accept\u00e9s\u00a0: PDF, JPG, PNG (max 5 Mo).',
+            s4_btn: 'Soumettre les Documents',
+            s4_drop: 'Cliquez ou glissez un fichier ici',
+            s4_formats: 'PDF, JPG, PNG \u2014 max 5 Mo',
+            s4_change: 'Changer le fichier',
+            s4i_title: 'Candidature en Cours d\u2019Examen',
+            s4i_desc: 'Votre candidature a \u00e9t\u00e9 soumise et est en cours d\u2019examen. Voici les prochaines \u00e9tapes\u00a0:',
+            s4i_step1: 'Candidature soumise',
+            s4i_step2: 'Examen par le comit\u00e9 d\u2019organisation',
+            s4i_step3: 'Notification de la d\u00e9cision par email',
+            s4i_step4: 'T\u00e9l\u00e9chargement des documents (si accept\u00e9)',
+            s4i_app_prompt: 'T\u00e9l\u00e9chargez l\u2019application pour des mises \u00e0 jour en temps r\u00e9el\u00a0:',
+            s5_title: 'Inscription Compl\u00e8te',
+            s5_desc: 'Vos documents ont \u00e9t\u00e9 soumis pour examen. Vous recevrez une notification une fois votre accr\u00e9ditation pr\u00eate.',
+            s5_ref_label: 'Votre num\u00e9ro de r\u00e9f\u00e9rence\u00a0:',
+            s5_app_prompt: 'T\u00e9l\u00e9chargez l\u2019application B4Africa pour consulter votre accr\u00e9ditation, recevoir des mises \u00e0 jour et acc\u00e9der aux informations de l\u2019\u00e9v\u00e9nement.',
+            err_passwords: 'Les mots de passe ne correspondent pas.',
+            err_generic: 'Une erreur est survenue. Veuillez r\u00e9essayer.',
+            err_file_size: 'Le fichier doit faire moins de 5 Mo.',
+            err_file_type: 'Seuls les fichiers PDF, JPG et PNG sont accept\u00e9s.',
+            err_upload_all: 'Veuillez t\u00e9l\u00e9charger tous les documents requis.',
+            doc_uploaded: 'T\u00e9l\u00e9charg\u00e9',
+            doc_not_uploaded: 'Non t\u00e9l\u00e9charg\u00e9',
+            doc_uploading: 'T\u00e9l\u00e9chargement...',
+            doc_rejected_label: 'Les documents ont \u00e9t\u00e9 retourn\u00e9s pour r\u00e9vision\u00a0:',
+        }
+    };
+
+    var lang = 'en';
+
+    function t(key) {
+        return (STRINGS[lang] && STRINGS[lang][key]) || (STRINGS.en[key]) || key;
+    }
+
+    function applyLanguage() {
+        document.querySelectorAll('[data-i18n]').forEach(function(el) {
+            var key = el.getAttribute('data-i18n');
+            el.innerHTML = t(key);
+        });
+        // Re-render dynamic form labels if they exist
+        if (cachedSettings && cachedSettings.form_fields) {
+            renderFormLabels();
+        }
+    }
+
+    function renderFormLabels() {
+        cachedSettings.form_fields.forEach(function(f) {
+            if (!f.is_active) return;
+            var label = document.querySelector('[data-field-label="' + f.field_name + '"]');
+            if (label) {
+                var text = lang === 'fr' && f.field_label_fr ? f.field_label_fr : f.field_label;
+                label.innerHTML = text + (f.is_required ? ' <span class="req">*</span>' : '');
+            }
+            // placeholders
+            var input = document.getElementById('field-' + f.field_name);
+            if (input && (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA')) {
+                var ph = lang === 'fr' && f.placeholder_fr ? f.placeholder_fr : (f.placeholder || '');
+                input.placeholder = ph;
+            }
+            // help text
+            var helpEl = document.querySelector('[data-field-help="' + f.field_name + '"]');
+            if (helpEl) {
+                var ht = lang === 'fr' && f.help_text_fr ? f.help_text_fr : (f.help_text || '');
+                helpEl.textContent = ht;
+                helpEl.style.display = ht ? 'block' : 'none';
+            }
+        });
+    }
+
+    // ─── State ────────────────────────────────────────────────
+    var currentStep = 1;
+    var cachedSettings = null;
+    var uploadedDocs = {};  // { docType: true }
+    var appStatus = null;
+
+    // ─── DOM helpers ──────────────────────────────────────────
+    function $(id) { return document.getElementById(id); }
+    function show(id) { var el = $(id); if (el) el.style.display = 'block'; }
+    function hide(id) { var el = $(id); if (el) el.style.display = 'none'; }
+    function showAlert(id, msg) {
+        var el = $(id);
+        if (el) { el.textContent = msg; el.classList.add('show'); el.style.display = 'block'; }
+    }
+    function hideAlert(id) {
+        var el = $(id);
+        if (el) { el.textContent = ''; el.classList.remove('show'); el.style.display = 'none'; }
+    }
+    function setLoading(btn, loading) {
+        if (!btn) return;
+        btn.disabled = loading;
+        var span = btn.querySelector('span');
+        if (loading) {
+            btn._prevHTML = span ? span.innerHTML : btn.innerHTML;
+            if (span) span.innerHTML = '<span class="spinner"></span>';
+            else btn.innerHTML = '<span class="spinner"></span>';
+        } else {
+            if (span) span.innerHTML = btn._prevHTML || '';
+            else btn.innerHTML = btn._prevHTML || '';
+        }
+    }
+
+    // ─── API helper ───────────────────────────────────────────
+    function getToken() { return localStorage.getItem(STORAGE_ACCESS); }
+    function getRefresh() { return localStorage.getItem(STORAGE_REFRESH); }
+    function saveTokens(access, refresh) {
+        if (access) localStorage.setItem(STORAGE_ACCESS, access);
+        if (refresh) localStorage.setItem(STORAGE_REFRESH, refresh);
+    }
+    function clearTokens() {
+        localStorage.removeItem(STORAGE_ACCESS);
+        localStorage.removeItem(STORAGE_REFRESH);
+    }
+
+    function apiFetch(path, opts) {
+        opts = opts || {};
+        var url = API + path;
+        var headers = opts.headers || {};
+        headers['Accept'] = 'application/json';
+        if (!(opts.body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+        }
+        var token = getToken();
+        if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+        }
+        opts.headers = headers;
+
+        return fetch(url, opts).then(function(resp) {
+            if (resp.status === 401 && getRefresh()) {
+                return refreshToken().then(function(ok) {
+                    if (!ok) { clearTokens(); throw new Error('Session expired'); }
+                    headers['Authorization'] = 'Bearer ' + getToken();
+                    opts.headers = headers;
+                    return fetch(url, opts);
+                });
+            }
+            return resp;
+        });
+    }
+
+    function refreshToken() {
+        return fetch(API + '/auth/refresh/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh: getRefresh() })
+        }).then(function(resp) {
+            if (!resp.ok) return false;
+            return resp.json().then(function(data) {
+                saveTokens(data.access, data.refresh || getRefresh());
+                return true;
+            });
+        }).catch(function() { return false; });
+    }
+
+    function parseError(data) {
+        if (!data) return t('err_generic');
+        if (typeof data === 'string') return data;
+        if (data.detail) return data.detail;
+        if (data.non_field_errors) return data.non_field_errors.join(' ');
+        var msgs = [];
+        for (var key in data) {
+            if (data.hasOwnProperty(key)) {
+                var val = data[key];
+                if (Array.isArray(val)) msgs.push(val.join(' '));
+                else if (typeof val === 'string') msgs.push(val);
+            }
+        }
+        return msgs.join(' ') || t('err_generic');
+    }
+
+    // ─── Progress bar ─────────────────────────────────────────
+    function updateProgress(step) {
+        currentStep = step;
+        for (var i = 1; i <= 5; i++) {
+            var circle = $('step-circle-' + i);
+            var label = $('step-label-' + i);
+            if (i < step) {
+                circle.className = 'step-circle done';
+                circle.innerHTML = '&#10003;';
+                label.className = 'step-label';
+            } else if (i === step) {
+                circle.className = 'step-circle active';
+                circle.textContent = i;
+                label.className = 'step-label active';
+            } else {
+                circle.className = 'step-circle';
+                circle.textContent = i;
+                label.className = 'step-label';
+            }
+        }
+        for (var j = 1; j <= 4; j++) {
+            var line = $('step-line-' + j);
+            line.className = j < step ? 'step-line done' : 'step-line';
+        }
+    }
+
+    function goToStep(step) {
+        // Hide all sections
+        document.querySelectorAll('.step-section').forEach(function(s) {
+            s.classList.remove('active');
+        });
+        // Show the right one
+        if (step === 'closed') {
+            $('section-closed').classList.add('active');
+            $('progress-container').style.display = 'none';
+        } else if (step === '4-info') {
+            $('section-step4-info').classList.add('active');
+            updateProgress(4);
+        } else {
+            var sec = $('section-step' + step);
+            if (sec) sec.classList.add('active');
+            updateProgress(step);
+            $('progress-container').style.display = '';
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ─── Step 1: Signup ───────────────────────────────────────
+    $('signup-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        hideAlert('s1-error');
+        var name = $('signup-name').value.trim();
+        var email = $('signup-email').value.trim();
+        var pw = $('signup-password').value;
+        var pw2 = $('signup-password2').value;
+        var hp = $('_hp').value;
+
+        if (pw !== pw2) {
+            showAlert('s1-error', t('err_passwords'));
+            return;
+        }
+
+        var btn = $('signup-btn');
+        setLoading(btn, true);
+
+        var body = { name: name, email: email, password: pw, _hp: hp };
+
+        // reCAPTCHA
+        var doSignup = function(captchaToken) {
+            if (captchaToken) body.captcha_token = captchaToken;
+
+            apiFetch('/auth/register/', {
+                method: 'POST',
+                body: JSON.stringify(body)
+            }).then(function(resp) {
+                return resp.json().then(function(data) { return { ok: resp.ok, status: resp.status, data: data }; });
+            }).then(function(r) {
+                setLoading(btn, false);
+                if (!r.ok) {
+                    showAlert('s1-error', parseError(r.data));
+                    return;
+                }
+                saveTokens(r.data.access, r.data.refresh);
+                // Send OTP
+                sendOTP();
+                goToStep(2);
+            }).catch(function(err) {
+                setLoading(btn, false);
+                showAlert('s1-error', t('err_generic'));
+            });
+        };
+
+        if (RECAPTCHA_KEY && window.grecaptcha) {
+            grecaptcha.ready(function() {
+                grecaptcha.execute(RECAPTCHA_KEY, { action: 'register' }).then(doSignup);
+            });
+        } else {
+            doSignup(null);
+        }
+    });
+
+    // ─── Step 2: OTP ──────────────────────────────────────────
+    var otpInputs = document.querySelectorAll('.otp-input');
+    otpInputs.forEach(function(inp, idx) {
+        inp.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
+            if (this.value && idx < otpInputs.length - 1) {
+                otpInputs[idx + 1].focus();
+            }
+            checkOTPFilled();
+        });
+        inp.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !this.value && idx > 0) {
+                otpInputs[idx - 1].focus();
+            }
+        });
+        inp.addEventListener('paste', function(e) {
+            e.preventDefault();
+            var paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+            for (var i = 0; i < otpInputs.length && i < paste.length; i++) {
+                otpInputs[i].value = paste[i];
+            }
+            var focusIdx = Math.min(paste.length, otpInputs.length - 1);
+            otpInputs[focusIdx].focus();
+            checkOTPFilled();
+        });
+    });
+
+    function checkOTPFilled() {
+        var code = getOTPValue();
+        $('verify-btn').disabled = code.length !== 6;
+    }
+
+    function getOTPValue() {
+        var code = '';
+        otpInputs.forEach(function(inp) { code += inp.value; });
+        return code;
+    }
+
+    function sendOTP() {
+        return apiFetch('/auth/send-signup-otp/', { method: 'POST', body: '{}' })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                startResendCountdown();
+                return data;
+            })
+            .catch(function() {});
+    }
+
+    var resendTimer = null;
+    function startResendCountdown() {
+        var seconds = 60;
+        $('resend-btn').disabled = true;
+        $('resend-countdown').textContent = '(' + seconds + 's)';
+        clearInterval(resendTimer);
+        resendTimer = setInterval(function() {
+            seconds--;
+            if (seconds <= 0) {
+                clearInterval(resendTimer);
+                $('resend-btn').disabled = false;
+                $('resend-countdown').textContent = '';
+            } else {
+                $('resend-countdown').textContent = '(' + seconds + 's)';
+            }
+        }, 1000);
+    }
+
+    $('resend-btn').addEventListener('click', function() {
+        hideAlert('s2-error');
+        sendOTP().then(function() {
+            showAlert('s2-success', t('s2_sent'));
+            setTimeout(function() { hideAlert('s2-success'); }, 3000);
+        });
+    });
+
+    $('verify-btn').addEventListener('click', function() {
+        hideAlert('s2-error');
+        var code = getOTPValue();
+        if (code.length !== 6) return;
+
+        var btn = $('verify-btn');
+        setLoading(btn, true);
+
+        apiFetch('/auth/verify-signup-otp/', {
+            method: 'POST',
+            body: JSON.stringify({ otp_code: code })
+        }).then(function(resp) {
+            return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+        }).then(function(r) {
+            setLoading(btn, false);
+            if (!r.ok) {
+                showAlert('s2-error', parseError(r.data));
+                return;
+            }
+            // Load settings and go to step 3
+            loadSettingsAndGoToStep3();
+        }).catch(function() {
+            setLoading(btn, false);
+            showAlert('s2-error', t('err_generic'));
+        });
+    });
+
+    // ─── Step 3: Application Form ─────────────────────────────
+    function loadSettingsAndGoToStep3() {
+        showLoadingOverlay(true);
+        apiFetch('/youth-dialogue/settings/', { method: 'GET' })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                showLoadingOverlay(false);
+                cachedSettings = data;
+                renderDynamicForm(data);
+                goToStep(3);
+            })
+            .catch(function() {
+                showLoadingOverlay(false);
+                goToStep(3);
+            });
+    }
+
+    function renderDynamicForm(settings) {
+        var container = $('dynamic-fields');
+        container.innerHTML = '';
+
+        if (!settings.form_fields) return;
+
+        // Country list for country/nationality fields
+        var countries = settings.countries || [];
+
+        settings.form_fields.forEach(function(field) {
+            if (!field.is_active) return;
+
+            var group = document.createElement('div');
+            group.className = 'form-group';
+
+            var label = document.createElement('label');
+            label.setAttribute('data-field-label', field.field_name);
+            var labelText = lang === 'fr' && field.field_label_fr ? field.field_label_fr : field.field_label;
+            label.innerHTML = labelText + (field.is_required ? ' <span class="req">*</span>' : '');
+            group.appendChild(label);
+
+            var inputId = 'field-' + field.field_name;
+            var placeholder = lang === 'fr' && field.placeholder_fr ? field.placeholder_fr : (field.placeholder || '');
+
+            switch (field.field_type) {
+                case 'text':
+                case 'email':
+                case 'phone':
+                case 'number':
+                case 'date':
+                case 'time':
+                case 'url':
+                case 'passport':
+                    var typeMap = {
+                        text: 'text', email: 'email', phone: 'tel', number: 'number',
+                        date: 'date', time: 'time', url: 'url', passport: 'text'
+                    };
+                    var inp = document.createElement('input');
+                    inp.type = typeMap[field.field_type] || 'text';
+                    inp.id = inputId;
+                    inp.name = field.field_name;
+                    inp.placeholder = placeholder;
+                    if (field.is_required) inp.required = true;
+                    if (field.max_length) inp.maxLength = field.max_length;
+                    if (field.min_length) inp.minLength = field.min_length;
+                    group.appendChild(inp);
+                    break;
+
+                case 'textarea':
+                    var ta = document.createElement('textarea');
+                    ta.id = inputId;
+                    ta.name = field.field_name;
+                    ta.placeholder = placeholder;
+                    if (field.is_required) ta.required = true;
+                    if (field.max_length) ta.maxLength = field.max_length;
+                    group.appendChild(ta);
+                    break;
+
+                case 'select':
+                    var sel = document.createElement('select');
+                    sel.id = inputId;
+                    sel.name = field.field_name;
+                    if (field.is_required) sel.required = true;
+                    var defOpt = document.createElement('option');
+                    defOpt.value = '';
+                    defOpt.textContent = placeholder || (lang === 'fr' ? 'Choisir...' : 'Select...');
+                    sel.appendChild(defOpt);
+                    (field.options || []).forEach(function(opt) {
+                        var o = document.createElement('option');
+                        if (typeof opt === 'object') {
+                            o.value = opt.value || opt.label || '';
+                            o.textContent = opt.label || opt.value || '';
+                        } else {
+                            o.value = opt;
+                            o.textContent = opt;
+                        }
+                        sel.appendChild(o);
+                    });
+                    group.appendChild(sel);
+                    break;
+
+                case 'country':
+                case 'nationality':
+                    var csel = document.createElement('select');
+                    csel.id = inputId;
+                    csel.name = field.field_name;
+                    if (field.is_required) csel.required = true;
+                    var cdef = document.createElement('option');
+                    cdef.value = '';
+                    cdef.textContent = placeholder || (lang === 'fr' ? 'Choisir un pays...' : 'Select a country...');
+                    csel.appendChild(cdef);
+                    countries.forEach(function(c) {
+                        var o = document.createElement('option');
+                        o.value = c.code || c.value || c;
+                        o.textContent = (c.flag ? c.flag + ' ' : '') + (c.name || c.label || c);
+                        csel.appendChild(o);
+                    });
+                    group.appendChild(csel);
+                    break;
+
+                case 'radio':
+                    var rg = document.createElement('div');
+                    rg.className = 'radio-group';
+                    (field.options || []).forEach(function(opt, oi) {
+                        var rl = document.createElement('label');
+                        var ri = document.createElement('input');
+                        ri.type = 'radio';
+                        ri.name = field.field_name;
+                        ri.value = typeof opt === 'object' ? (opt.value || opt.label || '') : opt;
+                        if (field.is_required) ri.required = true;
+                        rl.appendChild(ri);
+                        rl.appendChild(document.createTextNode(' ' + (typeof opt === 'object' ? (opt.label || opt.value || '') : opt)));
+                        rg.appendChild(rl);
+                    });
+                    rg.id = inputId;
+                    group.appendChild(rg);
+                    break;
+
+                case 'checkbox':
+                    var cw = document.createElement('div');
+                    cw.className = 'single-checkbox';
+                    var ci = document.createElement('input');
+                    ci.type = 'checkbox';
+                    ci.id = inputId;
+                    ci.name = field.field_name;
+                    if (field.is_required) ci.required = true;
+                    var cl = document.createElement('label');
+                    cl.setAttribute('for', inputId);
+                    cl.textContent = labelText;
+                    cw.appendChild(ci);
+                    cw.appendChild(cl);
+                    // Replace the label we already added
+                    group.innerHTML = '';
+                    group.appendChild(cw);
+                    break;
+
+                case 'multi_checkbox':
+                    var mcg = document.createElement('div');
+                    mcg.className = 'checkbox-group';
+                    mcg.id = inputId;
+                    (field.options || []).forEach(function(opt) {
+                        var ml = document.createElement('label');
+                        var mi = document.createElement('input');
+                        mi.type = 'checkbox';
+                        mi.name = field.field_name;
+                        mi.value = typeof opt === 'object' ? (opt.value || opt.label || '') : opt;
+                        ml.appendChild(mi);
+                        ml.appendChild(document.createTextNode(' ' + (typeof opt === 'object' ? (opt.label || opt.value || '') : opt)));
+                        mcg.appendChild(ml);
+                    });
+                    group.appendChild(mcg);
+                    break;
+
+                default:
+                    // Fallback to text
+                    var fb = document.createElement('input');
+                    fb.type = 'text';
+                    fb.id = inputId;
+                    fb.name = field.field_name;
+                    fb.placeholder = placeholder;
+                    if (field.is_required) fb.required = true;
+                    group.appendChild(fb);
+            }
+
+            // Help text
+            if (field.help_text || field.help_text_fr) {
+                var ht = document.createElement('div');
+                ht.className = 'help-text';
+                ht.setAttribute('data-field-help', field.field_name);
+                ht.textContent = lang === 'fr' && field.help_text_fr ? field.help_text_fr : (field.help_text || '');
+                group.appendChild(ht);
+            }
+
+            container.appendChild(group);
+        });
+
+        // Side events
+        if (settings.side_events && settings.side_events.length > 0) {
+            $('side-events-container').style.display = 'block';
+            var seList = $('side-events-list');
+            seList.innerHTML = '';
+            settings.side_events.forEach(function(se) {
+                var card = document.createElement('div');
+                card.className = 'side-event-card';
+                card.setAttribute('data-se-id', se.id);
+                card.innerHTML = '<h5>' + (se.title || se.name || '') + '</h5>' +
+                    (se.description ? '<p>' + se.description + '</p>' : '');
+                card.addEventListener('click', function() {
+                    // Deselect others
+                    seList.querySelectorAll('.side-event-card').forEach(function(c) {
+                        c.classList.remove('selected');
+                    });
+                    card.classList.toggle('selected');
+                });
+                seList.appendChild(card);
+            });
+        }
+    }
+
+    $('apply-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        hideAlert('s3-error');
+
+        var formData = {};
+
+        if (cachedSettings && cachedSettings.form_fields) {
+            cachedSettings.form_fields.forEach(function(field) {
+                if (!field.is_active) return;
+                var inputId = 'field-' + field.field_name;
+
+                switch (field.field_type) {
+                    case 'radio':
+                        var checked = document.querySelector('input[name="' + field.field_name + '"]:checked');
+                        formData[field.field_name] = checked ? checked.value : '';
+                        break;
+                    case 'checkbox':
+                        var cb = $(inputId);
+                        formData[field.field_name] = cb ? cb.checked : false;
+                        break;
+                    case 'multi_checkbox':
+                        var checked_vals = [];
+                        document.querySelectorAll('input[name="' + field.field_name + '"]:checked').forEach(function(c) {
+                            checked_vals.push(c.value);
+                        });
+                        formData[field.field_name] = checked_vals;
+                        break;
+                    default:
+                        var el = $(inputId);
+                        formData[field.field_name] = el ? el.value.trim() : '';
+                }
+            });
+        }
+
+        // Side event
+        var selectedSE = document.querySelector('.side-event-card.selected');
+        if (selectedSE) {
+            formData.selected_side_events = [parseInt(selectedSE.getAttribute('data-se-id'))];
+        }
+
+        var btn = $('apply-btn');
+        setLoading(btn, true);
+
+        apiFetch('/youth-dialogue/apply/', {
+            method: 'POST',
+            body: JSON.stringify({ form_data: formData })
+        }).then(function(resp) {
+            return resp.json().then(function(data) { return { ok: resp.ok, status: resp.status, data: data }; });
+        }).then(function(r) {
+            setLoading(btn, false);
+            if (!r.ok) {
+                showAlert('s3-error', parseError(r.data));
+                return;
+            }
+            appStatus = r.data;
+            // Check status to determine next step
+            checkStatusAndRoute();
+        }).catch(function() {
+            setLoading(btn, false);
+            showAlert('s3-error', t('err_generic'));
+        });
+    });
+
+    // ─── Step 4: Documents ────────────────────────────────────
+    function checkStatusAndRoute() {
+        showLoadingOverlay(true);
+        apiFetch('/youth-dialogue/status/', { method: 'GET' })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                showLoadingOverlay(false);
+                appStatus = data;
+
+                if (!data.has_application) {
+                    // No application yet, go to step 3
+                    loadSettingsAndGoToStep3();
+                    return;
+                }
+
+                var status = data.status;
+
+                if (status === 'submitted' || status === 'under_review') {
+                    // Show info page
+                    if (data.reference_id) {
+                        $('s4i-ref').innerHTML = (lang === 'fr' ? 'R\u00e9f\u00e9rence\u00a0: ' : 'Reference: ') +
+                            '<strong>' + data.reference_id + '</strong>';
+                    }
+                    goToStep('4-info');
+                } else if (status === 'rejected') {
+                    // Show rejection info
+                    $('s4i-ref').innerHTML = data.rejection_reason || (lang === 'fr'
+                        ? 'Votre candidature n\u2019a pas \u00e9t\u00e9 retenue.'
+                        : 'Your application was not accepted.');
+                    goToStep('4-info');
+                } else if (status === 'accepted' || status === 'documents_pending' || status === 'documents_rejected') {
+                    // Show upload UI
+                    renderDocUpload(data);
+                    goToStep(4);
+                } else if (status === 'documents_submitted' || status === 'documents_under_review' || status === 'credential_issued') {
+                    // Already done
+                    showSuccess(data);
+                    goToStep(5);
+                } else {
+                    // Default: show info
+                    goToStep('4-info');
+                }
+            })
+            .catch(function() {
+                showLoadingOverlay(false);
+                goToStep('4-info');
+            });
+    }
+
+    function renderDocUpload(statusData) {
+        var container = $('doc-upload-sections');
+        container.innerHTML = '';
+        uploadedDocs = {};
+
+        // Show rejection notes if applicable
+        if (statusData.status === 'documents_rejected' && statusData.documents_rejection_notes) {
+            var rn = $('s4-rejection-notes');
+            rn.textContent = t('doc_rejected_label') + ' ' + statusData.documents_rejection_notes;
+            rn.style.display = 'block';
+        }
+
+        // Determine required docs from settings or defaults
+        var requiredDocs = [];
+        if (cachedSettings && cachedSettings.required_documents && cachedSettings.required_documents.length > 0) {
+            requiredDocs = cachedSettings.required_documents;
+        } else {
+            // Default document types
+            requiredDocs = [
+                { key: 'passport', label: 'Passport Copy', label_fr: 'Copie du Passeport' },
+                { key: 'photo', label: 'Passport Photo', label_fr: 'Photo d\'identit\u00e9' },
+                { key: 'national_id', label: 'National ID (optional)', label_fr: 'Carte d\'identit\u00e9 (optionnel)' }
+            ];
+        }
+
+        // Check already uploaded docs
+        var existingDocs = statusData.documents || [];
+        existingDocs.forEach(function(d) {
+            if (d.document_type) uploadedDocs[d.document_type] = true;
+        });
+
+        requiredDocs.forEach(function(doc) {
+            var section = document.createElement('div');
+            section.className = 'doc-section';
+            section.id = 'doc-section-' + doc.key;
+
+            var docLabel = lang === 'fr' && doc.label_fr ? doc.label_fr : doc.label;
+            var isUploaded = uploadedDocs[doc.key];
+
+            section.innerHTML =
+                '<h4>' + docLabel + '</h4>' +
+                '<div class="doc-status ' + (isUploaded ? 'uploaded' : '') + '" id="doc-status-' + doc.key + '">' +
+                    (isUploaded ? t('doc_uploaded') : t('doc_not_uploaded')) +
+                '</div>' +
+                '<div class="file-drop" id="drop-' + doc.key + '">' +
+                    '<div class="file-icon">&#128206;</div>' +
+                    '<p>' + (isUploaded ? t('s4_change') : t('s4_drop')) + '</p>' +
+                    '<p style="font-size:11px;color:#aaa;margin-top:4px;">' + t('s4_formats') + '</p>' +
+                '</div>' +
+                '<input type="file" id="file-' + doc.key + '" accept=".pdf,.jpg,.jpeg,.png" style="display:none">' +
+                '<div class="file-preview" id="preview-' + doc.key + '" style="display:none;"></div>' +
+                '<div class="upload-progress" id="progress-' + doc.key + '">' +
+                    '<div class="progress-bar-track"><div class="progress-bar-fill" id="bar-' + doc.key + '"></div></div>' +
+                    '<div class="progress-text" id="ptext-' + doc.key + '">0%</div>' +
+                '</div>';
+
+            container.appendChild(section);
+
+            // Event listeners
+            var dropZone = document.getElementById('drop-' + doc.key);
+            var fileInput = document.getElementById('file-' + doc.key);
+
+            dropZone.addEventListener('click', function() { fileInput.click(); });
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', function() {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    handleFile(doc.key, e.dataTransfer.files[0]);
+                }
+            });
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length) {
+                    handleFile(doc.key, fileInput.files[0]);
+                }
+            });
+        });
+
+        updateSubmitDocsBtn();
+    }
+
+    function handleFile(docKey, file) {
+        hideAlert('s4-error');
+
+        // Validate size
+        if (file.size > 5 * 1024 * 1024) {
+            showAlert('s4-error', t('err_file_size'));
+            return;
+        }
+
+        // Validate type
+        var ext = file.name.split('.').pop().toLowerCase();
+        if (['pdf', 'jpg', 'jpeg', 'png'].indexOf(ext) === -1) {
+            showAlert('s4-error', t('err_file_type'));
+            return;
+        }
+
+        // Show preview
+        var preview = document.getElementById('preview-' + docKey);
+        preview.innerHTML = '';
+        if (ext !== 'pdf') {
+            var img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            preview.appendChild(img);
+        }
+        var fn = document.createElement('div');
+        fn.className = 'file-name';
+        fn.textContent = file.name;
+        preview.appendChild(fn);
+        preview.style.display = 'block';
+
+        // Upload
+        uploadFile(docKey, file);
+    }
+
+    function uploadFile(docKey, file) {
+        var progressDiv = document.getElementById('progress-' + docKey);
+        var bar = document.getElementById('bar-' + docKey);
+        var ptext = document.getElementById('ptext-' + docKey);
+        var statusEl = document.getElementById('doc-status-' + docKey);
+
+        progressDiv.style.display = 'block';
+        statusEl.textContent = t('doc_uploading');
+        statusEl.className = 'doc-status';
+
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('document_type', docKey);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', API + '/youth-dialogue/upload-document/');
+
+        var token = getToken();
+        if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                var pct = Math.round((e.loaded / e.total) * 100);
+                bar.style.width = pct + '%';
+                ptext.textContent = pct + '%';
+            }
+        });
+
+        xhr.addEventListener('load', function() {
+            if (xhr.status === 201 || xhr.status === 200) {
+                uploadedDocs[docKey] = true;
+                statusEl.textContent = t('doc_uploaded');
+                statusEl.className = 'doc-status uploaded';
+                var dropZone = document.getElementById('drop-' + docKey);
+                dropZone.querySelector('p').textContent = t('s4_change');
+                setTimeout(function() { progressDiv.style.display = 'none'; }, 1000);
+                updateSubmitDocsBtn();
+            } else if (xhr.status === 401) {
+                // Try refresh and retry
+                refreshToken().then(function(ok) {
+                    if (ok) uploadFile(docKey, file);
+                    else {
+                        showAlert('s4-error', t('err_generic'));
+                        progressDiv.style.display = 'none';
+                        statusEl.textContent = t('doc_not_uploaded');
+                    }
+                });
+            } else {
+                try {
+                    var errData = JSON.parse(xhr.responseText);
+                    showAlert('s4-error', parseError(errData));
+                } catch (e) {
+                    showAlert('s4-error', t('err_generic'));
+                }
+                progressDiv.style.display = 'none';
+                statusEl.textContent = t('doc_not_uploaded');
+                statusEl.className = 'doc-status';
+            }
+        });
+
+        xhr.addEventListener('error', function() {
+            showAlert('s4-error', t('err_generic'));
+            progressDiv.style.display = 'none';
+            statusEl.textContent = t('doc_not_uploaded');
+            statusEl.className = 'doc-status';
+        });
+
+        xhr.send(fd);
+    }
+
+    function updateSubmitDocsBtn() {
+        // At minimum need passport + photo (or national_id + photo for BI)
+        var hasPassport = uploadedDocs['passport'];
+        var hasPhoto = uploadedDocs['photo'];
+        var hasNationalId = uploadedDocs['national_id'];
+
+        var ready = hasPhoto && (hasPassport || hasNationalId);
+        $('submit-docs-btn').disabled = !ready;
+    }
+
+    $('submit-docs-btn').addEventListener('click', function() {
+        hideAlert('s4-error');
+        var btn = $('submit-docs-btn');
+        setLoading(btn, true);
+
+        apiFetch('/youth-dialogue/submit-documents/', {
+            method: 'POST',
+            body: '{}'
+        }).then(function(resp) {
+            return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+        }).then(function(r) {
+            setLoading(btn, false);
+            if (!r.ok) {
+                showAlert('s4-error', parseError(r.data));
+                return;
+            }
+            // Fetch final status for reference ID
+            apiFetch('/youth-dialogue/status/', { method: 'GET' })
+                .then(function(resp) { return resp.json(); })
+                .then(function(data) {
+                    showSuccess(data);
+                    goToStep(5);
+                })
+                .catch(function() {
+                    goToStep(5);
+                });
+        }).catch(function() {
+            setLoading(btn, false);
+            showAlert('s4-error', t('err_generic'));
+        });
+    });
+
+    // ─── Step 5: Success ──────────────────────────────────────
+    function showSuccess(data) {
+        if (data && data.reference_id) {
+            $('s5-ref-id').textContent = data.reference_id;
+            $('s5-ref-container').style.display = 'block';
+        }
+    }
+
+    // ─── Loading overlay ──────────────────────────────────────
+    function showLoadingOverlay(show) {
+        var el = $('loading-overlay');
+        if (show) el.classList.add('show');
+        else el.classList.remove('show');
+    }
+
+    // ─── Language toggle ──────────────────────────────────────
+    $('lang-toggle').addEventListener('click', function() {
+        lang = lang === 'en' ? 'fr' : 'en';
+        $('lang-toggle').textContent = lang === 'en' ? 'FR' : 'EN';
+        document.documentElement.lang = lang;
+        applyLanguage();
+        // Re-render doc upload labels if on step 4
+        if (currentStep === 4 && appStatus) {
+            renderDocUpload(appStatus);
+        }
+    });
+
+    // ─── Init (re-entrant flow) ───────────────────────────────
+    function init() {
+        showLoadingOverlay(true);
+
+        // First check settings for registration open/closed
+        fetch(API + '/youth-dialogue/settings/')
+            .then(function(resp) { return resp.json(); })
+            .then(function(settings) {
+                cachedSettings = settings;
+
+                // Check if registration is open
+                if (settings.is_registration_open === false) {
+                    showLoadingOverlay(false);
+                    if (settings.registration_closed_message) {
+                        $('closed-message').textContent = settings.registration_closed_message;
+                    }
+                    goToStep('closed');
+                    return;
+                }
+
+                // Check for existing session
+                var token = getToken();
+                if (!token) {
+                    showLoadingOverlay(false);
+                    goToStep(1);
+                    return;
+                }
+
+                // Try to get status
+                apiFetch('/youth-dialogue/status/', { method: 'GET' })
+                    .then(function(resp) {
+                        if (!resp.ok) {
+                            // Token might be expired
+                            if (resp.status === 401) {
+                                return refreshToken().then(function(ok) {
+                                    if (!ok) {
+                                        clearTokens();
+                                        showLoadingOverlay(false);
+                                        goToStep(1);
+                                        return null;
+                                    }
+                                    return apiFetch('/youth-dialogue/status/', { method: 'GET' })
+                                        .then(function(r) { return r.json(); });
+                                });
+                            }
+                            throw new Error('Status check failed');
+                        }
+                        return resp.json();
+                    })
+                    .then(function(data) {
+                        if (!data) return;
+                        showLoadingOverlay(false);
+                        appStatus = data;
+
+                        if (!data.has_application) {
+                            // Has account but no application — check email verified
+                            // Try to load settings for form
+                            renderDynamicForm(cachedSettings);
+                            goToStep(3);
+                            return;
+                        }
+
+                        var status = data.status;
+                        if (status === 'submitted' || status === 'under_review') {
+                            if (data.reference_id) {
+                                $('s4i-ref').innerHTML = (lang === 'fr' ? 'R\u00e9f\u00e9rence\u00a0: ' : 'Reference: ') +
+                                    '<strong>' + data.reference_id + '</strong>';
+                            }
+                            goToStep('4-info');
+                        } else if (status === 'rejected') {
+                            $('s4i-ref').innerHTML = data.rejection_reason || '';
+                            goToStep('4-info');
+                        } else if (status === 'accepted' || status === 'documents_pending' || status === 'documents_rejected') {
+                            renderDocUpload(data);
+                            goToStep(4);
+                        } else if (status === 'documents_submitted' || status === 'documents_under_review' || status === 'credential_issued') {
+                            showSuccess(data);
+                            goToStep(5);
+                        } else {
+                            goToStep('4-info');
+                        }
+                    })
+                    .catch(function() {
+                        showLoadingOverlay(false);
+                        clearTokens();
+                        goToStep(1);
+                    });
+            })
+            .catch(function() {
+                showLoadingOverlay(false);
+                goToStep(1);
+            });
+    }
+
+    // ─── reCAPTCHA script ─────────────────────────────────────
+    if (RECAPTCHA_KEY) {
+        var script = document.createElement('script');
+        script.src = 'https://www.google.com/recaptcha/api.js?render=' + RECAPTCHA_KEY;
+        script.async = true;
+        document.head.appendChild(script);
+    }
+
+    // ─── Start ────────────────────────────────────────────────
+    init();
+})();
+</script>
+
+</body>
+</html>

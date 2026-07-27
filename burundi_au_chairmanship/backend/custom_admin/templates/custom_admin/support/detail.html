@@ -8,7 +8,7 @@
     <div class="max-w-4xl mx-auto">
         <!-- Header -->
         <div class="mb-6">
-            <a href="{% url 'custom_admin:support_tickets_list' %}" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline mb-4">
+            <a href="{% url 'custom_admin:support_tickets_list' %}{% if list_filters %}?{{ list_filters }}{% endif %}" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline mb-4">
                 <span class="material-symbols-outlined text-sm">arrow_back</span>
                 Back to tickets
             </a>

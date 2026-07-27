@@ -15,7 +15,7 @@
                 <p class="text-sm text-slate-500 mt-1">{{ submission.event_registration.event_title }}</p>
             </div>
         </div>
-        <a href="{% url 'custom_admin:event_registration_submissions' pk=submission.event_registration.pk %}" class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
+        <a href="{% url 'custom_admin:event_registration_submissions' pk=submission.event_registration.pk %}{% if list_filters %}?{{ list_filters }}{% endif %}" class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
             <span class="material-symbols-outlined text-sm">arrow_back</span>
             Back to Submissions
         </a>

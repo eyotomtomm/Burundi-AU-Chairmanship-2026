@@ -162,7 +162,7 @@
               <p class="text-xs text-slate-400">{{ ver.created_at|date:"g:i A" }}</p>
             </td>
             <td class="px-6 py-4 text-right">
-              <a href="{% url 'custom_admin:verification_request_review' ver.pk %}"
+              <a href="{% url 'custom_admin:verification_request_review' ver.pk %}{% if request.GET.urlencode %}?_list_filters={{ request.GET.urlencode|urlencode }}{% endif %}"
                  class="inline-flex items-center gap-1.5 bg-slate-900 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-slate-800 transition-all shadow-sm">
                 <span class="material-symbols-outlined text-sm">visibility</span>
                 Review

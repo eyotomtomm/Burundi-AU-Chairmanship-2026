@@ -17,6 +17,7 @@ from django.contrib import messages
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Replace
 from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
 from axes.exceptions import AxesBackendRequestParameterRequired
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
@@ -2190,8 +2191,14 @@ def verification_request_review(request, pk):
             except Exception as e:
                 logger.warning(f'Verification rejection push failed for user {ver_request.user.pk}: {e}')
             messages.success(request, f'Rejected verification request from {ver_request.full_name}.')
-        return redirect('custom_admin:verification_requests_list')
-    return render(request, 'custom_admin/verification/review.html', {'ver_request': ver_request})
+        _lf = request.GET.get('_list_filters', '')
+        url = reverse('custom_admin:verification_requests_list')
+        return redirect(f'{url}?{_lf}' if _lf else url)
+    list_filters = request.GET.get('_list_filters', '')
+    return render(request, 'custom_admin/verification/review.html', {
+        'ver_request': ver_request,
+        'list_filters': list_filters,
+    })
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -3052,9 +3059,11 @@ def event_submission_review(request, pk):
                 value = ', '.join(str(v) for v in value)
             field_labels[friendly] = value
 
+    list_filters = request.GET.get('_list_filters', '')
     return render(request, 'custom_admin/event_registrations/submission_review.html', {
         'submission': submission,
         'field_labels': field_labels,
+        'list_filters': list_filters,
     })
 
 
@@ -4113,9 +4122,11 @@ def support_tickets_list(request):
 def support_ticket_detail(request, pk):
     ticket = get_object_or_404(SupportTicket.objects.select_related('user', 'assigned_to'), pk=pk)
     ticket_messages = ticket.messages.select_related('sender').all()
+    list_filters = request.GET.get('_list_filters', '')
     return render(request, 'custom_admin/support/detail.html', {
         'ticket': ticket,
         'messages': ticket_messages,
+        'list_filters': list_filters,
     })
 
 
@@ -10133,16 +10144,24 @@ def youth_dialogue_review(request, pk):
             application.activity_logs.all().delete()
             application.delete()
             messages.success(request, f'Application for {applicant_name} has been deleted. The user can now re-apply.')
+            # Redirect back to list with preserved filters
+            _lf = request.GET.get('_list_filters', '')
             if event:
-                return redirect('custom_admin:youth_dialogue_applications_list', event_pk=event.pk)
+                url = reverse('custom_admin:youth_dialogue_applications_list', kwargs={'event_pk': event.pk})
+                return redirect(f'{url}?{_lf}' if _lf else url)
             return redirect('custom_admin:youth_dialogue_list')
 
-        return redirect('custom_admin:youth_dialogue_review', pk=pk)
+        # Preserve list filters on redirect back to same review page
+        _lf = request.GET.get('_list_filters', '')
+        url = reverse('custom_admin:youth_dialogue_review', kwargs={'pk': pk})
+        return redirect(f'{url}?_list_filters={_lf}' if _lf else url)
 
+    list_filters = request.GET.get('_list_filters', '')
     return render(request, 'custom_admin/youth_dialogue/review.html', {
         'application': application,
         'documents': documents,
         'activity_logs': activity_logs,
+        'list_filters': list_filters,
     })
 
 

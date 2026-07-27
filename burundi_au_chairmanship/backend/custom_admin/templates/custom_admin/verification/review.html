@@ -15,7 +15,7 @@
         <p class="text-sm text-slate-500 mt-1">Evaluate and process verification application</p>
       </div>
     </div>
-    <a href="{% url 'custom_admin:verification_requests_list' %}"
+    <a href="{% url 'custom_admin:verification_requests_list' %}{% if list_filters %}?{{ list_filters }}{% endif %}"
        class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-slate-50 transition-all shadow-sm">
       <span class="material-symbols-outlined text-sm">arrow_back</span>
       Back to List

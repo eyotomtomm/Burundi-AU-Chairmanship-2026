@@ -60,7 +60,7 @@
             {% if tickets %}
             <div class="divide-y divide-slate-200 dark:divide-slate-700">
                 {% for ticket in tickets %}
-                <a href="{% url 'custom_admin:support_ticket_detail' ticket.pk %}" class="block p-5 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
+                <a href="{% url 'custom_admin:support_ticket_detail' ticket.pk %}{% if request.GET.urlencode %}?_list_filters={{ request.GET.urlencode|urlencode }}{% endif %}" class="block p-5 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors">
                     <div class="flex items-center justify-between gap-4">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-3 mb-1">

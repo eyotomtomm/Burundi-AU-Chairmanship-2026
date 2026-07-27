@@ -2727,10 +2727,17 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
 
         if self.request.user.is_authenticated:
             # Show global notifications + user-targeted notifications
-            from django.db.models import Q
+            from django.db.models import Q, Exists, OuterRef
             qs = qs.filter(
                 Q(is_global=True) | Q(target_users=self.request.user)
-            ).distinct().prefetch_related('read_by')
+            ).distinct().annotate(
+                _is_read=Exists(
+                    Notification.read_by.through.objects.filter(
+                        notification_id=OuterRef('pk'),
+                        user_id=self.request.user.id,
+                    )
+                )
+            )
         else:
             # Show only global notifications for anonymous users
             qs = qs.filter(is_global=True)
@@ -2762,12 +2769,22 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         # Get all active notifications for the user
         notifications = self.get_queryset()
 
-        # Add user to read_by for each notification
-        count = 0
-        for notification in notifications:
-            if not notification.read_by.filter(id=request.user.id).exists():
-                notification.read_by.add(request.user)
-                count += 1
+        # Bulk-add user to read_by for all unread notifications
+        already_read = set(
+            Notification.read_by.through.objects.filter(
+                user_id=request.user.id,
+                notification_id__in=notifications.values_list('pk', flat=True),
+            ).values_list('notification_id', flat=True)
+        )
+        to_mark = [n for n in notifications if n.pk not in already_read]
+        if to_mark:
+            Notification.read_by.through.objects.bulk_create(
+                [Notification.read_by.through(
+                    notification_id=n.pk, user_id=request.user.id,
+                ) for n in to_mark],
+                ignore_conflicts=True,
+            )
+        count = len(to_mark)
 
         remaining = self.get_queryset().exclude(read_by=request.user).count()
         return Response({

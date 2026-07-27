@@ -1,4 +1,5 @@
 import logging
+from django.db import OperationalError, close_old_connections
 from rest_framework import authentication
 from rest_framework import exceptions
 from django.contrib.auth.models import User
@@ -22,6 +23,21 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
     class returns None so the next backend can try.
     """
 
+    @staticmethod
+    def _get_profile(firebase_uid):
+        """Fetch UserProfile, retrying once on connection failure."""
+        try:
+            return UserProfile.objects.select_related('user').get(
+                firebase_uid=firebase_uid,
+            )
+        except OperationalError:
+            # Connection slot may have been exhausted or gone stale.
+            # Drop the broken connection and try once more.
+            close_old_connections()
+            return UserProfile.objects.select_related('user').get(
+                firebase_uid=firebase_uid,
+            )
+
     def authenticate(self, request):
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
 
@@ -35,9 +51,7 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
             firebase_uid = decoded_token['uid']
 
             try:
-                profile = UserProfile.objects.select_related('user').get(
-                    firebase_uid=firebase_uid,
-                )
+                profile = self._get_profile(firebase_uid)
 
                 # Sync email-verification from Firebase — only UPGRADE
                 # (False→True), never downgrade.  The app uses its own

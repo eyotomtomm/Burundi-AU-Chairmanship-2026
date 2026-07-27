@@ -126,6 +126,9 @@ if DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL, conn_max_age=0)
     }
+    # Validate connections before use so stale/broken connections from the
+    # pool are replaced instead of raising OperationalError mid-request.
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 else:
     DATABASES = {
         'default': {

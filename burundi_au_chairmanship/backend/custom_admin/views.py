@@ -340,18 +340,33 @@ def dashboard(request):
 
     # --- User growth + Event activity (last 30 days) ---
     now = timezone.now()
+    from django.db.models.functions import TruncDate
+    thirty_days_ago = (now - timedelta(days=30)).date()
+
+    # Two queries instead of 60: aggregate counts per day in the DB
+    user_counts = dict(
+        User.objects.filter(date_joined__date__gte=thirty_days_ago, is_staff=False)
+        .annotate(day=TruncDate('date_joined'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .values_list('day', 'count')
+    )
+    event_counts = dict(
+        Event.objects.filter(created_at__date__gte=thirty_days_ago)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .values_list('day', 'count')
+    )
+
     growth_labels = []
     growth_data = []
     events_30d_data = []
     for i in range(29, -1, -1):
         day = (now - timedelta(days=i)).date()
         growth_labels.append(day.strftime('%b %d'))
-        growth_data.append(
-            User.objects.filter(date_joined__date=day, is_staff=False).count()
-        )
-        events_30d_data.append(
-            Event.objects.filter(created_at__date=day).count()
-        )
+        growth_data.append(user_counts.get(day, 0))
+        events_30d_data.append(event_counts.get(day, 0))
 
     # --- User growth trend: last 30 days vs previous 30 days ---
     growth_last_30 = sum(growth_data)

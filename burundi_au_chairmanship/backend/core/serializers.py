@@ -838,6 +838,10 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_is_read(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Use annotation set by the viewset (single query) instead of
+            # hitting the DB per notification (N+1).
+            if hasattr(obj, '_is_read'):
+                return obj._is_read
             return obj.read_by.filter(id=request.user.id).exists()
         return False
 

@@ -188,6 +188,10 @@ CACHE_TTL_SHORT = 60       # 1 min  — rapidly changing (notifications, live fe
 CACHE_TTL_MEDIUM = 300     # 5 min  — articles list, settings, weather
 CACHE_TTL_LONG = 3600      # 1 hour — categories, priority agendas, social media
 CACHE_TTL_STATIC = 86400   # 24 hrs — onboarding steps, app config
+CACHE_TTL_WEATHER = 1800   # 30 min — weather proxy (ephemeral, no DB)
+
+# ─── WeatherAPI.com ───────────────────────────────────────────
+WEATHERAPI_KEY = os.environ.get('WEATHERAPI_KEY', '')
 
 # ─── Database Read Replica ────────────────────────────────────
 READ_REPLICA_URL = os.environ.get('READ_REPLICA_URL', '')
@@ -353,6 +357,7 @@ REST_FRAMEWORK = {
         'support': '5/hour',  # 5 support tickets per hour per user
         'search': '30/min',  # 30 search requests per minute per user/IP
         'proxy_registration': '5/hour',  # 5 proxy registrations per hour per user
+        'weather': '60/hour',  # 60 weather proxy requests per hour per user/IP
     },
     # Use real client IP behind Cloudflare / reverse proxies
     'NUM_PROXIES': 1,

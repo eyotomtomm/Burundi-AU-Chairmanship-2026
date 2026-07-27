@@ -163,3 +163,15 @@ class ProxyRegistrationThrottle(SimpleRateThrottle):
         else:
             ident = self.get_ident(request)
         return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class WeatherProxyThrottle(SimpleRateThrottle):
+    """
+    Throttle for weather proxy endpoints to prevent upstream API abuse.
+    Limits: 60 requests per hour per user/IP.
+    """
+    scope = 'weather'
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}

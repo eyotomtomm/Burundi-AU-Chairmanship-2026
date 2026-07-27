@@ -24,7 +24,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from config.firebase import verify_firebase_token
-from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, OTPVerifyThrottle, SupportTicketThrottle, SearchRateThrottle, ProxyRegistrationThrottle
+from .throttling import ViewCountThrottle, LikeToggleThrottle, AuthRateThrottle, OTPRateThrottle, OTPVerifyThrottle, SupportTicketThrottle, SearchRateThrottle, ProxyRegistrationThrottle, WeatherProxyThrottle
 
 logger = logging.getLogger(__name__)
 from .models import (
@@ -2708,6 +2708,79 @@ class WeatherCityViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = WeatherCity.objects.filter(is_active=True)
     serializer_class = WeatherCitySerializer
     pagination_class = None
+
+    @action(detail=True, methods=['get'], url_path='weather')
+    def weather(self, request, pk=None):
+        """Proxy weather data for a specific city from WeatherAPI.com."""
+        from .weather_service import get_weather_for_city
+        city = self.get_object()
+        data = get_weather_for_city(city.latitude, city.longitude)
+        if data is None:
+            return Response(
+                {'error': 'Weather data temporarily unavailable'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@throttle_classes([WeatherProxyThrottle])
+def weather_by_coordinates(request):
+    """GET /weather/?lat=...&lon=... — proxy weather for arbitrary coordinates."""
+    from .weather_service import get_weather_for_city
+
+    lat = request.query_params.get('lat')
+    lon = request.query_params.get('lon')
+    if lat is None or lon is None:
+        return Response(
+            {'error': 'lat and lon query parameters are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (ValueError, TypeError):
+        return Response(
+            {'error': 'lat and lon must be valid numbers'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        return Response(
+            {'error': 'lat must be -90..90 and lon must be -180..180'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    data = get_weather_for_city(lat, lon)
+    if data is None:
+        return Response(
+            {'error': 'Weather data temporarily unavailable'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@throttle_classes([WeatherProxyThrottle])
+def weather_city_search(request):
+    """GET /weather/search/?q=... — proxy city search from WeatherAPI.com."""
+    from .weather_service import search_cities
+
+    query = request.query_params.get('q', '').strip()
+    if len(query) < 2:
+        return Response(
+            {'error': 'Query must be at least 2 characters'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    results = search_cities(query)
+    if results is None:
+        return Response(
+            {'error': 'City search temporarily unavailable'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return Response(results)
 
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -8718,6 +8791,16 @@ def verify_qr_web(request):
 
     html = render_to_string('core/verify_qr.html', context)
     return DjangoHttpResponse(html)
+
+
+def register_web(request):
+    """Public web registration page for the Continental Dialogue."""
+    from django.shortcuts import render
+    from django.conf import settings as django_settings
+    return render(request, 'register.html', {
+        'recaptcha_site_key': getattr(django_settings, 'RECAPTCHA_SITE_KEY', ''),
+        'api_base': '/api',
+    })
 
 
 # ═══════════════════════════════════════════════════════════════

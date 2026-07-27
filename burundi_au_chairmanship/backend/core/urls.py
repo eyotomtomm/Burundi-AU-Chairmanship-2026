@@ -48,6 +48,10 @@ router.register('facts', views.FactViewSet, basename='fact')
 urlpatterns = [
     path('', include(router.urls)),
     path('health/', views.health_check, name='health-check'),  # For load balancers/monitoring
+
+    # Weather proxy (routes through backend to WeatherAPI.com)
+    path('weather/', views.weather_by_coordinates, name='weather-by-coordinates'),
+    path('weather/search/', views.weather_city_search, name='weather-city-search'),
     path('settings/', views.app_settings, name='app-settings'),
     path('home-feed/', views.home_feed, name='home-feed'),
 

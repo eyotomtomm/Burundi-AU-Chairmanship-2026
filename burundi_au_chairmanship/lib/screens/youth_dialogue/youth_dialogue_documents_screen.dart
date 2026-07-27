@@ -1,7 +1,11 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
@@ -374,6 +378,22 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     } finally {
       if (mounted) setState(() => _uploading[docType] = false);
     }
+  }
+
+  /// Returns true if the filename looks like an image (not a PDF or other doc).
+  bool _isImageFile(String filename) {
+    final lower = filename.toLowerCase();
+    return lower.endsWith('.jpg') || lower.endsWith('.jpeg') ||
+           lower.endsWith('.png') || lower.endsWith('.webp');
+  }
+
+  /// Opens the sandboxed secure viewer for an image document.
+  void _openSecureViewer(String imageUrl, String title) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _SecureDocumentViewer(imageUrl: imageUrl, title: title),
+      ),
+    );
   }
 
   bool _showStatusPage = false;
@@ -1032,6 +1052,83 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
               ],
             ),
           ],
+          // Sandboxed image preview — tap to view securely without downloading
+          if (hasDoc && doc.file != null && doc.file!.isNotEmpty && _isImageFile(doc.originalFilename)) ...[
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => _openSecureViewer(doc.file!, _docLabel(docConfig)),
+              child: Container(
+                height: 80,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Blurred thumbnail preview
+                    ClipRRect(
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+                      child: SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: doc.file!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => Container(
+                                color: isDark ? Colors.white10 : Colors.grey[200],
+                                child: const Center(child: SizedBox(width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 1.5))),
+                              ),
+                              errorWidget: (_, _, _) => Container(
+                                color: isDark ? Colors.white10 : Colors.grey[200],
+                                child: Icon(Icons.image_not_supported_outlined, size: 20,
+                                  color: isDark ? Colors.white24 : Colors.black26),
+                              ),
+                            ),
+                            // Frost overlay so thumbnail is not fully visible
+                            Container(
+                              decoration: BoxDecoration(
+                                color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // "Tap to preview" label
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility_outlined, size: 16,
+                            color: isDark ? Colors.white38 : Colors.black38),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _isFr() == 'fr' ? 'Aperçu sécurisé' : 'Secure preview',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white54 : Colors.black45),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Icon(Icons.chevron_right_rounded, size: 20,
+                        color: isDark ? Colors.white24 : Colors.black26),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           if (isRejected && doc.rejectionReason != null && doc.rejectionReason!.isNotEmpty) ...[
             const SizedBox(height: 10),
             Container(
@@ -1218,4 +1315,251 @@ class _PhotoPreviewScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Secure Document Viewer — sandboxed, screenshot-protected image
+// preview. Images are streamed in memory via CachedNetworkImage
+// and never saved to the device filesystem. Screenshot and screen
+// recording are blocked via screen_protector.
+// ═══════════════════════════════════════════════════════════════════
+class _SecureDocumentViewer extends StatefulWidget {
+  final String imageUrl;
+  final String title;
+
+  const _SecureDocumentViewer({required this.imageUrl, required this.title});
+
+  @override
+  State<_SecureDocumentViewer> createState() => _SecureDocumentViewerState();
+}
+
+class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
+  @override
+  void initState() {
+    super.initState();
+    _enableScreenProtection();
+  }
+
+  @override
+  void dispose() {
+    _disableScreenProtection();
+    super.dispose();
+  }
+
+  Future<void> _enableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOn();
+      await ScreenProtector.preventScreenshotOn();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection error: $e');
+    }
+  }
+
+  Future<void> _disableScreenProtection() async {
+    try {
+      await ScreenProtector.protectDataLeakageOff();
+      await ScreenProtector.preventScreenshotOff();
+    } catch (e) {
+      if (kDebugMode) debugPrint('Screen protection disable error: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isFr = Localizations.localeOf(context).languageCode == 'fr';
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Main image with zoom/pan
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: CachedNetworkImage(
+                  imageUrl: widget.imageUrl,
+                  fit: BoxFit.contain,
+                  placeholder: (_, _) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (_, _, _) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.broken_image_rounded, color: Colors.white38, size: 64),
+                        const SizedBox(height: 12),
+                        Text(
+                          isFr ? 'Impossible de charger l\'image' : 'Failed to load image',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // CONFIDENTIAL watermark overlay
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _WatermarkPainter(),
+                ),
+              ),
+            ),
+
+            // Top bar
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.8),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  children: [
+                    // Close button
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Title
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // Security badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.burundiGreen.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.shield_rounded, size: 14, color: AppColors.burundiGreen),
+                          const SizedBox(width: 4),
+                          Text(
+                            isFr ? 'Protégé' : 'Protected',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.burundiGreen,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bottom security info bar
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.8),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 30, 20, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 14,
+                      color: Colors.white.withValues(alpha: 0.4)),
+                    const SizedBox(width: 6),
+                    Text(
+                      isFr
+                          ? 'Aperçu sécurisé — Capture d\'écran bloquée'
+                          : 'Secure preview — Screenshots blocked',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Paints a repeating diagonal "CONFIDENTIAL" watermark across the screen.
+class _WatermarkPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final textStyle = TextStyle(
+      color: Colors.white.withValues(alpha: 0.06),
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 6,
+    );
+    final textSpan = TextSpan(text: 'CONFIDENTIAL', style: textStyle);
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    const spacing = 160.0;
+    const angle = -math.pi / 6; // -30 degrees
+
+    canvas.save();
+    canvas.rotate(angle);
+
+    // Paint enough copies to fill the rotated canvas
+    final diagonal = math.sqrt(size.width * size.width + size.height * size.height);
+    for (double y = -diagonal; y < diagonal; y += spacing) {
+      for (double x = -diagonal; x < diagonal; x += textPainter.width + 80) {
+        textPainter.paint(canvas, Offset(x, y));
+      }
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

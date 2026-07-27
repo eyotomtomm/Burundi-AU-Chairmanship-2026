@@ -7285,16 +7285,37 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         if isinstance(raw, dict) is False:
             selected_side_event_ids = None
 
+        # Map common field name aliases to their canonical model column names
+        _FIELD_ALIASES = {
+            'country': 'nationality',
+            'pays': 'nationality',
+            'nationalite': 'nationality',
+            'country_of_origin': 'nationality',
+        }
+
         # Separate known model fields from custom/extra fields
         model_data = {}
         additional_data = {}
         for key, value in raw.items():
             if key == 'selected_side_events':
                 continue
-            if key in self._KNOWN_FIELD_NAMES:
-                model_data[key] = value
+            canonical = _FIELD_ALIASES.get(key, key)
+            if canonical in self._KNOWN_FIELD_NAMES:
+                # Only set if not already populated (first match wins)
+                if canonical not in model_data:
+                    model_data[canonical] = value
             else:
                 additional_data[key] = value
+
+        # If nationality is a full country name, resolve to ISO code
+        if model_data.get('nationality'):
+            from core.models import NATIONALITY_CHOICES
+            nat_val = str(model_data['nationality']).strip()
+            if nat_val.upper() not in dict(NATIONALITY_CHOICES):
+                reverse_map = {v.lower(): k for k, v in NATIONALITY_CHOICES}
+                resolved = reverse_map.get(nat_val.lower())
+                if resolved:
+                    model_data['nationality'] = resolved
 
         # ── Normalize form field names to model columns ──
         # Split single 'name' into first_name + last_name if needed

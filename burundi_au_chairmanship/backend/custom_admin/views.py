@@ -9626,11 +9626,55 @@ def youth_dialogue_applications_list(request, event_pk):
     elif status_filter:
         qs = qs.filter(status=status_filter)
 
+    # --- Nationality helpers ---
+    # Some applications store nationality in additional_data under keys like
+    # "country", "pays", "nationalite" instead of the model's nationality column.
+    from core.models import NATIONALITY_CHOICES
+    nationality_map = dict(NATIONALITY_CHOICES)  # code → name
+    _reverse_nat = {v.lower(): k for k, v in NATIONALITY_CHOICES}  # name → code
+    _COUNTRY_KEYS = ('nationality', 'country', 'pays', 'nationalite', 'country_of_origin')
+
+    def _resolve_code(value):
+        """Normalize a nationality value (ISO code or country name) to an ISO code."""
+        if not value:
+            return ''
+        val = str(value).strip()
+        upper = val.upper()
+        if upper in nationality_map:
+            return upper
+        code = _reverse_nat.get(val.lower(), '')
+        return code
+
+    def _app_nationality_code(app):
+        """Return resolved nationality code for an application, checking additional_data."""
+        if app.nationality:
+            return app.nationality.upper()
+        ad = app.additional_data
+        if isinstance(ad, dict):
+            for key in _COUNTRY_KEYS:
+                val = ad.get(key)
+                if val:
+                    code = _resolve_code(val)
+                    if code:
+                        return code
+        return ''
+
     nationality_filter = request.GET.getlist('nationality')
-    # Strip empty values
     nationality_filter = [n.strip() for n in nationality_filter if n.strip()]
     if nationality_filter:
-        qs = qs.filter(nationality__in=nationality_filter)
+        # Build Q to match nationality column OR additional_data country keys
+        nat_q = Q(nationality__in=nationality_filter)
+        # Also match country names for additional_data lookups
+        filter_names = []
+        for code in nationality_filter:
+            name = nationality_map.get(code)
+            if name:
+                filter_names.append(name)
+        for key in _COUNTRY_KEYS:
+            nat_q |= Q(**{f'additional_data__{key}__in': nationality_filter})
+            if filter_names:
+                nat_q |= Q(**{f'additional_data__{key}__in': filter_names})
+        qs = qs.filter(nat_q)
 
     search_q = request.GET.get('q', '').strip()
     if search_q:
@@ -9650,19 +9694,27 @@ def youth_dialogue_applications_list(request, event_pk):
     credential_count = event_apps.filter(status='credential_issued').count()
     rejected_count = event_apps.filter(status__in=['rejected', 'documents_rejected']).count()
 
-    # Build nationality options from actual applications for this event
-    from core.models import NATIONALITY_CHOICES
-    nationality_map = dict(NATIONALITY_CHOICES)
-    used_codes = (
+    # Build nationality options from BOTH nationality column AND additional_data
+    used_codes = set(
         event_apps.exclude(nationality='')
         .values_list('nationality', flat=True)
         .distinct()
-        .order_by('nationality')
     )
+    # Scan additional_data for country values on apps with empty nationality
+    for ad in event_apps.filter(nationality='').values_list('additional_data', flat=True):
+        if not isinstance(ad, dict):
+            continue
+        for key in _COUNTRY_KEYS:
+            val = ad.get(key)
+            if val:
+                code = _resolve_code(val)
+                if code:
+                    used_codes.add(code)
+                break
+
     nationality_options = []
     for code in used_codes:
         label = nationality_map.get(code, code)
-        # Build flag emoji
         flag = ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in code.upper()) if len(code) == 2 else ''
         nationality_options.append({'code': code, 'label': label, 'flag': flag})
     nationality_options.sort(key=lambda x: x['label'])
@@ -9670,6 +9722,15 @@ def youth_dialogue_applications_list(request, event_pk):
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
     applications = paginator.get_page(page)
+
+    # Annotate each application with resolved nationality (covers additional_data)
+    for app in applications:
+        code = _app_nationality_code(app)
+        app.resolved_nationality_code = code
+        app.resolved_nationality_display = nationality_map.get(code, code) if code else ''
+        app.resolved_nationality_flag = (
+            ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in code) if len(code) == 2 else ''
+        )
 
     return render(request, 'custom_admin/youth_dialogue/list.html', {
         'applications': applications,

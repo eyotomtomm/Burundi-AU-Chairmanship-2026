@@ -102,41 +102,68 @@
 
   <!-- Filter Tabs -->
   <div class="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-slate-100 flex-wrap">
-    <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}{% if search_query %}?q={{ search_query }}{% endif %}"
+    <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}{% if search_query %}?q={{ search_query }}{% endif %}{% if nationality_filter %}{% if search_query %}&{% else %}?{% endif %}nationality={{ nationality_filter }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if not current_filter %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       All
     </a>
-    <a href="?status=pending_review{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?status=pending_review{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'pending_review' %}bg-amber-500 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Pending Review
     </a>
-    <a href="?status=accepted{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?status=accepted{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'accepted' %}bg-emerald-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Accepted
     </a>
-    <a href="?status=documents{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?status=documents{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'documents' %}bg-cyan-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Documents
     </a>
-    <a href="?status=credentials{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?status=credentials{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'credentials' %}bg-indigo-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Credentials
     </a>
-    <a href="?status=rejected{% if search_query %}&q={{ search_query }}{% endif %}"
+    <a href="?status=rejected{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'rejected' %}bg-red-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Rejected
     </a>
   </div>
 
-  <!-- Search Bar -->
+  <!-- Search & Nationality Filter -->
   <form method="get" class="mb-6">
     {% if current_filter %}<input type="hidden" name="status" value="{{ current_filter }}">{% endif %}
-    <div class="relative">
-      <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
-      <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, email, or participant code..."
-             class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm">
+    <div class="flex gap-3">
+      <div class="relative flex-1">
+        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, email, or participant code..."
+               class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm">
+      </div>
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">public</span>
+        <select name="nationality" onchange="this.form.submit()"
+                class="bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-10 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm appearance-none cursor-pointer min-w-[200px]">
+          <option value="">All Countries</option>
+          {% for opt in nationality_options %}
+          <option value="{{ opt.code }}" {% if nationality_filter == opt.code %}selected{% endif %}>{{ opt.flag }} {{ opt.label }}</option>
+          {% endfor %}
+        </select>
+        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none">expand_more</span>
+      </div>
     </div>
   </form>
+
+  {% if nationality_filter %}
+  <div class="mb-4 flex items-center gap-2">
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+      <span class="material-symbols-outlined text-sm" style="font-size:14px;">public</span>
+      Filtered by: {% for opt in nationality_options %}{% if opt.code == nationality_filter %}{{ opt.flag }} {{ opt.label }}{% endif %}{% endfor %}
+    </span>
+    <a href="?{% if current_filter %}status={{ current_filter }}{% endif %}{% if search_query %}{% if current_filter %}&{% endif %}q={{ search_query }}{% endif %}"
+       class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 transition-colors">
+      <span class="material-symbols-outlined text-sm">close</span>
+      Clear
+    </a>
+  </div>
+  {% endif %}
 
   <!-- Table -->
   <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
@@ -145,6 +172,10 @@
       <table class="w-full">
         <thead class="bg-slate-50 border-b border-slate-200">
           <tr>
+            <th class="px-4 py-4 text-left w-12">
+              <input type="checkbox" id="ydSelectAll"
+                     class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+            </th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Applicant</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Nationality</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Organization</th>
@@ -156,6 +187,10 @@
         <tbody class="divide-y divide-slate-100">
           {% for app in applications %}
           <tr class="hover:bg-slate-50/50 transition-colors">
+            <td class="px-4 py-4">
+              <input type="checkbox" class="yd-bulk-cb w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                     value="{{ app.pk }}" data-status="{{ app.status }}">
+            </td>
             <td class="px-6 py-4">
               <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
@@ -222,14 +257,14 @@
       </p>
       <div class="flex gap-2">
         {% if applications.has_previous %}
-        <a href="?page={{ applications.previous_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+        <a href="?page={{ applications.previous_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
            class="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2 px-4 text-sm hover:bg-slate-50 transition-all">
           <span class="material-symbols-outlined text-sm">chevron_left</span>
           Previous
         </a>
         {% endif %}
         {% if applications.has_next %}
-        <a href="?page={{ applications.next_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}"
+        <a href="?page={{ applications.next_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
            class="inline-flex items-center gap-1 bg-slate-900 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-slate-800 transition-all">
           Next
           <span class="material-symbols-outlined text-sm">chevron_right</span>
@@ -252,4 +287,315 @@
     {% endif %}
   </div>
 </div>
+
+<!-- Bulk Action Bar -->
+<div id="ydBulkBar"
+     class="fixed bottom-0 left-72 right-0 z-50 transform translate-y-full transition-transform duration-300 ease-in-out"
+     style="pointer-events: none;">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-4" style="pointer-events: auto;">
+    <div class="bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 px-6 py-4 flex items-center justify-between gap-4">
+      <!-- Left: Selection info -->
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-blue-400 text-xl">checklist</span>
+          <span class="text-white font-semibold text-sm">
+            <span id="ydBulkCount" class="text-blue-400 font-bold text-lg">0</span>
+            <span class="text-slate-300 ml-1">application(s) selected</span>
+          </span>
+        </div>
+        <div class="h-6 w-px bg-slate-700"></div>
+        <button type="button" onclick="ydSelectAllPage()" class="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors">
+          Select All on Page
+        </button>
+        <button type="button" onclick="ydDeselectAll()" class="text-xs text-slate-400 hover:text-white font-medium transition-colors">
+          Deselect All
+        </button>
+      </div>
+
+      <!-- Right: Action buttons -->
+      <div class="flex items-center gap-3">
+        <button type="button" onclick="ydBulkAction('accept')"
+                class="inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-sm transition-colors shadow-lg shadow-emerald-600/25">
+          <span class="material-symbols-outlined text-sm">check_circle</span>
+          Accept Selected
+        </button>
+        <button type="button" onclick="ydShowRejectModal()"
+                class="inline-flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm transition-colors shadow-lg shadow-red-600/25">
+          <span class="material-symbols-outlined text-sm">cancel</span>
+          Reject Selected
+        </button>
+        <button type="button" onclick="ydDeselectAll()"
+                class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Cancel">
+          <span class="material-symbols-outlined text-sm">close</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal (Accept) -->
+<div id="ydConfirmModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+    <div class="px-6 pt-6 pb-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div id="ydModalIcon" class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl text-emerald-600">check_circle</span>
+        </div>
+        <div>
+          <h3 id="ydModalTitle" class="text-lg font-bold text-slate-900">Confirm Bulk Accept</h3>
+          <p class="text-sm text-slate-500">This will notify applicants via email</p>
+        </div>
+      </div>
+      <p id="ydModalMessage" class="text-sm text-slate-700 mt-2"></p>
+    </div>
+    <!-- Progress bar -->
+    <div id="ydProgressWrap" class="hidden px-6 pb-4">
+      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div id="ydProgressBar" class="bg-emerald-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <p id="ydProgressText" class="text-xs text-slate-500 mt-2 text-center">Processing...</p>
+    </div>
+    <!-- Actions -->
+    <div id="ydModalActions" class="px-6 pb-6 flex gap-3 justify-end">
+      <button type="button" onclick="ydModalClose()"
+              class="px-5 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors text-sm">
+        Cancel
+      </button>
+      <button type="button" id="ydModalConfirmBtn" onclick="ydModalConfirm()"
+              class="px-5 py-2.5 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors text-sm shadow-sm">
+        Accept All
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject Modal (with reason input) -->
+<div id="ydRejectModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+    <div class="px-6 pt-6 pb-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl text-red-600">cancel</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Confirm Bulk Reject</h3>
+          <p class="text-sm text-slate-500">This will notify applicants via email</p>
+        </div>
+      </div>
+      <p id="ydRejectMessage" class="text-sm text-slate-700 mt-2"></p>
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Rejection reason (optional)</label>
+        <textarea id="ydRejectReason" rows="3" placeholder="Enter a reason for rejection..."
+                  class="w-full border border-slate-200 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"></textarea>
+      </div>
+    </div>
+    <!-- Progress bar -->
+    <div id="ydRejectProgressWrap" class="hidden px-6 pb-4">
+      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div id="ydRejectProgressBar" class="bg-red-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <p id="ydRejectProgressText" class="text-xs text-slate-500 mt-2 text-center">Processing...</p>
+    </div>
+    <!-- Actions -->
+    <div id="ydRejectActions" class="px-6 pb-6 flex gap-3 justify-end">
+      <button type="button" onclick="ydRejectModalClose()"
+              class="px-5 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors text-sm">
+        Cancel
+      </button>
+      <button type="button" id="ydRejectConfirmBtn" onclick="ydRejectConfirm()"
+              class="px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm shadow-sm">
+        Reject All
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var BULK_URL = '{% url "custom_admin:youth_dialogue_bulk_action" event_pk=yd_event.pk %}';
+  var CSRF = '{{ csrf_token }}';
+  var pendingAction = null;
+
+  function getCheckboxes() {
+    return document.querySelectorAll('.yd-bulk-cb');
+  }
+
+  function getCheckedIds() {
+    var ids = [];
+    getCheckboxes().forEach(function(cb) {
+      if (cb.checked) ids.push(cb.value);
+    });
+    return ids;
+  }
+
+  function updateBar() {
+    var ids = getCheckedIds();
+    var bar = document.getElementById('ydBulkBar');
+    var count = document.getElementById('ydBulkCount');
+    if (ids.length > 0) {
+      bar.classList.remove('translate-y-full');
+      bar.classList.add('translate-y-0');
+      count.textContent = ids.length;
+    } else {
+      bar.classList.add('translate-y-full');
+      bar.classList.remove('translate-y-0');
+    }
+    var selectAll = document.getElementById('ydSelectAll');
+    if (selectAll) {
+      var allBoxes = getCheckboxes();
+      selectAll.checked = allBoxes.length > 0 && ids.length === allBoxes.length;
+      selectAll.indeterminate = ids.length > 0 && ids.length < allBoxes.length;
+    }
+  }
+
+  window.ydSelectAllPage = function() {
+    getCheckboxes().forEach(function(cb) { cb.checked = true; });
+    var selectAll = document.getElementById('ydSelectAll');
+    if (selectAll) selectAll.checked = true;
+    updateBar();
+  };
+
+  window.ydDeselectAll = function() {
+    getCheckboxes().forEach(function(cb) { cb.checked = false; });
+    var selectAll = document.getElementById('ydSelectAll');
+    if (selectAll) selectAll.checked = false;
+    updateBar();
+  };
+
+  // Accept flow
+  window.ydBulkAction = function(action) {
+    var ids = getCheckedIds();
+    if (ids.length === 0) return;
+    pendingAction = { action: action, ids: ids };
+    var modal = document.getElementById('ydConfirmModal');
+    var msg = document.getElementById('ydModalMessage');
+    msg.textContent = 'Accept ' + ids.length + ' application(s)? Each applicant will be notified and prompted to upload documents.';
+    document.getElementById('ydProgressWrap').classList.add('hidden');
+    document.getElementById('ydModalActions').classList.remove('hidden');
+    document.getElementById('ydModalConfirmBtn').disabled = false;
+    modal.classList.remove('hidden');
+  };
+
+  window.ydModalClose = function() {
+    document.getElementById('ydConfirmModal').classList.add('hidden');
+    pendingAction = null;
+  };
+
+  window.ydModalConfirm = function() {
+    if (!pendingAction) return;
+    executeBulk(pendingAction.action, pendingAction.ids, '', 'ydConfirmModal', 'ydProgressWrap', 'ydProgressBar', 'ydProgressText', 'ydModalActions', 'ydModalConfirmBtn');
+  };
+
+  // Reject flow
+  window.ydShowRejectModal = function() {
+    var ids = getCheckedIds();
+    if (ids.length === 0) return;
+    pendingAction = { action: 'reject', ids: ids };
+    var msg = document.getElementById('ydRejectMessage');
+    msg.textContent = 'Reject ' + ids.length + ' application(s)? Each applicant will be notified via email.';
+    document.getElementById('ydRejectReason').value = '';
+    document.getElementById('ydRejectProgressWrap').classList.add('hidden');
+    document.getElementById('ydRejectActions').classList.remove('hidden');
+    document.getElementById('ydRejectConfirmBtn').disabled = false;
+    document.getElementById('ydRejectModal').classList.remove('hidden');
+  };
+
+  window.ydRejectModalClose = function() {
+    document.getElementById('ydRejectModal').classList.add('hidden');
+    pendingAction = null;
+  };
+
+  window.ydRejectConfirm = function() {
+    if (!pendingAction) return;
+    var reason = document.getElementById('ydRejectReason').value.trim();
+    executeBulk('reject', pendingAction.ids, reason, 'ydRejectModal', 'ydRejectProgressWrap', 'ydRejectProgressBar', 'ydRejectProgressText', 'ydRejectActions', 'ydRejectConfirmBtn');
+  };
+
+  function executeBulk(action, ids, reason, modalId, progressWrapId, progressBarId, progressTextId, actionsId, confirmBtnId) {
+    var confirmBtn = document.getElementById(confirmBtnId);
+    var progressWrap = document.getElementById(progressWrapId);
+    var progressBar = document.getElementById(progressBarId);
+    var progressText = document.getElementById(progressTextId);
+    var actionsDiv = document.getElementById(actionsId);
+
+    confirmBtn.disabled = true;
+    progressWrap.classList.remove('hidden');
+    actionsDiv.classList.add('hidden');
+    progressBar.style.width = '30%';
+    progressText.textContent = 'Processing ' + ids.length + ' application(s)...';
+
+    var formData = new FormData();
+    formData.append('action', action);
+    if (reason) formData.append('reason', reason);
+    ids.forEach(function(id) { formData.append('ids', id); });
+
+    fetch(BULK_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: formData,
+      credentials: 'same-origin',
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      progressBar.style.width = '100%';
+      if (data.status === 'success') {
+        progressText.textContent = 'Done!';
+        setTimeout(function() {
+          document.getElementById(modalId).classList.add('hidden');
+          showToast(data.message, 'success');
+          setTimeout(function() { window.location.reload(); }, 800);
+        }, 500);
+      } else {
+        document.getElementById(modalId).classList.add('hidden');
+        showToast(data.message || 'An error occurred.', 'error');
+      }
+      pendingAction = null;
+    })
+    .catch(function(err) {
+      document.getElementById(modalId).classList.add('hidden');
+      showToast('Network error: ' + err.message, 'error');
+      pendingAction = null;
+    });
+  }
+
+  function showToast(message, type) {
+    var container = document.getElementById('ydToastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'ydToastContainer';
+      container.className = 'fixed top-24 right-6 z-[200] flex flex-col gap-2';
+      document.body.appendChild(container);
+    }
+    var colors = { success: 'bg-emerald-600 text-white', error: 'bg-red-600 text-white', warning: 'bg-amber-500 text-white' };
+    var icons = { success: 'check_circle', error: 'error', warning: 'warning' };
+    var toast = document.createElement('div');
+    toast.className = 'flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl transform translate-x-full transition-transform duration-300 ' + (colors[type] || colors.success);
+    toast.innerHTML = '<span class="material-symbols-outlined text-lg">' + (icons[type] || 'info') + '</span><span class="text-sm font-medium">' + message + '</span>';
+    container.appendChild(toast);
+    requestAnimationFrame(function() {
+      toast.classList.remove('translate-x-full');
+      toast.classList.add('translate-x-0');
+    });
+    setTimeout(function() {
+      toast.classList.remove('translate-x-0');
+      toast.classList.add('translate-x-full');
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 4000);
+  }
+
+  // Bind events
+  document.addEventListener('DOMContentLoaded', function() {
+    getCheckboxes().forEach(function(cb) {
+      cb.addEventListener('change', updateBar);
+    });
+    var selectAll = document.getElementById('ydSelectAll');
+    if (selectAll) {
+      selectAll.addEventListener('change', function() {
+        getCheckboxes().forEach(function(cb) { cb.checked = selectAll.checked; });
+        updateBar();
+      });
+    }
+  });
+})();
+</script>
 {% endblock %}

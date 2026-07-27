@@ -5630,6 +5630,87 @@ def bulk_content_action(request):
     return redirect(redirect_url)
 
 
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def bulk_yd_action(request, event_pk):
+    """Bulk accept or reject Continental Dialogue applications."""
+    from core.views import _notify_yd
+
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    action = request.POST.get('action', '')
+    ids = request.POST.getlist('ids')
+
+    if not ids:
+        return JsonResponse({'status': 'error', 'message': 'No applications selected.'})
+
+    applications = YouthDialogueApplication.objects.filter(pk__in=ids, event=yd_event)
+
+    if action == 'accept':
+        eligible = applications.filter(status__in=['submitted', 'under_review'])
+        count = 0
+        for app in eligible:
+            old_status = app.status
+            app.status = 'accepted'
+            app.reviewed_by = request.user
+            app.reviewed_at = timezone.now()
+            app.save()
+            log_admin_action(
+                request, 'approve', 'YouthDialogueApplication', object_id=app.pk,
+                object_repr=f'{app.first_name} {app.last_name}',
+                changes={'status': {'old': old_status, 'new': 'accepted'}},
+            )
+            try:
+                _notify_yd(app, 'accepted')
+            except Exception:
+                logger.exception('Failed to notify applicant %s on bulk accept', app.pk)
+            count += 1
+        skipped = applications.count() - count
+        msg = f'{count} application(s) accepted.'
+        if skipped:
+            msg += f' {skipped} skipped (not in reviewable status).'
+        log_admin_action(
+            request, 'bulk_action', 'YouthDialogueApplication',
+            object_repr=f'Bulk accept {count} application(s)',
+            changes={'action': 'accept', 'count': str(count), 'event': yd_event.programme_title},
+        )
+        return JsonResponse({'status': 'success', 'message': msg, 'count': count})
+
+    elif action == 'reject':
+        reason = request.POST.get('reason', '').strip() or 'Application not approved'
+        eligible = applications.filter(status__in=['submitted', 'under_review'])
+        count = 0
+        for app in eligible:
+            old_status = app.status
+            app.status = 'rejected'
+            app.rejection_reason = reason
+            app.reviewed_by = request.user
+            app.reviewed_at = timezone.now()
+            app.save()
+            log_admin_action(
+                request, 'reject', 'YouthDialogueApplication', object_id=app.pk,
+                object_repr=f'{app.first_name} {app.last_name}',
+                changes={'status': {'old': old_status, 'new': 'rejected'}, 'reason': reason},
+            )
+            try:
+                _notify_yd(app, 'rejected')
+            except Exception:
+                logger.exception('Failed to notify applicant %s on bulk reject', app.pk)
+            count += 1
+        skipped = applications.count() - count
+        msg = f'{count} application(s) rejected.'
+        if skipped:
+            msg += f' {skipped} skipped (not in reviewable status).'
+        log_admin_action(
+            request, 'bulk_action', 'YouthDialogueApplication',
+            object_repr=f'Bulk reject {count} application(s)',
+            changes={'action': 'reject', 'count': str(count), 'event': yd_event.programme_title},
+        )
+        return JsonResponse({'status': 'success', 'message': msg, 'count': count})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid action.'})
+
+
 # ═══════════════════════════════════════════════════════════════
 #  GLOBAL SEARCH
 # ═══════════════════════════════════════════════════════════════
@@ -9545,6 +9626,10 @@ def youth_dialogue_applications_list(request, event_pk):
     elif status_filter:
         qs = qs.filter(status=status_filter)
 
+    nationality_filter = request.GET.get('nationality', '').strip()
+    if nationality_filter:
+        qs = qs.filter(nationality=nationality_filter)
+
     search_q = request.GET.get('q', '').strip()
     if search_q:
         qs = qs.filter(
@@ -9563,6 +9648,23 @@ def youth_dialogue_applications_list(request, event_pk):
     credential_count = event_apps.filter(status='credential_issued').count()
     rejected_count = event_apps.filter(status__in=['rejected', 'documents_rejected']).count()
 
+    # Build nationality options from actual applications for this event
+    from core.models import NATIONALITY_CHOICES
+    nationality_map = dict(NATIONALITY_CHOICES)
+    used_codes = (
+        event_apps.exclude(nationality='')
+        .values_list('nationality', flat=True)
+        .distinct()
+        .order_by('nationality')
+    )
+    nationality_options = []
+    for code in used_codes:
+        label = nationality_map.get(code, code)
+        # Build flag emoji
+        flag = ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in code.upper()) if len(code) == 2 else ''
+        nationality_options.append({'code': code, 'label': label, 'flag': flag})
+    nationality_options.sort(key=lambda x: x['label'])
+
     paginator = Paginator(qs, 20)
     page = request.GET.get('page')
     applications = paginator.get_page(page)
@@ -9577,6 +9679,8 @@ def youth_dialogue_applications_list(request, event_pk):
         'rejected_count': rejected_count,
         'current_filter': status_filter or '',
         'search_query': search_q,
+        'nationality_filter': nationality_filter,
+        'nationality_options': nationality_options,
     })
 
 

@@ -353,6 +353,7 @@ urlpatterns = [
     path('youth-dialogue/<int:event_pk>/edit/', views.youth_dialogue_event_form, name='youth_dialogue_event_edit'),
     path('youth-dialogue/<int:event_pk>/toggle-active/', views.youth_dialogue_toggle_active, name='youth_dialogue_toggle_active'),
     path('youth-dialogue/<int:event_pk>/applications/', views.youth_dialogue_applications_list, name='youth_dialogue_applications_list'),
+    path('youth-dialogue/<int:event_pk>/bulk-action/', views.bulk_yd_action, name='youth_dialogue_bulk_action'),
     path('youth-dialogue/<int:event_pk>/media/', views.youth_dialogue_media_list, name='youth_dialogue_media_list'),
     path('youth-dialogue/<int:event_pk>/media/create/', views.youth_dialogue_media_form, name='youth_dialogue_media_create'),
     path('youth-dialogue/<int:event_pk>/media/<int:pk>/edit/', views.youth_dialogue_media_form, name='youth_dialogue_media_edit'),

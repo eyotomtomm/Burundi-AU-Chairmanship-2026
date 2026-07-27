@@ -102,66 +102,77 @@
 
   <!-- Filter Tabs -->
   <div class="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-slate-100 flex-wrap">
-    <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}{% if search_query %}?q={{ search_query }}{% endif %}{% if nationality_filter %}{% if search_query %}&{% else %}?{% endif %}nationality={{ nationality_filter }}{% endif %}"
+    <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}{% if search_query %}?q={{ search_query }}{% endif %}{% for nc in nationality_filter %}{% if search_query or not forloop.first %}&{% else %}?{% endif %}nationality={{ nc }}{% endfor %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if not current_filter %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       All
     </a>
-    <a href="?status=pending_review{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+    <a href="?status=pending_review{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'pending_review' %}bg-amber-500 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Pending Review
     </a>
-    <a href="?status=accepted{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+    <a href="?status=accepted{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'accepted' %}bg-emerald-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Accepted
     </a>
-    <a href="?status=documents{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+    <a href="?status=documents{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'documents' %}bg-cyan-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Documents
     </a>
-    <a href="?status=credentials{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+    <a href="?status=credentials{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'credentials' %}bg-indigo-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Credentials
     </a>
-    <a href="?status=rejected{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+    <a href="?status=rejected{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
        class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'rejected' %}bg-red-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
       Rejected
     </a>
   </div>
 
-  <!-- Search & Nationality Filter -->
-  <form method="get" class="mb-6">
+  <!-- Search Bar -->
+  <form id="ydFilterForm" method="get" class="mb-6">
     {% if current_filter %}<input type="hidden" name="status" value="{{ current_filter }}">{% endif %}
-    <div class="flex gap-3">
-      <div class="relative flex-1">
-        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, email, or participant code..."
-               class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm">
-      </div>
-      <div class="relative">
-        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">public</span>
-        <select name="nationality" onchange="this.form.submit()"
-                class="bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-10 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm appearance-none cursor-pointer min-w-[200px]">
-          <option value="">All Countries</option>
-          {% for opt in nationality_options %}
-          <option value="{{ opt.code }}" {% if nationality_filter == opt.code %}selected{% endif %}>{{ opt.flag }} {{ opt.label }}</option>
-          {% endfor %}
-        </select>
-        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg pointer-events-none">expand_more</span>
-      </div>
+    <div class="relative">
+      <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+      <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, email, or participant code..."
+             class="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm">
+    </div>
+    <!-- Hidden nationality inputs (managed by JS) -->
+    <div id="ydNatHidden">
+      {% for nc in nationality_filter %}
+      <input type="hidden" name="nationality" value="{{ nc }}">
+      {% endfor %}
     </div>
   </form>
 
-  {% if nationality_filter %}
-  <div class="mb-4 flex items-center gap-2">
-    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-      <span class="material-symbols-outlined text-sm" style="font-size:14px;">public</span>
-      Filtered by: {% for opt in nationality_options %}{% if opt.code == nationality_filter %}{{ opt.flag }} {{ opt.label }}{% endif %}{% endfor %}
-    </span>
-    <a href="?{% if current_filter %}status={{ current_filter }}{% endif %}{% if search_query %}{% if current_filter %}&{% endif %}q={{ search_query }}{% endif %}"
-       class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 transition-colors">
-      <span class="material-symbols-outlined text-sm">close</span>
-      Clear
-    </a>
+  <!-- Country Filter (Checkboxes) -->
+  {% if nationality_options %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-slate-500 text-lg">public</span>
+        <span class="text-sm font-semibold text-slate-700">Filter by Country</span>
+        {% if nationality_filter %}
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">{{ nationality_filter|length }} selected</span>
+        {% endif %}
+      </div>
+      {% if nationality_filter %}
+      <a href="?{% if current_filter %}status={{ current_filter }}{% endif %}{% if search_query %}{% if current_filter %}&{% endif %}q={{ search_query }}{% endif %}"
+         class="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 transition-colors">
+        <span class="material-symbols-outlined text-sm">close</span>
+        Clear All
+      </a>
+      {% endif %}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% for opt in nationality_options %}
+      <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-all border
+        {% if opt.code in nationality_filter %}bg-indigo-50 border-indigo-300 text-indigo-800 font-semibold{% else %}bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300{% endif %}">
+        <input type="checkbox" class="yd-nat-cb hidden" value="{{ opt.code }}"
+               {% if opt.code in nationality_filter %}checked{% endif %}>
+        <span>{{ opt.flag }} {{ opt.label }}</span>
+      </label>
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
 
@@ -257,14 +268,14 @@
       </p>
       <div class="flex gap-2">
         {% if applications.has_previous %}
-        <a href="?page={{ applications.previous_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+        <a href="?page={{ applications.previous_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
            class="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-2 px-4 text-sm hover:bg-slate-50 transition-all">
           <span class="material-symbols-outlined text-sm">chevron_left</span>
           Previous
         </a>
         {% endif %}
         {% if applications.has_next %}
-        <a href="?page={{ applications.next_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% if nationality_filter %}&nationality={{ nationality_filter }}{% endif %}"
+        <a href="?page={{ applications.next_page_number }}{% if current_filter %}&status={{ current_filter }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
            class="inline-flex items-center gap-1 bg-slate-900 text-white font-semibold rounded-lg py-2 px-4 text-sm hover:bg-slate-800 transition-all">
           Next
           <span class="material-symbols-outlined text-sm">chevron_right</span>
@@ -595,6 +606,22 @@
         updateBar();
       });
     }
+
+    // Country filter checkboxes
+    document.querySelectorAll('.yd-nat-cb').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var hiddenDiv = document.getElementById('ydNatHidden');
+        hiddenDiv.innerHTML = '';
+        document.querySelectorAll('.yd-nat-cb:checked').forEach(function(checked) {
+          var inp = document.createElement('input');
+          inp.type = 'hidden';
+          inp.name = 'nationality';
+          inp.value = checked.value;
+          hiddenDiv.appendChild(inp);
+        });
+        document.getElementById('ydFilterForm').submit();
+      });
+    });
   });
 })();
 </script>

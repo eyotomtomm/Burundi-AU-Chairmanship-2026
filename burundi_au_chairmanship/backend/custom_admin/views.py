@@ -9626,9 +9626,11 @@ def youth_dialogue_applications_list(request, event_pk):
     elif status_filter:
         qs = qs.filter(status=status_filter)
 
-    nationality_filter = request.GET.get('nationality', '').strip()
+    nationality_filter = request.GET.getlist('nationality')
+    # Strip empty values
+    nationality_filter = [n.strip() for n in nationality_filter if n.strip()]
     if nationality_filter:
-        qs = qs.filter(nationality=nationality_filter)
+        qs = qs.filter(nationality__in=nationality_filter)
 
     search_q = request.GET.get('q', '').strip()
     if search_q:

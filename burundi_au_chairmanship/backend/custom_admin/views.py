@@ -4171,10 +4171,18 @@ def support_ticket_reply(request, pk):
         ticket.assigned_to = request.user
         ticket.save(update_fields=['status', 'assigned_to'])
 
-    # Send email copy to user
+    # Send email copy to user via support SMTP (info@burundichairship.africa)
     try:
-        from django.core.mail import send_mail
-        from django.conf import settings as django_settings
+        from django.core.mail import send_mail, get_connection
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=settings.FALLBACK_EMAIL_HOST,
+            port=settings.FALLBACK_EMAIL_PORT,
+            username=settings.FALLBACK_EMAIL_HOST_USER,
+            password=settings.FALLBACK_EMAIL_HOST_PASSWORD,
+            use_tls=settings.FALLBACK_EMAIL_USE_TLS,
+            use_ssl=settings.FALLBACK_EMAIL_USE_SSL,
+        )
         send_mail(
             subject=f'Re: {ticket.subject} - Support Ticket #{ticket.pk}',
             message=(
@@ -4185,9 +4193,10 @@ def support_ticket_reply(request, pk):
                 f'Best regards,\n'
                 f'Burundi AU Support Team'
             ),
-            from_email=django_settings.DEFAULT_FROM_EMAIL,
+            from_email=settings.FALLBACK_FROM_EMAIL,
             recipient_list=[ticket.user.email],
-            fail_silently=True,
+            fail_silently=False,
+            connection=connection,
         )
     except Exception:
         pass  # Don't block reply if email fails
@@ -4248,10 +4257,18 @@ def support_ticket_update_status(request, pk):
             is_read=False,
         )
 
-        # Send email with closing template
+        # Send email with closing template via support SMTP
         try:
-            from django.core.mail import send_mail
-            from django.conf import settings as django_settings
+            from django.core.mail import send_mail, get_connection
+            connection = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=settings.FALLBACK_EMAIL_HOST,
+                port=settings.FALLBACK_EMAIL_PORT,
+                username=settings.FALLBACK_EMAIL_HOST_USER,
+                password=settings.FALLBACK_EMAIL_HOST_PASSWORD,
+                use_tls=settings.FALLBACK_EMAIL_USE_TLS,
+                use_ssl=settings.FALLBACK_EMAIL_USE_SSL,
+            )
             send_mail(
                 subject=f'Ticket Resolved: {ticket.subject} - #{ticket.pk}',
                 message=(
@@ -4262,9 +4279,10 @@ def support_ticket_update_status(request, pk):
                     f'Best regards,\n'
                     f'Burundi AU Support Team'
                 ),
-                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                from_email=settings.FALLBACK_FROM_EMAIL,
                 recipient_list=[ticket.user.email],
-                fail_silently=True,
+                fail_silently=False,
+                connection=connection,
             )
         except Exception:
             pass

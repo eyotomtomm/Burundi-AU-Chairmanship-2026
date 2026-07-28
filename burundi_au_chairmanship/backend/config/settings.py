@@ -465,6 +465,20 @@ DEFAULT_FROM_EMAIL = os.environ.get(
     'Be 4 Africa <info@burundi4africa.com>'
 )
 
+# ─── Fallback SMTP (used when primary Gmail SMTP fails) ──────
+# If the primary EMAIL_HOST fails (e.g. Gmail auth error), OTP emails
+# will automatically retry via this fallback server.
+FALLBACK_EMAIL_HOST = os.environ.get('FALLBACK_EMAIL_HOST', 'smtp.burundichairship.africa')
+FALLBACK_EMAIL_PORT = int(os.environ.get('FALLBACK_EMAIL_PORT', '465'))
+FALLBACK_EMAIL_USE_TLS = os.environ.get('FALLBACK_EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
+FALLBACK_EMAIL_USE_SSL = os.environ.get('FALLBACK_EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
+FALLBACK_EMAIL_HOST_USER = os.environ.get('FALLBACK_EMAIL_HOST_USER', 'info@burundichairship.africa')
+FALLBACK_EMAIL_HOST_PASSWORD = os.environ.get('FALLBACK_EMAIL_HOST_PASSWORD', '')
+FALLBACK_FROM_EMAIL = os.environ.get(
+    'FALLBACK_FROM_EMAIL',
+    'Be 4 Africa <info@burundichairship.africa>'
+)
+
 # ─── Campaign / Newsletter SMTP (separate account) ──────────
 # Used only by email campaigns. OTP & system emails use the defaults above.
 CAMPAIGN_EMAIL_HOST = os.environ.get('CAMPAIGN_EMAIL_HOST', 'smtp.burundichairship.africa')

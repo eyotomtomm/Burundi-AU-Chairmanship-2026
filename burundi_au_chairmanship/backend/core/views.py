@@ -4167,7 +4167,7 @@ def my_event_registrations(request):
 def send_pending_otp(request):
     """Send OTP for a pending (pre-registration) signup. No auth required —
     verifies Firebase token directly, like firebase_register/firebase_login."""
-    from .otp_utils import generate_otp, _hash_otp
+    from .otp_utils import generate_otp, _hash_otp, _send_mail_with_fallback
 
     id_token = request.data.get('firebase_token')
     if not id_token:
@@ -4206,7 +4206,7 @@ def send_pending_otp(request):
         )
 
     try:
-        send_mail(
+        _send_mail_with_fallback(
             'Be 4 Africa - Email Verification OTP',
             f'Hello {pending["name"]},\n\n'
             f'Your email verification OTP code is: {otp_code}\n\n'
@@ -4216,7 +4216,6 @@ def send_pending_otp(request):
             f'Be 4 Africa Team',
             from_email,
             [pending['email']],
-            fail_silently=False,
         )
     except Exception as e:
         logger.exception('Failed to send pending signup OTP email: %s', e)

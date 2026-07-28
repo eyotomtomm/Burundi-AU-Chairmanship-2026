@@ -4,7 +4,8 @@ import logging
 import secrets
 import string
 from datetime import timedelta
-from django.core.mail import EmailMultiAlternatives, send_mail
+from smtplib import SMTPAuthenticationError, SMTPException
+from django.core.mail import EmailMultiAlternatives, send_mail, get_connection
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import F as models_F
@@ -13,6 +14,41 @@ from .models import OTPVerification
 logger = logging.getLogger(__name__)
 
 MAX_OTP_ATTEMPTS = 5
+
+
+def _send_mail_with_fallback(subject, message, from_email, recipient_list):
+    """
+    Try sending via the primary SMTP backend. On authentication or
+    connection failure, automatically retry via the fallback SMTP server.
+    """
+    try:
+        send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+        return
+    except (SMTPAuthenticationError, ConnectionRefusedError, OSError) as primary_err:
+        fallback_host = getattr(settings, 'FALLBACK_EMAIL_HOST', '')
+        fallback_password = getattr(settings, 'FALLBACK_EMAIL_HOST_PASSWORD', '')
+        if not fallback_host or not fallback_password:
+            raise  # no fallback configured, propagate original error
+
+        logger.warning(
+            'Primary SMTP failed (%s), retrying with fallback %s',
+            primary_err, fallback_host,
+        )
+
+        fallback_from = getattr(settings, 'FALLBACK_FROM_EMAIL', from_email)
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=fallback_host,
+            port=getattr(settings, 'FALLBACK_EMAIL_PORT', 465),
+            username=getattr(settings, 'FALLBACK_EMAIL_HOST_USER', ''),
+            password=fallback_password,
+            use_tls=getattr(settings, 'FALLBACK_EMAIL_USE_TLS', False),
+            use_ssl=getattr(settings, 'FALLBACK_EMAIL_USE_SSL', True),
+        )
+        send_mail(
+            subject, message, fallback_from, recipient_list,
+            fail_silently=False, connection=connection,
+        )
 
 
 def _hash_otp(code) -> str:
@@ -73,13 +109,7 @@ def send_email_otp(user, email):
             logger.error('DEFAULT_FROM_EMAIL is not configured')
             return False, 'Email sending is not configured. Please contact support.', None
 
-        send_mail(
-            subject,
-            message,
-            from_email,
-            [email],
-            fail_silently=False,
-        )
+        _send_mail_with_fallback(subject, message, from_email, [email])
 
         logger.info(f'OTP email sent to {email} for user {user.pk}')
         return True, 'OTP sent successfully', otp.id
@@ -127,13 +157,7 @@ def send_pending_email_otp(email, name):
             logger.error('DEFAULT_FROM_EMAIL is not configured')
             return False, 'Email sending is not configured. Please contact support.'
 
-        send_mail(
-            subject,
-            message,
-            from_email,
-            [email],
-            fail_silently=False,
-        )
+        _send_mail_with_fallback(subject, message, from_email, [email])
 
         logger.info('Pending signup OTP email sent to %s', email)
         return True, 'OTP sent successfully'

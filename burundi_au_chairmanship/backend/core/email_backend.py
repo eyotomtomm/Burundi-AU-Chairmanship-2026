@@ -8,10 +8,18 @@ Every ``send_mail`` / ``EmailMessage.send()`` call in the project is
 transparently captured (subject, recipients, status, error, body preview),
 so the admin "Email Logs" page can show sent + failed mail without
 touching Gmail.
-"""
-import re
 
+When the primary SMTP (Gmail) fails with an authentication or connection
+error, the backend automatically retries via the FALLBACK_EMAIL_* server.
+"""
+import logging
+import re
+from smtplib import SMTPAuthenticationError
+
+from django.conf import settings
 from django.core.mail.backends.smtp import EmailBackend as SMTPEmailBackend
+
+_logger = logging.getLogger(__name__)
 
 _OTP_RE = re.compile(r'\b\d{4,8}\b')
 _PASSWORD_RE = re.compile(r'(Temporary Password:\s*)(\S+)', re.IGNORECASE)
@@ -84,6 +92,10 @@ class LoggingEmailBackend(SMTPEmailBackend):
                 total_sent += sent
                 status = 'sent' if sent else 'failed'
                 error = '' if sent else 'send_messages returned 0'
+            except (SMTPAuthenticationError, ConnectionRefusedError, OSError) as exc:
+                # Primary SMTP failed — try fallback server
+                sent, status, error = self._try_fallback(msg, exc)
+                total_sent += sent
             except Exception as exc:
                 status = 'failed'
                 error = str(exc)[:2000]
@@ -103,3 +115,41 @@ class LoggingEmailBackend(SMTPEmailBackend):
                 pass
 
         return total_sent
+
+    @staticmethod
+    def _try_fallback(msg, primary_exc):
+        """Retry a single message via the FALLBACK_EMAIL_* SMTP server."""
+        fallback_host = getattr(settings, 'FALLBACK_EMAIL_HOST', '')
+        fallback_password = getattr(settings, 'FALLBACK_EMAIL_HOST_PASSWORD', '')
+        if not fallback_host or not fallback_password:
+            return 0, 'failed', str(primary_exc)[:2000]
+
+        _logger.warning(
+            'Primary SMTP failed (%s), retrying via fallback %s',
+            primary_exc, fallback_host,
+        )
+
+        # Rewrite the from address to the fallback sender
+        fallback_from = getattr(
+            settings, 'FALLBACK_FROM_EMAIL', msg.from_email,
+        )
+        msg.from_email = fallback_from
+
+        try:
+            fallback_backend = SMTPEmailBackend(
+                host=fallback_host,
+                port=getattr(settings, 'FALLBACK_EMAIL_PORT', 465),
+                username=getattr(settings, 'FALLBACK_EMAIL_HOST_USER', ''),
+                password=fallback_password,
+                use_tls=getattr(settings, 'FALLBACK_EMAIL_USE_TLS', False),
+                use_ssl=getattr(settings, 'FALLBACK_EMAIL_USE_SSL', True),
+            )
+            sent = fallback_backend.send_messages([msg]) or 0
+            status = 'sent' if sent else 'failed'
+            error = '' if sent else 'fallback send_messages returned 0'
+            return sent, status, error
+        except Exception as fallback_exc:
+            _logger.exception(
+                'Fallback SMTP also failed: %s', fallback_exc,
+            )
+            return 0, 'failed', f'Primary: {primary_exc} | Fallback: {fallback_exc}'[:2000]

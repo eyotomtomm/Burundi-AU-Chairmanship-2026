@@ -448,22 +448,29 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                   );
                 },
               ),
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
+              Builder(
+                builder: (btnContext) => IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
                   ),
-                  child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                  onPressed: () {
+                    HapticService.light();
+                    final shareUrl = '${Environment.siteBaseUrl}/articles/${_article.id}/share/';
+                    final box = btnContext.findRenderObject() as RenderBox?;
+                    final origin = box != null
+                        ? box.localToGlobal(Offset.zero) & box.size
+                        : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
+                    Share.share(
+                      '${_article.getTitle(Provider.of<LanguageProvider>(context, listen: false).languageCode)}\n\n$shareUrl',
+                      sharePositionOrigin: origin,
+                    );
+                  },
                 ),
-                onPressed: () {
-                  HapticService.light();
-                  final shareUrl = '${Environment.siteBaseUrl}/articles/${_article.id}/share/';
-                  Share.share(
-                    '${_article.getTitle(Provider.of<LanguageProvider>(context, listen: false).languageCode)}\n\n$shareUrl',
-                  );
-                },
               ),
               const TranslateButton(),
             ],

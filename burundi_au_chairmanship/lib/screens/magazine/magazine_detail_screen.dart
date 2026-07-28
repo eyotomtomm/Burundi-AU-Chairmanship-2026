@@ -319,19 +319,28 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
                   onPressed: () => Navigator.pop(context),
                 ),
                 actions: [
-                  IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
+                  Builder(
+                    builder: (btnContext) => IconButton(
+                      icon: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.share_rounded, color: textPrimary, size: 20),
                       ),
-                      child: Icon(Icons.share_rounded, color: textPrimary, size: 20),
+                      onPressed: () {
+                        HapticService.light();
+                        final box = btnContext.findRenderObject() as RenderBox?;
+                        final origin = box != null
+                            ? box.localToGlobal(Offset.zero) & box.size
+                            : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
+                        Share.share(
+                          '${_magazine.getTitle(langCode)}\n\n${Environment.siteBaseUrl}/magazines/${_magazine.id}/share/',
+                          sharePositionOrigin: origin,
+                        );
+                      },
                     ),
-                    onPressed: () {
-                      HapticService.light();
-                      Share.share('${_magazine.getTitle(langCode)}\n\n${Environment.siteBaseUrl}/magazines/${_magazine.id}/share/');
-                    },
                   ),
                 ],
               ),

@@ -496,9 +496,14 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
       final file = File('${tempDir.path}/event_ticket.png');
       await file.writeAsBytes(pngBytes);
 
+      final box = context.findRenderObject() as RenderBox?;
+      final origin = box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
       await Share.shareXFiles(
         [XFile(file.path)],
         text: 'My ticket for ${_ticketData?['event_name'] ?? 'event'}',
+        sharePositionOrigin: origin,
       );
     } catch (e) {
       if (mounted) {

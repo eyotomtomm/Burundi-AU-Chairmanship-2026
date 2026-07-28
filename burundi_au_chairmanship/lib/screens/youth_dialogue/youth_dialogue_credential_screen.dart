@@ -146,9 +146,14 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
       final file = File('${dir.path}/YD-IDCard-$code.pdf');
       await file.writeAsBytes(bytes);
       if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      final origin = box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'application/pdf')],
         text: '$_programmeName ID Card - $code',
+        sharePositionOrigin: origin,
       );
     } catch (e) {
       if (mounted) {

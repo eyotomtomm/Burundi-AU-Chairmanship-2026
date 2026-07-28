@@ -97,14 +97,20 @@ class _FactDetailScreenState extends State<FactDetailScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.share_outlined),
-                onPressed: () {
-                  final text = fact.isQuote
-                      ? '"${fact.getContent(langCode)}"\n\u2014 ${fact.authorName}'
-                      : '${fact.getTitle(langCode)}\n\n${fact.getContent(langCode)}';
-                  Share.share(text);
-                },
+              Builder(
+                builder: (btnContext) => IconButton(
+                  icon: const Icon(Icons.share_outlined),
+                  onPressed: () {
+                    final text = fact.isQuote
+                        ? '"${fact.getContent(langCode)}"\n\u2014 ${fact.authorName}'
+                        : '${fact.getTitle(langCode)}\n\n${fact.getContent(langCode)}';
+                    final box = btnContext.findRenderObject() as RenderBox?;
+                    final origin = box != null
+                        ? box.localToGlobal(Offset.zero) & box.size
+                        : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
+                    Share.share(text, sharePositionOrigin: origin);
+                  },
+                ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(

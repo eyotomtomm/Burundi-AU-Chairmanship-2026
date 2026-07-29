@@ -204,8 +204,21 @@ def _catch_upload_errors(view_func):
     return wrapper
 
 
+def _is_reviewer_only(user):
+    """Return True if user is a non-superuser staff with only reviewer access."""
+    if user.is_superuser:
+        return False
+    try:
+        sections = user.profile.admin_sections or []
+    except Exception:
+        return False
+    return sections == ['youth_dialogue_list']
+
+
 def admin_login(request):
     if request.user.is_authenticated and is_staff(request.user):
+        if _is_reviewer_only(request.user):
+            return redirect('custom_admin:reviewer_list')
         return redirect('custom_admin:dashboard')
 
     is_locked = False
@@ -240,6 +253,8 @@ def admin_login(request):
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
             if hasattr(user, 'profile') and user.profile.force_password_change:
                 return redirect('custom_admin:force_password_change')
+            if _is_reviewer_only(user):
+                return redirect('custom_admin:reviewer_list')
             return redirect('custom_admin:dashboard')
 
     return render(request, 'custom_admin/login.html', {'is_locked': is_locked})

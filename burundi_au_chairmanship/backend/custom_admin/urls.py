@@ -395,4 +395,9 @@ urlpatterns = [
     # Continental Dialogue Ban Management
     path('users/<int:pk>/toggle-yd-ban/', views.user_toggle_yd_ban, name='user_toggle_yd_ban'),
 
+    # Simplified Reviewer Portal (Continental Dialogue)
+    path('reviewer/', views.reviewer_list, name='reviewer_list'),
+    path('reviewer/detail/<int:pk>/', views.reviewer_detail, name='reviewer_detail'),
+    path('reviewer/action/<int:pk>/', views.reviewer_action, name='reviewer_action'),
+    path('reviewer/set-lang/', views.reviewer_set_lang, name='reviewer_set_lang'),
 ]

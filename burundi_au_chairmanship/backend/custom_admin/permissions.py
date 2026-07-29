@@ -265,6 +265,10 @@ def get_required_section(url_name):
     if 'qr_scan_log' in url_name or 'scan_log' in url_name:
         return 'qr_scan_log'
 
+    # Reviewer Portal (simplified Continental Dialogue review)
+    if url_name.startswith('reviewer_'):
+        return 'youth_dialogue_list'
+
     # Youth Dialogue
     if 'youth_dialogue' in url_name:
         return 'youth_dialogue_list'

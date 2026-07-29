@@ -1,0 +1,179 @@
+{% extends "custom_admin/reviewer/base.html" %}
+
+{% block title %}{{ t.applicants }} - {{ t.portal_title }}{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+        <div class="text-3xl font-bold text-gray-800">{{ stats.total }}</div>
+        <div class="text-sm text-gray-500 mt-1">{{ t.total }}</div>
+    </div>
+    <div class="bg-white rounded-xl border border-yellow-200 p-5 text-center">
+        <div class="text-3xl font-bold text-yellow-600">{{ stats.pending }}</div>
+        <div class="text-sm text-yellow-600 mt-1">{{ t.pending }}</div>
+    </div>
+    <div class="bg-white rounded-xl border border-green-200 p-5 text-center">
+        <div class="text-3xl font-bold text-green-600">{{ stats.accepted }}</div>
+        <div class="text-sm text-green-600 mt-1">{{ t.accepted }}</div>
+    </div>
+    <div class="bg-white rounded-xl border border-red-200 p-5 text-center">
+        <div class="text-3xl font-bold text-red-600">{{ stats.rejected }}</div>
+        <div class="text-sm text-red-600 mt-1">{{ t.rejected }}</div>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="flex flex-wrap gap-2 mb-4">
+    <a href="?status=all{% if search %}&q={{ search }}{% endif %}"
+       class="px-5 py-2.5 rounded-xl text-base font-semibold transition
+              {% if current_status == 'all' %}bg-green-700 text-white{% else %}bg-white text-gray-600 border border-gray-200 hover:bg-gray-50{% endif %}">
+        {{ t.all }} ({{ stats.total }})
+    </a>
+    <a href="?status=pending{% if search %}&q={{ search }}{% endif %}"
+       class="px-5 py-2.5 rounded-xl text-base font-semibold transition
+              {% if current_status == 'pending' %}bg-yellow-500 text-white{% else %}bg-white text-gray-600 border border-gray-200 hover:bg-gray-50{% endif %}">
+        {{ t.pending }} ({{ stats.pending }})
+    </a>
+    <a href="?status=accepted{% if search %}&q={{ search }}{% endif %}"
+       class="px-5 py-2.5 rounded-xl text-base font-semibold transition
+              {% if current_status == 'accepted' %}bg-green-600 text-white{% else %}bg-white text-gray-600 border border-gray-200 hover:bg-gray-50{% endif %}">
+        {{ t.accepted }} ({{ stats.accepted }})
+    </a>
+    <a href="?status=rejected{% if search %}&q={{ search }}{% endif %}"
+       class="px-5 py-2.5 rounded-xl text-base font-semibold transition
+              {% if current_status == 'rejected' %}bg-red-600 text-white{% else %}bg-white text-gray-600 border border-gray-200 hover:bg-gray-50{% endif %}">
+        {{ t.rejected }} ({{ stats.rejected }})
+    </a>
+</div>
+
+<!-- Search -->
+<form method="get" class="mb-6">
+    <input type="hidden" name="status" value="{{ current_status }}">
+    <div class="flex gap-2">
+        <input type="text" name="q" value="{{ search }}"
+               placeholder="{{ t.search_placeholder }}"
+               class="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-base focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+        <button type="submit"
+                class="px-6 py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 transition">
+            {{ t.search }}
+        </button>
+    </div>
+</form>
+
+<!-- Applicant Cards -->
+{% if applications %}
+<div class="space-y-3">
+    {% for app in applications %}
+    <div class="bg-white rounded-xl border {% if app.is_burundian %}border-green-300 border-l-4 border-l-green-500 bg-green-50/30{% else %}border-gray-200{% endif %} p-5">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <!-- Left: Applicant Info -->
+            <div class="flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xl font-bold text-gray-800">{{ app.nationality_flag }} {{ app.first_name }} {{ app.last_name }}</span>
+                    {% if app.is_burundian %}
+                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Burundi</span>
+                    {% endif %}
+                    <!-- Status Badge -->
+                    {% if app.status == 'submitted' or app.status == 'under_review' %}
+                    <span class="px-2.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">{{ t.pending }}</span>
+                    {% elif app.status == 'accepted' %}
+                    <span class="px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">{{ t.accepted }}</span>
+                    {% elif app.status == 'rejected' %}
+                    <span class="px-2.5 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">{{ t.rejected }}</span>
+                    {% else %}
+                    <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">{{ app.get_status_display }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-sm text-gray-500 mt-1">
+                    {% if app.organization %}{{ app.organization }} &middot; {% endif %}
+                    {{ app.email }}
+                    {% if app.get_nationality_display %} &middot; {{ app.get_nationality_display }}{% endif %}
+                </div>
+            </div>
+
+            <!-- Right: Actions -->
+            <div class="flex items-center gap-2 flex-wrap">
+                {% if app.status == 'submitted' or app.status == 'under_review' %}
+                <!-- Accept Button -->
+                <form method="post" action="{% url 'custom_admin:reviewer_action' app.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="accept">
+                    <button type="submit"
+                            class="px-5 py-2.5 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition flex items-center gap-1">
+                        <span class="material-symbols-outlined" style="font-size:20px">check_circle</span>
+                        {{ t.accept }}
+                    </button>
+                </form>
+                <!-- Reject Button (expandable) -->
+                <button type="button" onclick="toggleReject({{ app.pk }})"
+                        class="px-5 py-2.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition flex items-center gap-1">
+                    <span class="material-symbols-outlined" style="font-size:20px">cancel</span>
+                    {{ t.reject }}
+                </button>
+                {% endif %}
+                <!-- View Details -->
+                <a href="{% url 'custom_admin:reviewer_detail' app.pk %}"
+                   class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition flex items-center gap-1">
+                    <span class="material-symbols-outlined" style="font-size:20px">visibility</span>
+                    {{ t.view_details }}
+                </a>
+            </div>
+        </div>
+        <!-- Reject Reason (hidden by default) -->
+        <div id="reject-{{ app.pk }}" class="hidden mt-3 pt-3 border-t border-gray-200">
+            <form method="post" action="{% url 'custom_admin:reviewer_action' app.pk %}" class="flex gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                <textarea name="rejection_reason" rows="2" placeholder="{{ t.rejection_reason_placeholder }}"
+                          class="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-base focus:ring-2 focus:ring-red-400 outline-none"></textarea>
+                <button type="submit"
+                        class="px-5 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition self-end">
+                    {{ t.confirm_reject }}
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="flex justify-center items-center gap-2 mt-8">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&status={{ current_status }}{% if search %}&q={{ search }}{% endif %}"
+       class="px-5 py-3 bg-white border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition">
+        &larr; {{ t.previous }}
+    </a>
+    {% endif %}
+    <span class="px-4 py-3 text-base text-gray-600">
+        {{ t.page }} {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&status={{ current_status }}{% if search %}&q={{ search }}{% endif %}"
+       class="px-5 py-3 bg-white border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition">
+        {{ t.next }} &rarr;
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <span class="material-symbols-outlined text-gray-300" style="font-size:64px">inbox</span>
+    <p class="text-gray-500 mt-4 text-lg">{{ t.no_applications }}</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleReject(pk) {
+    var el = document.getElementById('reject-' + pk);
+    el.classList.toggle('hidden');
+    if (!el.classList.contains('hidden')) {
+        el.querySelector('textarea').focus();
+    }
+}
+</script>
+{% endblock %}

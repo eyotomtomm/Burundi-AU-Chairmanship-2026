@@ -10857,3 +10857,264 @@ def phrasebook_delete(request, pk):
     messages.success(request, 'Phrase deleted successfully!')
     return redirect('custom_admin:phrasebook_list')
 
+
+# ═══════════════════════════════════════════════════════════════
+# Simplified Reviewer Portal for Continental Dialogue
+# ═══════════════════════════════════════════════════════════════
+
+REVIEWER_TRANSLATIONS = {
+    'fr': {
+        'portal_title': 'Portail de Révision — Dialogue Continental',
+        'logout': 'Déconnexion',
+        'applicants': 'Candidats',
+        'total': 'Total',
+        'pending': 'En attente',
+        'accepted': 'Accepté',
+        'rejected': 'Rejeté',
+        'approved': 'Approuvé',
+        'all': 'Tous',
+        'search': 'Rechercher',
+        'search_placeholder': 'Rechercher par nom ou email…',
+        'accept': 'Accepter',
+        'reject': 'Rejeter',
+        'confirm_reject': 'Confirmer le rejet',
+        'view_details': 'Voir détails',
+        'rejection_reason_placeholder': 'Motif du rejet (optionnel)…',
+        'no_applications': 'Aucune candidature trouvée.',
+        'previous': 'Précédent',
+        'next': 'Suivant',
+        'page': 'Page',
+        'back_to_list': 'Retour à la liste',
+        'status': 'Statut',
+        'personal_info': 'Informations personnelles',
+        'full_name': 'Nom complet',
+        'email': 'Email',
+        'phone': 'Téléphone',
+        'nationality': 'Nationalité',
+        'date_of_birth': 'Date de naissance',
+        'gender': 'Genre',
+        'organization': 'Organisation',
+        'position': 'Poste',
+        'motivation': 'Motivation',
+        'documents': 'Documents',
+        'view_file': 'Voir le fichier',
+        'additional_info': 'Informations supplémentaires',
+        'side_events': 'Événements parallèles',
+        'review_actions': 'Actions de révision',
+        'accept_application': 'Accepter la candidature',
+        'reject_application': 'Rejeter la candidature',
+        'action_success_accepted': 'Candidature de {name} acceptée.',
+        'action_success_rejected': 'Candidature de {name} rejetée.',
+        'action_invalid_status': 'Cette candidature ne peut pas être révisée (statut actuel: {status}).',
+        'event_not_found': 'Aucun événement de Dialogue Continental actif trouvé.',
+    },
+    'en': {
+        'portal_title': 'Reviewer Portal — Continental Dialogue',
+        'logout': 'Logout',
+        'applicants': 'Applicants',
+        'total': 'Total',
+        'pending': 'Pending',
+        'accepted': 'Accepted',
+        'rejected': 'Rejected',
+        'approved': 'Approved',
+        'all': 'All',
+        'search': 'Search',
+        'search_placeholder': 'Search by name or email…',
+        'accept': 'Accept',
+        'reject': 'Reject',
+        'confirm_reject': 'Confirm Reject',
+        'view_details': 'View Details',
+        'rejection_reason_placeholder': 'Reason for rejection (optional)…',
+        'no_applications': 'No applications found.',
+        'previous': 'Previous',
+        'next': 'Next',
+        'page': 'Page',
+        'back_to_list': 'Back to list',
+        'status': 'Status',
+        'personal_info': 'Personal Information',
+        'full_name': 'Full Name',
+        'email': 'Email',
+        'phone': 'Phone',
+        'nationality': 'Nationality',
+        'date_of_birth': 'Date of Birth',
+        'gender': 'Gender',
+        'organization': 'Organization',
+        'position': 'Position',
+        'motivation': 'Motivation',
+        'documents': 'Documents',
+        'view_file': 'View File',
+        'additional_info': 'Additional Information',
+        'side_events': 'Side Events',
+        'review_actions': 'Review Actions',
+        'accept_application': 'Accept Application',
+        'reject_application': 'Reject Application',
+        'action_success_accepted': 'Application from {name} accepted.',
+        'action_success_rejected': 'Application from {name} rejected.',
+        'action_invalid_status': 'This application cannot be reviewed (current status: {status}).',
+        'event_not_found': 'No active Continental Dialogue event found.',
+    },
+}
+
+
+def _reviewer_context(request):
+    """Return (lang, translations_dict) for the reviewer portal."""
+    lang = request.session.get('reviewer_lang', 'fr')
+    return lang, REVIEWER_TRANSLATIONS[lang]
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def reviewer_list(request):
+    lang, t = _reviewer_context(request)
+
+    # Find the active Continental Dialogue event
+    event = YouthDialogueEvent.objects.filter(is_active=True).order_by('-created_at').first()
+    if not event:
+        messages.warning(request, t['event_not_found'])
+        return render(request, 'custom_admin/reviewer/list.html', {
+            'lang': lang, 't': t, 'applications': [],
+            'stats': {'total': 0, 'pending': 0, 'accepted': 0, 'rejected': 0},
+            'current_status': 'all', 'search': '', 'page_obj': None,
+        })
+
+    from django.db.models import Case, When, IntegerField
+    qs = YouthDialogueApplication.objects.filter(event=event).select_related('user').annotate(
+        is_burundian_order=Case(
+            When(nationality='BI', then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        ),
+    ).order_by('is_burundian_order', '-created_at')
+
+    # Stats (unfiltered for this event)
+    all_apps = YouthDialogueApplication.objects.filter(event=event)
+    stats = {
+        'total': all_apps.count(),
+        'pending': all_apps.filter(status__in=['submitted', 'under_review']).count(),
+        'accepted': all_apps.filter(status='accepted').count(),
+        'rejected': all_apps.filter(status='rejected').count(),
+    }
+
+    # Status filter
+    current_status = request.GET.get('status', 'all')
+    if current_status == 'pending':
+        qs = qs.filter(status__in=['submitted', 'under_review'])
+    elif current_status == 'accepted':
+        qs = qs.filter(status='accepted')
+    elif current_status == 'rejected':
+        qs = qs.filter(status='rejected')
+
+    # Search
+    search = request.GET.get('q', '').strip()
+    if search:
+        qs = qs.filter(
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(email__icontains=search)
+        )
+
+    # Annotate is_burundian for template use
+    for app in qs:
+        app.is_burundian = (app.nationality == 'BI')
+
+    # Pagination
+    paginator = Paginator(qs, 15)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    # Re-annotate page objects
+    for app in page_obj:
+        app.is_burundian = (app.nationality == 'BI')
+
+    return render(request, 'custom_admin/reviewer/list.html', {
+        'lang': lang, 't': t, 'applications': page_obj,
+        'stats': stats, 'current_status': current_status,
+        'search': search, 'page_obj': page_obj,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def reviewer_detail(request, pk):
+    lang, t = _reviewer_context(request)
+    app = get_object_or_404(
+        YouthDialogueApplication.objects.select_related('user', 'reviewed_by', 'event')
+        .prefetch_related('selected_side_events'),
+        pk=pk,
+    )
+    documents = app.documents.select_related('reviewed_by').order_by('uploaded_at')
+    side_events = app.selected_side_events.all()
+
+    return render(request, 'custom_admin/reviewer/detail.html', {
+        'lang': lang, 't': t, 'app': app,
+        'documents': documents, 'side_events': side_events,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def reviewer_action(request, pk):
+    lang, t = _reviewer_context(request)
+    application = get_object_or_404(
+        YouthDialogueApplication.objects.select_related('user', 'event'),
+        pk=pk,
+    )
+    action = request.POST.get('action')
+    old_status = application.status
+    name = f'{application.first_name} {application.last_name}'
+
+    if application.status not in ('submitted', 'under_review'):
+        messages.error(request, t['action_invalid_status'].format(status=application.get_status_display()))
+        return redirect('custom_admin:reviewer_list')
+
+    if action == 'accept':
+        application.status = 'accepted'
+        application.reviewed_by = request.user
+        application.reviewed_at = timezone.now()
+        application.save()
+        log_admin_action(
+            request, 'approve', 'YouthDialogueApplication', object_id=pk,
+            object_repr=name,
+            changes={'status': {'old': old_status, 'new': 'accepted'}},
+        )
+        from core.views import _notify_yd
+        notif_results = _notify_yd(application, 'accepted')
+        messages.success(request, t['action_success_accepted'].format(name=name))
+        if notif_results:
+            _surface_notif_results(request, notif_results)
+
+    elif action == 'reject':
+        reason = request.POST.get('rejection_reason', '')
+        application.status = 'rejected'
+        application.rejection_reason = reason
+        application.reviewed_by = request.user
+        application.reviewed_at = timezone.now()
+        application.save()
+        log_admin_action(
+            request, 'reject', 'YouthDialogueApplication', object_id=pk,
+            object_repr=name,
+            changes={'status': {'old': old_status, 'new': 'rejected'}, 'reason': reason},
+        )
+        from core.views import _notify_yd
+        notif_results = _notify_yd(application, 'rejected')
+        messages.success(request, t['action_success_rejected'].format(name=name))
+        if notif_results:
+            _surface_notif_results(request, notif_results)
+
+    return redirect('custom_admin:reviewer_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def reviewer_set_lang(request):
+    lang = request.POST.get('lang', 'fr')
+    if lang not in ('fr', 'en'):
+        lang = 'fr'
+    request.session['reviewer_lang'] = lang
+    next_url = request.POST.get('next', '')
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect('custom_admin:reviewer_list')
+

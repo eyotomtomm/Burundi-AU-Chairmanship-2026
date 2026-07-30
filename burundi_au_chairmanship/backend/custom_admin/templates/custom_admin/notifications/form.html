@@ -212,9 +212,10 @@
                                     <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
                                 </div>
                             </div>
-                            <div>
+                            <!-- Action Value: URL text input (shown for 'url') -->
+                            <div id="action_value_url_wrapper">
                                 <label for="action_value" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                    Action Value
+                                    URL
                                 </label>
                                 <input type="text"
                                        id="action_value"
@@ -222,7 +223,61 @@
                                        value="{{ notification.action_value|default:'' }}"
                                        maxlength="500"
                                        class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150"
-                                       placeholder="URL or app route (e.g., /news, /magazine)">
+                                       placeholder="https://example.com/page">
+                                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Full URL to open when the user taps the notification</p>
+                            </div>
+                            <!-- Action Value: Route dropdown (shown for 'route') -->
+                            <div id="action_value_route_wrapper" class="hidden">
+                                <label for="action_route_select" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                    App Screen
+                                </label>
+                                <div class="relative">
+                                    <select id="action_route_select"
+                                            class="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-150 appearance-none">
+                                        <option value="">Select a screen...</option>
+                                        <optgroup label="Main">
+                                            <option value="/">Home</option>
+                                            <option value="/news">News / Articles</option>
+                                            <option value="/events">Events</option>
+                                            <option value="/magazine">Magazine</option>
+                                            <option value="/gallery">Gallery</option>
+                                            <option value="/videos">Videos</option>
+                                        </optgroup>
+                                        <optgroup label="Features">
+                                            <option value="/live-feeds">Live Feeds</option>
+                                            <option value="/resources">Resources</option>
+                                            <option value="/calendar">Calendar</option>
+                                            <option value="/weather">Weather</option>
+                                            <option value="/translate">Translate</option>
+                                            <option value="/trending">Trending</option>
+                                            <option value="/social-media">Social Media</option>
+                                        </optgroup>
+                                        <optgroup label="Continental Dialogue">
+                                            <option value="/youth-dialogue">Continental Dialogue</option>
+                                            <option value="/youth-dialogue-apply">Apply</option>
+                                            <option value="/youth-dialogue-documents">Documents</option>
+                                            <option value="/youth-dialogue-credential">Credential</option>
+                                        </optgroup>
+                                        <optgroup label="User">
+                                            <option value="/profile">Profile</option>
+                                            <option value="/profile-completion">Profile Completion</option>
+                                            <option value="/email-verification">Email Verification</option>
+                                            <option value="/notifications">Notifications</option>
+                                            <option value="/verification-request">Verification Request</option>
+                                        </optgroup>
+                                        <optgroup label="Support">
+                                            <option value="/support-tickets">Support Tickets</option>
+                                            <option value="/contact-support">Contact Support</option>
+                                        </optgroup>
+                                        <optgroup label="Initiatives">
+                                            <option value="/water-sanitation">Water &amp; Sanitation</option>
+                                            <option value="/arise-initiative">ARISE Initiative</option>
+                                            <option value="/peace-security">Peace &amp; Security</option>
+                                        </optgroup>
+                                    </select>
+                                    <span class="material-symbols-outlined absolute right-3 top-3 text-slate-400 dark:text-slate-500 pointer-events-none">expand_more</span>
+                                </div>
+                                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">The app screen to open when the user taps the notification</p>
                             </div>
                         </div>
                     </div>
@@ -756,6 +811,30 @@ function updateFrLangWarning() {
     }
 }
 
+// Toggle between URL input and Route dropdown based on action_type
+function toggleActionValue() {
+    const actionType = document.getElementById('action_type').value;
+    const urlWrapper = document.getElementById('action_value_url_wrapper');
+    const routeWrapper = document.getElementById('action_value_route_wrapper');
+    const urlInput = document.getElementById('action_value');
+    const routeSelect = document.getElementById('action_route_select');
+
+    if (actionType === 'route') {
+        urlWrapper.classList.add('hidden');
+        routeWrapper.classList.remove('hidden');
+        // Pre-select current value in dropdown
+        if (urlInput.value) {
+            routeSelect.value = urlInput.value;
+        }
+    } else if (actionType === 'url') {
+        urlWrapper.classList.remove('hidden');
+        routeWrapper.classList.add('hidden');
+    } else {
+        urlWrapper.classList.add('hidden');
+        routeWrapper.classList.add('hidden');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const globalCheckbox = document.getElementById('is_global');
     if (globalCheckbox) {
@@ -770,6 +849,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     updateFrLangWarning();
+
+    // Action type toggle
+    const actionTypeEl = document.getElementById('action_type');
+    if (actionTypeEl) {
+        actionTypeEl.addEventListener('change', toggleActionValue);
+        toggleActionValue();
+    }
+
+    // On form submit, copy route dropdown value into the action_value hidden input
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            if (document.getElementById('action_type').value === 'route') {
+                document.getElementById('action_value').value =
+                    document.getElementById('action_route_select').value;
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

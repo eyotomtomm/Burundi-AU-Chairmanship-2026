@@ -208,36 +208,8 @@ input#remember_me {
       </form>
 
       <script>
-      // Admin-portal convenience: remember username + password in localStorage when
-      // "Remember me" is checked. Passwords are base64-encoded as light obfuscation
-      // (NOT encryption). This is an admin-only portal — the admin is consciously
-      // trading some security for convenience on their own device.
-      (function() {
-        var saved = localStorage.getItem('admin_remember_user');
-        if (saved) {
-          try {
-            var data = JSON.parse(saved);
-            document.getElementById('username').value = data.username || '';
-            if (data.password) {
-              try {
-                document.getElementById('password').value = atob(data.password);
-              } catch(e) {}
-            }
-            document.getElementById('remember_me').checked = true;
-          } catch(e) {}
-        }
-        document.getElementById('loginForm').addEventListener('submit', function() {
-          var cb = document.getElementById('remember_me');
-          if (cb.checked) {
-            localStorage.setItem('admin_remember_user', JSON.stringify({
-              username: document.getElementById('username').value,
-              password: btoa(document.getElementById('password').value)
-            }));
-          } else {
-            localStorage.removeItem('admin_remember_user');
-          }
-        });
-      })();
+      // Clean up any previously stored credentials from localStorage
+      localStorage.removeItem('admin_remember_user');
       </script>
 
       <footer class="mt-12 pt-8 border-t border-surface-container flex justify-between items-center gap-4 text-xs text-outline font-medium">

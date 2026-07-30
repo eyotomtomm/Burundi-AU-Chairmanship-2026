@@ -88,25 +88,56 @@
         <span class="material-symbols-outlined text-green-700">description</span>
         {{ t.documents }}
     </h2>
-    <div class="space-y-2">
+    <div class="space-y-4">
         {% for doc in documents %}
-        <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-gray-500" style="font-size:20px">attach_file</span>
-                <span class="font-medium">{{ doc.get_document_type_display }}</span>
-                {% if doc.status == 'approved' %}
-                <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">{{ t.approved }}</span>
-                {% elif doc.status == 'rejected' %}
-                <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">{{ t.rejected }}</span>
-                {% else %}
-                <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">{{ t.pending }}</span>
+        <div class="rounded-lg border border-gray-200 overflow-hidden">
+            <!-- Document header -->
+            <div class="flex items-center justify-between p-3 bg-gray-50">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-gray-500" style="font-size:20px">attach_file</span>
+                    <span class="font-medium">{{ doc.get_document_type_display }}</span>
+                    {% if doc.status == 'approved' %}
+                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full">{{ t.approved }}</span>
+                    {% elif doc.status == 'rejected' %}
+                    <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">{{ t.rejected }}</span>
+                    {% else %}
+                    <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">{{ t.pending }}</span>
+                    {% endif %}
+                </div>
+                {% if doc.file %}
+                <a href="{% url 'custom_admin:reviewer_document_proxy' doc.pk %}" target="_blank"
+                   class="text-sm text-green-700 hover:text-green-800 font-medium">
+                    {{ t.view_file }}
+                </a>
                 {% endif %}
             </div>
+            <!-- Inline preview -->
             {% if doc.file %}
-            <a href="{{ doc.file.url }}" target="_blank"
-               class="text-sm text-green-700 hover:text-green-800 font-medium">
-                {{ t.view_file }}
-            </a>
+            <div class="p-3">
+                {% if doc.preview_type == 'image' %}
+                <img src="{% url 'custom_admin:reviewer_document_proxy' doc.pk %}"
+                     alt="{{ doc.get_document_type_display }}"
+                     loading="lazy"
+                     class="max-w-full max-h-96 rounded border border-gray-200 mx-auto block">
+                {% elif doc.preview_type == 'pdf' %}
+                <iframe src="{% url 'custom_admin:reviewer_document_proxy' doc.pk %}"
+                        sandbox="allow-same-origin"
+                        class="w-full rounded border border-gray-200"
+                        style="height:600px"
+                        title="{{ doc.get_document_type_display }}"></iframe>
+                {% else %}
+                <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg text-gray-500">
+                    <span class="material-symbols-outlined" style="font-size:32px">file_present</span>
+                    <div>
+                        <p class="text-sm">{{ t.preview_unavailable }}</p>
+                        <a href="{% url 'custom_admin:reviewer_document_proxy' doc.pk %}"
+                           class="text-sm text-green-700 hover:text-green-800 font-medium">
+                            {{ t.download_file }}
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
         {% endfor %}

@@ -3,6 +3,7 @@ import functools
 import io
 import json
 import logging
+import mimetypes
 import os
 import re
 import time
@@ -16,7 +17,7 @@ from django.contrib.auth.models import User as AuthUser
 from django.contrib import messages
 from django.db.models import Count, Q, Sum, Value
 from django.db.models.functions import Replace
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, StreamingHttpResponse
 from django.urls import reverse
 from axes.exceptions import AxesBackendRequestParameterRequired
 from django.views.decorators.http import require_POST
@@ -10922,6 +10923,8 @@ REVIEWER_TRANSLATIONS = {
         'action_success_rejected': 'Candidature de {name} rejetée.',
         'action_invalid_status': 'Cette candidature ne peut pas être révisée (statut actuel: {status}).',
         'event_not_found': 'Aucun événement de Dialogue Continental actif trouvé.',
+        'download_file': 'Télécharger le fichier',
+        'preview_unavailable': 'Aperçu non disponible pour ce type de fichier',
     },
     'en': {
         'portal_title': 'Reviewer Portal — Continental Dialogue',
@@ -10967,6 +10970,8 @@ REVIEWER_TRANSLATIONS = {
         'action_success_rejected': 'Application from {name} rejected.',
         'action_invalid_status': 'This application cannot be reviewed (current status: {status}).',
         'event_not_found': 'No active Continental Dialogue event found.',
+        'download_file': 'Download File',
+        'preview_unavailable': 'Preview not available for this file type',
     },
 }
 
@@ -11057,8 +11062,20 @@ def reviewer_detail(request, pk):
         .prefetch_related('selected_side_events'),
         pk=pk,
     )
-    documents = app.documents.select_related('reviewed_by').order_by('uploaded_at')
+    documents = list(app.documents.select_related('reviewed_by').order_by('uploaded_at'))
     side_events = app.selected_side_events.all()
+
+    # Annotate preview_type for inline document display
+    _IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+    for doc in documents:
+        fname = doc.original_filename or (doc.file.name if doc.file else '')
+        ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+        if ext in _IMAGE_EXTS:
+            doc.preview_type = 'image'
+        elif ext == 'pdf':
+            doc.preview_type = 'pdf'
+        else:
+            doc.preview_type = 'other'
 
     return render(request, 'custom_admin/reviewer/detail.html', {
         'lang': lang, 't': t, 'app': app,
@@ -11132,4 +11149,78 @@ def reviewer_set_lang(request):
     if next_url and next_url.startswith('/'):
         return redirect(next_url)
     return redirect('custom_admin:reviewer_list')
+
+
+# ---------------------------------------------------------------------------
+# Secure document proxy for reviewer portal
+# ---------------------------------------------------------------------------
+
+SAFE_INLINE_MIMETYPES = {
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+}
+
+DANGEROUS_MIMETYPES = {
+    'image/svg+xml', 'text/html', 'application/xhtml+xml',
+    'text/xml', 'application/xml',
+}
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def reviewer_document_proxy(request, doc_pk):
+    """Stream a document file through Django with hardened headers.
+
+    The signed S3 URL never reaches the browser.  Dangerous MIME types
+    (SVG, HTML, XML) are blocked entirely; safe types are served inline;
+    everything else forces a download.
+    """
+    doc = get_object_or_404(
+        YouthDialogueDocument.objects.select_related('application__event'),
+        pk=doc_pk,
+    )
+    if not doc.file:
+        return HttpResponse('No file attached.', status=404)
+
+    # Detect MIME type from filename
+    fname = doc.original_filename or doc.file.name
+    content_type, _ = mimetypes.guess_type(fname)
+    if not content_type:
+        content_type = 'application/octet-stream'
+
+    # Block dangerous types
+    if content_type in DANGEROUS_MIMETYPES:
+        return HttpResponseForbidden('This file type cannot be previewed for security reasons.')
+
+    # Determine disposition
+    if content_type in SAFE_INLINE_MIMETYPES:
+        disposition = 'inline'
+    else:
+        safe_fname = fname.rsplit('/', 1)[-1] if '/' in fname else fname
+        disposition = f'attachment; filename="{safe_fname}"'
+
+    # Stream in 8 KB chunks
+    def _stream():
+        f = doc.file.open('rb')
+        try:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            f.close()
+
+    response = StreamingHttpResponse(_stream(), content_type=content_type)
+    response['Content-Disposition'] = disposition
+    response['X-Content-Type-Options'] = 'nosniff'
+    response['Cache-Control'] = 'private, no-store'
+    response['Content-Security-Policy'] = (
+        "default-src 'none'; "
+        "style-src 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "frame-ancestors 'self'"
+    )
+    # Tell the CSP middleware not to overwrite our restrictive policy
+    response._skip_admin_csp = True
+    return response
 

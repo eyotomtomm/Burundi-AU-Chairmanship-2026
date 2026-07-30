@@ -62,6 +62,7 @@ class SecurityHeadersMiddleware:
 
         # Only apply CSP to admin HTML pages, not to API JSON responses.
         if request.path.startswith('/admin/'):
-            response['Content-Security-Policy'] = self._admin_csp
+            if not getattr(response, '_skip_admin_csp', False):
+                response['Content-Security-Policy'] = self._admin_csp
 
         return response

@@ -400,4 +400,5 @@ urlpatterns = [
     path('reviewer/detail/<int:pk>/', views.reviewer_detail, name='reviewer_detail'),
     path('reviewer/action/<int:pk>/', views.reviewer_action, name='reviewer_action'),
     path('reviewer/set-lang/', views.reviewer_set_lang, name='reviewer_set_lang'),
+    path('reviewer/document/<int:doc_pk>/', views.reviewer_document_proxy, name='reviewer_document_proxy'),
 ]

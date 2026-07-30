@@ -9912,8 +9912,20 @@ def youth_dialogue_review(request, pk):
         .prefetch_related('selected_side_events'),
         pk=pk,
     )
-    documents = application.documents.select_related('reviewed_by').order_by('uploaded_at')
+    documents = list(application.documents.select_related('reviewed_by').order_by('uploaded_at'))
     activity_logs = application.activity_logs.order_by('-timestamp')[:20]
+
+    # Annotate preview_type for inline document display
+    _IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+    for doc in documents:
+        fname = doc.original_filename or (doc.file.name if doc.file else '')
+        ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+        if ext in _IMAGE_EXTS:
+            doc.preview_type = 'image'
+        elif ext == 'pdf':
+            doc.preview_type = 'pdf'
+        else:
+            doc.preview_type = 'other'
 
     if request.method == 'POST':
         action = request.POST.get('action')

@@ -11226,13 +11226,24 @@ def reviewer_document_proxy(request, doc_pk):
     response['Content-Disposition'] = disposition
     response['X-Content-Type-Options'] = 'nosniff'
     response['Cache-Control'] = 'private, no-store'
-    response['Content-Security-Policy'] = (
-        "default-src 'none'; "
-        "style-src 'unsafe-inline'; "
-        "img-src 'self' data:; "
-        "frame-ancestors 'self'"
-    )
-    # Tell the CSP middleware not to overwrite our restrictive policy
+
+    # PDFs need style-src for the browser's built-in viewer; images need
+    # no CSP at all (they can't execute scripts).  In both cases we lock
+    # down frame-ancestors so the resource can only be embedded by our
+    # own admin pages.
+    if content_type == 'application/pdf':
+        response['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "frame-ancestors 'self'"
+        )
+    else:
+        # Images and other binary files — only restrict framing
+        response['Content-Security-Policy'] = "frame-ancestors 'self'"
+
+    # Tell the CSP middleware not to overwrite our policy
     response._skip_admin_csp = True
     return response
 

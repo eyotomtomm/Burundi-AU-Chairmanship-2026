@@ -22,6 +22,7 @@ from django.urls import reverse
 from axes.exceptions import AxesBackendRequestParameterRequired
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -11179,6 +11180,7 @@ DANGEROUS_MIMETYPES = {
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@xframe_options_sameorigin
 def reviewer_document_proxy(request, doc_pk):
     """Stream a document file through Django with hardened headers.
 

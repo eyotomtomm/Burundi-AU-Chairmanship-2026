@@ -10129,14 +10129,15 @@ def youth_dialogue_review(request, pk):
                 required_types.discard('passport')
                 required_types.discard('national_id')
             missing_types = required_types - approved_types
-            if missing_types and application.status in ('accepted', 'documents_submitted', 'documents_under_review'):
+            _credential_statuses = ('accepted', 'documents_pending', 'documents_submitted', 'documents_under_review', 'documents_rejected')
+            if missing_types and application.status in _credential_statuses:
                 doc_labels = {d['key']: d.get('label', d['key']) for d in event_docs}
                 labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
                 labels.update(doc_labels)
                 missing_names = [labels.get(m, m) for m in missing_types]
                 messages.error(request, f'Cannot issue credential. Missing approved documents: {", ".join(missing_names)}')
                 return redirect('custom_admin:youth_dialogue_review', pk=pk)
-            if application.status in ('accepted', 'documents_submitted', 'documents_under_review') and all_docs_approved and not has_rejected and not missing_types:
+            if application.status in _credential_statuses and all_docs_approved and not has_rejected and not missing_types:
                 try:
                     application.generate_participant_code()
                     application.generate_qr_hash()

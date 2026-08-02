@@ -21,6 +21,7 @@
   <!-- Header -->
   <div class="flex items-center gap-4 mb-8">
     <a href="{% if application.event %}{% url 'custom_admin:youth_dialogue_applications_list' event_pk=application.event.pk %}{% else %}{% url 'custom_admin:youth_dialogue_list' %}{% endif %}{% if list_filters %}?{{ list_filters|safe }}{% endif %}"
+       onclick="if(sessionStorage.getItem('yd_list_url')){window.location=sessionStorage.getItem('yd_list_url');return false;}"
        class="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all shadow-sm">
       <span class="material-symbols-outlined text-slate-600">arrow_back</span>
     </a>
@@ -569,6 +570,7 @@
         Reject Application
       </button>
       <a href="{% if application.event %}{% url 'custom_admin:youth_dialogue_applications_list' event_pk=application.event.pk %}{% else %}{% url 'custom_admin:youth_dialogue_list' %}{% endif %}{% if list_filters %}?{{ list_filters|safe }}{% endif %}"
+         onclick="if(sessionStorage.getItem('yd_list_url')){window.location=sessionStorage.getItem('yd_list_url');return false;}"
          class="bg-white border border-slate-200 text-slate-700 font-semibold rounded-lg py-3 px-8 hover:bg-slate-50 transition-all">
         Cancel
       </a>

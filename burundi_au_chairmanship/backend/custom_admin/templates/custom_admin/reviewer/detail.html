@@ -121,7 +121,6 @@
                      class="max-w-full max-h-96 rounded border border-gray-200 mx-auto block">
                 {% elif doc.preview_type == 'pdf' %}
                 <iframe src="{% url 'custom_admin:reviewer_document_proxy' doc.pk %}"
-                        sandbox="allow-same-origin allow-scripts"
                         class="w-full rounded border border-gray-200"
                         style="height:600px"
                         title="{{ doc.get_document_type_display }}"></iframe>

@@ -577,7 +577,7 @@
   {% endif %}
 
   <!-- Document Review Actions (for accepted / documents phase) -->
-  {% if application.status == 'accepted' or application.status == 'documents_pending' or application.status == 'documents_submitted' or application.status == 'documents_under_review' %}
+  {% if application.status == 'accepted' or application.status == 'documents_pending' or application.status == 'documents_submitted' or application.status == 'documents_under_review' or application.status == 'documents_rejected' %}
   <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-8 mb-6">
     <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
       <span class="material-symbols-outlined text-amber-600">gavel</span>

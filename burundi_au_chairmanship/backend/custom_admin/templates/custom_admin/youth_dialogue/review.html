@@ -290,7 +290,7 @@
         Documents
         <span class="text-sm font-normal text-slate-500 ml-2">({{ documents|length }})</span>
       </h2>
-      {% if application.status == 'documents_submitted' or application.status == 'documents_under_review' %}
+      {% if has_pending_docs %}
       <form method="post" class="inline">
         {% csrf_token %}
         <input type="hidden" name="action" value="approve_all_documents">
@@ -301,6 +301,11 @@
           Approve All Pending
         </button>
       </form>
+      {% elif all_docs_approved %}
+      <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold rounded-lg py-2 px-4 text-sm">
+        <span class="material-symbols-outlined text-sm">check_circle</span>
+        All Documents Approved
+      </span>
       {% endif %}
     </div>
 
@@ -586,8 +591,15 @@
       Document Review Actions
     </h2>
 
-    {% with pending_docs=application.documents.all %}
-    {% with all_approved=True %}
+    {% if all_docs_approved %}
+    <!-- All docs approved — show issue credential prominently -->
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+      <p class="text-sm text-emerald-800 font-semibold flex items-center gap-2">
+        <span class="material-symbols-outlined text-sm">check_circle</span>
+        All documents are approved. Ready to issue credential.
+      </p>
+    </div>
+    {% endif %}
 
     <div class="flex flex-wrap gap-3">
       <!-- Issue Credential -->
@@ -595,22 +607,24 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="issue_credential">
         <button type="submit"
-                class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                onclick="return confirm('Issue credential to this applicant? This will generate a participant code and QR hash.')"
-                title="All documents must be approved first">
+                class="inline-flex items-center gap-2 bg-indigo-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-indigo-700 transition-all shadow-sm"
+                onclick="return confirm('Issue credential to this applicant? This will generate a participant code and QR hash.')">
           <span class="material-symbols-outlined text-sm">badge</span>
           Issue Credential
         </button>
       </form>
 
-      <!-- Reject Documents -->
+      {% if has_pending_docs %}
+      <!-- Reject Documents (only when there are pending docs to reject) -->
       <button type="button" onclick="document.getElementById('reject-docs-form').classList.toggle('hidden')"
               class="inline-flex items-center gap-2 bg-red-600 text-white font-semibold rounded-lg py-3 px-6 text-sm hover:bg-red-700 transition-all shadow-sm">
         <span class="material-symbols-outlined text-sm">cancel</span>
         Reject Documents
       </button>
+      {% endif %}
     </div>
 
+    {% if has_pending_docs %}
     <!-- Reject Documents Form (hidden by default) -->
     <form method="post" id="reject-docs-form" class="hidden mt-6 bg-red-50 border border-red-200 rounded-xl p-6">
       {% csrf_token %}
@@ -629,9 +643,7 @@
         Confirm Rejection
       </button>
     </form>
-
-    {% endwith %}
-    {% endwith %}
+    {% endif %}
   </div>
   {% endif %}
 

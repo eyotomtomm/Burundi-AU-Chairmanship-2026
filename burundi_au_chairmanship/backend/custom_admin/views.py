@@ -10238,11 +10238,19 @@ def youth_dialogue_review(request, pk):
         return redirect(f'{url}?_list_filters={_lf}' if _lf else url)
 
     list_filters = request.GET.get('_list_filters', '')
+    # Compute document review state for template
+    approved_doc_types = set(d.document_type for d in documents if d.status == 'approved')
+    has_pending_docs = any(d.status == 'pending' and d.document_type not in approved_doc_types for d in documents)
+    has_rejected_docs = any(d.status == 'rejected' and d.document_type not in approved_doc_types for d in documents)
+    all_docs_reviewed = not has_pending_docs
+    all_docs_approved = all_docs_reviewed and not has_rejected_docs and len(documents) > 0
     return render(request, 'custom_admin/youth_dialogue/review.html', {
         'application': application,
         'documents': documents,
         'activity_logs': activity_logs,
         'list_filters': list_filters,
+        'has_pending_docs': has_pending_docs,
+        'all_docs_approved': all_docs_approved,
     })
 
 

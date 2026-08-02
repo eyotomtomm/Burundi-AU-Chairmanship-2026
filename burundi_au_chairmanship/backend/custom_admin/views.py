@@ -9818,28 +9818,36 @@ def _auto_finalize_docs(request, application):
     - Has rejected, none pending → set documents_rejected + notify
     - Still has pending → do nothing (wait for more reviews)
     """
-    from django.db.models import Max
     from core.models import YouthDialogueDocument
 
-    # Deduplicate: only look at the most recent document per type
-    latest_doc_ids = list(
-        application.documents
-        .values('document_type')
-        .annotate(latest_id=Max('id'))
-        .values_list('latest_id', flat=True)
+    # A document type is satisfied if ANY doc of that type is approved.
+    # Rejected duplicates of an already-approved type are ignored.
+    approved_types = set(
+        application.documents.filter(status='approved')
+        .values_list('document_type', flat=True)
     )
-    latest_docs = application.documents.filter(id__in=latest_doc_ids)
 
-    pending_count = latest_docs.filter(status='pending').count()
+    # Still have pending docs for types that aren't already approved? Wait.
+    pending_count = (
+        application.documents
+        .filter(status='pending')
+        .exclude(document_type__in=approved_types)
+        .count()
+    )
     if pending_count > 0:
         return  # Still have docs to review
 
-    has_rejected = latest_docs.filter(status='rejected').exists()
+    # Only flag rejected for types with NO approved version
+    rejected_docs = (
+        application.documents
+        .filter(status='rejected')
+        .exclude(document_type__in=approved_types)
+    )
+    has_rejected = rejected_docs.exists()
     all_approved = not has_rejected
 
     if has_rejected:
-        # Build rejection notes from rejected docs (latest versions only)
-        rejected_docs = latest_docs.filter(status='rejected')
+        # Build rejection notes from rejected docs (only unresolved types)
         rejection_details = []
         for doc in rejected_docs:
             reason = doc.rejection_reason or 'No reason specified'
@@ -9863,11 +9871,8 @@ def _auto_finalize_docs(request, application):
             _surface_notif_results(request, notif_results)
 
     elif all_approved:
-        # All latest docs approved — auto-issue credential if all required types present
-        approved_types = set(
-            latest_docs.filter(status='approved')
-            .values_list('document_type', flat=True)
-        )
+        # All docs approved — auto-issue credential if all required types present
+        # (approved_types already computed above)
         # Check against configured required docs
         event = application.event
         if event and event.required_documents:
@@ -10101,22 +10106,26 @@ def youth_dialogue_review(request, pk):
             return redirect('custom_admin:youth_dialogue_review', pk=pk)
 
         elif action == 'issue_credential':
-            # Only consider the LATEST document per type (ignore superseded ones)
-            from django.db.models import Max, Subquery, OuterRef
-            latest_doc_ids = (
-                application.documents
-                .values('document_type')
-                .annotate(latest_id=Max('id'))
-                .values_list('latest_id', flat=True)
-            )
-            latest_docs = application.documents.filter(id__in=latest_doc_ids)
-            all_docs_approved = not latest_docs.filter(status='pending').exists()
-            has_rejected = latest_docs.filter(status='rejected').exists()
-            # Verify all required document types (from event config) exist and are approved
+            # A document type is satisfied if ANY document of that type is approved.
+            # Rejected duplicates of an already-approved type are ignored.
             approved_types = set(
-                latest_docs.filter(status='approved')
+                application.documents.filter(status='approved')
                 .values_list('document_type', flat=True)
             )
+            # Only flag rejected/pending docs for types that have NO approved version
+            has_rejected = (
+                application.documents
+                .filter(status='rejected')
+                .exclude(document_type__in=approved_types)
+                .exists()
+            )
+            has_pending = (
+                application.documents
+                .filter(status='pending')
+                .exclude(document_type__in=approved_types)
+                .exists()
+            )
+            all_docs_approved = not has_pending and not has_rejected
             event_docs = application.event.required_documents if application.event and application.event.required_documents else []
             required_types = {d['key'] for d in event_docs} if event_docs else {'passport', 'national_id', 'photo', 'cv'}
             # Foreigners don't need national_id (only passport + photo);

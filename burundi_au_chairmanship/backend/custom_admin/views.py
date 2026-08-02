@@ -10101,11 +10101,20 @@ def youth_dialogue_review(request, pk):
             return redirect('custom_admin:youth_dialogue_review', pk=pk)
 
         elif action == 'issue_credential':
-            all_docs_approved = not application.documents.filter(status='pending').exists()
-            has_rejected = application.documents.filter(status='rejected').exists()
+            # Only consider the LATEST document per type (ignore superseded ones)
+            from django.db.models import Max, Subquery, OuterRef
+            latest_doc_ids = (
+                application.documents
+                .values('document_type')
+                .annotate(latest_id=Max('id'))
+                .values_list('latest_id', flat=True)
+            )
+            latest_docs = application.documents.filter(id__in=latest_doc_ids)
+            all_docs_approved = not latest_docs.filter(status='pending').exists()
+            has_rejected = latest_docs.filter(status='rejected').exists()
             # Verify all required document types (from event config) exist and are approved
             approved_types = set(
-                application.documents.filter(status='approved')
+                latest_docs.filter(status='approved')
                 .values_list('document_type', flat=True)
             )
             event_docs = application.event.required_documents if application.event and application.event.required_documents else []

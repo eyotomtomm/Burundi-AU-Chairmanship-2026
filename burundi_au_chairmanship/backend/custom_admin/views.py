@@ -10286,33 +10286,44 @@ def _yd_email_html(application, heading, badge_color, body_html):
 @require_POST
 def youth_dialogue_export_csv(request, event_pk):
     yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
-    qs = YouthDialogueApplication.objects.filter(event=yd_event).select_related('user').order_by('-created_at')
+    qs = YouthDialogueApplication.objects.filter(event=yd_event).select_related('user').prefetch_related('selected_side_events').order_by('-created_at')
+
+    # Collect all side events for this event to create columns
+    all_side_events = list(YouthDialogueSideEvent.objects.filter(event=yd_event).order_by('order'))
 
     safe_title = yd_event.slug or 'youth_dialogue'
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{safe_title}_applications.csv"'
 
     writer = csv.writer(response)
-    writer.writerow([
-        'Name', 'Email', 'Nationality', 'Organization', 'Position',
+    header = [
+        'Name', 'Email', 'Nationality', 'Organization', 'Position', 'Gender',
         'Status', 'Participant Code', 'Created At', 'Documents Status',
-    ])
+    ]
+    for se in all_side_events:
+        header.append(se.name)
+    writer.writerow(header)
 
     for app in qs:
         total_docs = app.documents.count()
         approved_docs = app.documents.filter(status='approved').count()
         docs_status = f'{approved_docs}/{total_docs} approved' if total_docs else 'No documents'
-        writer.writerow(_sanitize_csv_row([
+        app_side_event_ids = set(app.selected_side_events.values_list('id', flat=True))
+        row = [
             f'{app.first_name} {app.last_name}',
             app.email,
             app.get_nationality_display() if app.nationality else '',
             app.organization,
-            app.position,
+            app.get_position_display() if app.position else app.position,
+            app.get_gender_display() if app.gender else '',
             app.get_status_display(),
             app.participant_code or '',
             app.created_at.strftime('%Y-%m-%d %H:%M:%S') if app.created_at else '',
             docs_status,
-        ]))
+        ]
+        for se in all_side_events:
+            row.append('Yes' if se.id in app_side_event_ids else '')
+        writer.writerow(_sanitize_csv_row(row))
 
     log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'CSV export of {qs.count()} applications')
 
@@ -10334,6 +10345,152 @@ def youth_dialogue_export_excel(request, event_pk):
     )
     response['Content-Disposition'] = f'attachment; filename="{safe_title}_participants.xlsx"'
     log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'Excel export ({safe_title})')
+    return response
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_analytics(request, event_pk):
+    """Continental Dialogue analytics dashboard with pipeline, side events, country/gender/position breakdowns."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    apps = YouthDialogueApplication.objects.filter(event=yd_event)
+
+    total = apps.count()
+
+    # Per-status counts
+    status_counts = {}
+    for code, label in YouthDialogueApplication.STATUS_CHOICES:
+        status_counts[code] = apps.filter(status=code).count()
+
+    # Pipeline / funnel
+    phase1_passed = status_counts.get('accepted', 0) + sum(
+        status_counts.get(s, 0) for s in [
+            'documents_pending', 'documents_submitted', 'documents_under_review',
+            'documents_rejected', 'credential_issued',
+        ]
+    )
+    phase2_entered = sum(
+        status_counts.get(s, 0) for s in [
+            'documents_pending', 'documents_submitted', 'documents_under_review',
+            'documents_rejected', 'credential_issued',
+        ]
+    )
+    credential_issued = status_counts.get('credential_issued', 0)
+    total_rejected = status_counts.get('rejected', 0) + status_counts.get('documents_rejected', 0)
+    phase1_stuck = status_counts.get('submitted', 0) + status_counts.get('under_review', 0)
+    phase2_stuck = sum(
+        status_counts.get(s, 0) for s in [
+            'documents_pending', 'documents_submitted', 'documents_under_review',
+        ]
+    )
+
+    # Funnel percentages (relative to total)
+    funnel = []
+    for label, value in [
+        ('All Applied', total),
+        ('Phase 1 Passed', phase1_passed),
+        ('Documents Phase', phase2_entered),
+        ('Credential Issued', credential_issued),
+    ]:
+        pct = round(value / total * 100, 1) if total else 0
+        funnel.append({'label': label, 'value': value, 'pct': pct})
+
+    # Side event registration counts
+    side_events_data = []
+    side_events = YouthDialogueSideEvent.objects.filter(event=yd_event).annotate(
+        reg_count=Count('applications')
+    ).order_by('-reg_count')
+    for se in side_events:
+        pct = round(se.reg_count / total * 100, 1) if total else 0
+        side_events_data.append({
+            'name': se.name,
+            'date': se.event_date,
+            'count': se.reg_count,
+            'pct': pct,
+        })
+
+    # Country breakdown
+    from core.models import NATIONALITY_CHOICES
+    nat_dict = dict(NATIONALITY_CHOICES)
+    country_data = list(
+        apps.values('nationality').annotate(count=Count('id')).order_by('-count')
+    )
+    for entry in country_data:
+        code = entry['nationality']
+        entry['display'] = nat_dict.get(code, code or 'Unknown')
+
+    # Gender breakdown
+    male_count = apps.filter(gender='male').count()
+    female_count = apps.filter(gender='female').count()
+    unspecified_count = total - male_count - female_count
+    gender_data = [
+        {'label': 'Male', 'count': male_count},
+        {'label': 'Female', 'count': female_count},
+        {'label': 'Unspecified', 'count': unspecified_count},
+    ]
+
+    # Position breakdown
+    position_dict = dict(YouthDialogueApplication.POSITION_CHOICES)
+    position_qs = apps.exclude(position='').values('position').annotate(count=Count('id')).order_by('-count')
+    position_data = []
+    for entry in position_qs:
+        pct = round(entry['count'] / total * 100, 1) if total else 0
+        position_data.append({
+            'label': position_dict.get(entry['position'], entry['position']),
+            'count': entry['count'],
+            'pct': pct,
+        })
+
+    # Daily application trend
+    from django.db.models.functions import TruncDate
+    daily_qs = (
+        apps.annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+        .order_by('day')
+    )
+    daily_labels = [entry['day'].strftime('%Y-%m-%d') for entry in daily_qs if entry['day']]
+    daily_values = [entry['count'] for entry in daily_qs if entry['day']]
+
+    context = {
+        'yd_event': yd_event,
+        'total': total,
+        'phase1_passed': phase1_passed,
+        'phase2_entered': phase2_entered,
+        'credential_issued': credential_issued,
+        'total_rejected': total_rejected,
+        'phase1_stuck': phase1_stuck,
+        'phase2_stuck': phase2_stuck,
+        'funnel': funnel,
+        'status_counts': status_counts,
+        'side_events_data': side_events_data,
+        'country_data': country_data,
+        'gender_data': gender_data,
+        'position_data': position_data,
+        'daily_labels_json': json.dumps(daily_labels),
+        'daily_values_json': json.dumps(daily_values),
+        'gender_labels_json': json.dumps([g['label'] for g in gender_data]),
+        'gender_values_json': json.dumps([g['count'] for g in gender_data]),
+        'country_labels_json': json.dumps([e['display'] for e in country_data[:20]]),
+        'country_values_json': json.dumps([e['count'] for e in country_data[:20]]),
+    }
+    return render(request, 'custom_admin/youth_dialogue/analytics.html', context)
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def youth_dialogue_export_analytics_excel(request, event_pk):
+    """Export Continental Dialogue analytics as a multi-sheet Excel file."""
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+    from custom_admin.reports import generate_youth_dialogue_analytics_excel
+    buf = generate_youth_dialogue_analytics_excel(yd_event)
+    safe_title = yd_event.slug or 'youth_dialogue'
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{safe_title}_analytics.xlsx"'
+    log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'Analytics Excel export ({safe_title})')
     return response
 
 

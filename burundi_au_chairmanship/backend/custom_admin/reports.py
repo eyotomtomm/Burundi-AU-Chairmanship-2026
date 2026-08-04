@@ -141,7 +141,7 @@ def generate_youth_dialogue_excel(event, status_filter=None):
     """Generate a styled Excel workbook with Youth Dialogue participants.
     Returns a BytesIO buffer.
     """
-    from core.models import YouthDialogueApplication
+    from core.models import YouthDialogueApplication, YouthDialogueSideEvent, NATIONALITY_CHOICES
     from datetime import date
 
     wb = Workbook()
@@ -150,9 +150,12 @@ def generate_youth_dialogue_excel(event, status_filter=None):
     ws = wb.active
     ws.title = 'Participants'
 
-    qs = YouthDialogueApplication.objects.filter(event=event).select_related('user').order_by('last_name', 'first_name')
+    qs = YouthDialogueApplication.objects.filter(event=event).select_related('user').prefetch_related('selected_side_events').order_by('last_name', 'first_name')
     if status_filter:
         qs = qs.filter(status=status_filter)
+
+    # Collect all side events for this event
+    all_side_events = list(YouthDialogueSideEvent.objects.filter(event=event).order_by('order'))
 
     columns = [
         '#', 'Title', 'Name', 'Country', 'Position', 'Gender', 'Age',
@@ -170,6 +173,10 @@ def generate_youth_dialogue_excel(event, status_filter=None):
     # Pretty-print extra field names as column headers
     extra_labels = [k.replace('_', ' ').title() for k in extra_keys]
     columns += extra_labels
+
+    # Add side event columns
+    for se in all_side_events:
+        columns.append(se.name)
 
     ws.append(columns)
 
@@ -211,6 +218,8 @@ def generate_youth_dialogue_excel(event, status_filter=None):
         approved_docs = app.documents.filter(status='approved').count()
         docs_status = f'{approved_docs}/{total_docs} approved' if total_docs else 'None'
 
+        app_side_event_ids = set(app.selected_side_events.values_list('id', flat=True))
+
         row = [
             idx,
             app.get_title_display() if app.title else '',
@@ -231,6 +240,9 @@ def generate_youth_dialogue_excel(event, status_filter=None):
         for key in extra_keys:
             val = app.additional_data.get(key, '') if app.additional_data else ''
             row.append(str(val) if val else '')
+        # Append side event columns
+        for se in all_side_events:
+            row.append('Yes' if se.id in app_side_event_ids else '')
 
         ws.append(row)
         for col in range(1, len(columns) + 1):
@@ -254,6 +266,8 @@ def generate_youth_dialogue_excel(event, status_filter=None):
     _style_header_row(ws2, 2)
 
     total = qs.count()
+    nat_dict = dict(NATIONALITY_CHOICES)
+
     stats = [
         ('Event', event.programme_title or event.slug),
         ('Total Applications', total),
@@ -268,19 +282,11 @@ def generate_youth_dialogue_excel(event, status_filter=None):
     female = qs.filter(gender='female').count()
     stats += [('Male', male), ('Female', female)]
     # Top nationalities
-    from django.db.models import Count as DjCount
-    top_countries = qs.values('nationality').annotate(c=DjCount('id')).order_by('-c')[:10]
+    top_countries = qs.values('nationality').annotate(c=Count('id')).order_by('-c')[:10]
     for entry in top_countries:
         nat = entry['nationality']
         if nat:
-            # Get display name
-            display = nat
-            try:
-                from core.models import NATIONALITY_CHOICES
-                nat_dict = dict(NATIONALITY_CHOICES)
-                display = nat_dict.get(nat, nat)
-            except Exception:
-                pass
+            display = nat_dict.get(nat, nat)
             stats.append((f'Country: {display}', entry['c']))
 
     data_font2 = Font(name='Arial', size=10)
@@ -289,6 +295,130 @@ def generate_youth_dialogue_excel(event, status_filter=None):
         ws2.cell(row=i, column=2, value=value).font = Font(name='Arial', size=10, bold=True)
 
     _auto_width(ws2)
+
+    # ── Sheet 3: Countries ──
+    ws3 = wb.create_sheet(title='Countries')
+    ws3.append(['Country', 'Count', '% of Total'])
+    _style_header_row(ws3, 3)
+    all_countries = qs.values('nationality').annotate(c=Count('id')).order_by('-c')
+    for i, entry in enumerate(all_countries, start=2):
+        nat = entry['nationality']
+        display = nat_dict.get(nat, nat or 'Unknown')
+        pct = round(entry['c'] / total * 100, 1) if total else 0
+        ws3.cell(row=i, column=1, value=display).font = data_font2
+        ws3.cell(row=i, column=2, value=entry['c']).font = data_font2
+        ws3.cell(row=i, column=3, value=f'{pct}%').font = data_font2
+    _auto_width(ws3)
+
+    # ── Sheet 4: Side Events ──
+    ws4 = wb.create_sheet(title='Side Events')
+    ws4.append(['Side Event', 'Registrations', '% of Total'])
+    _style_header_row(ws4, 3)
+    side_events_with_counts = YouthDialogueSideEvent.objects.filter(event=event).annotate(
+        reg_count=Count('applications')
+    ).order_by('-reg_count')
+    for i, se in enumerate(side_events_with_counts, start=2):
+        pct = round(se.reg_count / total * 100, 1) if total else 0
+        ws4.cell(row=i, column=1, value=se.name).font = data_font2
+        ws4.cell(row=i, column=2, value=se.reg_count).font = data_font2
+        ws4.cell(row=i, column=3, value=f'{pct}%').font = data_font2
+    _auto_width(ws4)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+# ──────────────────────────────────────────────────────
+# Excel: Youth Dialogue Analytics Report (multi-sheet)
+# ──────────────────────────────────────────────────────
+def generate_youth_dialogue_analytics_excel(event):
+    """Generate a multi-sheet analytics Excel workbook for a Continental Dialogue event.
+    Returns a BytesIO buffer.
+    """
+    from core.models import (
+        YouthDialogueApplication, YouthDialogueSideEvent, NATIONALITY_CHOICES,
+    )
+
+    wb = Workbook()
+    apps = YouthDialogueApplication.objects.filter(event=event)
+    total = apps.count()
+    nat_dict = dict(NATIONALITY_CHOICES)
+    data_font = Font(name='Arial', size=10)
+    bold_font = Font(name='Arial', size=10, bold=True)
+
+    # ── Sheet 1: Pipeline Summary ──
+    ws1 = wb.active
+    ws1.title = 'Pipeline Summary'
+    ws1.append(['Status', 'Count', '% of Total'])
+    _style_header_row(ws1, 3)
+    for i, (code, label) in enumerate(YouthDialogueApplication.STATUS_CHOICES, start=2):
+        count = apps.filter(status=code).count()
+        pct = round(count / total * 100, 1) if total else 0
+        ws1.cell(row=i, column=1, value=label).font = data_font
+        ws1.cell(row=i, column=2, value=count).font = bold_font
+        ws1.cell(row=i, column=3, value=f'{pct}%').font = data_font
+    summary_row = len(YouthDialogueApplication.STATUS_CHOICES) + 2
+    _add_summary_row(ws1, summary_row, 'Total', total, 3)
+    _auto_width(ws1)
+
+    # ── Sheet 2: Side Events ──
+    ws2 = wb.create_sheet(title='Side Events')
+    ws2.append(['Side Event', 'Date', 'Registrations', '% of Total'])
+    _style_header_row(ws2, 4)
+    side_events = YouthDialogueSideEvent.objects.filter(event=event).annotate(
+        reg_count=Count('applications')
+    ).order_by('-reg_count')
+    for i, se in enumerate(side_events, start=2):
+        pct = round(se.reg_count / total * 100, 1) if total else 0
+        ws2.cell(row=i, column=1, value=se.name).font = data_font
+        ws2.cell(row=i, column=2, value=se.event_date.strftime('%Y-%m-%d') if se.event_date else '').font = data_font
+        ws2.cell(row=i, column=3, value=se.reg_count).font = bold_font
+        ws2.cell(row=i, column=4, value=f'{pct}%').font = data_font
+    _auto_width(ws2)
+
+    # ── Sheet 3: Countries ──
+    ws3 = wb.create_sheet(title='Countries')
+    ws3.append(['Country', 'Count', '% of Total'])
+    _style_header_row(ws3, 3)
+    country_qs = apps.values('nationality').annotate(c=Count('id')).order_by('-c')
+    for i, entry in enumerate(country_qs, start=2):
+        nat = entry['nationality']
+        display = nat_dict.get(nat, nat or 'Unknown')
+        pct = round(entry['c'] / total * 100, 1) if total else 0
+        ws3.cell(row=i, column=1, value=display).font = data_font
+        ws3.cell(row=i, column=2, value=entry['c']).font = bold_font
+        ws3.cell(row=i, column=3, value=f'{pct}%').font = data_font
+    _auto_width(ws3)
+
+    # ── Sheet 4: Gender ──
+    ws4 = wb.create_sheet(title='Gender')
+    ws4.append(['Gender', 'Count', '% of Total'])
+    _style_header_row(ws4, 3)
+    male = apps.filter(gender='male').count()
+    female = apps.filter(gender='female').count()
+    unspecified = total - male - female
+    for i, (label, count) in enumerate([('Male', male), ('Female', female), ('Unspecified', unspecified)], start=2):
+        pct = round(count / total * 100, 1) if total else 0
+        ws4.cell(row=i, column=1, value=label).font = data_font
+        ws4.cell(row=i, column=2, value=count).font = bold_font
+        ws4.cell(row=i, column=3, value=f'{pct}%').font = data_font
+    _auto_width(ws4)
+
+    # ── Sheet 5: Positions ──
+    ws5 = wb.create_sheet(title='Positions')
+    ws5.append(['Position', 'Count', '% of Total'])
+    _style_header_row(ws5, 3)
+    position_dict = dict(YouthDialogueApplication.POSITION_CHOICES)
+    position_qs = apps.exclude(position='').values('position').annotate(c=Count('id')).order_by('-c')
+    for i, entry in enumerate(position_qs, start=2):
+        label = position_dict.get(entry['position'], entry['position'])
+        pct = round(entry['c'] / total * 100, 1) if total else 0
+        ws5.cell(row=i, column=1, value=label).font = data_font
+        ws5.cell(row=i, column=2, value=entry['c']).font = bold_font
+        ws5.cell(row=i, column=3, value=f'{pct}%').font = data_font
+    _auto_width(ws5)
 
     buf = io.BytesIO()
     wb.save(buf)

@@ -101,6 +101,11 @@
           <span class="material-symbols-outlined" style="font-size:14px;">perm_media</span>
           Media
         </a>
+        <a href="{% url 'custom_admin:youth_dialogue_analytics' event_pk=event.pk %}"
+           class="inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-semibold bg-white border border-slate-200 rounded-lg py-1.5 px-3 hover:bg-amber-50 transition-all">
+          <span class="material-symbols-outlined" style="font-size:14px;">analytics</span>
+          Analytics
+        </a>
         {% if not event.is_active %}
         <form method="post" action="{% url 'custom_admin:youth_dialogue_toggle_active' event_pk=event.pk %}" class="inline">
           {% csrf_token %}

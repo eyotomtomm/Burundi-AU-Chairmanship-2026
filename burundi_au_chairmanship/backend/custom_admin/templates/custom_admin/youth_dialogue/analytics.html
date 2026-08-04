@@ -1,0 +1,411 @@
+{% extends 'custom_admin/base.html' %}
+{% block title %}Analytics — {{ yd_event.programme_title }} — Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div class="flex items-center gap-4">
+      <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+        <span class="material-symbols-outlined text-slate-600">arrow_back</span>
+      </a>
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
+        <span class="material-symbols-outlined text-3xl text-white" style="font-variation-settings: 'FILL' 1">analytics</span>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold text-slate-900 font-headline">Analytics</h1>
+        <p class="text-sm text-slate-500 mt-1">{{ yd_event.programme_title }}</p>
+      </div>
+    </div>
+    <a href="{% url 'custom_admin:youth_dialogue_export_analytics_excel' event_pk=yd_event.pk %}"
+       class="inline-flex items-center gap-2 bg-green-600 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-green-700 transition-all shadow-sm">
+      <span class="material-symbols-outlined text-sm">table_view</span>
+      Export Analytics Excel
+    </a>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Applied</p>
+          <p class="text-2xl font-bold text-slate-900 mt-1">{{ total }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-blue-600">groups</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phase 1 Passed</p>
+          <p class="text-2xl font-bold text-emerald-600 mt-1">{{ phase1_passed }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Documents Phase</p>
+          <p class="text-2xl font-bold text-cyan-600 mt-1">{{ phase2_entered }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-cyan-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-cyan-600">description</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Credentials Issued</p>
+          <p class="text-2xl font-bold text-indigo-600 mt-1">{{ credential_issued }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-indigo-600">badge</span>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-100">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rejected</p>
+          <p class="text-2xl font-bold text-red-600 mt-1">{{ total_rejected }}</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+          <span class="material-symbols-outlined text-red-600">cancel</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Pipeline Funnel -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-8">
+    <h2 class="text-lg font-bold text-slate-900 mb-1">Application Pipeline</h2>
+    <p class="text-sm text-slate-500 mb-6">Funnel showing applicant progression through each phase</p>
+    <div class="space-y-4">
+      {% for step in funnel %}
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-sm font-semibold text-slate-700">{{ step.label }}</span>
+          <span class="text-sm text-slate-500">{{ step.value }} <span class="text-xs text-slate-400">({{ step.pct }}%)</span></span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-6 overflow-hidden">
+          <div class="h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2
+            {% if forloop.first %}bg-blue-500
+            {% elif forloop.counter == 2 %}bg-emerald-500
+            {% elif forloop.counter == 3 %}bg-cyan-500
+            {% else %}bg-indigo-500{% endif %}"
+               style="width: {% if step.pct > 0 %}{{ step.pct }}%{% else %}0%{% endif %}; min-width: {% if step.value > 0 %}2rem{% else %}0{% endif %};">
+            {% if step.value > 0 %}
+            <span class="text-xs font-bold text-white">{{ step.pct }}%</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <!-- Stuck indicators -->
+    <div class="mt-6 flex gap-6">
+      <div class="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-lg border border-amber-200">
+        <span class="material-symbols-outlined text-amber-600 text-sm">hourglass_top</span>
+        <span class="text-sm text-amber-800"><strong>{{ phase1_stuck }}</strong> stuck in Phase 1 (awaiting review)</span>
+      </div>
+      <div class="flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-lg border border-orange-200">
+        <span class="material-symbols-outlined text-orange-600 text-sm">hourglass_top</span>
+        <span class="text-sm text-orange-800"><strong>{{ phase2_stuck }}</strong> stuck in Phase 2 (documents pending/review)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Status Breakdown -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Phase 1 -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        Phase 1: Application Review
+      </h3>
+      <div class="space-y-3">
+        {% for code, label in status_phase1 %}
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">{{ label }}</span>
+          <span class="text-sm font-bold text-slate-900">{{ status_counts|get_item:code|default:"0" }}</span>
+        </div>
+        {% empty %}
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Submitted</span>
+          <span class="text-sm font-bold text-slate-900">{{ status_counts.submitted }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Under Review</span>
+          <span class="text-sm font-bold text-slate-900">{{ status_counts.under_review }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Accepted</span>
+          <span class="text-sm font-bold text-emerald-600">{{ status_counts.accepted }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Rejected</span>
+          <span class="text-sm font-bold text-red-600">{{ status_counts.rejected }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+        Phase 2: Documents & Credentials
+      </h3>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Documents Pending</span>
+          <span class="text-sm font-bold text-slate-900">{{ status_counts.documents_pending }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Documents Submitted</span>
+          <span class="text-sm font-bold text-slate-900">{{ status_counts.documents_submitted }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Documents Under Review</span>
+          <span class="text-sm font-bold text-slate-900">{{ status_counts.documents_under_review }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Documents Rejected</span>
+          <span class="text-sm font-bold text-red-600">{{ status_counts.documents_rejected }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm text-slate-700">Credential Issued</span>
+          <span class="text-sm font-bold text-indigo-600">{{ status_counts.credential_issued }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side Events Table -->
+  {% if side_events_data %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-8">
+    <h2 class="text-lg font-bold text-slate-900 mb-1">Side Event Registrations</h2>
+    <p class="text-sm text-slate-500 mb-4">Number of applicants registered for each side event</p>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Side Event</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Date</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-right">Registrations</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-right">% of Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for se in side_events_data %}
+          <tr class="hover:bg-slate-50/50">
+            <td class="px-6 py-3 text-sm font-medium text-slate-900">{{ se.name }}</td>
+            <td class="px-6 py-3 text-sm text-slate-500">{{ se.date|date:"M d, Y"|default:"—" }}</td>
+            <td class="px-6 py-3 text-sm font-bold text-slate-900 text-right">{{ se.count }}</td>
+            <td class="px-6 py-3 text-sm text-slate-500 text-right">{{ se.pct }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Daily Application Trend -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h3 class="text-base font-bold text-slate-900 mb-4">Daily Application Trend</h3>
+      <div style="position:relative; height:280px;">
+        <canvas id="dailyTrendChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Gender Distribution -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h3 class="text-base font-bold text-slate-900 mb-4">Gender Distribution</h3>
+      <div style="position:relative; height:280px;">
+        <canvas id="genderChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Country Breakdown -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Top 20 Country Chart -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h3 class="text-base font-bold text-slate-900 mb-4">Top 20 Countries</h3>
+      <div style="position:relative; height:500px;">
+        <canvas id="countryChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Full Country Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h3 class="text-base font-bold text-slate-900 mb-4">All Countries</h3>
+      <div class="overflow-y-auto" style="max-height:500px;">
+        <table class="w-full">
+          <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
+            <tr>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-left">#</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-left">Country</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-right">Count</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-right">%</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for c in country_data %}
+            <tr class="hover:bg-slate-50/50">
+              <td class="px-4 py-2 text-xs text-slate-400">{{ forloop.counter }}</td>
+              <td class="px-4 py-2 text-sm text-slate-700">{{ c.display }}</td>
+              <td class="px-4 py-2 text-sm font-bold text-slate-900 text-right">{{ c.count }}</td>
+              <td class="px-4 py-2 text-sm text-slate-500 text-right">
+                {% widthratio c.count total 1000 as pct_x10 %}
+                {% if total > 0 %}{% widthratio c.count total 100 %}%{% else %}0%{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Position/Role Table -->
+  {% if position_data %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-8">
+    <h2 class="text-lg font-bold text-slate-900 mb-1">Position / Role Breakdown</h2>
+    <p class="text-sm text-slate-500 mb-4">Distribution of applicants by assigned position</p>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-left">Position</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-right">Count</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-3 text-right">% of Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for p in position_data %}
+          <tr class="hover:bg-slate-50/50">
+            <td class="px-6 py-3 text-sm font-medium text-slate-900">{{ p.label }}</td>
+            <td class="px-6 py-3 text-sm font-bold text-slate-900 text-right">{{ p.count }}</td>
+            <td class="px-6 py-3 text-sm text-slate-500 text-right">{{ p.pct }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var dailyLabels = {{ daily_labels_json|safe }};
+  var dailyValues = {{ daily_values_json|safe }};
+  var genderLabels = {{ gender_labels_json|safe }};
+  var genderValues = {{ gender_values_json|safe }};
+  var countryLabels = {{ country_labels_json|safe }};
+  var countryValues = {{ country_values_json|safe }};
+
+  // Daily Trend Line Chart
+  if (dailyLabels.length > 0) {
+    new Chart(document.getElementById('dailyTrendChart'), {
+      type: 'line',
+      data: {
+        labels: dailyLabels,
+        datasets: [{
+          label: 'Applications',
+          data: dailyValues,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointBackgroundColor: '#6366f1',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            ticks: { maxRotation: 45, font: { size: 10 } },
+            grid: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, font: { size: 10 } },
+          }
+        }
+      }
+    });
+  }
+
+  // Gender Doughnut Chart
+  new Chart(document.getElementById('genderChart'), {
+    type: 'doughnut',
+    data: {
+      labels: genderLabels,
+      datasets: [{
+        data: genderValues,
+        backgroundColor: ['#3b82f6', '#ec4899', '#94a3b8'],
+        borderWidth: 2,
+        borderColor: '#fff',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 12 }, padding: 16 } },
+      }
+    }
+  });
+
+  // Country Horizontal Bar Chart
+  if (countryLabels.length > 0) {
+    new Chart(document.getElementById('countryChart'), {
+      type: 'bar',
+      data: {
+        labels: countryLabels,
+        datasets: [{
+          label: 'Applicants',
+          data: countryValues,
+          backgroundColor: '#d97706',
+          borderColor: '#b45309',
+          borderWidth: 1,
+          borderRadius: 3,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { precision: 0, font: { size: 10 } },
+          },
+          y: {
+            ticks: { font: { size: 11 } },
+          }
+        }
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

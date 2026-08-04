@@ -160,12 +160,21 @@ if REDIS_URL:
             },
             'KEY_PREFIX': 'burundi_au',
             'TIMEOUT': 300,  # 5 minutes default
-        }
+        },
+        'sessions': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'KEY_PREFIX': 'burundi_sess',
+            'TIMEOUT': 60 * 60 * 24,  # 24 hours — matches SESSION_COOKIE_AGE
+        },
     }
-    # Use Redis + DB for session storage — cached_db writes through to the
-    # database so sessions survive cache eviction (default TIMEOUT is 5 min).
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
-    SESSION_CACHE_ALIAS = 'default'
+    # Use a dedicated Redis cache alias for sessions with a 24-hour timeout,
+    # separate from the default 5-minute cache that was evicting sessions.
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'sessions'
 else:
     # WARNING: LocMemCache is per-process.  With multiple gunicorn workers,
     # DRF throttle counters are NOT shared — each worker tracks its own

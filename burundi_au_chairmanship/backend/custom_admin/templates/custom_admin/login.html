@@ -196,7 +196,7 @@ input#remember_me {
 
         <div class="flex items-center gap-3">
           <input type="checkbox" id="remember_me" name="remember_me" value="1" checked class="w-4 h-4 rounded border-outline-variant text-secondary focus:ring-secondary cursor-pointer" />
-          <label for="remember_me" class="font-label text-sm text-on-surface-variant cursor-pointer select-none">Remember me for 24 hours</label>
+          <label for="remember_me" class="font-label text-sm text-on-surface-variant cursor-pointer select-none">Remember me</label>
         </div>
 
         <button class="w-full py-5 bg-primary-container text-white font-headline font-bold rounded-lg shadow-lg shadow-primary-container/20 hover:bg-primary transition-all active:scale-[0.98] flex items-center justify-center gap-3" type="submit">
@@ -206,8 +206,35 @@ input#remember_me {
       </form>
 
       <script>
-      // Clean up any previously stored credentials from localStorage
-      localStorage.removeItem('admin_remember_user');
+      (function() {
+        var KEY_USER = 'admin_remember_user';
+        var KEY_PASS = 'admin_remember_pass';
+        var usernameInput = document.getElementById('username');
+        var passwordInput = document.getElementById('password');
+        var rememberCb = document.getElementById('remember_me');
+
+        // Restore saved credentials on load
+        var savedUser = localStorage.getItem(KEY_USER);
+        var savedPass = localStorage.getItem(KEY_PASS);
+        if (savedUser) {
+          usernameInput.value = savedUser;
+          rememberCb.checked = true;
+        }
+        if (savedPass) {
+          try { passwordInput.value = atob(savedPass); } catch(e) {}
+        }
+
+        // Save or clear on form submit
+        document.getElementById('loginForm').addEventListener('submit', function() {
+          if (rememberCb.checked) {
+            localStorage.setItem(KEY_USER, usernameInput.value);
+            localStorage.setItem(KEY_PASS, btoa(passwordInput.value));
+          } else {
+            localStorage.removeItem(KEY_USER);
+            localStorage.removeItem(KEY_PASS);
+          }
+        });
+      })();
       </script>
 
       <footer class="mt-12 pt-8 border-t border-surface-container flex justify-between items-center gap-4 text-xs text-outline font-medium">

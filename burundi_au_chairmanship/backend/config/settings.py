@@ -162,8 +162,9 @@ if REDIS_URL:
             'TIMEOUT': 300,  # 5 minutes default
         }
     }
-    # Use Redis for session storage (stateless app servers)
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    # Use Redis + DB for session storage — cached_db writes through to the
+    # database so sessions survive cache eviction (default TIMEOUT is 5 min).
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
     SESSION_CACHE_ALIAS = 'default'
 else:
     # WARNING: LocMemCache is per-process.  With multiple gunicorn workers,

@@ -131,11 +131,9 @@ def validate_for_auto_approve(document):
     MAX_SIZE = 5 * 1024 * 1024  # 5 MB
 
     try:
-        doc_file = document.file
-        doc_file.seek(0)
-        file_data = doc_file.read()
+        with document.file.open('rb') as f:
+            file_data = f.read()
         file_size = len(file_data)
-        doc_file.seek(0)
     except Exception as e:
         return False, f'Cannot read file: {e}'
 

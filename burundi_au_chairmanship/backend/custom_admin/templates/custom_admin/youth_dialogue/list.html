@@ -201,6 +201,7 @@
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Nationality</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Organization</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Status</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-center">Support</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-left">Submitted</th>
             <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-6 py-4 text-right">Actions</th>
           </tr>
@@ -251,6 +252,26 @@
                 </span>
                 {{ app.get_status_display }}
               </span>
+            </td>
+            <td class="px-6 py-4 text-center">
+              {% if app.has_unanswered_ticket %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200" title="Awaiting reply">
+                  <span class="material-symbols-outlined" style="font-size:14px;">mark_chat_unread</span>
+                  Needs Reply
+                </span>
+              {% elif app.has_admin_reply %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Admin replied">
+                  <span class="material-symbols-outlined" style="font-size:14px;">chat_bubble</span>
+                  Replied
+                </span>
+              {% elif app.has_support_ticket %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Open ticket">
+                  <span class="material-symbols-outlined" style="font-size:14px;">support_agent</span>
+                  Open
+                </span>
+              {% else %}
+                <span class="text-slate-300">&mdash;</span>
+              {% endif %}
             </td>
             <td class="px-6 py-4">
               <p class="text-sm text-slate-700">{{ app.created_at|date:"M d, Y" }}</p>

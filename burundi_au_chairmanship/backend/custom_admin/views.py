@@ -9825,6 +9825,25 @@ def youth_dialogue_applications_list(request, event_pk):
     applications = paginator.get_page(page)
 
     # Annotate each application with resolved nationality (covers additional_data)
+    # Also annotate support ticket status per applicant
+    app_user_ids = [a.user_id for a in applications if a.user_id]
+    # Build lookup: user_id → {has_ticket, has_admin_reply, has_unanswered}
+    ticket_info = {}
+    if app_user_ids:
+        user_tickets = SupportTicket.objects.filter(user_id__in=app_user_ids).prefetch_related('messages')
+        for ticket in user_tickets:
+            uid = ticket.user_id
+            if uid not in ticket_info:
+                ticket_info[uid] = {'has_ticket': False, 'has_admin_reply': False, 'has_unanswered': False}
+            ticket_info[uid]['has_ticket'] = True
+            msgs = list(ticket.messages.all())
+            has_reply = any(m.is_admin_reply for m in msgs)
+            if has_reply:
+                ticket_info[uid]['has_admin_reply'] = True
+            # Unanswered = last message is NOT from admin
+            if msgs and not msgs[-1].is_admin_reply:
+                ticket_info[uid]['has_unanswered'] = True
+
     for app in applications:
         code = _app_nationality_code(app)
         app.resolved_nationality_code = code
@@ -9832,6 +9851,10 @@ def youth_dialogue_applications_list(request, event_pk):
         app.resolved_nationality_flag = (
             ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in code) if len(code) == 2 else ''
         )
+        info = ticket_info.get(app.user_id, {})
+        app.has_support_ticket = info.get('has_ticket', False)
+        app.has_admin_reply = info.get('has_admin_reply', False)
+        app.has_unanswered_ticket = info.get('has_unanswered', False)
 
     return render(request, 'custom_admin/youth_dialogue/list.html', {
         'applications': applications,

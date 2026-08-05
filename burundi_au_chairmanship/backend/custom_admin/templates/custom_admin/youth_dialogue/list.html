@@ -431,6 +431,9 @@
   </div>
 </div>
 
+<!-- CSRF for auto-approve -->
+<form id="ydAutoApproveForm" style="display:none">{% csrf_token %}</form>
+
 <!-- Auto-Approve Documents Modal -->
 <div id="ydAutoApproveModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
   <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
@@ -690,15 +693,20 @@
     progressBar.style.width = '30%';
     progressText.textContent = 'Validating documents...';
 
+    var autoApproveToken = document.querySelector('#ydAutoApproveForm [name=csrfmiddlewaretoken]').value;
     var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', autoApproveToken);
 
     fetch(AUTO_APPROVE_URL, {
       method: 'POST',
-      headers: { 'X-CSRFToken': CSRF },
+      headers: { 'X-CSRFToken': autoApproveToken },
       body: formData,
       credentials: 'same-origin',
     })
-    .then(function(response) { return response.json(); })
+    .then(function(response) {
+      if (!response.ok) throw new Error('Server returned ' + response.status);
+      return response.json();
+    })
     .then(function(data) {
       progressBar.style.width = '100%';
       if (data.status === 'success') {

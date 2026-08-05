@@ -668,10 +668,13 @@
     document.getElementById('ydAutoApproveActions').classList.remove('hidden');
     document.getElementById('ydAutoApproveConfirmBtn').disabled = false;
     modal.classList.remove('hidden');
+    modal.style.display = 'flex';
   };
 
   window.ydAutoApproveClose = function() {
-    document.getElementById('ydAutoApproveModal').classList.add('hidden');
+    var modal = document.getElementById('ydAutoApproveModal');
+    modal.classList.add('hidden');
+    modal.style.display = '';
   };
 
   window.ydAutoApproveConfirm = function() {
@@ -708,12 +711,12 @@
         showToast(data.message, 'success');
         setTimeout(function() { window.location.reload(); }, 3000);
       } else {
-        document.getElementById('ydAutoApproveModal').classList.add('hidden');
+        ydAutoApproveClose();
         showToast(data.message || 'An error occurred.', 'error');
       }
     })
     .catch(function(err) {
-      document.getElementById('ydAutoApproveModal').classList.add('hidden');
+      ydAutoApproveClose();
       showToast('Network error: ' + err.message, 'error');
     });
   };

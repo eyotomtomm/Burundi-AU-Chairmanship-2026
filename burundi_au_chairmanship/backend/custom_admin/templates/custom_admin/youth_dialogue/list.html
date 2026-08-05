@@ -340,6 +340,11 @@
           <span class="material-symbols-outlined text-sm">check_circle</span>
           Accept Selected
         </button>
+        <button type="button" onclick="ydBulkApproveDocs()"
+                class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm transition-colors shadow-lg shadow-indigo-600/25">
+          <span class="material-symbols-outlined text-sm">verified</span>
+          Approve Docs &amp; Issue Credentials
+        </button>
         <button type="button" onclick="ydShowRejectModal()"
                 class="inline-flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm transition-colors shadow-lg shadow-red-600/25">
           <span class="material-symbols-outlined text-sm">cancel</span>
@@ -426,6 +431,40 @@
       <button type="button" id="ydRejectConfirmBtn" onclick="ydRejectConfirm()"
               class="px-5 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm shadow-sm">
         Reject All
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Approve Documents & Issue Credentials Modal -->
+<div id="ydApproveDocsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+    <div class="px-6 pt-6 pb-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl text-indigo-600">verified</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Approve Docs & Issue Credentials</h3>
+          <p class="text-sm text-slate-500">This will notify applicants via email</p>
+        </div>
+      </div>
+      <p id="ydApproveDocsMessage" class="text-sm text-slate-700 mt-2"></p>
+    </div>
+    <div id="ydApproveDocsProgressWrap" class="hidden px-6 pb-4">
+      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div id="ydApproveDocsProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <p id="ydApproveDocsProgressText" class="text-xs text-slate-500 mt-2 text-center">Processing...</p>
+    </div>
+    <div id="ydApproveDocsActions" class="px-6 pb-6 flex gap-3 justify-end">
+      <button type="button" onclick="ydApproveDocsClose()"
+              class="px-5 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors text-sm">
+        Cancel
+      </button>
+      <button type="button" id="ydApproveDocsConfirmBtn" onclick="ydApproveDocsConfirm()"
+              class="px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors text-sm shadow-sm">
+        Approve & Issue
       </button>
     </div>
   </div>
@@ -559,6 +598,33 @@
   window.ydModalClose = function() {
     document.getElementById('ydConfirmModal').classList.add('hidden');
     pendingAction = null;
+  };
+
+  // Approve Documents & Issue Credentials flow
+  window.ydBulkApproveDocs = function() {
+    var ids = getCheckedIds();
+    if (ids.length === 0) return;
+    pendingAction = { action: 'approve_documents', ids: ids };
+    var modal = document.getElementById('ydApproveDocsModal');
+    var msg = document.getElementById('ydApproveDocsMessage');
+    msg.textContent = 'Approve all pending documents for ' + ids.length + ' application(s) and issue credentials? Each applicant will be notified via email.';
+    document.getElementById('ydApproveDocsProgressWrap').classList.add('hidden');
+    document.getElementById('ydApproveDocsActions').classList.remove('hidden');
+    document.getElementById('ydApproveDocsConfirmBtn').disabled = false;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  };
+
+  window.ydApproveDocsClose = function() {
+    var modal = document.getElementById('ydApproveDocsModal');
+    modal.classList.add('hidden');
+    modal.style.display = '';
+    pendingAction = null;
+  };
+
+  window.ydApproveDocsConfirm = function() {
+    if (!pendingAction) return;
+    executeBulk('approve_documents', pendingAction.ids, '', 'ydApproveDocsModal', 'ydApproveDocsProgressWrap', 'ydApproveDocsProgressBar', 'ydApproveDocsProgressText', 'ydApproveDocsActions', 'ydApproveDocsConfirmBtn');
   };
 
   window.ydModalConfirm = function() {

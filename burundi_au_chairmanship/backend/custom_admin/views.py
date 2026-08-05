@@ -5769,6 +5769,45 @@ def bulk_yd_action(request, event_pk):
         )
         return JsonResponse({'status': 'success', 'message': msg, 'count': count})
 
+    elif action == 'approve_documents':
+        # Bulk approve all pending documents for selected applications and issue credentials
+        doc_statuses = ['documents_pending', 'documents_submitted', 'documents_under_review', 'documents_rejected']
+        eligible = applications.filter(status__in=doc_statuses)
+        doc_count = 0
+        credential_count = 0
+        app_count = 0
+        for app in eligible:
+            # Copy photo to id_photo if there's a pending photo doc
+            photo_doc = app.documents.filter(status='pending', document_type='photo').first()
+            if photo_doc and photo_doc.file:
+                app.id_photo = photo_doc.file
+                app.save(update_fields=['id_photo'])
+
+            pending_docs = app.documents.filter(status='pending')
+            count = pending_docs.update(
+                status='approved',
+                reviewed_by=request.user,
+                reviewed_at=timezone.now(),
+            )
+            doc_count += count
+            if count > 0:
+                app_count += 1
+            # Auto-finalize: issue credential if all required docs approved
+            _auto_finalize_docs(request, app)
+            app.refresh_from_db(fields=['status'])
+            if app.status == 'credential_issued':
+                credential_count += 1
+        skipped = applications.count() - app_count
+        msg = f'{doc_count} document(s) approved across {app_count} application(s). {credential_count} credential(s) issued.'
+        if skipped:
+            msg += f' {skipped} application(s) skipped (no pending documents).'
+        log_admin_action(
+            request, 'bulk_action', 'YouthDialogueApplication',
+            object_repr=f'Bulk approve docs & issue credentials',
+            changes={'action': 'approve_documents', 'docs': str(doc_count), 'credentials': str(credential_count), 'event': yd_event.programme_title},
+        )
+        return JsonResponse({'status': 'success', 'message': msg, 'count': app_count, 'credential_count': credential_count})
+
     return JsonResponse({'status': 'error', 'message': 'Invalid action.'})
 
 

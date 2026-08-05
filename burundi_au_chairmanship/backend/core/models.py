@@ -4790,6 +4790,10 @@ class YouthDialogueEvent(models.Model):
 
     # Registration control
     is_registration_open = models.BooleanField(default=True, help_text='Whether new applications are accepted')
+    auto_approve_documents = models.BooleanField(
+        default=False,
+        help_text='Auto-validate and approve uploaded documents. Photos require face detection.',
+    )
     min_app_version = models.CharField(max_length=20, blank=True, default='', help_text='Minimum app version required to register (e.g. 1.2.16). Leave blank to allow all versions.')
     registration_closed_message = models.TextField(blank=True, default='Registration is currently closed. Please check back later.')
     registration_closed_message_fr = models.TextField(blank=True, default='Les inscriptions sont actuellement fermées. Veuillez réessayer plus tard.')

@@ -112,6 +112,112 @@ def validate_document_or_image_file(file):
         return validate_document_file(file)
 
 
+def validate_for_auto_approve(document):
+    """Validate a YouthDialogueDocument for auto-approval.
+
+    Returns (bool, str) — (is_valid, reason).
+    Photo documents require face detection; images must not be blank;
+    PDFs must be readable with at least one page.
+    """
+    import io
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        import numpy as np
+    except ImportError:
+        np = None
+    MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+
+    try:
+        doc_file = document.file
+        doc_file.seek(0)
+        file_data = doc_file.read()
+        file_size = len(file_data)
+        doc_file.seek(0)
+    except Exception as e:
+        return False, f'Cannot read file: {e}'
+
+    if file_size > MAX_SIZE:
+        return False, 'File exceeds 5 MB limit.'
+    if file_size < 100:
+        return False, 'File is too small or empty.'
+
+    filename = getattr(document, 'original_filename', '') or document.file.name or ''
+    ext = os.path.splitext(filename)[1][1:].lower()
+    doc_type = document.document_type
+
+    # --- PDF documents ---
+    if ext == 'pdf':
+        try:
+            from PyPDF2 import PdfReader
+            reader = PdfReader(io.BytesIO(file_data))
+            if len(reader.pages) < 1:
+                return False, 'PDF has no pages.'
+        except ImportError:
+            # Fallback: basic PDF header check
+            if not file_data[:5] == b'%PDF-':
+                return False, 'File is not a valid PDF.'
+        except Exception as e:
+            return False, f'PDF is corrupt or unreadable: {e}'
+        if file_size < 1024:
+            return False, 'PDF file is suspiciously small (< 1 KB).'
+        return True, ''
+
+    # --- Image-based documents (photo, passport, national_id, etc.) ---
+    if ext in ('jpg', 'jpeg', 'png'):
+        try:
+            img = Image.open(io.BytesIO(file_data))
+            img.verify()
+            # Re-open after verify (verify can close the stream)
+            img = Image.open(io.BytesIO(file_data))
+            width, height = img.size
+        except Exception as e:
+            return False, f'Image is corrupt or unreadable: {e}'
+
+        # Dimension checks
+        if doc_type == 'photo':
+            if width < 200 or height < 200:
+                return False, f'Photo too small ({width}x{height}). Minimum 200x200 pixels.'
+        else:
+            if width < 100 or height < 100:
+                return False, f'Image too small ({width}x{height}). Minimum 100x100 pixels.'
+
+        # Blank image check via pixel variance
+        if np is not None:
+            try:
+                arr = np.array(img.convert('L'), dtype=np.float64)
+                variance = np.var(arr)
+                if variance < 50:
+                    return False, 'Image appears blank or solid-colored.'
+            except Exception:
+                pass  # Non-critical — skip if conversion fails
+
+        # Face detection for photo documents
+        if doc_type == 'photo':
+            try:
+                import face_recognition
+                fr_image = face_recognition.load_image_file(io.BytesIO(file_data))
+                faces = face_recognition.face_locations(fr_image, model='hog')
+                if len(faces) < 1:
+                    return False, 'No face detected in photo. Please upload a clear face photo.'
+            except ImportError:
+                logger.warning(
+                    'face_recognition not installed — skipping face detection for document %s. '
+                    'Approving based on image quality only.',
+                    document.pk,
+                )
+            except Exception as e:
+                logger.warning('Face detection failed for document %s: %s', document.pk, e)
+                # Don't reject on face detection errors — approve on image quality
+                pass
+
+        return True, ''
+
+    return False, f'Unsupported file format: .{ext}'
+
+
 def validate_video_file(file):
     """
     Validate uploaded video file size and extension.

@@ -6635,6 +6635,65 @@ def _get_yd_user_lang(application):
     return 'en'
 
 
+def _auto_finalize_api(application):
+    """Auto-finalize an application's documents from the API (no request object).
+
+    Mirrors _auto_finalize_docs from admin views but works without a Django
+    request — used when auto-approve processes all docs automatically.
+    Returns True if credential was issued.
+    """
+    from core.models import YouthDialogueDocument
+
+    approved_types = set(
+        application.documents.filter(status='approved')
+        .values_list('document_type', flat=True)
+    )
+    # Still have pending docs for types that aren't already approved? Wait.
+    pending_count = (
+        application.documents
+        .filter(status='pending')
+        .exclude(document_type__in=approved_types)
+        .count()
+    )
+    if pending_count > 0:
+        return False
+
+    rejected_docs = (
+        application.documents
+        .filter(status='rejected')
+        .exclude(document_type__in=approved_types)
+    )
+    if rejected_docs.exists():
+        rejection_details = []
+        for doc in rejected_docs:
+            reason = doc.rejection_reason or 'No reason specified'
+            rejection_details.append(f'\u2022 {doc.get_document_type_display()}: {reason}')
+        application.status = 'documents_rejected'
+        application.documents_rejection_notes = '\n'.join(rejection_details)
+        application.documents_reviewed_at = timezone.now()
+        application.save()
+        _notify_yd(application, 'documents_rejected')
+        return False
+
+    # All docs approved — check required types
+    event = application.event
+    if event and event.required_documents:
+        required_types = {d.get('key', '') for d in event.required_documents if d.get('key')}
+    else:
+        required_types = {'passport', 'national_id', 'photo', 'cv'}
+    missing_types = required_types - approved_types
+    if not missing_types:
+        application.generate_participant_code()
+        application.generate_qr_hash()
+        application.status = 'credential_issued'
+        application.credential_issued_at = timezone.now()
+        application.documents_reviewed_at = timezone.now()
+        application.save()
+        _notify_yd(application, 'credential_issued')
+        return True
+    return False
+
+
 def _notify_yd(application, event_key):
     """Unified Continental Dialogue notification: email + push + in-app Notification record.
 
@@ -7628,8 +7687,22 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
 
         doc.save()
 
+        # Auto-approve if event setting is ON
+        event = app.event
+        if event and event.auto_approve_documents:
+            from core.validators import validate_for_auto_approve
+            is_valid, reason = validate_for_auto_approve(doc)
+            if is_valid:
+                doc.status = 'approved'
+                doc.reviewed_at = timezone.now()
+                doc.save(update_fields=['status', 'reviewed_at'])
+            else:
+                doc.status = 'rejected'
+                doc.rejection_reason = reason
+                doc.save(update_fields=['status', 'rejection_reason'])
+
         # Copy photo to application's id_photo field for credential/ID card generation
-        if doc_type == 'photo':
+        if doc_type == 'photo' and doc.status != 'rejected':
             uploaded_file.seek(0)
             app.id_photo.save(uploaded_file.name, uploaded_file, save=False)
             app.save(update_fields=['id_photo', 'updated_at'])
@@ -7717,6 +7790,13 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
         app.status = 'documents_submitted'
         app.save(update_fields=['status', 'updated_at'])
         _notify_yd(app, 'documents_submitted')
+
+        # Auto-finalize if auto-approve is ON and all docs already approved
+        event = app.event
+        if event and event.auto_approve_documents:
+            credential_issued = _auto_finalize_api(app)
+            if credential_issued:
+                return Response({'detail': 'Documents approved and credential issued.'})
 
         return Response({'detail': 'Documents submitted for review.'})
 

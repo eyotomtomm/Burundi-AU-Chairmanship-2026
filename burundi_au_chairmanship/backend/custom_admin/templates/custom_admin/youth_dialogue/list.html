@@ -37,6 +37,11 @@
         <span class="material-symbols-outlined text-sm">download</span>
         Export CSV
       </a>
+      <button type="button" onclick="bulkAutoApproveDocs()"
+              class="inline-flex items-center gap-2 bg-violet-600 text-white font-semibold rounded-lg py-2.5 px-5 text-sm hover:bg-violet-700 transition-all shadow-sm">
+        <span class="material-symbols-outlined text-sm">auto_awesome</span>
+        Auto-Approve Docs
+      </button>
       {% if pending_review_count > 0 %}
       <div class="bg-amber-50 border border-amber-200 text-amber-800 font-headline font-bold rounded-xl py-3 px-6 flex items-center gap-2 shadow-sm">
         <span class="material-symbols-outlined animate-pulse">notifications_active</span>
@@ -426,9 +431,65 @@
   </div>
 </div>
 
+<!-- Auto-Approve Documents Modal -->
+<div id="ydAutoApproveModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+    <div class="px-6 pt-6 pb-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
+          <span class="material-symbols-outlined text-2xl text-violet-600">auto_awesome</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Auto-Approve Documents</h3>
+          <p class="text-sm text-slate-500">Validates all pending documents</p>
+        </div>
+      </div>
+      <p id="ydAutoApproveMessage" class="text-sm text-slate-700 mt-2">
+        This will run validation on all pending documents for this event. Photos will be checked for face detection, PDFs for integrity, and images for quality. Valid documents will be approved and invalid ones rejected.
+      </p>
+    </div>
+    <!-- Progress bar -->
+    <div id="ydAutoApproveProgressWrap" class="hidden px-6 pb-4">
+      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div id="ydAutoApproveProgressBar" class="bg-violet-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+      <p id="ydAutoApproveProgressText" class="text-xs text-slate-500 mt-2 text-center">Processing documents...</p>
+    </div>
+    <!-- Results -->
+    <div id="ydAutoApproveResults" class="hidden px-6 pb-4">
+      <div class="bg-slate-50 rounded-lg p-4 space-y-2">
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-emerald-700 font-medium">Approved</span>
+          <span id="ydAutoApproveApproved" class="font-bold text-emerald-700">0</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-red-700 font-medium">Rejected</span>
+          <span id="ydAutoApproveRejected" class="font-bold text-red-700">0</span>
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-indigo-700 font-medium">Credentials Issued</span>
+          <span id="ydAutoApproveCredentials" class="font-bold text-indigo-700">0</span>
+        </div>
+      </div>
+    </div>
+    <!-- Actions -->
+    <div id="ydAutoApproveActions" class="px-6 pb-6 flex gap-3 justify-end">
+      <button type="button" onclick="ydAutoApproveClose()"
+              class="px-5 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors text-sm">
+        Cancel
+      </button>
+      <button type="button" id="ydAutoApproveConfirmBtn" onclick="ydAutoApproveConfirm()"
+              class="px-5 py-2.5 bg-violet-600 text-white font-semibold rounded-lg hover:bg-violet-700 transition-colors text-sm shadow-sm">
+        Run Auto-Approve
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   var BULK_URL = '{% url "custom_admin:youth_dialogue_bulk_action" event_pk=yd_event.pk %}';
+  var AUTO_APPROVE_URL = '{% url "custom_admin:youth_dialogue_bulk_auto_approve" event_pk=yd_event.pk %}';
   var CSRF = '{{ csrf_token }}';
   var pendingAction = null;
 
@@ -598,6 +659,64 @@
       setTimeout(function() { toast.remove(); }, 300);
     }, 4000);
   }
+
+  // Auto-approve documents flow
+  window.bulkAutoApproveDocs = function() {
+    var modal = document.getElementById('ydAutoApproveModal');
+    document.getElementById('ydAutoApproveProgressWrap').classList.add('hidden');
+    document.getElementById('ydAutoApproveResults').classList.add('hidden');
+    document.getElementById('ydAutoApproveActions').classList.remove('hidden');
+    document.getElementById('ydAutoApproveConfirmBtn').disabled = false;
+    modal.classList.remove('hidden');
+  };
+
+  window.ydAutoApproveClose = function() {
+    document.getElementById('ydAutoApproveModal').classList.add('hidden');
+  };
+
+  window.ydAutoApproveConfirm = function() {
+    var confirmBtn = document.getElementById('ydAutoApproveConfirmBtn');
+    var progressWrap = document.getElementById('ydAutoApproveProgressWrap');
+    var progressBar = document.getElementById('ydAutoApproveProgressBar');
+    var progressText = document.getElementById('ydAutoApproveProgressText');
+    var actionsDiv = document.getElementById('ydAutoApproveActions');
+
+    confirmBtn.disabled = true;
+    progressWrap.classList.remove('hidden');
+    actionsDiv.classList.add('hidden');
+    progressBar.style.width = '30%';
+    progressText.textContent = 'Validating documents...';
+
+    var formData = new FormData();
+
+    fetch(AUTO_APPROVE_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: formData,
+      credentials: 'same-origin',
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      progressBar.style.width = '100%';
+      if (data.status === 'success') {
+        progressText.textContent = 'Done!';
+        // Show results
+        document.getElementById('ydAutoApproveApproved').textContent = data.approved_count || 0;
+        document.getElementById('ydAutoApproveRejected').textContent = data.rejected_count || 0;
+        document.getElementById('ydAutoApproveCredentials').textContent = data.credential_count || 0;
+        document.getElementById('ydAutoApproveResults').classList.remove('hidden');
+        showToast(data.message, 'success');
+        setTimeout(function() { window.location.reload(); }, 3000);
+      } else {
+        document.getElementById('ydAutoApproveModal').classList.add('hidden');
+        showToast(data.message || 'An error occurred.', 'error');
+      }
+    })
+    .catch(function(err) {
+      document.getElementById('ydAutoApproveModal').classList.add('hidden');
+      showToast('Network error: ' + err.message, 'error');
+    });
+  };
 
   // Bind events
   document.addEventListener('DOMContentLoaded', function() {

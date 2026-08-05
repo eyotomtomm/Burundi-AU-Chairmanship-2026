@@ -9322,6 +9322,7 @@ def youth_dialogue_event_form(request, event_pk=None):
         # Visibility & Quick Access
         yd_event.is_visible = request.POST.get('is_visible') == 'on'
         yd_event.is_registration_open = request.POST.get('is_registration_open') == 'on'
+        yd_event.auto_approve_documents = request.POST.get('auto_approve_documents') == 'on'
         yd_event.min_app_version = request.POST.get('min_app_version', '').strip()
         yd_event.quick_access_title_en = request.POST.get('quick_access_title_en', 'Continental Dialogue')
         yd_event.quick_access_title_fr = request.POST.get('quick_access_title_fr', '')
@@ -9908,6 +9909,71 @@ def _auto_finalize_docs(request, application):
             labels = dict(YouthDialogueDocument.DOCUMENT_TYPE_CHOICES)
             missing_names = [labels.get(m, m) for m in missing_types]
             messages.warning(request, f'All documents approved but missing required types: {", ".join(missing_names)}')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def bulk_auto_approve_documents(request, event_pk):
+    """Bulk auto-approve all pending documents for an event using validation."""
+    from core.validators import validate_for_auto_approve
+
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+
+    # Get all pending documents for this event
+    pending_docs = YouthDialogueDocument.objects.filter(
+        application__event=yd_event,
+        status='pending',
+    ).select_related('application')
+
+    approved_count = 0
+    rejected_count = 0
+    processed_apps = set()
+
+    for doc in pending_docs:
+        is_valid, reason = validate_for_auto_approve(doc)
+        if is_valid:
+            doc.status = 'approved'
+            doc.reviewed_by = request.user
+            doc.reviewed_at = timezone.now()
+            doc.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
+            approved_count += 1
+        else:
+            doc.status = 'rejected'
+            doc.rejection_reason = reason
+            doc.reviewed_by = request.user
+            doc.reviewed_at = timezone.now()
+            doc.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at'])
+            rejected_count += 1
+        processed_apps.add(doc.application_id)
+
+    # Auto-finalize each affected application
+    credential_count = 0
+    for app in YouthDialogueApplication.objects.filter(pk__in=processed_apps):
+        _auto_finalize_docs(request, app)
+        if app.status == 'credential_issued':
+            credential_count += 1
+
+    log_admin_action(
+        request, 'bulk_action', 'YouthDialogueDocument',
+        object_repr=f'Bulk auto-approve docs for {yd_event.programme_title}',
+        changes={
+            'approved': str(approved_count),
+            'rejected': str(rejected_count),
+            'credentials': str(credential_count),
+        },
+    )
+
+    return JsonResponse({
+        'status': 'success',
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'credential_count': credential_count,
+        'message': (
+            f'{approved_count} document(s) approved, {rejected_count} rejected. '
+            f'{credential_count} credential(s) issued.'
+        ),
+    })
 
 
 @login_required(login_url='custom_admin:login')

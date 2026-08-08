@@ -355,6 +355,7 @@ urlpatterns = [
     path('youth-dialogue/<int:event_pk>/applications/', views.youth_dialogue_applications_list, name='youth_dialogue_applications_list'),
     path('youth-dialogue/<int:event_pk>/bulk-action/', views.bulk_yd_action, name='youth_dialogue_bulk_action'),
     path('youth-dialogue/<int:event_pk>/bulk-auto-approve/', views.bulk_auto_approve_documents, name='youth_dialogue_bulk_auto_approve'),
+    path('youth-dialogue/<int:event_pk>/batch-accept-documents/', views.batch_accept_all_documents, name='youth_dialogue_batch_accept_docs'),
     path('youth-dialogue/<int:event_pk>/media/', views.youth_dialogue_media_list, name='youth_dialogue_media_list'),
     path('youth-dialogue/<int:event_pk>/media/create/', views.youth_dialogue_media_form, name='youth_dialogue_media_create'),
     path('youth-dialogue/<int:event_pk>/media/<int:pk>/edit/', views.youth_dialogue_media_form, name='youth_dialogue_media_edit'),

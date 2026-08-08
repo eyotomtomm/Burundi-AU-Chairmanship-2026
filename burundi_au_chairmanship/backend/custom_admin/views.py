@@ -9794,6 +9794,9 @@ def youth_dialogue_applications_list(request, event_pk):
     ).count()
     credential_count = event_apps.filter(status='credential_issued').count()
     rejected_count = event_apps.filter(status__in=['rejected', 'documents_rejected']).count()
+    docs_awaiting_count = event_apps.filter(
+        status__in=['documents_submitted', 'documents_under_review']
+    ).count()
 
     # Build nationality options from BOTH nationality column AND additional_data
     used_codes = set(
@@ -9864,6 +9867,7 @@ def youth_dialogue_applications_list(request, event_pk):
         'accepted_count': accepted_count,
         'credential_count': credential_count,
         'rejected_count': rejected_count,
+        'docs_awaiting_count': docs_awaiting_count,
         'current_filter': status_filter or '',
         'search_query': search_q,
         'nationality_filter': nationality_filter,
@@ -10034,6 +10038,78 @@ def bulk_auto_approve_documents(request, event_pk):
         'message': (
             f'{approved_count} document(s) approved, {rejected_count} rejected. '
             f'{credential_count} credential(s) issued.'
+        ),
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def batch_accept_all_documents(request, event_pk):
+    """Batch accept ALL pending documents for applications that have uploaded docs
+    and issue digital IDs (credentials) for those with all required documents."""
+    from core.views import _notify_yd
+
+    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+
+    # Target applications in document stages that have pending documents
+    doc_statuses = [
+        'documents_pending', 'documents_submitted',
+        'documents_under_review', 'documents_rejected',
+    ]
+    eligible_apps = YouthDialogueApplication.objects.filter(
+        event=yd_event,
+        status__in=doc_statuses,
+        documents__status='pending',
+    ).distinct()
+
+    doc_count = 0
+    app_count = 0
+    credential_count = 0
+
+    for app in eligible_apps:
+        # Copy photo to id_photo if there's a pending photo doc
+        photo_doc = app.documents.filter(status='pending', document_type='photo').first()
+        if photo_doc and photo_doc.file:
+            app.id_photo = photo_doc.file
+            app.save(update_fields=['id_photo'])
+
+        # Approve all pending documents
+        count = app.documents.filter(status='pending').update(
+            status='approved',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+        )
+        doc_count += count
+        if count > 0:
+            app_count += 1
+
+        # Auto-finalize: issue credential if all required docs approved
+        _auto_finalize_docs(request, app)
+        app.refresh_from_db(fields=['status'])
+        if app.status == 'credential_issued':
+            credential_count += 1
+
+    log_admin_action(
+        request, 'bulk_action', 'YouthDialogueApplication',
+        object_repr=f'Batch accept all documents for {yd_event.programme_title}',
+        changes={
+            'action': 'batch_accept_all_documents',
+            'docs': str(doc_count),
+            'apps': str(app_count),
+            'credentials': str(credential_count),
+            'event': yd_event.programme_title,
+        },
+    )
+
+    return JsonResponse({
+        'status': 'success',
+        'doc_count': doc_count,
+        'app_count': app_count,
+        'credential_count': credential_count,
+        'message': (
+            f'{doc_count} document(s) accepted across {app_count} application(s). '
+            f'{credential_count} digital ID(s) issued.'
         ),
     })
 

@@ -10722,6 +10722,38 @@ def youth_dialogue_analytics(request, event_pk):
     daily_labels = [entry['day'].strftime('%Y-%m-%d') for entry in daily_qs if entry['day']]
     daily_values = [entry['count'] for entry in daily_qs if entry['day']]
 
+    # Digital ID holders — full list with name, country, side events
+    id_holders_qs = apps.filter(
+        status='credential_issued',
+    ).prefetch_related('selected_side_events').order_by('last_name', 'first_name')
+
+    id_holders = []
+    for holder in id_holders_qs:
+        code = holder.nationality.upper() if holder.nationality else ''
+        flag = ''.join(chr(0x1F1E6 + ord(c) - ord('A')) for c in code) if len(code) == 2 else ''
+        side_evts = list(holder.selected_side_events.all())
+        id_holders.append({
+            'name': f'{holder.first_name} {holder.last_name}',
+            'country_code': code,
+            'country': nat_dict.get(code, code or 'Unknown'),
+            'flag': flag,
+            'participant_code': holder.participant_code or '',
+            'side_events': [se.name for se in side_evts],
+            'side_events_display': ', '.join(se.name for se in side_evts) if side_evts else '—',
+        })
+
+    # Side event breakdown for ID holders only
+    id_holder_side_events = []
+    side_events_all = YouthDialogueSideEvent.objects.filter(event=yd_event).order_by('order')
+    for se in side_events_all:
+        holders_in_se = [h for h in id_holders if se.name in h['side_events']]
+        id_holder_side_events.append({
+            'name': se.name,
+            'date': se.event_date,
+            'holders': holders_in_se,
+            'count': len(holders_in_se),
+        })
+
     context = {
         'yd_event': yd_event,
         'total': total,
@@ -10743,6 +10775,8 @@ def youth_dialogue_analytics(request, event_pk):
         'gender_values_json': json.dumps([g['count'] for g in gender_data]),
         'country_labels_json': json.dumps([e['display'] for e in country_data[:20]]),
         'country_values_json': json.dumps([e['count'] for e in country_data[:20]]),
+        'id_holders': id_holders,
+        'id_holder_side_events': id_holder_side_events,
     }
     return render(request, 'custom_admin/youth_dialogue/analytics.html', context)
 

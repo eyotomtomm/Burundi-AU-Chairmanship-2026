@@ -297,6 +297,99 @@
     </div>
   </div>
   {% endif %}
+
+  <!-- Digital ID Holders — Full List -->
+  {% if id_holders %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-8">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+        <span class="material-symbols-outlined text-indigo-600">badge</span>
+        Digital ID Holders
+      </h2>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+        {{ id_holders|length }} holder{{ id_holders|length|pluralize }}
+      </span>
+    </div>
+    <p class="text-sm text-slate-500 mb-4">All applicants who have been issued a digital ID — with their country and side event registrations</p>
+    <div class="overflow-y-auto" style="max-height:600px;">
+      <table class="w-full">
+        <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
+          <tr>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 text-left">#</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 text-left">Name</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 text-left">Participant Code</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 text-left">Country</th>
+            <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 text-left">Side Event(s)</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for h in id_holders %}
+          <tr class="hover:bg-slate-50/50">
+            <td class="px-4 py-2.5 text-xs text-slate-400">{{ forloop.counter }}</td>
+            <td class="px-4 py-2.5 text-sm font-semibold text-slate-900">{{ h.name }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-indigo-600">{{ h.participant_code|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-700">{{ h.flag }} {{ h.country }}</td>
+            <td class="px-4 py-2.5 text-sm text-slate-600">{{ h.side_events_display }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ID Holders by Side Event -->
+  {% if id_holder_side_events %}
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-8">
+    <h2 class="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+      <span class="material-symbols-outlined text-teal-600">event</span>
+      ID Holders by Side Event
+    </h2>
+    <p class="text-sm text-slate-500 mb-6">Digital ID holders grouped by the side event they registered for</p>
+    {% for se in id_holder_side_events %}
+    <div class="mb-6 last:mb-0">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-bold text-slate-800">{{ se.name }}</h3>
+        <div class="flex items-center gap-3">
+          {% if se.date %}
+          <span class="text-xs text-slate-400">{{ se.date|date:"M d, Y" }}</span>
+          {% endif %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200">
+            {{ se.count }} holder{{ se.count|pluralize }}
+          </span>
+        </div>
+      </div>
+      {% if se.holders %}
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead class="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-left">#</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-left">Name</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-left">Country</th>
+              <th class="text-xs uppercase tracking-wider text-slate-500 font-semibold px-4 py-2 text-left">Participant Code</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for h in se.holders %}
+            <tr class="hover:bg-slate-50/50">
+              <td class="px-4 py-2 text-xs text-slate-400">{{ forloop.counter }}</td>
+              <td class="px-4 py-2 text-sm font-semibold text-slate-900">{{ h.name }}</td>
+              <td class="px-4 py-2 text-sm text-slate-700">{{ h.flag }} {{ h.country }}</td>
+              <td class="px-4 py-2 text-xs font-mono text-indigo-600">{{ h.participant_code|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-400 italic pl-4">No ID holders registered for this side event</p>
+      {% endif %}
+    </div>
+    {% if not forloop.last %}<hr class="border-slate-100 my-4">{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 
 <!-- Chart.js CDN -->

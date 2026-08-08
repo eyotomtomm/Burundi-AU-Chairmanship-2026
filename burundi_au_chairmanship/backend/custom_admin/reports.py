@@ -484,9 +484,23 @@ def generate_id_holders_side_events_excel(event):
     _auto_width(ws1)
 
     # ── One sheet per side event ──
+    used_sheet_names = set()
     for se in side_events:
-        # Sanitize sheet name (Excel max 31 chars, no special chars)
-        sheet_name = se.name[:31].replace('/', '-').replace('\\', '-').replace('*', '').replace('?', '').replace('[', '').replace(']', '')
+        # Sanitize sheet name (Excel max 31 chars, no : / \ ? * [ ] chars)
+        raw = se.name
+        for ch in [':', '/', '\\', '?', '*', '[', ']']:
+            raw = raw.replace(ch, '-')
+        sheet_name = raw[:31].strip()
+        if not sheet_name:
+            sheet_name = f'Side Event {se.id}'
+        # Ensure uniqueness
+        base = sheet_name
+        counter = 2
+        while sheet_name in used_sheet_names:
+            suffix = f' ({counter})'
+            sheet_name = base[:31 - len(suffix)] + suffix
+            counter += 1
+        used_sheet_names.add(sheet_name)
         ws = wb.create_sheet(title=sheet_name)
         se_columns = ['#', 'Name', 'Participant Code', 'Country', 'Email', 'Organisation']
         ws.append(se_columns)

@@ -9811,12 +9811,32 @@ def youth_dialogue_applications_list(request, event_pk):
 
     search_q = request.GET.get('q', '').strip()
     if search_q:
-        qs = qs.filter(
-            Q(first_name__icontains=search_q) |
-            Q(last_name__icontains=search_q) |
-            Q(email__icontains=search_q) |
-            Q(participant_code__icontains=search_q)
-        )
+        # Split into words so "John Doe" matches first_name=John + last_name=Doe
+        words = search_q.split()
+        if len(words) > 1:
+            # Multi-word: each word must match at least one name field, email, or code
+            word_queries = []
+            for word in words:
+                word_queries.append(
+                    Q(first_name__icontains=word) |
+                    Q(last_name__icontains=word) |
+                    Q(email__icontains=word) |
+                    Q(participant_code__icontains=word)
+                )
+            combined = word_queries[0]
+            for wq in word_queries[1:]:
+                combined &= wq
+            qs = qs.filter(combined)
+        else:
+            # Single word: match any field
+            qs = qs.filter(
+                Q(first_name__icontains=search_q) |
+                Q(last_name__icontains=search_q) |
+                Q(email__icontains=search_q) |
+                Q(participant_code__icontains=search_q) |
+                Q(phone_number__icontains=search_q) |
+                Q(organization__icontains=search_q)
+            )
 
     event_apps = YouthDialogueApplication.objects.filter(event=yd_event)
     total_count = event_apps.count()

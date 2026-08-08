@@ -365,6 +365,7 @@ urlpatterns = [
     path('youth-dialogue/<int:event_pk>/export-excel/', views.youth_dialogue_export_excel, name='youth_dialogue_export_excel'),
     path('youth-dialogue/<int:event_pk>/analytics/', views.youth_dialogue_analytics, name='youth_dialogue_analytics'),
     path('youth-dialogue/<int:event_pk>/export-analytics-excel/', views.youth_dialogue_export_analytics_excel, name='youth_dialogue_export_analytics_excel'),
+    path('youth-dialogue/<int:event_pk>/export-id-holders-excel/', views.youth_dialogue_export_id_holders_excel, name='youth_dialogue_export_id_holders_excel'),
     path('youth-dialogue/applications/<int:pk>/id-card-pdf/', views.youth_dialogue_id_card_pdf, name='youth_dialogue_id_card_pdf'),
     path('youth-dialogue/verify/', views.youth_dialogue_verify_qr, name='youth_dialogue_verify_qr'),
 

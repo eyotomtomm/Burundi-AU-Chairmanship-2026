@@ -427,6 +427,103 @@ def generate_youth_dialogue_analytics_excel(event):
 
 
 # ──────────────────────────────────────────────────────
+# Excel: ID Holders by Side Event Report
+# ──────────────────────────────────────────────────────
+def generate_id_holders_side_events_excel(event):
+    """Generate an Excel workbook with one sheet per side event listing
+    all digital ID holders registered for it, plus an 'All ID Holders' overview sheet.
+    Returns a BytesIO buffer.
+    """
+    from core.models import (
+        YouthDialogueApplication, YouthDialogueSideEvent, NATIONALITY_CHOICES,
+    )
+
+    wb = Workbook()
+    nat_dict = dict(NATIONALITY_CHOICES)
+    data_font = Font(name='Arial', size=10)
+    bold_font = Font(name='Arial', size=10, bold=True)
+    alt_fill = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+    credential_fill = PatternFill(start_color='E0E7FF', end_color='E0E7FF', fill_type='solid')
+
+    id_holders = YouthDialogueApplication.objects.filter(
+        event=event,
+        status='credential_issued',
+    ).prefetch_related('selected_side_events').order_by('last_name', 'first_name')
+
+    side_events = list(YouthDialogueSideEvent.objects.filter(event=event).order_by('order'))
+
+    # ── Sheet 1: All ID Holders ──
+    ws1 = wb.active
+    ws1.title = 'All ID Holders'
+    columns = ['#', 'Name', 'Participant Code', 'Country', 'Email', 'Organisation', 'Side Event(s)']
+    ws1.append(columns)
+    _style_header_row(ws1, len(columns))
+
+    row_idx = 2
+    for idx, app in enumerate(id_holders, start=1):
+        country = nat_dict.get(app.nationality, app.nationality or 'Unknown')
+        se_names = ', '.join(se.name for se in app.selected_side_events.all()) or '—'
+        row = [
+            idx,
+            f'{app.first_name} {app.last_name}',
+            app.participant_code or '',
+            country,
+            app.email,
+            app.organization or '',
+            se_names,
+        ]
+        ws1.append(row)
+        for col in range(1, len(columns) + 1):
+            cell = ws1.cell(row=row_idx, column=col)
+            cell.font = data_font
+            if row_idx % 2 == 0:
+                cell.fill = alt_fill
+        row_idx += 1
+
+    _add_summary_row(ws1, row_idx, f'Total: {id_holders.count()} ID holders', '', len(columns))
+    _auto_width(ws1)
+
+    # ── One sheet per side event ──
+    for se in side_events:
+        # Sanitize sheet name (Excel max 31 chars, no special chars)
+        sheet_name = se.name[:31].replace('/', '-').replace('\\', '-').replace('*', '').replace('?', '').replace('[', '').replace(']', '')
+        ws = wb.create_sheet(title=sheet_name)
+        se_columns = ['#', 'Name', 'Participant Code', 'Country', 'Email', 'Organisation']
+        ws.append(se_columns)
+        _style_header_row(ws, len(se_columns))
+
+        # Filter ID holders registered for this side event
+        se_holders = id_holders.filter(selected_side_events=se)
+
+        se_row = 2
+        for idx, app in enumerate(se_holders, start=1):
+            country = nat_dict.get(app.nationality, app.nationality or 'Unknown')
+            row = [
+                idx,
+                f'{app.first_name} {app.last_name}',
+                app.participant_code or '',
+                country,
+                app.email,
+                app.organization or '',
+            ]
+            ws.append(row)
+            for col in range(1, len(se_columns) + 1):
+                cell = ws.cell(row=se_row, column=col)
+                cell.font = data_font
+                if se_row % 2 == 0:
+                    cell.fill = alt_fill
+            se_row += 1
+
+        _add_summary_row(ws, se_row, f'Total: {se_holders.count()} ID holders', '', len(se_columns))
+        _auto_width(ws)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+# ──────────────────────────────────────────────────────
 # Excel: Events Report
 # ──────────────────────────────────────────────────────
 def generate_events_excel(queryset):

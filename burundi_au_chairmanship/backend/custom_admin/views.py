@@ -5771,36 +5771,68 @@ def bulk_yd_action(request, event_pk):
 
     elif action == 'approve_documents':
         # Bulk approve all pending documents for selected applications and issue credentials
+        # Skips required document type check — admin override
         doc_statuses = ['documents_pending', 'documents_submitted', 'documents_under_review', 'documents_rejected']
         eligible = applications.filter(status__in=doc_statuses)
         doc_count = 0
         credential_count = 0
         app_count = 0
         for app in eligible:
-            # Copy photo to id_photo if there's a pending photo doc
-            photo_doc = app.documents.filter(status='pending', document_type='photo').first()
-            if photo_doc and photo_doc.file:
+            # Copy photo to id_photo if there's a photo doc
+            photo_doc = (
+                app.documents.filter(document_type='photo')
+                .order_by('-uploaded_at')
+                .first()
+            )
+            if photo_doc and photo_doc.file and not app.id_photo:
                 app.id_photo = photo_doc.file
                 app.save(update_fields=['id_photo'])
 
-            pending_docs = app.documents.filter(status='pending')
-            count = pending_docs.update(
+            # Approve all pending documents
+            count = app.documents.filter(status='pending').update(
                 status='approved',
                 reviewed_by=request.user,
                 reviewed_at=timezone.now(),
             )
             doc_count += count
-            if count > 0:
+
+            # Also approve any rejected documents
+            rejected_count = app.documents.filter(status='rejected').update(
+                status='approved',
+                reviewed_by=request.user,
+                reviewed_at=timezone.now(),
+            )
+            doc_count += rejected_count
+
+            if count > 0 or rejected_count > 0:
                 app_count += 1
-            # Auto-finalize: issue credential if all required docs approved
-            _auto_finalize_docs(request, app)
-            app.refresh_from_db(fields=['status'])
-            if app.status == 'credential_issued':
+
+            # Issue credential directly — skip required document type check
+            if app.status != 'credential_issued':
+                app.generate_participant_code()
+                app.generate_qr_hash()
+                app.status = 'credential_issued'
+                app.credential_issued_at = timezone.now()
+                app.documents_reviewed_by = request.user
+                app.documents_reviewed_at = timezone.now()
+                app.save()
+                log_admin_action(
+                    request, 'issue_credential', 'YouthDialogueApplication',
+                    object_id=app.pk,
+                    object_repr=f'{app.first_name} {app.last_name}',
+                    changes={'status': {'old': app.status, 'new': 'credential_issued'}},
+                )
+                try:
+                    from core.views import _notify_yd
+                    _notify_yd(app, 'credential_issued')
+                except Exception:
+                    logger.exception('Failed to notify applicant %s on bulk approve', app.pk)
                 credential_count += 1
-        skipped = applications.count() - app_count
-        msg = f'{doc_count} document(s) approved across {app_count} application(s). {credential_count} credential(s) issued.'
+
+        skipped = applications.count() - eligible.count()
+        msg = f'{doc_count} document(s) approved across {app_count} application(s). {credential_count} digital ID(s) issued.'
         if skipped:
-            msg += f' {skipped} application(s) skipped (no pending documents).'
+            msg += f' {skipped} application(s) skipped (not in document stage).'
         log_admin_action(
             request, 'bulk_action', 'YouthDialogueApplication',
             object_repr=f'Bulk approve docs & issue credentials',
@@ -10047,12 +10079,18 @@ def bulk_auto_approve_documents(request, event_pk):
 @require_POST
 def batch_accept_all_documents(request, event_pk):
     """Batch accept ALL pending documents for applications that have uploaded docs
-    and issue digital IDs (credentials) for those with all required documents."""
+    and issue digital IDs (credentials) regardless of missing document types.
+
+    This is an admin override — when the admin clicks "Batch Accept", every
+    applicant in a document stage gets their docs approved and a credential
+    issued, even if some required document types (e.g. national_id) are missing.
+    """
     from core.views import _notify_yd
 
     yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
 
-    # Target applications in document stages that have pending documents
+    # Target ALL applications in any document stage (including those stuck
+    # in documents_under_review from a previous attempt with missing types)
     doc_statuses = [
         'documents_pending', 'documents_submitted',
         'documents_under_review', 'documents_rejected',
@@ -10060,17 +10098,20 @@ def batch_accept_all_documents(request, event_pk):
     eligible_apps = YouthDialogueApplication.objects.filter(
         event=yd_event,
         status__in=doc_statuses,
-        documents__status='pending',
-    ).distinct()
+    )
 
     doc_count = 0
     app_count = 0
     credential_count = 0
 
     for app in eligible_apps:
-        # Copy photo to id_photo if there's a pending photo doc
-        photo_doc = app.documents.filter(status='pending', document_type='photo').first()
-        if photo_doc and photo_doc.file:
+        # Copy photo to id_photo if there's a photo doc (pending or approved)
+        photo_doc = (
+            app.documents.filter(document_type='photo')
+            .order_by('-uploaded_at')
+            .first()
+        )
+        if photo_doc and photo_doc.file and not app.id_photo:
             app.id_photo = photo_doc.file
             app.save(update_fields=['id_photo'])
 
@@ -10084,10 +10125,35 @@ def batch_accept_all_documents(request, event_pk):
         if count > 0:
             app_count += 1
 
-        # Auto-finalize: issue credential if all required docs approved
-        _auto_finalize_docs(request, app)
-        app.refresh_from_db(fields=['status'])
-        if app.status == 'credential_issued':
+        # Also approve any rejected documents (admin is overriding)
+        rejected_count = app.documents.filter(status='rejected').update(
+            status='approved',
+            reviewed_by=request.user,
+            reviewed_at=timezone.now(),
+        )
+        doc_count += rejected_count
+        if rejected_count > 0 and count == 0:
+            app_count += 1
+
+        # Issue credential directly — skip required document type check
+        if app.status != 'credential_issued':
+            app.generate_participant_code()
+            app.generate_qr_hash()
+            app.status = 'credential_issued'
+            app.credential_issued_at = timezone.now()
+            app.documents_reviewed_by = request.user
+            app.documents_reviewed_at = timezone.now()
+            app.save()
+            log_admin_action(
+                request, 'issue_credential', 'YouthDialogueApplication',
+                object_id=app.pk,
+                object_repr=f'{app.first_name} {app.last_name}',
+                changes={'status': {'old': 'documents', 'new': 'credential_issued'}},
+            )
+            try:
+                _notify_yd(app, 'credential_issued')
+            except Exception:
+                logger.exception('Failed to notify applicant %s on batch accept', app.pk)
             credential_count += 1
 
     log_admin_action(

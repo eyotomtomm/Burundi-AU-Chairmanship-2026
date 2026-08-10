@@ -7385,6 +7385,19 @@ class YouthDialogueViewSet(viewsets.GenericViewSet):
                 user=request.user, is_revoked=True, allow_reapply=False
             ).exists()
         response_data['is_device_banned'] = is_banned
+
+        # Allow existing applicants to access Continental Dialogue even when
+        # registration is closed — the deployed Flutter app uses
+        # is_registration_open to lock/unlock the menu item.
+        if (not response_data.get('is_registration_open')
+                and request.user.is_authenticated
+                and not is_banned):
+            has_app = YouthDialogueApplication.objects.filter(
+                user=request.user, is_revoked=False,
+            ).exclude(status__in=('submitted', 'rejected')).exists()
+            if has_app:
+                response_data['is_registration_open'] = True
+
         return Response(response_data)
 
     # Known field names that map directly to YouthDialogueApplication model columns

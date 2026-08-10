@@ -339,6 +339,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
   }
 
   static const _ydSettingsCacheKey = 'yd_settings_cache';
+  static const _ydEligibleCacheKey = 'yd_eligible_cache';
+  static const _ydHasCredentialCacheKey = 'yd_has_credential_cache';
 
   void _fetchYouthDialogueData() {
     final api = ApiService();
@@ -356,6 +358,22 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
       });
     }
 
+    // Load cached eligibility/credential state so tile unlocks instantly
+    if (isAuth) {
+      SharedPreferences.getInstance().then((prefs) {
+        if (mounted) {
+          final cachedEligible = prefs.getBool(_ydEligibleCacheKey) ?? false;
+          final cachedCredential = prefs.getBool(_ydHasCredentialCacheKey) ?? false;
+          if (cachedEligible || cachedCredential) {
+            setState(() {
+              _ydEligible = cachedEligible;
+              _ydHasCredential = cachedCredential;
+            });
+          }
+        }
+      });
+    }
+
     // Fetch fresh settings from API, then cache
     api.youthDialogueSettings().then((data) {
       if (mounted) setState(() => _ydSettings = data);
@@ -367,13 +385,21 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
 
     if (isAuth) {
       api.youthDialogueEligibility().then((data) {
-        if (mounted) setState(() => _ydEligible = data['eligible'] == true);
+        final eligible = data['eligible'] == true;
+        if (mounted) setState(() => _ydEligible = eligible);
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool(_ydEligibleCacheKey, eligible);
+        });
       }).catchError((_) {});
 
       api.youthDialogueStatus().then((data) {
+        final hasCredential = data['has_credential'] == true;
         if (mounted) {
-          setState(() => _ydHasCredential = data['has_credential'] == true);
+          setState(() => _ydHasCredential = hasCredential);
         }
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool(_ydHasCredentialCacheKey, hasCredential);
+        });
       }).catchError((_) {});
     }
   }

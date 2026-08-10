@@ -10822,17 +10822,24 @@ def youth_dialogue_export_analytics_excel(request, event_pk):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def youth_dialogue_export_id_holders_excel(request, event_pk):
     """Export digital ID holders by side event as a multi-sheet Excel file."""
-    yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
-    from custom_admin.reports import generate_id_holders_side_events_excel
-    buf = generate_id_holders_side_events_excel(yd_event)
-    safe_title = yd_event.slug or 'youth_dialogue'
-    response = HttpResponse(
-        buf.getvalue(),
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    )
-    response['Content-Disposition'] = f'attachment; filename="{safe_title}_id_holders_side_events.xlsx"'
-    log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'ID holders side events export ({safe_title})')
-    return response
+    import traceback as tb
+    try:
+        yd_event = get_object_or_404(YouthDialogueEvent, pk=event_pk)
+        from custom_admin.reports import generate_id_holders_side_events_excel
+        buf = generate_id_holders_side_events_excel(yd_event)
+        safe_title = yd_event.slug or 'youth_dialogue'
+        response = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{safe_title}_id_holders_side_events.xlsx"'
+        log_admin_action(request, 'export', 'YouthDialogueApplication', object_repr=f'ID holders side events export ({safe_title})')
+        return response
+    except Exception as e:
+        logger.exception('ERROR in export_id_holders_excel: %s', e)
+        print(f'[ID_HOLDERS_EXPORT_ERROR] {e}')
+        print(tb.format_exc())
+        raise
 
 
 @login_required(login_url='custom_admin:login')

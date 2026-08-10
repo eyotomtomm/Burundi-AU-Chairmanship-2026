@@ -827,6 +827,8 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
           : _ydSettings!['registration_closed_message'] as String? ?? 'Registration is currently closed.';
 
       final isUsher = authProvider.isUsher;
+      // Allow access for users who already registered (eligible or have credential)
+      final canAccessYd = ydIsOpen || _ydEligible || _ydHasCredential;
       items.add(<String, dynamic>{
         'title': ydTitle,
         'icon': Icons.groups_rounded,
@@ -838,15 +840,18 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                 ? (langCode == 'fr' ? 'Scanner' : 'Scan Only')
                 : ydIsOpen
                     ? (langCode == 'fr' ? 'Ouvert' : 'Open')
-                    : _isYdComingSoon()
-                        ? (langCode == 'fr' ? 'Bientôt' : 'Coming Soon')
-                        : (langCode == 'fr' ? 'Fermé' : 'Closed'),
+                    : (_ydHasCredential || _ydEligible)
+                        ? (langCode == 'fr' ? 'Mon ID' : 'My ID')
+                        : _isYdComingSoon()
+                            ? (langCode == 'fr' ? 'Bientôt' : 'Coming Soon')
+                            : (langCode == 'fr' ? 'Fermé' : 'Closed'),
         'badgeColor': !isLoggedIn ? '#9E9E9E'
             : isUsher ? '#9E9E9E'
             : ydIsOpen ? '#4CAF50'
+            : (_ydHasCredential || _ydEligible) ? '#4CAF50'
             : _isYdComingSoon() ? '#FF9800'
             : '#9E9E9E',
-        'locked': !isLoggedIn || isUsher || !ydIsOpen,
+        'locked': !isLoggedIn || isUsher || !canAccessYd,
         'onTap': !isLoggedIn
             ? () => Navigator.pushNamed(context, '/auth')
             : isUsher
@@ -860,7 +865,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                       ),
                     );
                   }
-                : ydIsOpen
+                : canAccessYd
                     ? () => Navigator.pushNamed(context, '/youth-dialogue')
                     : () {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -905,7 +910,9 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
         final isYdRoute = actionValue == '/youth-dialogue';
 
         // Youth Dialogue items get special locked/sign-in behavior
+        // Allow access for users who already registered (eligible or have credential)
         if (isYdRoute) {
+          final canAccessYdRoute = ydIsOpen || _ydEligible || _ydHasCredential;
           return <String, dynamic>{
             'title': title, 'icon': icon,
             'iconImageUrl': iconImageUrl.isNotEmpty ? Environment.fixMediaUrl(iconImageUrl) : '',
@@ -914,10 +921,10 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                 ? (langCode == 'fr' ? 'Connexion' : 'Sign in')
                 : (m['badge_text'] as String? ?? ''),
             'badgeColor': !isLoggedIn ? '#9E9E9E' : (m['badge_color'] as String? ?? ''),
-            'locked': !isLoggedIn || !ydIsOpen,
+            'locked': !isLoggedIn || !canAccessYdRoute,
             'onTap': !isLoggedIn
                 ? () => Navigator.pushNamed(context, '/auth')
-                : ydIsOpen
+                : canAccessYdRoute
                     ? () => Navigator.pushNamed(context, '/youth-dialogue')
                     : () => ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(ydClosedMsg), backgroundColor: AppColors.auGold)),

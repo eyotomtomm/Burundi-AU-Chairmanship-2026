@@ -1,11 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../config/app_colors.dart';
+import '../../../config/app_ds.dart';
 import '../../../config/environment.dart';
 import '../../../models/magazine_model.dart';
+import '../../../widgets/ds/ds_widgets.dart';
 import '../../magazine/magazine_detail_screen.dart';
 
+/// "Latest · Récents" row for a magazine issue: 74px cover and a gold
+/// MAGAZINE · NEW ISSUE kicker.
 class MagazineCard extends StatelessWidget {
   final MagazineEdition magazine;
   final String langCode;
@@ -18,68 +21,76 @@ class MagazineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = magazine.getTitle(langCode);
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          CupertinoPageRoute(
-            builder: (_) => MagazineDetailScreen(magazine: magazine),
-          ),
-        );
-      },
-      child: Container(
-        width: 140,
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: magazine.coverImageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
-                      width: 140,
-                      height: 170,
+    final fr = langCode == 'fr';
+    final kicker = magazine.isFeatured
+        ? (fr ? 'MAGAZINE · NOUVEAU NUMÉRO' : 'MAGAZINE · NEW ISSUE')
+        : 'MAGAZINE';
+
+    return DsCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      onTap: () => Navigator.push(
+        context,
+        CupertinoPageRoute(builder: (_) => MagazineDetailScreen(magazine: magazine)),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(Ds.rTile),
+            child: SizedBox(
+              width: 74,
+              height: 74,
+              child: magazine.coverImageUrl.isEmpty
+                  ? const DsImagePlaceholder(
+                      radius: 0, icon: Icons.auto_stories_rounded)
+                  : CachedNetworkImage(
+                      imageUrl: Environment.fixMediaUrl(magazine.listImage),
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        width: 140,
-                        height: 170,
-                        color: Colors.grey[300],
-                        child: const Center(
-                          child: CupertinoActivityIndicator(),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        width: 140,
-                        height: 170,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.menu_book, size: 40, color: Colors.grey),
-                      ),
-                    )
-                  : Container(
-                      width: 140,
-                      height: 170,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.menu_book, size: 40, color: Colors.grey),
+                      placeholder: (_, _) => const DsImagePlaceholder(
+                          radius: 0, icon: Icons.auto_stories_rounded),
+                      errorWidget: (_, _, _) => const DsImagePlaceholder(
+                          radius: 0, icon: Icons.auto_stories_rounded),
                     ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  kicker,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: Ds.goldDeep),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  magazine.getTitle(langCode),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                      color: Ds.ink(context)),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded, size: 18, color: Ds.chevron),
+        ],
       ),
     );
   }
 }
 
+/// Section heading for the magazine block, in the shared "See all" style.
 class MagazineSectionTitle extends StatelessWidget {
   final String langCode;
   final VoidCallback? onSeeAll;
@@ -95,41 +106,26 @@ class MagazineSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 4,
-              height: 20,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.burundiGreen, AppColors.auGold],
-                ),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              customTitle ?? (langCode == 'fr' ? 'Derniers Magazines' : 'Latest Magazines'),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        Expanded(
+          child: Text(
+            customTitle ??
+                (langCode == 'fr' ? 'Derniers numéros' : 'Latest magazines'),
+            style: Ds.sectionTitle(context),
+          ),
         ),
-        TextButton(
-          onPressed: onSeeAll,
-          child: Row(
-            children: [
-              Text(
-                langCode == 'fr' ? 'Voir tout' : 'See All',
-                style: const TextStyle(color: AppColors.burundiGreen),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.burundiGreen, size: 18),
-            ],
+        GestureDetector(
+          onTap: onSeeAll,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Text(
+              langCode == 'fr' ? 'Voir tout' : 'See all',
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: Ds.green),
+            ),
           ),
         ),
       ],

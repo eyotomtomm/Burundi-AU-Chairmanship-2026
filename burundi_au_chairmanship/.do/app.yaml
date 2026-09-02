@@ -105,6 +105,11 @@ services:
         value: "burundi-au-media"
       - key: DO_SPACES_ENDPOINT
         value: "https://fra1.digitaloceanspaces.com"
+      # Serve media from the Spaces CDN edge instead of the fra1 origin.
+      # Enable the CDN on the Space first (Spaces → burundi-au-media → Settings
+      # → CDN). Included in the $5/mo Spaces plan; no extra charge.
+      - key: CDN_DOMAIN
+        value: "burundi-au-media.fra1.cdn.digitaloceanspaces.com"
 
 
 # Celery worker — processes async push notifications, OTP cleanup, etc.

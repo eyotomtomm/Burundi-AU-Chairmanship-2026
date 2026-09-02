@@ -255,7 +255,9 @@ if not DEBUG:
     AWS_STORAGE_BUCKET_NAME = os.environ.get('DO_SPACES_BUCKET', '').strip()
     AWS_S3_ENDPOINT_URL = os.environ.get('DO_SPACES_ENDPOINT', '').strip()
     AWS_S3_REGION_NAME = 'fra1'
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+    # Names are never reused (AWS_S3_FILE_OVERWRITE = False), so media is immutable:
+    # cache it for a year at the CDN edge and on device instead of re-fetching daily.
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'public, max-age=31536000, immutable'}
     AWS_DEFAULT_ACL = 'public-read'
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_FILE_OVERWRITE = False
@@ -322,7 +324,9 @@ ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'avi']
 ALLOWED_SUBTITLE_EXTENSIONS = ['srt', 'vtt']
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
-MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
+# 500 MB of progressive MP4 is ~2,000 plays per TiB of Spaces bandwidth and
+# unwatchable on a slow mobile link. Long videos belong on YouTube (Video.video_url).
+MAX_VIDEO_SIZE = int(os.environ.get('MAX_VIDEO_SIZE_MB', '200')) * 1024 * 1024
 MAX_SUBTITLE_SIZE = 2 * 1024 * 1024  # 2 MB
 
 # ─── CORS — allow Flutter app to connect ──────────────────────

@@ -142,8 +142,8 @@ REDIS_URL = os.environ.get('REDIS_URL', '')
 if not REDIS_URL and not DEBUG:
     import logging as _redis_log
     _redis_log.getLogger('django').warning(
-        'REDIS_URL not set — falling back to LocMemCache and eager Celery. '
-        'Add a Valkey/Redis database and set REDIS_URL for production use.'
+        'REDIS_URL not set — using the database cache and running Celery tasks '
+        'inline. Works, but Redis/Valkey is faster; set REDIS_URL when available.'
     )
 if REDIS_URL:
     CACHES = {
@@ -175,16 +175,29 @@ if REDIS_URL:
     # separate from the default 5-minute cache that was evicting sessions.
     SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
     SESSION_CACHE_ALIAS = 'sessions'
-else:
-    # WARNING: LocMemCache is per-process.  With multiple gunicorn workers,
-    # DRF throttle counters are NOT shared — each worker tracks its own
-    # counts, effectively multiplying the allowed rate by the worker count.
-    # Redis MUST be available in production for throttles to be accurate.
+elif not DEBUG:
+    # No Redis in production: fall back to the database cache, not LocMem.
+    # LocMemCache is per-process, so DRF throttle counters would not be shared
+    # between gunicorn workers — each worker would track its own counts and the
+    # allowed rate would be multiplied by the worker count. The DB cache is
+    # shared by every process, so throttles hold and the home feed is cached
+    # once instead of once per worker. Costs a few small queries per request;
+    # Redis is still faster if the budget allows.
+    # Requires: python manage.py createcachetable (run in the pre-deploy job).
     import logging as _logging
     _logging.getLogger('django').warning(
-        'REDIS_URL not set — using LocMemCache. '
-        'DRF throttles will be per-process and weaker than configured.'
+        'REDIS_URL not set — using the database cache. Throttles stay accurate '
+        'but Redis/Valkey is faster; set REDIS_URL when one is available.'
     )
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'django_cache_table',
+            'TIMEOUT': 300,
+        }
+    }
+else:
+    # Local development — no Redis, no cache table to create.
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',

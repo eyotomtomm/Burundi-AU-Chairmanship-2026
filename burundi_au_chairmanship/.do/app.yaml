@@ -179,7 +179,7 @@ jobs:
     source_dir: /burundi_au_chairmanship/backend
     environment_slug: python
     instance_size_slug: professional-xs
-    run_command: python manage.py migrate --noinput && python manage.py collectstatic --noinput
+    run_command: python manage.py migrate --noinput && python manage.py createcachetable && python manage.py collectstatic --noinput
     envs:
       - key: DJANGO_DEBUG
         value: "False"

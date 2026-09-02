@@ -273,6 +273,7 @@ if not DEBUG:
     AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'public, max-age=31536000, immutable'}
     AWS_DEFAULT_ACL = 'public-read'
     AWS_QUERYSTRING_AUTH = False
+    AWS_S3_SIGNATURE_VERSION = 's3v4'  # SigV2 is legacy; sign private URLs with v4
     AWS_S3_FILE_OVERWRITE = False
     AWS_LOCATION = 'media'
     DEFAULT_FILE_STORAGE = 'config.storage_backends.SpacesMediaStorage'

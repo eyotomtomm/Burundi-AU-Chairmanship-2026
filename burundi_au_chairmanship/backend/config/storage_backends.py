@@ -76,3 +76,8 @@ class PrivateSpacesMediaStorage(_SpacesErrorHandlingMixin, S3Boto3Storage):
     querystring_auth = True
     querystring_expire = 3600  # Signed URLs expire after 1 hour
     location = 'private-media'
+    # AWS_S3_CUSTOM_DOMAIN (the CDN) must NOT apply here. django-storages skips
+    # signing entirely when a custom domain is set and no CloudFront signer is
+    # configured, which would hand out unsigned URLs to verification documents,
+    # ID photos and support attachments. Always sign against the origin.
+    custom_domain = None

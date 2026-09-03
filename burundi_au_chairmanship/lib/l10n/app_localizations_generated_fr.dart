@@ -2983,4 +2983,18 @@ class AppLocalizationsGeneratedFr extends AppLocalizationsGenerated {
 
   @override
   String get ydm_your_application => 'Votre candidature';
+
+  @override
+  String get priority_agenda_footnote =>
+      'Sélectionnez une priorité pour consulter ses objectifs, ses domaines d\'impact et ses initiatives en cours.';
+
+  @override
+  String get priority_agenda_intro =>
+      'La présidence burundaise de l\'Union africaine repose sur trois priorités. Chacune dispose de son propre programme, de ses objectifs et de ses travaux en cours.';
+
+  @override
+  String get priority_agenda_open => 'Consulter l\'agenda complet';
+
+  @override
+  String get priority_label => 'PRIORITÉ';
 }

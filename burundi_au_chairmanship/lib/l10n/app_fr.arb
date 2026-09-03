@@ -934,5 +934,9 @@
   "ydm_verification_msg": "Vos documents sont en cours de vérification. Cela prend généralement quelques jours ouvrables.",
   "ydm_view_id_card": "Voir la carte d'identité",
   "ydm_what_happens_next": "Prochaines étapes",
-  "ydm_your_application": "Votre candidature"
+  "ydm_your_application": "Votre candidature",
+  "priority_agenda_footnote": "Sélectionnez une priorité pour consulter ses objectifs, ses domaines d'impact et ses initiatives en cours.",
+  "priority_agenda_intro": "La présidence burundaise de l'Union africaine repose sur trois priorités. Chacune dispose de son propre programme, de ses objectifs et de ses travaux en cours.",
+  "priority_agenda_open": "Consulter l'agenda complet",
+  "priority_label": "PRIORITÉ"
 }

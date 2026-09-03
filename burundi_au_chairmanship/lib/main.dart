@@ -47,6 +47,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/profile/profile_completion_screen.dart';
 import 'screens/agenda/water_sanitation_screen.dart';
 import 'screens/agenda/arise_initiative_screen.dart';
+import 'screens/agenda/priority_agenda_hub_screen.dart';
 import 'screens/agenda/peace_security_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
 import 'screens/videos/videos_screen.dart';
@@ -386,6 +387,8 @@ class BurundiAUApp extends StatelessWidget {
                 '/profile': (context) => const ProfileScreen(),
                 '/profile-completion': (context) => const ProfileCompletionScreen(),
                 '/email-verification': (context) => const EmailVerificationScreen(),
+                '/priority-agenda': (context) =>
+                    const PriorityAgendaHubScreen(),
                 '/water-sanitation': (context) => const WaterSanitationScreen(),
                 '/arise-initiative': (context) => const AriseInitiativeScreen(),
                 '/peace-security': (context) => const PeaceSecurityScreen(),

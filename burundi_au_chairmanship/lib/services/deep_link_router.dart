@@ -56,6 +56,7 @@ class DeepLinkRouter {
     '/profile',
     '/profile-completion',
     '/email-verification',
+    '/priority-agenda',
     '/water-sanitation',
     '/arise-initiative',
     '/peace-security',

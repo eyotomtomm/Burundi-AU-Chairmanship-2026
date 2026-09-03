@@ -2929,4 +2929,18 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
 
   @override
   String get ydm_your_application => 'Your Application';
+
+  @override
+  String get priority_agenda_footnote =>
+      'Select a priority to read its objectives, impact areas and current initiatives.';
+
+  @override
+  String get priority_agenda_intro =>
+      'Burundi\'s chairmanship of the African Union is built on three priorities. Each one has its own programme, objectives and current work.';
+
+  @override
+  String get priority_agenda_open => 'Read the full agenda';
+
+  @override
+  String get priority_label => 'PRIORITY';
 }

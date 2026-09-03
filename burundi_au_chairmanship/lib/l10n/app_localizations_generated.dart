@@ -5710,6 +5710,30 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'Your Application'**
   String get ydm_your_application;
+
+  /// No description provided for @priority_agenda_footnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a priority to read its objectives, impact areas and current initiatives.'**
+  String get priority_agenda_footnote;
+
+  /// No description provided for @priority_agenda_intro.
+  ///
+  /// In en, this message translates to:
+  /// **'Burundi\'s chairmanship of the African Union is built on three priorities. Each one has its own programme, objectives and current work.'**
+  String get priority_agenda_intro;
+
+  /// No description provided for @priority_agenda_open.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the full agenda'**
+  String get priority_agenda_open;
+
+  /// No description provided for @priority_label.
+  ///
+  /// In en, this message translates to:
+  /// **'PRIORITY'**
+  String get priority_label;
 }
 
 class _AppLocalizationsGeneratedDelegate

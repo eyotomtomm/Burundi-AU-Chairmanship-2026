@@ -169,7 +169,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     title: l10n.translate('priority_agenda'),
                     onTap: () {
                       HapticFeedback.lightImpact();
-                      Navigator.pushNamed(context, '/arise-initiative');
+                      Navigator.pushNamed(context, '/priority-agenda');
                     },
                   ),
                 ],

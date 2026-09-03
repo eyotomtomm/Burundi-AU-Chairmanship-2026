@@ -934,5 +934,9 @@
   "ydm_verification_msg": "Your documents are being checked. This usually takes a few working days.",
   "ydm_view_id_card": "View ID Card",
   "ydm_what_happens_next": "What Happens Next",
-  "ydm_your_application": "Your Application"
+  "ydm_your_application": "Your Application",
+  "priority_agenda_footnote": "Select a priority to read its objectives, impact areas and current initiatives.",
+  "priority_agenda_intro": "Burundi's chairmanship of the African Union is built on three priorities. Each one has its own programme, objectives and current work.",
+  "priority_agenda_open": "Read the full agenda",
+  "priority_label": "PRIORITY"
 }

@@ -1,0 +1,83 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}New Explore Post - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-2xl">
+
+  <div>
+    <h1>New Explore Post</h1>
+    <p>Publishes straight to the Explore feed under an official identity.</p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data"
+        class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-4">
+    {% csrf_token %}
+
+    <div>
+      <label class="block text-sm font-semibold text-on-surface mb-1">Post as <span class="text-red-600">*</span></label>
+      <select name="author" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        {% for user in identities %}
+        <option value="{{ user.pk }}">{{ user.first_name|default:user.username }}{% if user.profile.organization %} — {{ user.profile.organization }}{% endif %}</option>
+        {% empty %}
+        <option value="" disabled>No official accounts configured</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold text-on-surface mb-1">Post <span class="text-red-600">*</span></label>
+      <textarea name="content" required rows="6"
+                placeholder="What do you want the community to see?"
+                class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold text-on-surface mb-1">Headline</label>
+      <input type="text" name="title" maxlength="300"
+             placeholder="Optional — most feed posts leave this blank."
+             class="w-full border border-slate-300 rounded-lg px-3 py-2">
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold text-on-surface mb-1">Category</label>
+        <select name="category" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          {% for value, label in category_choices %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold text-on-surface mb-1">Answering topic</label>
+        <select name="topic" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <option value="">None</option>
+          {% for topic in topics %}
+          <option value="{{ topic.pk }}">{{ topic.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold text-on-surface mb-1">Photos</label>
+      <input type="file" name="images" accept="image/*" multiple
+             class="w-full border border-slate-300 rounded-lg px-3 py-2">
+      <p class="text-xs text-slate-500 mt-1">Up to {{ max_media }} images.</p>
+    </div>
+
+    <label class="flex items-center gap-2">
+      <input type="checkbox" name="is_pinned">
+      <span class="text-sm text-on-surface">Pin to the top of the feed</span>
+    </label>
+
+    <div class="flex gap-2 pt-2">
+      <button type="submit" class="bg-primary-container inline-flex items-center gap-2">
+        <span class="material-symbols-rounded">send</span>Publish
+      </button>
+      <a href="{% url 'custom_admin:discussions_list' %}" class="px-4 py-2 border border-slate-300 rounded-lg text-sm">Cancel</a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

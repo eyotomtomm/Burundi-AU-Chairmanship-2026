@@ -14,332 +14,306 @@
 })();
 </script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script>
-tailwind.config = {
-  darkMode: "class",
-  theme: {
-    extend: {
-      colors: {
-        "surface-container-low": "#f0f3ff",
-        "error-container": "#ffdad6",
-        "outline-variant": "#c5c6cd",
-        "surface-container-highest": "#d7e3fc",
-        "on-primary-fixed-variant": "#3c475b",
-        "inverse-primary": "#bbc7df",
-        "primary-fixed": "#d7e3fc",
-        "on-tertiary-fixed-variant": "#930015",
-        "primary-fixed-dim": "#bbc7df",
-        "outline": "#75777d",
-        "surface-container": "#e7eeff",
-        "primary": "#000000",
-        "on-primary": "#ffffff",
-        "secondary": "#745b17",
-        "on-error": "#ffffff",
-        "tertiary-container": "#410004",
-        "on-secondary-container": "#795f1b",
-        "primary-container": "#101c2e",
-        "on-background": "#101c2e",
-        "tertiary": "#000000",
-        "inverse-surface": "#253144",
-        "surface": "#f9f9ff",
-        "background": "#f9f9ff",
-        "surface-dim": "#cfdaf3",
-        "on-secondary": "#ffffff",
-        "secondary-fixed-dim": "#e5c374",
-        "on-tertiary-fixed": "#410004",
-        "surface-container-lowest": "#ffffff",
-        "on-tertiary-container": "#f8373e",
-        "on-primary-container": "#79849b",
-        "on-primary-fixed": "#101c2e",
-        "surface-container-high": "#dfe8ff",
-        "on-tertiary": "#ffffff",
-        "on-surface-variant": "#45474c",
-        "secondary-fixed": "#ffdf99",
-        "tertiary-fixed": "#ffdad7",
-        "surface-variant": "#d7e3fc",
-        "surface-bright": "#f9f9ff",
-        "secondary-container": "#ffdc8c",
-        "on-surface": "#101c2e",
-        "inverse-on-surface": "#ecf0ff",
-        "error": "#ba1a1a",
-        "tertiary-fixed-dim": "#ffb3ae",
-        "surface-tint": "#535f74",
-        "on-secondary-fixed-variant": "#5a4300",
-        "on-error-container": "#93000a",
-        "on-secondary-fixed": "#251a00"
-      },
-      fontFamily: {
-        "headline": ["Manrope", "sans-serif"],
-        "body": ["Inter", "sans-serif"],
-        "label": ["Inter", "sans-serif"]
-      },
-      borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
-    },
-  },
-}
-</script>
+{% include 'custom_admin/_design_tokens.html' %}
 <style>
+/* === Sidebar navigation (design: .nav-i) === */
+.nav-i{
+  position:relative; display:flex; align-items:center; gap:10px;
+  padding:9px 12px; margin:1px 0; border-radius:10px;
+  font-size:13px; font-weight:600; color:#a9c2b4; text-decoration:none;
+  cursor:pointer; transition:background .18s, color .18s;
+}
+.nav-i > .ic{
+  width:20px; flex-shrink:0; font-size:19px; line-height:1; color:#7fa08e;
+  transition:color .18s, transform .18s;
+  font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20;
+}
+.nav-i:hover{ background:rgba(255,255,255,0.05); color:var(--cream); }
+.nav-i:hover > .ic{ color:#cbd9cf; }
+
+/* Selected: a cream card that lifts out of the deep green. */
+.nav-i.on{
+  background:var(--cream); color:var(--deep); font-weight:700;
+  box-shadow:0 6px 16px -6px rgba(0,0,0,.55);
+}
+.nav-i.on:hover{ background:#fbf9f3; color:var(--deep); }
+.nav-i.on > .ic{
+  color:var(--green);
+  font-variation-settings:'FILL' 1,'wght' 600,'GRAD' 0,'opsz' 20;
+}
+
+/* Collapsible nav groups (native <details>, state kept in localStorage) */
+.nav-group > summary{
+  display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  padding:12px 14px 4px; list-style:none;
+  font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:2px;
+  color:#6f8f80; text-transform:uppercase; user-select:none;
+}
+.nav-group > summary::-webkit-details-marker{ display:none; }
+.nav-group > summary:hover{ color:#8fae9e; }
+.nav-group > summary::after{ content:'\25B8'; font-size:8px; transition:transform .15s; }
+.nav-group[open] > summary::after{ transform:rotate(90deg); }
+
+
 /* === Base Styles === */
 .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-body { font-family: 'Inter', sans-serif; }
-h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
+body { font-family: 'Sora', sans-serif; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { font-family: 'Sora', sans-serif; letter-spacing: -0.01em; }
 .sidebar-scroll::-webkit-scrollbar { width: 4px; }
 .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
 .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
 
 /* === Dark Mode Theme Overrides === */
-.dark body { background-color: #111827; color: #F9FAFB; }
+.dark body { background-color: #0c120e; color: #e8efe9; }
 
 /* Sidebar dark mode */
-.dark .sidebar { background-color: #0F172A; }
-.dark .sidebar .sidebar-divider-text { color: #64748B; }
+.dark .sidebar { background-color: #0b3d2e; }
+.dark .sidebar .sidebar-divider-text { color: #6f8f80; }
 
 /* Cards, panels, containers */
-.dark .card, .dark .panel { background-color: #1F2937; border-color: #374151; }
+.dark .card, .dark .panel { background-color: #131a15; border-color: #223026; }
 
 /* Tables */
-.dark table th { background-color: #374151; color: #F9FAFB; }
-.dark table td { border-color: #374151; color: #D1D5DB; }
-.dark table tr:hover { background-color: #374151; }
-.dark table { border-color: #374151; }
-.dark thead { border-color: #374151; }
+.dark table th { background-color: #223026; color: #e8efe9; }
+.dark table td { border-color: #223026; color: #b9c9be; }
+.dark table tr:hover { background-color: #223026; }
+.dark table { border-color: #223026; }
+.dark thead { border-color: #223026; }
 
 /* Form elements */
 .dark input, .dark select, .dark textarea {
-  background-color: #374151; color: #F9FAFB; border-color: #4B5563;
+  background-color: #223026; color: #e8efe9; border-color: #2d4034;
 }
-.dark input::placeholder, .dark textarea::placeholder { color: #9CA3AF; }
+.dark input::placeholder, .dark textarea::placeholder { color: #8fa396; }
 .dark input:focus, .dark select:focus, .dark textarea:focus {
-  border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+  border-color: #c9a227; box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.3);
 }
 
 /* Buttons */
-.dark .btn-secondary { background-color: #374151; color: #F9FAFB; border-color: #4B5563; }
+.dark .btn-secondary { background-color: #223026; color: #e8efe9; border-color: #2d4034; }
 
 /* Links */
-.dark a:not(.sidebar a):not([class*="bg-"]):not([class*="btn"]) { color: #60A5FA; }
+.dark a:not(.sidebar a):not([class*="bg-"]):not([class*="btn"]) { color: #d4b54a; }
 
 /* Header bar */
-.dark .top-header { background-color: rgba(17, 24, 39, 0.85); border-color: rgba(55, 65, 81, 0.5); }
-.dark .top-header h2 { color: #F9FAFB; }
+.dark .top-header { background-color: rgba(12, 18, 14, 0.85); border-color: rgba(34, 48, 38, 0.5); }
+.dark .top-header h2 { color: #e8efe9; }
 .dark .top-header .header-search-input {
-  background-color: #1F2937; border-color: #374151; color: #F9FAFB;
+  background-color: #131a15; border-color: #223026; color: #e8efe9;
 }
-.dark .top-header .header-search-input::placeholder { color: #6B7280; }
-.dark .top-header .header-search-input:focus { background-color: #1F2937; border-color: rgba(245, 158, 11, 0.4); }
-.dark .top-header kbd { background-color: rgba(55, 65, 81, 0.6); border-color: rgba(75, 85, 99, 0.5); color: #6B7280; }
+.dark .top-header .header-search-input::placeholder { color: #6f8478; }
+.dark .top-header .header-search-input:focus { background-color: #131a15; border-color: rgba(201, 162, 39, 0.4); }
+.dark .top-header kbd { background-color: rgba(34, 48, 38, 0.6); border-color: rgba(45, 64, 52, 0.5); color: #6f8478; }
 
 /* Search dropdown dark */
-.dark #globalSearchDropdown { background-color: #1F2937; border-color: #374151; }
-.dark #globalSearchDropdown .search-result-item { border-color: rgba(55, 65, 81, 0.5); }
-.dark #globalSearchDropdown .search-result-item:hover { background-color: #374151; }
+.dark #globalSearchDropdown { background-color: #131a15; border-color: #223026; }
+.dark #globalSearchDropdown .search-result-item { border-color: rgba(34, 48, 38, 0.5); }
+.dark #globalSearchDropdown .search-result-item:hover { background-color: #223026; }
 .dark #globalSearchDropdown .search-result-item p.text-slate-800,
-.dark #globalSearchDropdown .search-result-item .text-sm.font-medium { color: #F9FAFB; }
+.dark #globalSearchDropdown .search-result-item .text-sm.font-medium { color: #e8efe9; }
 .dark #globalSearchDropdown .search-result-item p.text-slate-400,
-.dark #globalSearchDropdown .search-result-item .text-xs { color: #9CA3AF; }
-.dark #globalSearchDropdown .search-result-item .text-slate-300 { color: #6B7280; }
-.dark #globalSearchDropdown #searchViewAll { border-color: #374151; }
-.dark #globalSearchDropdown #searchViewAll a { color: #F59E0B; }
-.dark #globalSearchDropdown #searchViewAll a:hover { background-color: rgba(245, 158, 11, 0.1); }
-.dark #globalSearchDropdown [class*="bg-slate-50"] { background-color: #111827; }
+.dark #globalSearchDropdown .search-result-item .text-xs { color: #8fa396; }
+.dark #globalSearchDropdown .search-result-item .text-slate-300 { color: #6f8478; }
+.dark #globalSearchDropdown #searchViewAll { border-color: #223026; }
+.dark #globalSearchDropdown #searchViewAll a { color: #c9a227; }
+.dark #globalSearchDropdown #searchViewAll a:hover { background-color: rgba(201, 162, 39, 0.1); }
+.dark #globalSearchDropdown [class*="bg-slate-50"] { background-color: #0c120e; }
 
 /* Session warning modal dark */
-.dark #sessionWarning .bg-white { background-color: #1F2937 !important; }
-.dark #sessionWarning .text-slate-900 { color: #F9FAFB !important; }
-.dark #sessionWarning .text-slate-600 { color: #D1D5DB !important; }
-.dark #sessionWarning .text-slate-500 { color: #9CA3AF !important; }
-.dark #sessionWarning .bg-white.border { background-color: #374151 !important; border-color: #4B5563 !important; }
+.dark #sessionWarning .bg-white { background-color: #131a15 !important; }
+.dark #sessionWarning .text-slate-900 { color: #e8efe9 !important; }
+.dark #sessionWarning .text-slate-600 { color: #b9c9be !important; }
+.dark #sessionWarning .text-slate-500 { color: #8fa396 !important; }
+.dark #sessionWarning .bg-white.border { background-color: #223026 !important; border-color: #2d4034 !important; }
 
 /* Tailwind class overrides for dark mode */
-.dark .bg-white { background-color: #1F2937 !important; }
-.dark .bg-gray-50, .dark .bg-slate-50 { background-color: #111827 !important; }
-.dark .bg-gray-100, .dark .bg-slate-100 { background-color: #1F2937 !important; }
-.dark .bg-slate-200 { background-color: #374151 !important; }
-.dark .bg-surface { background-color: #111827 !important; }
-.dark .text-gray-900, .dark .text-slate-900 { color: #F9FAFB !important; }
-.dark .text-gray-800, .dark .text-slate-800 { color: #E5E7EB !important; }
-.dark .text-gray-700, .dark .text-slate-700 { color: #D1D5DB !important; }
-.dark .text-gray-600, .dark .text-slate-600 { color: #9CA3AF !important; }
-.dark .text-gray-500, .dark .text-slate-500 { color: #9CA3AF !important; }
-.dark .text-gray-400, .dark .text-slate-400 { color: #6B7280 !important; }
-.dark .text-on-surface { color: #F9FAFB !important; }
-.dark .text-on-background { color: #F9FAFB !important; }
-.dark .text-on-surface-variant { color: #9CA3AF !important; }
-.dark .border-gray-100, .dark .border-slate-100 { border-color: #374151 !important; }
-.dark .border-gray-200, .dark .border-slate-200 { border-color: #374151 !important; }
-.dark .border-gray-300, .dark .border-slate-300 { border-color: #4B5563 !important; }
-.dark .divide-gray-100 > * + *, .dark .divide-slate-100 > * + * { border-color: #374151 !important; }
-.dark .divide-gray-200 > * + *, .dark .divide-slate-200 > * + * { border-color: #374151 !important; }
-.dark .divide-gray-50 > * + *, .dark .divide-slate-50 > * + * { border-color: #1F2937 !important; }
+.dark .bg-white { background-color: #131a15 !important; }
+.dark .bg-gray-50, .dark .bg-slate-50 { background-color: #0c120e !important; }
+.dark .bg-gray-100, .dark .bg-slate-100 { background-color: #131a15 !important; }
+.dark .bg-slate-200 { background-color: #223026 !important; }
+.dark .bg-surface { background-color: #0c120e !important; }
+.dark .text-gray-900, .dark .text-slate-900 { color: #e8efe9 !important; }
+.dark .text-gray-800, .dark .text-slate-800 { color: #d6e2d9 !important; }
+.dark .text-gray-700, .dark .text-slate-700 { color: #b9c9be !important; }
+.dark .text-gray-600, .dark .text-slate-600 { color: #8fa396 !important; }
+.dark .text-gray-500, .dark .text-slate-500 { color: #8fa396 !important; }
+.dark .text-gray-400, .dark .text-slate-400 { color: #6f8478 !important; }
+.dark .text-on-surface { color: #e8efe9 !important; }
+.dark .text-on-background { color: #e8efe9 !important; }
+.dark .text-on-surface-variant { color: #8fa396 !important; }
+.dark .border-gray-100, .dark .border-slate-100 { border-color: #223026 !important; }
+.dark .border-gray-200, .dark .border-slate-200 { border-color: #223026 !important; }
+.dark .border-gray-300, .dark .border-slate-300 { border-color: #2d4034 !important; }
+.dark .divide-gray-100 > * + *, .dark .divide-slate-100 > * + * { border-color: #223026 !important; }
+.dark .divide-gray-200 > * + *, .dark .divide-slate-200 > * + * { border-color: #223026 !important; }
+.dark .divide-gray-50 > * + *, .dark .divide-slate-50 > * + * { border-color: #131a15 !important; }
 .dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
 .dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.3) !important; }
 .dark .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.4) !important; }
 .dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4) !important; }
 .dark .shadow-xl { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4) !important; }
 .dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5) !important; }
-.dark .ring-1 { --tw-ring-color: #4B5563 !important; }
+.dark .ring-1 { --tw-ring-color: #2d4034 !important; }
 
 /* Hover state overrides for dark mode */
-.dark .hover\:bg-gray-50:hover, .dark .hover\:bg-slate-50:hover { background-color: #374151 !important; }
-.dark .hover\:bg-gray-100:hover, .dark .hover\:bg-slate-100:hover { background-color: #374151 !important; }
-.dark .hover\:bg-white:hover { background-color: #374151 !important; }
-.dark .hover\:bg-amber-50:hover { background-color: rgba(120, 53, 15, 0.3) !important; }
-.dark .hover\:bg-blue-100:hover { background-color: rgba(30, 58, 138, 0.4) !important; }
-.dark .hover\:bg-emerald-100:hover { background-color: rgba(6, 78, 59, 0.4) !important; }
+.dark .hover\:bg-gray-50:hover, .dark .hover\:bg-slate-50:hover { background-color: #223026 !important; }
+.dark .hover\:bg-gray-100:hover, .dark .hover\:bg-slate-100:hover { background-color: #223026 !important; }
+.dark .hover\:bg-white:hover { background-color: #223026 !important; }
+.dark .hover\:bg-amber-50:hover { background-color: rgba(138, 109, 19, 0.3) !important; }
+.dark .hover\:bg-blue-100:hover { background-color: rgba(107, 84, 13, 0.4) !important; }
+.dark .hover\:bg-emerald-100:hover { background-color: rgba(13, 68, 43, 0.4) !important; }
 .dark .hover\:bg-purple-100:hover { background-color: rgba(88, 28, 135, 0.4) !important; }
-.dark .hover\:border-slate-300:hover { border-color: #6B7280 !important; }
-.dark .hover\:bg-red-50:hover { background-color: rgba(127, 29, 29, 0.3) !important; }
-.dark .hover\:bg-green-50:hover { background-color: rgba(5, 46, 22, 0.3) !important; }
-.dark .hover\:bg-blue-50:hover { background-color: rgba(30, 58, 138, 0.3) !important; }
+.dark .hover\:border-slate-300:hover { border-color: #6f8478 !important; }
+.dark .hover\:bg-red-50:hover { background-color: rgba(76, 29, 28, 0.3) !important; }
+.dark .hover\:bg-green-50:hover { background-color: rgba(13, 68, 43, 0.3) !important; }
+.dark .hover\:bg-blue-50:hover { background-color: rgba(107, 84, 13, 0.3) !important; }
 .dark .hover\:bg-orange-50:hover { background-color: rgba(124, 45, 18, 0.3) !important; }
 .dark .hover\:bg-purple-50:hover { background-color: rgba(88, 28, 135, 0.3) !important; }
-.dark .hover\:bg-surface-container:hover { background-color: #334155 !important; }
-.dark .hover\:bg-surface-container-low:hover { background-color: #1E293B !important; }
+.dark .hover\:bg-surface-container:hover { background-color: #1e2f24 !important; }
+.dark .hover\:bg-surface-container-low:hover { background-color: #18271d !important; }
 
 /* Footer dark */
-.dark footer .bg-slate-200 { background-color: #374151 !important; }
-.dark footer .text-slate-400 { color: #6B7280 !important; }
+.dark footer .bg-slate-200 { background-color: #223026 !important; }
+.dark footer .text-slate-400 { color: #6f8478 !important; }
 
 /* Messages/alerts dark mode */
-.dark .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.3) !important; border-color: rgba(5, 150, 105, 0.4) !important; }
-.dark .bg-red-50 { background-color: rgba(127, 29, 29, 0.3) !important; border-color: rgba(239, 68, 68, 0.4) !important; }
-.dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.3) !important; border-color: rgba(245, 158, 11, 0.4) !important; }
-.dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.3) !important; border-color: rgba(59, 130, 246, 0.4) !important; }
+.dark .bg-emerald-50 { background-color: rgba(13, 68, 43, 0.3) !important; border-color: rgba(26, 122, 79, 0.4) !important; }
+.dark .bg-red-50 { background-color: rgba(76, 29, 28, 0.3) !important; border-color: rgba(176, 65, 62, 0.4) !important; }
+.dark .bg-amber-50 { background-color: rgba(138, 109, 19, 0.3) !important; border-color: rgba(201, 162, 39, 0.4) !important; }
+.dark .bg-blue-50 { background-color: rgba(107, 84, 13, 0.3) !important; border-color: rgba(201, 162, 39, 0.4) !important; }
 .dark .bg-purple-50 { background-color: rgba(88, 28, 135, 0.3) !important; border-color: rgba(147, 51, 234, 0.4) !important; }
 .dark .bg-indigo-50 { background-color: rgba(49, 46, 129, 0.3) !important; border-color: rgba(99, 102, 241, 0.4) !important; }
 .dark .bg-orange-50 { background-color: rgba(124, 45, 18, 0.3) !important; border-color: rgba(249, 115, 22, 0.4) !important; }
-.dark .bg-yellow-50 { background-color: rgba(113, 63, 18, 0.3) !important; border-color: rgba(234, 179, 8, 0.4) !important; }
-.dark .bg-teal-50 { background-color: rgba(19, 78, 74, 0.3) !important; border-color: rgba(20, 184, 166, 0.4) !important; }
+.dark .bg-yellow-50 { background-color: rgba(75, 59, 8, 0.3) !important; border-color: rgba(201, 162, 39, 0.4) !important; }
+.dark .bg-teal-50 { background-color: rgba(13, 68, 43, 0.3) !important; border-color: rgba(26, 122, 79, 0.4) !important; }
 .dark .bg-cyan-50 { background-color: rgba(22, 78, 99, 0.3) !important; border-color: rgba(6, 182, 212, 0.4) !important; }
 .dark .bg-pink-50 { background-color: rgba(131, 24, 67, 0.3) !important; border-color: rgba(236, 72, 153, 0.4) !important; }
 .dark .bg-rose-50 { background-color: rgba(136, 19, 55, 0.3) !important; border-color: rgba(244, 63, 94, 0.4) !important; }
-.dark .bg-green-50 { background-color: rgba(5, 46, 22, 0.3) !important; border-color: rgba(34, 197, 94, 0.4) !important; }
+.dark .bg-green-50 { background-color: rgba(13, 68, 43, 0.3) !important; border-color: rgba(26, 122, 79, 0.4) !important; }
 .dark .bg-sky-50 { background-color: rgba(12, 74, 110, 0.3) !important; border-color: rgba(14, 165, 233, 0.4) !important; }
 
 /* Colored -100 backgrounds for badges/icons in dark mode */
-.dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.4) !important; }
-.dark .bg-red-100 { background-color: rgba(127, 29, 29, 0.4) !important; }
-.dark .bg-amber-100 { background-color: rgba(120, 53, 15, 0.4) !important; }
-.dark .bg-blue-100 { background-color: rgba(30, 58, 138, 0.4) !important; }
+.dark .bg-emerald-100 { background-color: rgba(13, 68, 43, 0.4) !important; }
+.dark .bg-red-100 { background-color: rgba(76, 29, 28, 0.4) !important; }
+.dark .bg-amber-100 { background-color: rgba(138, 109, 19, 0.4) !important; }
+.dark .bg-blue-100 { background-color: rgba(107, 84, 13, 0.4) !important; }
 .dark .bg-purple-100 { background-color: rgba(88, 28, 135, 0.4) !important; }
 .dark .bg-indigo-100 { background-color: rgba(49, 46, 129, 0.4) !important; }
 .dark .bg-orange-100 { background-color: rgba(124, 45, 18, 0.4) !important; }
-.dark .bg-yellow-100 { background-color: rgba(113, 63, 18, 0.4) !important; }
-.dark .bg-teal-100 { background-color: rgba(19, 78, 74, 0.4) !important; }
+.dark .bg-yellow-100 { background-color: rgba(75, 59, 8, 0.4) !important; }
+.dark .bg-teal-100 { background-color: rgba(13, 68, 43, 0.4) !important; }
 .dark .bg-cyan-100 { background-color: rgba(22, 78, 99, 0.4) !important; }
 .dark .bg-pink-100 { background-color: rgba(131, 24, 67, 0.4) !important; }
-.dark .bg-green-100 { background-color: rgba(5, 46, 22, 0.4) !important; }
+.dark .bg-green-100 { background-color: rgba(13, 68, 43, 0.4) !important; }
 .dark .bg-sky-100 { background-color: rgba(12, 74, 110, 0.4) !important; }
 
 /* Colored text -800 overrides (make lighter for dark backgrounds) */
-.dark .text-emerald-800 { color: #6EE7B7 !important; }
-.dark .text-red-800 { color: #FCA5A5 !important; }
-.dark .text-amber-800 { color: #FCD34D !important; }
-.dark .text-blue-800 { color: #93C5FD !important; }
+.dark .text-emerald-800 { color: #7cbd97 !important; }
+.dark .text-red-800 { color: #dfaeac !important; }
+.dark .text-amber-800 { color: #dcc77e !important; }
+.dark .text-blue-800 { color: #dcc77e !important; }
 .dark .text-purple-800 { color: #D8B4FE !important; }
 .dark .text-indigo-800 { color: #A5B4FC !important; }
 .dark .text-orange-800 { color: #FDBA74 !important; }
 .dark .text-teal-800 { color: #5EEAD4 !important; }
 .dark .text-pink-800 { color: #F9A8D4 !important; }
-.dark .text-green-800 { color: #86EFAC !important; }
+.dark .text-green-800 { color: #a9d3ba !important; }
 
 /* Colored text -700 overrides */
-.dark .text-emerald-700 { color: #6EE7B7 !important; }
-.dark .text-red-700 { color: #FCA5A5 !important; }
-.dark .text-amber-700 { color: #FCD34D !important; }
-.dark .text-blue-700 { color: #93C5FD !important; }
+.dark .text-emerald-700 { color: #7cbd97 !important; }
+.dark .text-red-700 { color: #dfaeac !important; }
+.dark .text-amber-700 { color: #dcc77e !important; }
+.dark .text-blue-700 { color: #dcc77e !important; }
 .dark .text-purple-700 { color: #D8B4FE !important; }
 .dark .text-indigo-700 { color: #A5B4FC !important; }
 .dark .text-orange-700 { color: #FDBA74 !important; }
 
 /* Colored border -100 overrides */
-.dark .border-emerald-100 { border-color: rgba(5, 150, 105, 0.3) !important; }
-.dark .border-red-100 { border-color: rgba(239, 68, 68, 0.3) !important; }
-.dark .border-amber-100 { border-color: rgba(245, 158, 11, 0.3) !important; }
-.dark .border-blue-100 { border-color: rgba(59, 130, 246, 0.3) !important; }
+.dark .border-emerald-100 { border-color: rgba(26, 122, 79, 0.3) !important; }
+.dark .border-red-100 { border-color: rgba(176, 65, 62, 0.3) !important; }
+.dark .border-amber-100 { border-color: rgba(201, 162, 39, 0.3) !important; }
+.dark .border-blue-100 { border-color: rgba(201, 162, 39, 0.3) !important; }
 .dark .border-purple-100 { border-color: rgba(147, 51, 234, 0.3) !important; }
 .dark .border-indigo-100 { border-color: rgba(99, 102, 241, 0.3) !important; }
 .dark .border-orange-100 { border-color: rgba(249, 115, 22, 0.3) !important; }
 
 /* Colored border -200 overrides */
-.dark .border-emerald-200 { border-color: rgba(5, 150, 105, 0.4) !important; }
-.dark .border-red-200 { border-color: rgba(239, 68, 68, 0.4) !important; }
-.dark .border-amber-200 { border-color: rgba(245, 158, 11, 0.4) !important; }
-.dark .border-blue-200 { border-color: rgba(59, 130, 246, 0.4) !important; }
+.dark .border-emerald-200 { border-color: rgba(26, 122, 79, 0.4) !important; }
+.dark .border-red-200 { border-color: rgba(176, 65, 62, 0.4) !important; }
+.dark .border-amber-200 { border-color: rgba(201, 162, 39, 0.4) !important; }
+.dark .border-blue-200 { border-color: rgba(201, 162, 39, 0.4) !important; }
 .dark .border-purple-200 { border-color: rgba(147, 51, 234, 0.4) !important; }
 .dark .border-indigo-200 { border-color: rgba(99, 102, 241, 0.4) !important; }
 .dark .border-orange-200 { border-color: rgba(249, 115, 22, 0.4) !important; }
 
 /* Colored border -300 overrides */
-.dark .border-emerald-300 { border-color: rgba(5, 150, 105, 0.5) !important; }
-.dark .border-red-300 { border-color: rgba(239, 68, 68, 0.5) !important; }
-.dark .border-amber-300 { border-color: rgba(245, 158, 11, 0.5) !important; }
-.dark .border-blue-300 { border-color: rgba(59, 130, 246, 0.5) !important; }
+.dark .border-emerald-300 { border-color: rgba(26, 122, 79, 0.5) !important; }
+.dark .border-red-300 { border-color: rgba(176, 65, 62, 0.5) !important; }
+.dark .border-amber-300 { border-color: rgba(201, 162, 39, 0.5) !important; }
+.dark .border-blue-300 { border-color: rgba(201, 162, 39, 0.5) !important; }
 
 /* Custom surface colors for dark mode */
-.dark .bg-surface-container-lowest { background-color: #1F2937 !important; }
-.dark .bg-surface-container-low { background-color: #1E293B !important; }
-.dark .bg-surface-container { background-color: #1E293B !important; }
-.dark .bg-surface-container-high { background-color: #334155 !important; }
-.dark .bg-surface-container-highest { background-color: #374151 !important; }
-.dark .bg-surface-variant { background-color: #334155 !important; }
-.dark .bg-primary-container { background-color: #1E293B !important; }
+.dark .bg-surface-container-lowest { background-color: #131a15 !important; }
+.dark .bg-surface-container-low { background-color: #18271d !important; }
+.dark .bg-surface-container { background-color: #18271d !important; }
+.dark .bg-surface-container-high { background-color: #1e2f24 !important; }
+.dark .bg-surface-container-highest { background-color: #223026 !important; }
+.dark .bg-surface-variant { background-color: #1e2f24 !important; }
+/* Brand deep-green panels keep their colour in dark mode — they carry cream text */
+.dark .bg-primary-container { background-color: #0b3d2e !important; }
 
 /* Border color for colored borders */
-.dark .border-slate-50 { border-color: #1F2937 !important; }
+.dark .border-slate-50 { border-color: #131a15 !important; }
 
 /* Opacity-modified backgrounds and borders for dark mode */
-.dark .bg-slate-50\/80 { background-color: rgba(17, 24, 39, 0.85) !important; }
-.dark .bg-slate-50\/50 { background-color: rgba(17, 24, 39, 0.5) !important; }
-.dark .bg-blue-50\/30 { background-color: rgba(30, 58, 138, 0.15) !important; }
-.dark .border-slate-200\/50 { border-color: rgba(55, 65, 81, 0.5) !important; }
-.dark .hover\:bg-slate-50\/50:hover { background-color: rgba(55, 65, 81, 0.5) !important; }
+.dark .bg-slate-50\/80 { background-color: rgba(12, 18, 14, 0.85) !important; }
+.dark .bg-slate-50\/50 { background-color: rgba(12, 18, 14, 0.5) !important; }
+.dark .bg-blue-50\/30 { background-color: rgba(107, 84, 13, 0.15) !important; }
+.dark .border-slate-200\/50 { border-color: rgba(34, 48, 38, 0.5) !important; }
+.dark .hover\:bg-slate-50\/50:hover { background-color: rgba(34, 48, 38, 0.5) !important; }
 
 /* Custom theme color text overrides for dark mode */
-.dark .text-on-primary-container { color: #93A5CF !important; }
-.dark .text-on-primary-fixed-variant { color: #8899B5 !important; }
-.dark .text-on-secondary-container { color: #E5C374 !important; }
-.dark .text-on-primary-fixed { color: #BBC7DF !important; }
+.dark .text-on-primary-container { color: #a9d3ba !important; }
+.dark .text-on-primary-fixed-variant { color: #93a89a !important; }
+.dark .text-on-secondary-container { color: #dcc77e !important; }
+.dark .text-on-primary-fixed { color: #c2d2c6 !important; }
 .dark .text-on-secondary { color: #ffffff !important; }
 .dark .text-on-tertiary { color: #ffffff !important; }
-.dark .text-on-tertiary-container { color: #F8C5C8 !important; }
+.dark .text-on-tertiary-container { color: #dfaeac !important; }
 .dark .text-on-error { color: #ffffff !important; }
-.dark .text-on-error-container { color: #FCA5A5 !important; }
-.dark .text-primary { color: #F9FAFB !important; }
-.dark .text-primary-container { color: #BBC7DF !important; }
-.dark .text-secondary { color: #E5C374 !important; }
-.dark .text-tertiary { color: #F8C5C8 !important; }
-.dark .text-outline { color: #9CA3AF !important; }
-.dark .text-outline-variant { color: #6B7280 !important; }
-.dark .text-surface-tint { color: #93A5CF !important; }
-.dark .text-inverse-surface { color: #F9FAFB !important; }
-.dark .text-inverse-on-surface { color: #1F2937 !important; }
-.dark .text-inverse-primary { color: #BBC7DF !important; }
+.dark .text-on-error-container { color: #dfaeac !important; }
+.dark .text-primary { color: #e8efe9 !important; }
+.dark .text-primary-container { color: #c2d2c6 !important; }
+.dark .text-secondary { color: #dcc77e !important; }
+.dark .text-tertiary { color: #dfaeac !important; }
+.dark .text-outline { color: #8fa396 !important; }
+.dark .text-outline-variant { color: #6f8478 !important; }
+.dark .text-surface-tint { color: #a9d3ba !important; }
+.dark .text-inverse-surface { color: #e8efe9 !important; }
+.dark .text-inverse-on-surface { color: #131a15 !important; }
+.dark .text-inverse-primary { color: #c2d2c6 !important; }
 
 /* Background token overrides */
-.dark .bg-primary { background-color: #1E293B !important; }
-.dark .bg-secondary { background-color: #745b17 !important; }
-.dark .bg-tertiary { background-color: #410004 !important; }
-.dark .bg-tertiary-container { background-color: #2D0004 !important; }
-.dark .bg-secondary-container { background-color: #4A3C17 !important; }
-.dark .bg-error { background-color: #7F1D1D !important; }
-.dark .bg-error-container { background-color: #450A0A !important; }
-.dark .bg-surface { background-color: #111827 !important; }
-.dark .bg-background { background-color: #111827 !important; }
-.dark .bg-surface-dim { background-color: #0F172A !important; }
-.dark .bg-surface-bright { background-color: #1F2937 !important; }
-.dark .bg-inverse-surface { background-color: #E5E7EB !important; }
+.dark .bg-primary { background-color: #18271d !important; }
+.dark .bg-secondary { background-color: #8a6d13 !important; }
+.dark .bg-tertiary { background-color: #4c1d1c !important; }
+.dark .bg-tertiary-container { background-color: #2c1110 !important; }
+.dark .bg-secondary-container { background-color: #4b3b08 !important; }
+.dark .bg-error { background-color: #4c1d1c !important; }
+.dark .bg-error-container { background-color: #2c1110 !important; }
+.dark .bg-surface { background-color: #0c120e !important; }
+.dark .bg-background { background-color: #0c120e !important; }
+.dark .bg-surface-dim { background-color: #08281e !important; }
+.dark .bg-surface-bright { background-color: #131a15 !important; }
+.dark .bg-inverse-surface { background-color: #d6e2d9 !important; }
 
 /* Border token overrides */
-.dark .border-outline { border-color: #4B5563 !important; }
-.dark .border-outline-variant { border-color: #374151 !important; }
-.dark .border-primary { border-color: #BBC7DF !important; }
-.dark .border-secondary { border-color: #E5C374 !important; }
-.dark .border-primary-container { border-color: #374151 !important; }
+.dark .border-outline { border-color: #2d4034 !important; }
+.dark .border-outline-variant { border-color: #223026 !important; }
+.dark .border-primary { border-color: #c2d2c6 !important; }
+.dark .border-secondary { border-color: #dcc77e !important; }
+.dark .border-primary-container { border-color: #223026 !important; }
 
 /* Material Symbols icons — inherit from parent text color so overrides apply */
 .dark .material-symbols-outlined,
@@ -351,43 +325,43 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 .dark .text-on-surface .material-symbols-outlined,
 .dark .text-on-background .material-symbols-outlined,
 .dark .text-primary-container .material-symbols-outlined,
-.dark .text-primary .material-symbols-outlined { color: #F9FAFB !important; }
+.dark .text-primary .material-symbols-outlined { color: #e8efe9 !important; }
 
 /* Ensure select, input with slate backgrounds work */
-.dark .bg-slate-50, .dark select.bg-slate-50 { background-color: #374151 !important; }
+.dark .bg-slate-50, .dark select.bg-slate-50 { background-color: #223026 !important; }
 
 /* Placeholder text in dark mode */
-.dark .placeholder-slate-400::placeholder { color: #6B7280 !important; }
-.dark .placeholder-slate-500::placeholder { color: #6B7280 !important; }
+.dark .placeholder-slate-400::placeholder { color: #6f8478 !important; }
+.dark .placeholder-slate-500::placeholder { color: #6f8478 !important; }
 
 /* Code/pre blocks in dark mode */
-.dark pre, .dark code { background-color: #1F2937 !important; color: #E5E7EB !important; }
+.dark pre, .dark code { background-color: #131a15 !important; color: #d6e2d9 !important; }
 
 /* Dividers with opacity */
-.dark .divide-slate-50 > * + * { border-color: #1F2937 !important; }
+.dark .divide-slate-50 > * + * { border-color: #131a15 !important; }
 
 /* Focus ring colors */
-.dark .focus\:ring-amber-500:focus { --tw-ring-color: rgba(245, 158, 11, 0.5) !important; }
-.dark .focus\:ring-blue-500:focus { --tw-ring-color: rgba(59, 130, 246, 0.5) !important; }
-.dark .focus\:border-amber-500\/40:focus { border-color: rgba(245, 158, 11, 0.4) !important; }
+.dark .focus\:ring-amber-500:focus { --tw-ring-color: rgba(201, 162, 39, 0.5) !important; }
+.dark .focus\:ring-blue-500:focus { --tw-ring-color: rgba(201, 162, 39, 0.5) !important; }
+.dark .focus\:border-amber-500\/40:focus { border-color: rgba(201, 162, 39, 0.4) !important; }
 
 /* Chart containers need dark text override */
-.dark .text-on-surface-variant { color: #9CA3AF !important; }
+.dark .text-on-surface-variant { color: #8fa396 !important; }
 
 /* Opacity-variant borders */
-.dark [class*="border-slate-200/"] { border-color: rgba(55, 65, 81, 0.6) !important; }
-.dark [class*="border-slate-100/"] { border-color: rgba(55, 65, 81, 0.4) !important; }
+.dark [class*="border-slate-200/"] { border-color: rgba(34, 48, 38, 0.6) !important; }
+.dark [class*="border-slate-100/"] { border-color: rgba(34, 48, 38, 0.4) !important; }
 
 /* SVG text fills in dark mode (for system health charts etc.) */
-.dark svg text[fill="#0f172a"] { fill: #F9FAFB !important; }
-.dark svg text[fill="#94a3b8"] { fill: #6B7280 !important; }
-.dark svg circle[stroke="#e2e8f0"] { stroke: #374151 !important; }
+.dark svg text[fill="#0f172a"] { fill: #e8efe9 !important; }
+.dark svg text[fill="#94a3b8"] { fill: #6f8478 !important; }
+.dark svg circle[stroke="#e2e8f0"] { stroke: #223026 !important; }
 
 /* Gradient backgrounds in dark mode */
-.dark .from-slate-50 { --tw-gradient-from: #111827 !important; }
-.dark .via-blue-50 { --tw-gradient-via: #111827 !important; }
-.dark .to-blue-50 { --tw-gradient-to: #111827 !important; }
-.dark .to-emerald-50 { --tw-gradient-to: #111827 !important; }
+.dark .from-slate-50 { --tw-gradient-from: #0c120e !important; }
+.dark .via-blue-50 { --tw-gradient-via: #0c120e !important; }
+.dark .to-blue-50 { --tw-gradient-to: #0c120e !important; }
+.dark .to-emerald-50 { --tw-gradient-to: #0c120e !important; }
 
 /* Border-l colored borders */
 .dark .border-l-4.border-red-500 { border-left-color: #ef4444 !important; }
@@ -416,12 +390,12 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 
 /* Rose color overrides */
 .dark .border-rose-200 { border-color: rgba(244, 63, 94, 0.4) !important; }
-.dark .text-rose-600 { color: #FDA4AF !important; }
-.dark .text-rose-700 { color: #FDA4AF !important; }
+.dark .text-rose-600 { color: #dfaeac !important; }
+.dark .text-rose-700 { color: #dfaeac !important; }
 
 /* Teal color overrides */
 .dark .text-teal-700 { color: #5EEAD4 !important; }
-.dark .border-teal-200 { border-color: rgba(20, 184, 166, 0.4) !important; }
+.dark .border-teal-200 { border-color: rgba(26, 122, 79, 0.4) !important; }
 
 /* Pink color overrides */
 .dark .text-pink-700 { color: #F9A8D4 !important; }
@@ -432,46 +406,46 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 .dark .text-sky-700 { color: #7DD3FC !important; }
 
 /* Green color overrides */
-.dark .text-green-700 { color: #86EFAC !important; }
-.dark .border-green-200 { border-color: rgba(34, 197, 94, 0.4) !important; }
-.dark .border-green-100 { border-color: rgba(34, 197, 94, 0.3) !important; }
+.dark .text-green-700 { color: #a9d3ba !important; }
+.dark .border-green-200 { border-color: rgba(26, 122, 79, 0.4) !important; }
+.dark .border-green-100 { border-color: rgba(26, 122, 79, 0.3) !important; }
 
 /* Additional hover state overrides for dark mode */
-.dark .hover\:bg-slate-200:hover { background-color: #4B5563 !important; }
-.dark .hover\:bg-slate-100:hover { background-color: #374151 !important; }
-.dark .hover\:bg-red-100:hover { background-color: rgba(127, 29, 29, 0.4) !important; }
-.dark .hover\:bg-amber-100:hover { background-color: rgba(120, 53, 15, 0.4) !important; }
-.dark .hover\:bg-blue-100:hover { background-color: rgba(30, 58, 138, 0.4) !important; }
-.dark .hover\:bg-green-100:hover { background-color: rgba(5, 46, 22, 0.4) !important; }
+.dark .hover\:bg-slate-200:hover { background-color: #2d4034 !important; }
+.dark .hover\:bg-slate-100:hover { background-color: #223026 !important; }
+.dark .hover\:bg-red-100:hover { background-color: rgba(76, 29, 28, 0.4) !important; }
+.dark .hover\:bg-amber-100:hover { background-color: rgba(138, 109, 19, 0.4) !important; }
+.dark .hover\:bg-blue-100:hover { background-color: rgba(107, 84, 13, 0.4) !important; }
+.dark .hover\:bg-green-100:hover { background-color: rgba(13, 68, 43, 0.4) !important; }
 .dark .hover\:bg-cyan-50:hover { background-color: rgba(22, 78, 99, 0.3) !important; }
-.dark .hover\:bg-amber-50:hover { background-color: rgba(120, 53, 15, 0.3) !important; }
-.dark .hover\:bg-red-50:hover { background-color: rgba(127, 29, 29, 0.3) !important; }
+.dark .hover\:bg-amber-50:hover { background-color: rgba(138, 109, 19, 0.3) !important; }
+.dark .hover\:bg-red-50:hover { background-color: rgba(76, 29, 28, 0.3) !important; }
 
 /* Hover border overrides */
-.dark .hover\:border-slate-200:hover { border-color: #4B5563 !important; }
-.dark .hover\:border-blue-200:hover { border-color: rgba(59, 130, 246, 0.5) !important; }
+.dark .hover\:border-slate-200:hover { border-color: #2d4034 !important; }
+.dark .hover\:border-blue-200:hover { border-color: rgba(201, 162, 39, 0.5) !important; }
 
 /* Background color with opacity modifiers */
-.dark .bg-slate-800 { background-color: #1E293B !important; }
+.dark .bg-slate-800 { background-color: #18271d !important; }
 
 /* Toast/notification colors remain visible in dark mode */
-.dark .bg-emerald-100.text-emerald-700 { color: #6EE7B7 !important; }
-.dark .bg-red-100.text-red-700 { color: #FCA5A5 !important; }
-.dark .bg-amber-100.text-amber-700 { color: #FCD34D !important; }
-.dark .bg-blue-100.text-blue-700 { color: #93C5FD !important; }
+.dark .bg-emerald-100.text-emerald-700 { color: #7cbd97 !important; }
+.dark .bg-red-100.text-red-700 { color: #dfaeac !important; }
+.dark .bg-amber-100.text-amber-700 { color: #dcc77e !important; }
+.dark .bg-blue-100.text-blue-700 { color: #dcc77e !important; }
 .dark .bg-purple-100.text-purple-700 { color: #D8B4FE !important; }
 .dark .bg-indigo-100.text-indigo-700 { color: #A5B4FC !important; }
-.dark .bg-slate-100.text-slate-700 { color: #D1D5DB !important; }
+.dark .bg-slate-100.text-slate-700 { color: #b9c9be !important; }
 
 /* File input styling in dark mode */
-.dark input[type="file"]::file-selector-button { background-color: #374151; color: #E5E7EB; border-color: #4B5563; }
+.dark input[type="file"]::file-selector-button { background-color: #223026; color: #d6e2d9; border-color: #2d4034; }
 
 /* Peer-checked styles for dark mode (service chips, toggles) */
-.dark .peer-checked\:bg-slate-800 { background-color: #F59E0B !important; }
+.dark .peer-checked\:bg-slate-800 { background-color: #c9a227 !important; }
 
 /* Outline variant border in dark mode */
-.dark .border-outline-variant { border-color: #374151 !important; }
-.dark .divide-outline-variant > * + * { border-color: #374151 !important; }
+.dark .border-outline-variant { border-color: #223026 !important; }
+.dark .divide-outline-variant > * + * { border-color: #223026 !important; }
 
 /* Dark mode toggle icon switching */
 .dark .dark-icon-sun { display: inline-flex; }
@@ -502,7 +476,7 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
     z-index: 50;
     transform: translateX(-100%);
     transition: transform 0.3s ease;
-    width: 272px;
+    width: 236px;
   }
   .sidebar.open {
     transform: translateX(0);
@@ -582,442 +556,249 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
 
 <!-- Sidebar -->
-<aside id="sidebar" class="sidebar h-screen w-72 fixed left-0 top-0 overflow-y-auto bg-slate-900 z-50 flex flex-col py-8 px-4 shadow-2xl sidebar-scroll">
-  <div class="mb-10 px-4">
-    <div class="flex items-center gap-2 mb-2">
-      <!-- Republic of Burundi Coat of Arms -->
-      <img src="{% static 'img/burundi_coat_of_arms.svg' %}" alt="Republic of Burundi" class="w-11 h-11 object-contain drop-shadow-md flex-shrink-0" />
-      <!-- African Union Emblem (white on dark sidebar) -->
-      <img src="{% static 'img/au_emblem.svg' %}" alt="African Union" class="w-10 h-10 object-contain flex-shrink-0" style="filter: brightness(0) invert(1);" />
-      <span class="text-sm font-bold text-white tracking-tight font-headline flex-1 leading-tight">Be 4<br/>Africa</span>
-      <!-- Mobile close button -->
-      <button id="sidebarClose" class="lg:hidden text-slate-400 hover:text-white transition-colors p-1" aria-label="Close sidebar">
-        <span class="material-symbols-outlined">close</span>
-      </button>
+<aside id="sidebar" class="sidebar h-screen w-[236px] fixed left-0 top-0 overflow-y-auto bg-deep z-50 flex flex-col py-5 px-3.5 shadow-2xl sidebar-scroll">
+  <div class="flex items-center gap-2.5 px-1.5 pt-1 pb-4">
+    <!-- Be 4 Africa mark, on the cream tile the comp specifies -->
+    <img src="{% static 'img/b4africa_icon.png' %}" alt="Be 4 Africa"
+         class="w-9 h-9 rounded-[9px] bg-cream object-contain p-[3px] flex-shrink-0" />
+    <div class="flex-1 min-w-0 leading-tight">
+      <div class="text-[12px] font-extrabold text-cream font-headline whitespace-nowrap">AU Chairmanship</div>
+      <div class="font-label text-[9px] tracking-[2px] text-gold">2026&ndash;2027</div>
     </div>
-    <p class="text-slate-400 text-xs tracking-widest uppercase ml-1 font-label">2026-2027</p>
+    <!-- Mobile close button -->
+    <button id="sidebarClose" class="lg:hidden text-slate-400 hover:text-cream transition-colors p-1" aria-label="Close sidebar">
+      <span class="material-symbols-outlined">close</span>
+    </button>
   </div>
 
   <!-- Search Bar -->
-  <div class="px-4 mb-6">
+  <div class="px-2 mb-3">
     <form method="get" action="{% url 'custom_admin:global_search' %}" class="relative">
-      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6f8f80] text-sm">search</span>
       <input
         type="text"
         name="q"
-        placeholder="Search everything..."
-        class="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-amber-500/50 focus:border-transparent focus:outline-none"
+        placeholder="Search everything&hellip;"
+        class="w-full bg-white/[0.06] border border-white/10 rounded-[10px] py-2 pl-9 pr-3 text-[13px] text-cream placeholder-[#6f8f80] focus:ring-2 focus:ring-gold/40 focus:border-transparent focus:outline-none"
       />
     </form>
   </div>
 
-  <nav class="flex-1 space-y-1">
+  <nav class="flex-1">
     {% with url_name=request.resolver_match.url_name %}
-
-    <!-- Dashboard -->
-    {% if 'dashboard' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 ease-in-out {% if url_name == 'dashboard' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:dashboard' %}">
-      <span class="material-symbols-outlined">dashboard</span>
-      <span class="text-sm tracking-wide font-headline">Dashboard</span>
-    </a>
-    {% endif %}
-
-    {% if 'content_calendar' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'content_calendar' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:content_calendar' %}">
-      <span class="material-symbols-outlined">calendar_month</span>
-      <span class="text-sm tracking-wide font-headline">Content Calendar</span>
-    </a>
-    {% endif %}
-<!-- Content -->
-    {% if 'hero_slides_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'hero_slide' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:hero_slides_list' %}">
-      <span class="material-symbols-outlined">view_carousel</span>
-      <span class="text-sm tracking-wide font-headline">Hero Slides</span>
-    </a>
-    {% endif %}
-
-    {% if 'articles_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'article' in url_name and 'category' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:articles_list' %}">
-      <span class="material-symbols-outlined">article</span>
-      <span class="text-sm tracking-wide font-headline">Articles</span>
-    </a>
-    {% endif %}
-
-    {% if 'magazines_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'magazine' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:magazines_list' %}">
-      <span class="material-symbols-outlined">menu_book</span>
-      <span class="text-sm tracking-wide font-headline">Magazine</span>
-    </a>
-    {% endif %}
-
-    {% if 'events_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name in 'events_list event_create event_edit' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:events_list' %}">
-      <span class="material-symbols-outlined">event</span>
-      <span class="text-sm tracking-wide font-headline">Events</span>
-    </a>
-    {% endif %}
-
-    {% if 'live_feeds_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'live_feed' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:live_feeds_list' %}">
-      <span class="material-symbols-outlined">live_tv</span>
-      <span class="text-sm tracking-wide font-headline">Live Feeds</span>
-    </a>
-    {% endif %}
-
-    {% if 'facts_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'fact' in url_name and 'category' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:facts_list' %}">
-      <span class="material-symbols-outlined">lightbulb</span>
-      <span class="text-sm tracking-wide font-headline">Facts & Quotes</span>
-    </a>
-    <a class="flex items-center gap-4 px-4 py-3 pl-12 transition-all duration-300 {% if 'fact_category' in url_name or 'fact_categories' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:fact_categories_list' %}">
-      <span class="material-symbols-outlined text-[18px]">category</span>
-      <span class="text-sm tracking-wide font-headline">Fact Categories</span>
-    </a>
-    {% endif %}
-
-    {% if 'about_features_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'about_feature' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:about_features_list' %}">
-      <span class="material-symbols-outlined">info</span>
-      <span class="text-sm tracking-wide font-headline">About Features</span>
-    </a>
-    {% endif %}
-{% comment %}
-    A/B Tests link hidden until end-to-end wiring exists
-    (DRF endpoint + Flutter variant assignment + conversion reporting).
-    Model + admin CRUD are kept intact so re-enabling is a 1-block edit.
-    {% endcomment %}
-
-    <!-- Services divider -->
-    <div class="pt-6 pb-2 px-4">
-      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Services</p>
-    </div>
-    {% if 'resources_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'resource' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:resources_list' %}">
-      <span class="material-symbols-outlined">folder_open</span>
-      <span class="text-sm tracking-wide font-headline">Resources</span>
-    </a>
-    {% endif %}
-
-    {% if 'notifications_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'notification' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:notifications_list' %}">
-      <span class="material-symbols-outlined">notifications_active</span>
-      <span class="text-sm tracking-wide font-headline">Push Notifications</span>
-    </a>
-    {% endif %}
-
-    {% if 'app_releases_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'app_release' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:app_releases_list' %}">
-      <span class="material-symbols-outlined">campaign</span>
-      <span class="text-sm tracking-wide font-headline">What's New / Releases</span>
-    </a>
-    {% endif %}
-
-    {% if 'support_tickets_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'support_ticket' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:support_tickets_list' %}">
-      <span class="material-symbols-outlined">support_agent</span>
-      <span class="text-sm tracking-wide font-headline">Support Tickets</span>
-    </a>
-    {% endif %}
-<!-- Engagement divider -->
-    <div class="pt-6 pb-2 px-4">
-      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Engagement</p>
-    </div>
-    {% if 'polls_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'poll' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:polls_list' %}">
-      <span class="material-symbols-outlined">ballot</span>
-      <span class="text-sm tracking-wide font-headline">Polls</span>
-    </a>
-    {% endif %}
-
-    {% if 'discussions_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'discussion' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:discussions_list' %}">
-      <span class="material-symbols-outlined">forum</span>
-      <span class="text-sm tracking-wide font-headline">Discussions</span>
-    </a>
-    {% endif %}
-
-    {% if 'comments_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'comment' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:comments_list' %}">
-      <span class="material-symbols-outlined">chat_bubble</span>
-      <span class="text-sm tracking-wide font-headline">Comments</span>
-    </a>
-    {% endif %}
-
-    {% if 'announcements_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'announcement' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:announcements_list' %}">
-      <span class="material-symbols-outlined">campaign</span>
-      <span class="text-sm tracking-wide font-headline">Announcements</span>
-    </a>
-    {% endif %}
-
-    {% if 'contact_directory_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'contact_directory' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:contact_directory_list' %}">
-      <span class="material-symbols-outlined">contacts</span>
-      <span class="text-sm tracking-wide font-headline">Contact Directory</span>
-    </a>
-    {% endif %}
-
-    {% if 'event_speakers_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'event_speaker' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:event_speakers_list' %}">
-      <span class="material-symbols-outlined">record_voice_over</span>
-      <span class="text-sm tracking-wide font-headline">Event Speakers</span>
-    </a>
-    {% endif %}
-<!-- Administration divider -->
-    <div class="pt-6 pb-2 px-4">
-      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Administration</p>
-    </div>
-    {% if 'users_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'user' in url_name and 'admin_management' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:users_list' %}">
-      <span class="material-symbols-outlined">group</span>
-      <span class="text-sm tracking-wide font-headline">User Management</span>
-    </a>
-    {% endif %}
-{% if user.is_superuser %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'admin_management' in url_name or 'admin_invite' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:admin_management' %}">
-      <span class="material-symbols-outlined">admin_panel_settings</span>
-      <span class="text-sm tracking-wide font-headline">Admin Team &amp; Permissions</span>
-    </a>
-    {% endif %}
-
-    {% if 'analytics' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics' %}">
-      <span class="material-symbols-outlined">analytics</span>
-      <span class="text-sm tracking-wide font-headline">Analytics</span>
-    </a>
-    {% endif %}
-
-    {% if 'analytics_charts' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'analytics_charts' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:analytics_charts' %}">
-      <span class="material-symbols-outlined">bar_chart</span>
-      <span class="text-sm tracking-wide font-headline">Charts</span>
-    </a>
-    {% endif %}
-
-    {% if 'rate_limiting' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'rate_limiting' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:rate_limiting' %}">
-      <span class="material-symbols-outlined">shield</span>
-      <span class="text-sm tracking-wide font-headline">Rate Limiting</span>
-    </a>
-    {% endif %}
-
-    {% if 'audit_log' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'audit_log' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:audit_log' %}">
-      <span class="material-symbols-outlined">history</span>
-      <span class="text-sm tracking-wide font-headline">Audit Log</span>
-    </a>
-    {% endif %}
-
-    {% if 'activity_log' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'activity_log' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:activity_log' %}">
-      <span class="material-symbols-outlined">manage_history</span>
-      <span class="text-sm tracking-wide font-headline">Activity Log</span>
-    </a>
-    {% endif %}
-
-    {% if 'translation_manager' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'translation_manager' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:translation_manager' %}">
-      <span class="material-symbols-outlined">translate</span>
-      <span class="text-sm tracking-wide font-headline">Translations</span>
-    </a>
-    {% endif %}
-
-    {% if 'app_settings' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'app_settings' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:app_settings' %}">
-      <span class="material-symbols-outlined">settings</span>
-      <span class="text-sm tracking-wide font-headline">Settings</span>
-    </a>
-    {% endif %}
-
-    {% if 'system_health' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'system_health' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:system_health' %}">
-      <span class="material-symbols-outlined">monitor_heart</span>
-      <span class="text-sm tracking-wide font-headline">System Health</span>
-    </a>
-    {% endif %}
-
-    {% if 'database_backup' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'database_backup' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:database_backup' %}">
-      <span class="material-symbols-outlined">database</span>
-      <span class="text-sm tracking-wide font-headline">Database</span>
-    </a>
-    {% endif %}
-
-    {% if 'error_tracking' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'error_tracking' in url_name %}bg-red-500/10 text-red-500 border-r-4 border-red-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:error_tracking' %}">
-      <span class="material-symbols-outlined">bug_report</span>
-      <span class="text-sm tracking-wide font-headline">Error Tracking</span>
-    </a>
-    {% endif %}
-<!-- More (collapsed) -->
-    <div class="pt-6 pb-2 px-4">
-      <p class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">More</p>
-    </div>
-    {% if 'reorder' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if url_name == 'reorder' %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:reorder' %}?model=hero_slides">
-      <span class="material-symbols-outlined">reorder</span>
-      <span class="text-sm tracking-wide font-headline">Reorder Items</span>
-    </a>
-    {% endif %}
-
-    {% if 'hero_text_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'hero_text' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:hero_text_list' %}">
-      <span class="material-symbols-outlined">text_fields</span>
-      <span class="text-sm tracking-wide font-headline">Hero Text</span>
-    </a>
-    {% endif %}
-
-    {% if 'feature_cards_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'feature_card' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:feature_cards_list' %}">
-      <span class="material-symbols-outlined">auto_awesome</span>
-      <span class="text-sm tracking-wide font-headline">Feature Cards</span>
-    </a>
-    {% endif %}
-
-    {% if 'categories_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'categor' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:categories_list' %}">
-      <span class="material-symbols-outlined">label</span>
-      <span class="text-sm tracking-wide font-headline">Categories</span>
-    </a>
-    {% endif %}
-
-    {% if 'quick_access_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'quick_access' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:quick_access_list' %}">
-      <span class="material-symbols-outlined">bolt</span>
-      <span class="text-sm tracking-wide font-headline">Quick Access</span>
-    </a>
-    {% endif %}
-
-    {% if 'priority_agendas_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'priority_agenda' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:priority_agendas_list' %}">
-      <span class="material-symbols-outlined">flag</span>
-      <span class="text-sm tracking-wide font-headline">Priority Agendas</span>
-    </a>
-    {% endif %}
-
-    {% if 'gallery_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'gallery' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:gallery_list' %}">
-      <span class="material-symbols-outlined">photo_library</span>
-      <span class="text-sm tracking-wide font-headline">Gallery</span>
-    </a>
-    {% endif %}
-
-    {% if 'videos_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'video' in url_name and 'live' not in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:videos_list' %}">
-      <span class="material-symbols-outlined">videocam</span>
-      <span class="text-sm tracking-wide font-headline">Videos</span>
-    </a>
-    {% endif %}
-
-    {% if 'social_media_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'social_media' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:social_media_list' %}">
-      <span class="material-symbols-outlined">share</span>
-      <span class="text-sm tracking-wide font-headline">Social Media</span>
-    </a>
-    {% endif %}
-
-    {% if 'weather_cities_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'weather' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:weather_cities_list' %}">
-      <span class="material-symbols-outlined">cloud</span>
-      <span class="text-sm tracking-wide font-headline">Weather Cities</span>
-    </a>
-    {% endif %}
-
-    {% if 'verification_requests_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'verification' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:verification_requests_list' %}">
-      <span class="material-symbols-outlined">verified</span>
-      <span class="text-sm tracking-wide font-headline">Verification</span>
-    </a>
-    {% endif %}
-
-    {% if 'youth_dialogue_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'youth_dialogue' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:youth_dialogue_list' %}">
-      <span class="material-symbols-outlined">forum</span>
-      <span class="text-sm tracking-wide font-headline">Continental Dialogue</span>
-    </a>
-    {% endif %}
-
-    {% if 'qr_scan_log' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'qr_scan_log' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:qr_scan_log' %}">
-      <span class="material-symbols-outlined">qr_code_scanner</span>
-      <span class="text-sm tracking-wide font-headline">QR Scan Log</span>
-    </a>
-    {% endif %}
-
-    {% if 'event_registrations_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'event_registration' in url_name or 'event_submission' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:event_registrations_list' %}">
-      <span class="material-symbols-outlined">how_to_reg</span>
-      <span class="text-sm tracking-wide font-headline">Event Registrations</span>
-    </a>
-    {% endif %}
-
-    {% if 'onboarding_steps_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'onboarding' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:onboarding_steps_list' %}">
-      <span class="material-symbols-outlined">rocket_launch</span>
-      <span class="text-sm tracking-wide font-headline">Onboarding Steps</span>
-    </a>
-    {% endif %}
-
-    {% if 'email_templates_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'email_template' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:email_templates_list' %}">
-      <span class="material-symbols-outlined">mail</span>
-      <span class="text-sm tracking-wide font-headline">Email Templates</span>
-    </a>
-    {% endif %}
-
-    {% if 'email_campaigns_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'email_campaign' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:email_campaigns_list' %}">
-      <span class="material-symbols-outlined">send</span>
-      <span class="text-sm tracking-wide font-headline">Email Campaigns</span>
-    </a>
-    {% endif %}
-
-    {% if 'email_logs_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'email_log' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:email_logs_list' %}">
-      <span class="material-symbols-outlined">history</span>
-      <span class="text-sm tracking-wide font-headline">Email Logs</span>
-    </a>
-    {% endif %}
-
-    {% if 'email_inbox' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'email_inbox' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:email_inbox' %}">
-      <span class="material-symbols-outlined">inbox</span>
-      <span class="text-sm tracking-wide font-headline">Email Inbox</span>
-    </a>
-    {% endif %}
-
-    {% if 'newsletter_editions_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'newsletter' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:newsletter_editions_list' %}">
-      <span class="material-symbols-outlined">newspaper</span>
-      <span class="text-sm tracking-wide font-headline">Newsletters</span>
-    </a>
-    {% endif %}
-
-    {% if 'maintenance_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'maintenance' in url_name %}bg-amber-500/10 text-amber-500 border-r-4 border-amber-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:maintenance_list' %}">
-      <span class="material-symbols-outlined">engineering</span>
-      <span class="text-sm tracking-wide font-headline">Maintenance</span>
-    </a>
-    {% endif %}
-
-    {% if 'promotional_splash_list' in allowed_sections %}
-    <a class="flex items-center gap-4 px-4 py-3 transition-all duration-300 {% if 'promotional_splash' in url_name %}bg-purple-500/10 text-purple-400 border-r-4 border-purple-500 font-semibold rounded-l-lg{% else %}text-slate-400 hover:text-white hover:bg-slate-800/50{% endif %}" href="{% url 'custom_admin:promotional_splash_list' %}">
-      <span class="material-symbols-outlined">ad</span>
-      <span class="text-sm tracking-wide font-headline">Promo Splashes</span>
-    </a>
-    {% endif %}
-{% endwith %}
+    <details class="nav-group" data-nav-group="overview" open>
+      <summary>Overview</summary>
+      {% if 'dashboard' in allowed_sections %}
+      <a class="nav-i {% if url_name == 'dashboard' %}on{% endif %}" href="{% url 'custom_admin:dashboard' %}"><span class="ic material-symbols-rounded">space_dashboard</span><span>Dashboard</span></a>
+      {% endif %}
+      {% if 'analytics' in allowed_sections %}
+      <a class="nav-i {% if url_name == 'analytics' %}on{% endif %}" href="{% url 'custom_admin:analytics' %}"><span class="ic material-symbols-rounded">insights</span><span>Analytics</span></a>
+      {% endif %}
+      {% if 'analytics_charts' in allowed_sections %}
+      <a class="nav-i {% if url_name == 'analytics_charts' %}on{% endif %}" href="{% url 'custom_admin:analytics_charts' %}"><span class="ic material-symbols-rounded">bar_chart</span><span>Charts</span></a>
+      {% endif %}
+      {% if 'content_calendar' in allowed_sections %}
+      <a class="nav-i {% if url_name == 'content_calendar' %}on{% endif %}" href="{% url 'custom_admin:content_calendar' %}"><span class="ic material-symbols-rounded">calendar_month</span><span>Content Calendar</span></a>
+      {% endif %}
+    </details>
+    <details class="nav-group" data-nav-group="content">
+      <summary>Content</summary>
+      {% if 'articles_list' in allowed_sections %}
+      <a class="nav-i {% if 'article' in url_name and 'category' not in url_name %}on{% endif %}" href="{% url 'custom_admin:articles_list' %}"><span class="ic material-symbols-rounded">article</span><span>Articles</span></a>
+      {% endif %}
+      {% if 'news_scraper' in allowed_sections %}
+      <a class="nav-i {% if 'news_scraper' in url_name or 'news_sources' in url_name %}on{% endif %}" href="{% url 'custom_admin:news_scraper' %}"><span class="ic material-symbols-rounded">travel_explore</span><span>News Scraper</span></a>
+      {% endif %}
+      {% if 'magazines_list' in allowed_sections %}
+      <a class="nav-i {% if 'magazine' in url_name %}on{% endif %}" href="{% url 'custom_admin:magazines_list' %}"><span class="ic material-symbols-rounded">auto_stories</span><span>Magazine</span></a>
+      {% endif %}
+      {% if 'facts_list' in allowed_sections %}
+      <a class="nav-i {% if 'fact' in url_name and 'categor' not in url_name %}on{% endif %}" href="{% url 'custom_admin:facts_list' %}"><span class="ic material-symbols-rounded">format_quote</span><span>Facts &amp; Quotes</span></a>
+      {% endif %}
+      {% if 'facts_list' in allowed_sections %}
+      <a class="nav-i {% if 'fact_categor' in url_name %}on{% endif %}" href="{% url 'custom_admin:fact_categories_list' %}"><span class="ic material-symbols-rounded">sell</span><span>Fact Categories</span></a>
+      {% endif %}
+      {% if 'hero_slides_list' in allowed_sections %}
+      <a class="nav-i {% if 'hero_slide' in url_name %}on{% endif %}" href="{% url 'custom_admin:hero_slides_list' %}"><span class="ic material-symbols-rounded">view_carousel</span><span>Hero Slides</span></a>
+      {% endif %}
+      {% if 'hero_text_list' in allowed_sections %}
+      <a class="nav-i {% if 'hero_text' in url_name %}on{% endif %}" href="{% url 'custom_admin:hero_text_list' %}"><span class="ic material-symbols-rounded">title</span><span>Hero Text</span></a>
+      {% endif %}
+      {% if 'feature_cards_list' in allowed_sections %}
+      <a class="nav-i {% if 'feature_card' in url_name %}on{% endif %}" href="{% url 'custom_admin:feature_cards_list' %}"><span class="ic material-symbols-rounded">auto_awesome</span><span>Feature Cards</span></a>
+      {% endif %}
+      {% if 'categories_list' in allowed_sections %}
+      <a class="nav-i {% if 'categor' in url_name and 'fact' not in url_name %}on{% endif %}" href="{% url 'custom_admin:categories_list' %}"><span class="ic material-symbols-rounded">category</span><span>Categories</span></a>
+      {% endif %}
+      {% if 'gallery_list' in allowed_sections %}
+      <a class="nav-i {% if 'gallery' in url_name %}on{% endif %}" href="{% url 'custom_admin:gallery_list' %}"><span class="ic material-symbols-rounded">photo_library</span><span>Gallery</span></a>
+      {% endif %}
+      {% if 'videos_list' in allowed_sections %}
+      <a class="nav-i {% if 'video' in url_name %}on{% endif %}" href="{% url 'custom_admin:videos_list' %}"><span class="ic material-symbols-rounded">smart_display</span><span>Videos</span></a>
+      {% endif %}
+      {% if 'resources_list' in allowed_sections %}
+      <a class="nav-i {% if 'resource' in url_name %}on{% endif %}" href="{% url 'custom_admin:resources_list' %}"><span class="ic material-symbols-rounded">folder_zip</span><span>Resources</span></a>
+      {% endif %}
+      {% if 'reorder' in allowed_sections %}
+      <a class="nav-i {% if 'reorder' in url_name %}on{% endif %}" href="{% url 'custom_admin:reorder' %}"><span class="ic material-symbols-rounded">swap_vert</span><span>Reorder Items</span></a>
+      {% endif %}
+      {% if 'quick_access_list' in allowed_sections %}
+      <a class="nav-i {% if 'quick_access' in url_name %}on{% endif %}" href="{% url 'custom_admin:quick_access_list' %}"><span class="ic material-symbols-rounded">bolt</span><span>Quick Access</span></a>
+      {% endif %}
+      {% if 'priority_agendas_list' in allowed_sections %}
+      <a class="nav-i {% if 'priority_agenda' in url_name %}on{% endif %}" href="{% url 'custom_admin:priority_agendas_list' %}"><span class="ic material-symbols-rounded">flag</span><span>Priority Agendas</span></a>
+      {% endif %}
+      {% if 'about_features_list' in allowed_sections %}
+      <a class="nav-i {% if 'about_feature' in url_name %}on{% endif %}" href="{% url 'custom_admin:about_features_list' %}"><span class="ic material-symbols-rounded">info</span><span>About Features</span></a>
+      {% endif %}
+    </details>
+    <details class="nav-group" data-nav-group="people">
+      <summary>Events &amp; People</summary>
+      {% if 'events_list' in allowed_sections %}
+      <a class="nav-i {% if url_name in 'events_list event_create event_edit' %}on{% endif %}" href="{% url 'custom_admin:events_list' %}"><span class="ic material-symbols-rounded">event</span><span>Events</span></a>
+      {% endif %}
+      {% if 'event_registrations_list' in allowed_sections %}
+      <a class="nav-i {% if 'event_registration' in url_name %}on{% endif %}" href="{% url 'custom_admin:event_registrations_list' %}"><span class="ic material-symbols-rounded">how_to_reg</span><span>Event Registrations</span></a>
+      {% endif %}
+      {% if 'event_speakers_list' in allowed_sections %}
+      <a class="nav-i {% if 'event_speaker' in url_name %}on{% endif %}" href="{% url 'custom_admin:event_speakers_list' %}"><span class="ic material-symbols-rounded">record_voice_over</span><span>Event Speakers</span></a>
+      {% endif %}
+      {% if 'users_list' in allowed_sections %}
+      <a class="nav-i {% if 'users' in url_name %}on{% endif %}" href="{% url 'custom_admin:users_list' %}"><span class="ic material-symbols-rounded">group</span><span>User Management</span></a>
+      {% endif %}
+      {% if 'device_bans_list' in allowed_sections %}
+      <a class="nav-i {% if 'device_ban' in url_name %}on{% endif %}" href="{% url 'custom_admin:device_bans_list' %}"><span class="ic material-symbols-rounded">phonelink_erase</span><span>Device Bans</span></a>
+      {% endif %}
+      {% if 'verification_requests_list' in allowed_sections %}
+      <a class="nav-i {% if 'verification' in url_name %}on{% endif %}" href="{% url 'custom_admin:verification_requests_list' %}"><span class="ic material-symbols-rounded">verified</span><span>Verification</span></a>
+      {% endif %}
+      {% if 'users_list' in allowed_sections %}
+      <a class="nav-i {% if 'admin_management' in url_name %}on{% endif %}" href="{% url 'custom_admin:admin_management' %}"><span class="ic material-symbols-rounded">admin_panel_settings</span><span>Admin Team</span></a>
+      {% endif %}
+      {% if 'youth_dialogue_list' in allowed_sections %}
+      <a class="nav-i {% if 'youth_dialogue' in url_name %}on{% endif %}" href="{% url 'custom_admin:youth_dialogue_list' %}"><span class="ic material-symbols-rounded">diversity_3</span><span>Continental Dialogue</span></a>
+      {% endif %}
+      {% if 'qr_scan_log' in allowed_sections %}
+      <a class="nav-i {% if 'qr_scan' in url_name %}on{% endif %}" href="{% url 'custom_admin:qr_scan_log' %}"><span class="ic material-symbols-rounded">qr_code_scanner</span><span>QR Scan Log</span></a>
+      {% endif %}
+    </details>
+    <details class="nav-group" data-nav-group="engage">
+      <summary>Engagement</summary>
+      {% if 'polls_list' in allowed_sections %}
+      <a class="nav-i {% if 'poll' in url_name %}on{% endif %}" href="{% url 'custom_admin:polls_list' %}"><span class="ic material-symbols-rounded">ballot</span><span>Polls</span></a>
+      {% endif %}
+      {% if 'discussions_list' in allowed_sections %}
+      <a class="nav-i {% if 'discussion' in url_name %}on{% endif %}" href="{% url 'custom_admin:discussions_list' %}"><span class="ic material-symbols-rounded">forum</span><span>Discussions</span></a>
+      {% endif %}
+      {% if 'comments_list' in allowed_sections %}
+      <a class="nav-i {% if 'comment' in url_name %}on{% endif %}" href="{% url 'custom_admin:comments_list' %}"><span class="ic material-symbols-rounded">mode_comment</span><span>Comments</span></a>
+      {% endif %}
+      {% if 'announcements_list' in allowed_sections %}
+      <a class="nav-i {% if 'announcement' in url_name %}on{% endif %}" href="{% url 'custom_admin:announcements_list' %}"><span class="ic material-symbols-rounded">campaign</span><span>Announcements</span></a>
+      {% endif %}
+      {% if 'discussion_topics_list' in allowed_sections %}
+      <a class="nav-i {% if 'discussion_topic' in url_name %}on{% endif %}" href="{% url 'custom_admin:discussion_topics_list' %}"><span class="ic material-symbols-rounded">forum</span><span>Explore Topics</span></a>
+      {% endif %}
+      {% if 'content_reports_list' in allowed_sections %}
+      <a class="nav-i {% if 'content_report' in url_name %}on{% endif %}" href="{% url 'custom_admin:content_reports_list' %}"><span class="ic material-symbols-rounded">flag</span><span>Reported Content</span></a>
+      {% endif %}
+      {% if 'emergency_contacts_list' in allowed_sections %}
+      <a class="nav-i {% if 'emergency_contact' in url_name %}on{% endif %}" href="{% url 'custom_admin:emergency_contacts_list' %}"><span class="ic material-symbols-rounded">emergency</span><span>Emergency Contacts</span></a>
+      {% endif %}
+      {% if 'contact_directory_list' in allowed_sections %}
+      <a class="nav-i {% if 'contact_directory' in url_name %}on{% endif %}" href="{% url 'custom_admin:contact_directory_list' %}"><span class="ic material-symbols-rounded">contacts</span><span>Contact Directory</span></a>
+      {% endif %}
+      {% if 'support_tickets_list' in allowed_sections %}
+      <a class="nav-i {% if 'support_ticket' in url_name %}on{% endif %}" href="{% url 'custom_admin:support_tickets_list' %}"><span class="ic material-symbols-rounded">support_agent</span><span>Support Tickets</span></a>
+      {% endif %}
+    </details>
+    <details class="nav-group" data-nav-group="comms">
+      <summary>Comms &amp; Email</summary>
+      {% if 'notifications_list' in allowed_sections %}
+      <a class="nav-i {% if 'notification' in url_name and 'admin_notif' not in url_name %}on{% endif %}" href="{% url 'custom_admin:notifications_list' %}"><span class="ic material-symbols-rounded">notifications_active</span><span>Push Notifications</span></a>
+      {% endif %}
+      {% if 'live_feeds_list' in allowed_sections %}
+      <a class="nav-i {% if 'live_feed' in url_name %}on{% endif %}" href="{% url 'custom_admin:live_feeds_list' %}"><span class="ic material-symbols-rounded">sensors</span><span>Live Feeds</span></a>
+      {% endif %}
+      {% if 'app_releases_list' in allowed_sections %}
+      <a class="nav-i {% if 'app_release' in url_name %}on{% endif %}" href="{% url 'custom_admin:app_releases_list' %}"><span class="ic material-symbols-rounded">rocket_launch</span><span>What&rsquo;s New / Releases</span></a>
+      {% endif %}
+      {% if 'promotional_splash_list' in allowed_sections %}
+      <a class="nav-i {% if 'promotional_splash' in url_name %}on{% endif %}" href="{% url 'custom_admin:promotional_splash_list' %}"><span class="ic material-symbols-rounded">ad_units</span><span>Promo Splashes</span></a>
+      {% endif %}
+      {% if 'social_media_list' in allowed_sections %}
+      <a class="nav-i {% if 'social_media' in url_name %}on{% endif %}" href="{% url 'custom_admin:social_media_list' %}"><span class="ic material-symbols-rounded">share</span><span>Social Media</span></a>
+      {% endif %}
+      {% if 'email_campaigns_list' in allowed_sections %}
+      <a class="nav-i {% if 'email_campaign' in url_name %}on{% endif %}" href="{% url 'custom_admin:email_campaigns_list' %}"><span class="ic material-symbols-rounded">send</span><span>Email Campaigns</span></a>
+      {% endif %}
+      {% if 'email_templates_list' in allowed_sections %}
+      <a class="nav-i {% if 'email_template' in url_name %}on{% endif %}" href="{% url 'custom_admin:email_templates_list' %}"><span class="ic material-symbols-rounded">drafts</span><span>Email Templates</span></a>
+      {% endif %}
+      {% if 'email_logs_list' in allowed_sections %}
+      <a class="nav-i {% if 'email_log' in url_name %}on{% endif %}" href="{% url 'custom_admin:email_logs_list' %}"><span class="ic material-symbols-rounded">mark_email_read</span><span>Email Logs</span></a>
+      {% endif %}
+      {% if 'email_inbox' in allowed_sections %}
+      <a class="nav-i {% if 'email_inbox' in url_name %}on{% endif %}" href="{% url 'custom_admin:email_inbox' %}"><span class="ic material-symbols-rounded">inbox</span><span>Email Inbox</span></a>
+      {% endif %}
+      {% if 'newsletter_editions_list' in allowed_sections %}
+      <a class="nav-i {% if 'newsletter' in url_name %}on{% endif %}" href="{% url 'custom_admin:newsletter_editions_list' %}"><span class="ic material-symbols-rounded">newspaper</span><span>Newsletters</span></a>
+      {% endif %}
+    </details>
+    <details class="nav-group" data-nav-group="services">
+      <summary>Services</summary>
+      {% if 'weather_cities_list' in allowed_sections %}
+      <a class="nav-i {% if 'weather' in url_name %}on{% endif %}" href="{% url 'custom_admin:weather_cities_list' %}"><span class="ic material-symbols-rounded">partly_cloudy_day</span><span>Weather Cities</span></a>
+      {% endif %}
+      {% if 'phrasebook_list' in allowed_sections %}
+      <a class="nav-i {% if 'phrasebook' in url_name %}on{% endif %}" href="{% url 'custom_admin:phrasebook_list' %}"><span class="ic material-symbols-rounded">translate</span><span>Phrasebook</span></a>
+      {% endif %}
+      {% if 'onboarding_steps_list' in allowed_sections %}
+      <a class="nav-i {% if 'onboarding' in url_name %}on{% endif %}" href="{% url 'custom_admin:onboarding_steps_list' %}"><span class="ic material-symbols-rounded">flag_circle</span><span>Onboarding Steps</span></a>
+      {% endif %}
+    </details>
+    <details class="nav-group" data-nav-group="admin">
+      <summary>Administration</summary>
+      {% if 'app_settings' in allowed_sections %}
+      <a class="nav-i {% if 'app_settings' in url_name %}on{% endif %}" href="{% url 'custom_admin:app_settings' %}"><span class="ic material-symbols-rounded">tune</span><span>Settings</span></a>
+      {% endif %}
+      {% if 'rate_limiting' in allowed_sections %}
+      <a class="nav-i {% if 'rate_limiting' in url_name %}on{% endif %}" href="{% url 'custom_admin:rate_limiting' %}"><span class="ic material-symbols-rounded">speed</span><span>Rate Limiting</span></a>
+      {% endif %}
+      {% if 'audit_log' in allowed_sections %}
+      <a class="nav-i {% if 'audit_log' in url_name %}on{% endif %}" href="{% url 'custom_admin:audit_log' %}"><span class="ic material-symbols-rounded">history</span><span>Audit Log</span></a>
+      {% endif %}
+      {% if 'activity_log' in allowed_sections %}
+      <a class="nav-i {% if 'activity_log' in url_name %}on{% endif %}" href="{% url 'custom_admin:activity_log' %}"><span class="ic material-symbols-rounded">manage_history</span><span>Activity Log</span></a>
+      {% endif %}
+      {% if 'translation_manager' in allowed_sections %}
+      <a class="nav-i {% if 'translation' in url_name %}on{% endif %}" href="{% url 'custom_admin:translation_manager' %}"><span class="ic material-symbols-rounded">g_translate</span><span>Translations</span></a>
+      {% endif %}
+      {% if 'system_health' in allowed_sections %}
+      <a class="nav-i {% if 'system_health' in url_name %}on{% endif %}" href="{% url 'custom_admin:system_health' %}"><span class="ic material-symbols-rounded">monitor_heart</span><span>System Health</span></a>
+      {% endif %}
+      {% if 'database_backup' in allowed_sections %}
+      <a class="nav-i {% if 'database_backup' in url_name %}on{% endif %}" href="{% url 'custom_admin:database_backup' %}"><span class="ic material-symbols-rounded">database</span><span>Database</span></a>
+      {% endif %}
+      {% if 'error_tracking' in allowed_sections %}
+      <a class="nav-i {% if 'error_tracking' in url_name %}on{% endif %}" href="{% url 'custom_admin:error_tracking' %}"><span class="ic material-symbols-rounded">bug_report</span><span>Error Tracking</span></a>
+      {% endif %}
+      {% if 'maintenance_list' in allowed_sections %}
+      <a class="nav-i {% if 'maintenance' in url_name %}on{% endif %}" href="{% url 'custom_admin:maintenance_list' %}"><span class="ic material-symbols-rounded">construction</span><span>Maintenance</span></a>
+      {% endif %}
+    </details>
+    {% endwith %}
   </nav>
 
   <!-- User menu at bottom -->
-  <div class="mt-auto pt-6 px-4 border-t border-white/10">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white font-bold">{% if user.first_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</div>
-      <div class="flex-1">
-        <p class="text-sm font-bold text-white">{{ user.get_full_name|default:user.username }}</p>
-        <p class="text-[10px] text-slate-500 uppercase tracking-wider">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
+  <div class="mt-auto pt-3.5 px-2 border-t border-white/10">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-[9px] bg-gold flex items-center justify-center text-[#231a02] text-xs font-extrabold flex-shrink-0">{% if user.first_name %}{{ user.first_name|first|upper }}{% else %}{{ user.username|first|upper }}{% endif %}</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs font-bold text-cream truncate">{{ user.get_full_name|default:user.username }}</p>
+        <p class="text-[10px] text-[#8fae9e]">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
       </div>
-      <a href="{% url 'custom_admin:logout' %}" class="text-slate-400 hover:text-red-400 transition-colors" title="Logout">
+      <a href="{% url 'custom_admin:logout' %}" class="text-[#8fae9e] hover:text-red-400 transition-colors" title="Logout">
         <span class="material-symbols-outlined text-sm">logout</span>
       </a>
     </div>
@@ -1025,9 +806,9 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 </aside>
 
 <!-- Main Content -->
-<main class="main-content ml-72 min-h-screen relative">
+<main class="main-content ml-[236px] min-h-screen relative">
   <!-- Top Bar -->
-  <header class="top-header fixed top-0 right-0 w-[calc(100%-18rem)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
+  <header class="top-header fixed top-0 right-0 w-[calc(100%-236px)] z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/50 flex justify-between items-center h-20 px-12 transition-colors duration-200">
     <div class="flex items-center gap-4 lg:gap-6">
       <!-- Hamburger button (mobile only) -->
       <button id="sidebarToggle" class="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors" aria-label="Open sidebar">
@@ -1035,13 +816,10 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       </button>
       <!-- Embassy of Burundi · Addis Ababa logo lockup -->
       <a href="{% url 'custom_admin:dashboard' %}" class="flex items-center gap-3 group" title="Embassy of Burundi — Addis Ababa">
-        <!-- Republic of Burundi Coat of Arms -->
-        <img src="{% static 'img/burundi_coat_of_arms.svg' %}" alt="Republic of Burundi" class="w-11 h-11 object-contain drop-shadow group-hover:scale-105 transition-transform" />
-        <!-- African Union Emblem — color in light mode, white in dark mode -->
-        <img src="{% static 'img/au_emblem.svg' %}" alt="African Union" class="w-10 h-10 object-contain hidden sm:block dark:[filter:brightness(0)_invert(1)]" />
+        <img src="{% static 'img/b4africa_icon.png' %}" alt="Be 4 Africa" class="w-11 h-11 object-contain group-hover:scale-105 transition-transform" />
         <div class="hidden md:flex flex-col leading-tight">
           <span class="header-title text-sm font-black text-slate-900 dark:text-slate-100 font-headline tracking-tight">Embassy of Burundi</span>
-          <span class="text-[10px] font-semibold uppercase tracking-[0.15em] text-amber-600 dark:text-amber-400">Addis Ababa &middot; Diplomatic Portal</span>
+          <span class="font-label text-[9px] uppercase tracking-[2px] text-amber-600 dark:text-amber-400">Addis Ababa &middot; Diplomatic Portal</span>
         </div>
       </a>
     </div>
@@ -1056,7 +834,7 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
           name="q"
           placeholder="Search users, articles, events..."
           autocomplete="off"
-          class="header-search-input w-full bg-slate-100 border border-slate-200 rounded-xl py-2.5 pl-11 pr-10 text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 focus:bg-white focus:outline-none transition-all duration-200"
+          class="header-search-input w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-11 pr-10 text-[13px] text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 focus:bg-white focus:outline-none transition-all duration-200"
         />
         <kbd id="globalSearchKbd" class="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 bg-slate-200/60 rounded border border-slate-300/50 pointer-events-none">/</kbd>
       </form>
@@ -1156,15 +934,15 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
       <div class="flex items-center gap-3 pl-6 border-l border-slate-200">
         <div class="text-right">
           <p class="text-xs font-bold text-slate-900">{{ user.get_full_name|default:user.username }}</p>
-          <p class="text-[10px] text-slate-500 uppercase tracking-tighter">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
+          <p class="font-label text-[9px] text-slate-500 uppercase tracking-[1px]">{% if user.is_superuser %}Super Admin{% else %}Staff{% endif %}</p>
         </div>
-        <div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-white font-bold shadow-sm">{{ user.username.0|upper }}</div>
+        <div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center text-cream font-bold shadow-sm">{{ user.username.0|upper }}</div>
       </div>
     </div>
   </header>
 
   <!-- Content Area -->
-  <section class="content-area pt-32 px-12 pb-12 bg-surface min-h-screen">
+  <section class="content-area pt-28 px-9 pb-10 bg-surface min-h-screen">
     <!-- Django Messages -->
     {% if messages %}
     <div class="mb-8 space-y-3">
@@ -1183,7 +961,7 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
   <!-- Footer -->
   <footer class="p-12 bg-surface text-center">
     <div class="h-px bg-slate-200 w-full mb-8"></div>
-    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">&copy; 2026 Be 4 Africa &bull; Minist&egrave;re des Affaires &Eacute;trang&egrave;res</p>
+    <p class="font-label text-[10px] text-slate-400 uppercase tracking-[2px]">&copy; 2026 Be 4 Africa &bull; Minist&egrave;re des Affaires &Eacute;trang&egrave;res</p>
   </footer>
 </main>
 
@@ -1193,6 +971,25 @@ h1, h2, h3, h4 { font-family: 'Manrope', sans-serif; }
 {% endif %}
 
 <script>
+// Sidebar nav groups: remember which are open
+(function() {
+  var groups = document.querySelectorAll('.nav-group[data-nav-group]');
+  if (!groups.length) return;
+  groups.forEach(function(g) {
+    var key = 'navGroup:' + g.dataset.navGroup;
+    // A group holding the active item always opens, whatever was stored.
+    if (g.querySelector('.nav-i.on')) {
+      g.open = true;
+    } else {
+      var saved = localStorage.getItem(key);
+      if (saved !== null) g.open = saved === '1';
+    }
+    g.addEventListener('toggle', function() {
+      localStorage.setItem(key, g.open ? '1' : '0');
+    });
+  });
+})();
+
 // Dark mode toggle function
 function toggleDarkMode() {
   document.documentElement.classList.toggle('dark');

@@ -4,8 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 import '../../services/api_service.dart';
-import '../../widgets/translate_button.dart';
+import '../../widgets/ds/ds_widgets.dart';
 
 class SocialMediaScreen extends StatefulWidget {
   const SocialMediaScreen({super.key});
@@ -194,235 +195,105 @@ class _SocialMediaScreenState extends State<SocialMediaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fr = Localizations.localeOf(context).languageCode == 'fr';
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: Text(fr ? 'Suivez-nous' : 'Follow us')),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : RefreshIndicator(
+              color: Ds.green,
               onRefresh: () async {
                 HapticFeedback.mediumImpact();
                 await _loadSocialMedia();
               },
-              child: CustomScrollView(
-                slivers: [
-                  // App Bar
-                  SliverAppBar(
-                    expandedHeight: 140,
-                    pinned: true,
-                    backgroundColor: AppColors.burundiGreen,
-                    actions: const [TranslateButton()],
-                    flexibleSpace: FlexibleSpaceBar(
-                      title: const Text(
-                        'Social Media',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 32),
+                children: [
+                  DsCard(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                    child: Column(
+                      children: [
+                        Text(
+                          fr
+                              ? 'Restez connecté avec la présidence'
+                              : 'Stay connected with the chairmanship',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Ds.ink(context)),
                         ),
-                      ),
-                      background: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.burundiGreen,
-                              AppColors.auGold,
-                            ],
-                          ),
+                        const SizedBox(height: 5),
+                        Text(
+                          fr
+                              ? 'Canaux officiels uniquement — cherchez le badge vérifié.'
+                              : 'Official channels only — look for the verified badge.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 13, height: 1.5, color: Ds.body(context)),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(height: 40),
-                            Icon(
-                              Icons.share,
-                              size: 48,
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ),
                   ),
-
-                  // Info Section
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverToBoxAdapter(
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withValues(alpha: isDark ? 0.15 : 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, color: AppColors.info),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Stay connected with us on social media for the latest updates, news, and events.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isDark ? Colors.white70 : Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                  for (final social in socialMedia)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: _buildSocialMediaCard(social, fr),
                     ),
-                  ),
-
-                  // Social Media Cards
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (index >= socialMedia.length) return null;
-                          return _buildSocialMediaCard(socialMedia[index], isDark);
-                        },
-                      ),
-                    ),
-                  ),
-
-                  const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildSocialMediaCard(Map<String, dynamic> social, bool isDark) {
+  Widget _buildSocialMediaCard(Map<String, dynamic> social, bool fr) {
     final color = _parseHexColor(social['icon_color'] as String?);
     final icon = _platformIcon(social['platform'] as String?);
-    final cardColor = isDark ? AppColors.darkSurface : Colors.white;
-    final titleColor = isDark ? Colors.white : Colors.black87;
-    final handleColor = isDark ? Colors.white54 : Colors.grey[600]!;
-    final descriptionColor = isDark ? Colors.white60 : Colors.grey[700]!;
     final platform = social['platform'] as String?;
+    final followers = social['follower_count']?.toString() ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    return DsCard(
+      onTap: () => _launchURL(social['url'] ?? ''),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(Ds.rTile),
+            ),
+            child: Center(child: FaIcon(icon, color: Colors.white, size: 18)),
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _launchURL(social['url'] ?? ''),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Platform Icon
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: FaIcon(
-                      icon,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
+                Text(
+                  social['handle']?.toString().isNotEmpty == true
+                      ? social['handle']
+                      : (social['display_name'] ?? social['name'] ?? ''),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Ds.cardTitle(context),
                 ),
-
-                const SizedBox(width: 16),
-
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        social['display_name'] ?? social['name'] ?? '',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: titleColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        social['handle'] ?? '',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: handleColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Follower count with label
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.people_outline, size: 14, color: color),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${social['follower_count'] ?? '0'} ${_followerLabel(platform)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: color,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (social['description'] != null && (social['description'] as String).isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          social['description'],
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: descriptionColor,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Open Button
-                Icon(
-                  Icons.open_in_new,
-                  color: color,
-                  size: 20,
-                ),
+                if (followers.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text('$followers ${_followerLabel(platform)}',
+                      style: Ds.meta(context)),
+                ],
               ],
             ),
           ),
-        ),
+          const SizedBox(width: 10),
+          DsOutlineButton(fr ? 'Suivre' : 'Follow',
+              radius: Ds.rPill, onTap: () => _launchURL(social['url'] ?? '')),
+        ],
       ),
     );
   }

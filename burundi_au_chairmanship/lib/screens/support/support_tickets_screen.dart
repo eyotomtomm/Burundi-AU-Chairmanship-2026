@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
 
@@ -169,18 +171,15 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
     commentController.dispose();
   }
 
-  Color _statusColor(String status) {
+  DsTone _statusTone(String status) {
     switch (status) {
       case 'open':
-        return Colors.orange;
+        return DsTone.gold;
       case 'in_progress':
-        return AppColors.burundiGreen;
       case 'resolved':
-        return AppColors.burundiGreen;
-      case 'closed':
-        return Colors.grey;
+        return DsTone.green;
       default:
-        return Colors.grey;
+        return DsTone.neutral;
     }
   }
 
@@ -216,15 +215,9 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Support Tickets'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: const Text('Support')),
       body: _isLoading
           ? const ShimmerListItemSkeleton()
           : _error != null
@@ -232,148 +225,140 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                      Icon(Icons.error_outline, size: 48, color: Ds.muted(context)),
                       const SizedBox(height: 16),
                       Text('Failed to load tickets',
-                          style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
-                      const SizedBox(height: 8),
-                      TextButton(onPressed: _loadTickets, child: const Text('Retry')),
+                          style: TextStyle(color: Ds.body(context))),
+                      const SizedBox(height: 16),
+                      DsOutlineButton('Retry', radius: Ds.rPill, onTap: _loadTickets),
                     ],
                   ),
                 )
-              : _tickets.isEmpty
-                  ? _buildEmptyState(isDark)
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        HapticFeedback.mediumImpact();
-                        await _loadTickets();
-                      },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _tickets.length,
-                        itemBuilder: (context, index) => _buildTicketCard(_tickets[index], isDark),
-                      ),
-                    ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          HapticFeedback.lightImpact();
-          final result = await Navigator.pushNamed(context, '/contact-support');
-          if (result == true) _loadTickets();
-        },
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('New Ticket'),
+              : RefreshIndicator(
+                  color: Ds.green,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    await _loadTickets();
+                  },
+                  child: ListView(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    children: [
+                      _buildNewTicketCard(),
+                      if (_tickets.isEmpty)
+                        _buildEmptyState()
+                      else ...[
+                        const DsGroupLabel('My tickets',
+                            padding: EdgeInsets.fromLTRB(22, 20, 22, 8)),
+                        for (final ticket in _tickets) _buildTicketCard(ticket),
+                      ],
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildNewTicketCard() {
+    return DsCard(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      onTap: () async {
+        HapticFeedback.lightImpact();
+        final result = await Navigator.pushNamed(context, '/contact-support');
+        if (result == true) _loadTickets();
+      },
+      child: Row(
+        children: [
+          DsIconSquare(Icons.chat_rounded,
+              tint: Ds.tint(context), color: Ds.green, size: 44, radius: Ds.rTile),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('New ticket',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Ds.ink(context))),
+                const SizedBox(height: 2),
+                Text('Nouveau ticket', style: Ds.meta(context)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 20, color: Ds.chevron),
+        ],
       ),
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.support_agent, size: 80,
-                color: isDark ? Colors.white24 : Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'No support tickets',
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
+      child: Column(
+        children: [
+          Icon(Icons.support_agent_rounded, size: 64, color: Ds.muted(context)),
+          const SizedBox(height: 16),
+          Text('No support tickets',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap the button below to create your first support request.',
+                  fontSize: 17, fontWeight: FontWeight.w700, color: Ds.ink(context))),
+          const SizedBox(height: 8),
+          Text('Open a ticket above and our team will get back to you.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark ? Colors.white38 : Colors.black38,
-              ),
-            ),
-          ],
-        ),
+              style: TextStyle(fontSize: 14, height: 1.5, color: Ds.body(context))),
+        ],
       ),
     );
   }
 
-  Widget _buildTicketCard(Map<String, dynamic> ticket, bool isDark) {
-    final status = ticket['status'] ?? 'open';
-    final hasRating = ticket['rating'] != null && ticket['rating'] > 0;
+  Widget _buildTicketCard(Map<String, dynamic> ticket) {
+    final status = (ticket['status'] ?? 'open').toString();
+    final rating = ticket['rating'] as int? ?? 0;
+    final reference = ticket['id'] == null ? '' : '#T-${ticket['id']}';
+    final meta = [
+      if (reference.isNotEmpty) reference,
+      if (_timeAgo(ticket['updated_at']).isNotEmpty)
+        'Updated ${_timeAgo(ticket['updated_at'])}',
+    ].join(' · ');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: isDark ? Colors.grey[850] : Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    ticket['subject'] ?? 'No subject',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return DsCard(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  ticket['subject'] ?? 'No subject',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Ds.cardTitle(context),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _statusColor(status).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _statusLabel(status),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _statusColor(status),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              DsPill(_statusLabel(status), tone: _statusTone(status), dense: true),
+            ],
+          ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(meta, style: Ds.meta(context)),
+          ],
+          if (status == 'resolved' && rating > 0) ...[
             const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _timeAgo(ticket['updated_at']),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.white38 : Colors.black38,
-                  ),
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(
+                5,
+                (i) => Icon(
+                  i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 16,
+                  color: i < rating ? Ds.gold : Ds.outline(context),
                 ),
-                if (status == 'resolved' && hasRating)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(5, (i) => Icon(
-                      i < (ticket['rating'] as int)
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      size: 16,
-                      color: i < (ticket['rating'] as int)
-                          ? Colors.amber
-                          : Colors.grey,
-                    )),
-                  ),
-              ],
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }

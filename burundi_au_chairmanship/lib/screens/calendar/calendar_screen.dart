@@ -4,11 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/location_model.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
-import '../../widgets/translate_button.dart';
+import '../../widgets/ds/ds_widgets.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -20,6 +21,10 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObserver {
   List<EventLocation>? _events;
   bool _isLoading = true;
+
+  /// First day of the month currently shown in the grid.
+  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDay;
 
   @override
   void initState() {
@@ -130,127 +135,267 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
     }
   }
 
+  static DateTime _dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Days in the shown month that have at least one event.
+  Set<int> get _eventDays => {
+        for (final e in _events ?? const <EventLocation>[])
+          if (e.eventDate.year == _month.year && e.eventDate.month == _month.month)
+            e.eventDate.day
+      };
+
+  List<EventLocation> get _dayEvents {
+    final day = _selectedDay;
+    if (day == null || _events == null) return const [];
+    return _events!.where((e) => _dayOf(e.eventDate) == day).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final langCode = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('calendar')),
-        actions: const [TranslateButton()],
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.burundiGreen, Color(0xFF0A5C1E)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.today_rounded),
+            tooltip: langCode == 'fr' ? "Aujourd'hui" : 'Today',
+            onPressed: () => setState(() {
+              final now = DateTime.now();
+              _month = DateTime(now.year, now.month);
+              _selectedDay = _dayOf(now);
+            }),
           ),
-        ),
-        foregroundColor: Colors.white,
-        elevation: 0,
+          const SizedBox(width: 4),
+        ],
       ),
       body: _isLoading
           ? const ShimmerCalendarSkeleton()
-          : _events == null || _events!.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.calendar_today_rounded, size: 56, color: Colors.grey[300]),
-                        const SizedBox(height: 16),
-                        Text(
-                          langCode == 'fr' ? 'Calendrier en préparation' : 'Calendar being prepared',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          langCode == 'fr'
-                              ? 'Les événements du sommet seront affichés ici dès leur publication.'
-                              : 'Summit events will appear here once they are published.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  color: AppColors.burundiGreen,
-                  onRefresh: () async {
-                    HapticFeedback.mediumImpact();
-                    await _loadEvents();
-                  },
-                  child: _buildEventsList(langCode),
-                ),
-    );
-  }
-
-  Widget _buildEventsList(String langCode) {
-    final grouped = <String, List<EventLocation>>{};
-    final dateFormat = DateFormat('EEEE, MMMM d, yyyy', langCode == 'fr' ? 'fr_FR' : 'en_US');
-
-    for (final event in _events!) {
-      final key = dateFormat.format(event.eventDate);
-      grouped.putIfAbsent(key, () => []).add(event);
-    }
-
-    final entries = grouped.entries.toList();
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final dateLabel = entries[index].key;
-        final events = entries[index].value;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Row(
+          : RefreshIndicator(
+              color: Ds.green,
+              onRefresh: () async {
+                HapticFeedback.mediumImpact();
+                await _loadEvents();
+              },
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 32),
                 children: [
-                  Container(
-                    width: 4,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.burundiGreen, AppColors.auGold],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      dateLabel,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.burundiGreen,
-                      ),
-                    ),
-                  ),
+                  _buildMonthGrid(langCode),
+                  if (_events == null || _events!.isEmpty)
+                    _buildEmptyState(langCode)
+                  else
+                    ..._buildAgenda(langCode),
                 ],
               ),
             ),
-            ...events.map((event) => _EventCard(
-              event: event,
-              langCode: langCode,
-              onAddToCalendar: () => _addToCalendar(event),
-            )),
-            if (index < entries.length - 1) const Divider(height: 24),
-          ],
-        );
-      },
     );
+  }
+
+  Widget _buildEmptyState(String langCode) => Padding(
+        padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
+        child: Column(
+          children: [
+            Icon(Icons.calendar_today_rounded, size: 56, color: Ds.muted(context)),
+            const SizedBox(height: 16),
+            Text(
+              langCode == 'fr' ? 'Calendrier en préparation' : 'Calendar being prepared',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: Ds.ink(context)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              langCode == 'fr'
+                  ? 'Les événements du sommet seront affichés ici dès leur publication.'
+                  : 'Summit events will appear here once they are published.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, height: 1.5, color: Ds.body(context)),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildMonthGrid(String langCode) {
+    final locale = langCode == 'fr' ? 'fr_FR' : 'en_US';
+    final monthLabel = DateFormat('MMMM yyyy', locale).format(_month);
+    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
+    // Monday-first grid, matching the M T W T F S S header in the comp.
+    final leadingBlanks = _month.weekday - DateTime.monday;
+    final eventDays = _eventDays;
+    final today = _dayOf(DateTime.now());
+
+    return DsCard(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _monthArrow(Icons.chevron_left_rounded, -1),
+              Expanded(
+                child: Text(monthLabel,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Ds.ink(context))),
+              ),
+              _monthArrow(Icons.chevron_right_rounded, 1),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final d in _weekdayInitials(locale))
+                Expanded(
+                  child: Text(d,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Ds.muted(context))),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          GridView.count(
+            crossAxisCount: 7,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+            childAspectRatio: 1.15,
+            children: [
+              for (var i = 0; i < leadingBlanks; i++) const SizedBox.shrink(),
+              for (var day = 1; day <= daysInMonth; day++)
+                _dayCell(day, eventDays.contains(day), today),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _legendDot(Ds.green, langCode == 'fr' ? 'Sélectionné' : 'Selected'),
+              const SizedBox(width: 14),
+              _legendDot(Ds.greenTint, langCode == 'fr' ? 'Événements' : 'Event days',
+                  outlined: true),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _weekdayInitials(String locale) {
+    final fmt = DateFormat('EEEEE', locale);
+    // 2024-01-01 was a Monday, so this walks Mon→Sun.
+    return [for (var i = 0; i < 7; i++) fmt.format(DateTime(2024, 1, 1 + i))];
+  }
+
+  Widget _monthArrow(IconData icon, int delta) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(
+            () => _month = DateTime(_month.year, _month.month + delta)),
+        child: SizedBox(
+            width: 34, height: 30, child: Icon(icon, size: 20, color: Ds.green)),
+      );
+
+  Widget _dayCell(int day, bool hasEvent, DateTime today) {
+    final date = DateTime(_month.year, _month.month, day);
+    final selected = _selectedDay == date;
+    final isToday = date == today;
+
+    Color? bg;
+    Color fg = Ds.ink(context);
+    FontWeight weight = FontWeight.w500;
+    if (selected) {
+      bg = Ds.green;
+      fg = Colors.white;
+      weight = FontWeight.w800;
+    } else if (hasEvent) {
+      bg = Ds.tint(context);
+      fg = Ds.greenDeep;
+      weight = FontWeight.w700;
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedDay = selected ? null : date),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(Ds.rIcon),
+          border: !selected && isToday
+              ? Border.all(color: Ds.green, width: 1.5)
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text('$day',
+            style: TextStyle(fontSize: 13, fontWeight: weight, color: fg)),
+      ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label, {bool outlined = false}) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: outlined ? Border.all(color: Ds.green) : null,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 11, color: Ds.muted(context))),
+        ],
+      );
+
+  /// Either the selected day's events, or every upcoming day grouped by date.
+  List<Widget> _buildAgenda(String langCode) {
+    final locale = langCode == 'fr' ? 'fr_FR' : 'en_US';
+    final headingFormat = DateFormat('EEEE d MMMM', locale);
+
+    if (_selectedDay != null) {
+      final events = _dayEvents;
+      return [
+        DsGroupLabel(headingFormat.format(_selectedDay!),
+            padding: const EdgeInsets.fromLTRB(22, 4, 22, 8)),
+        if (events.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 4, 22, 0),
+            child: Text(
+                langCode == 'fr'
+                    ? 'Aucun événement ce jour-là.'
+                    : 'No events on this day.',
+                style: TextStyle(fontSize: 13, color: Ds.body(context))),
+          )
+        else
+          ...events.map((e) => _EventCard(
+                event: e,
+                langCode: langCode,
+                onAddToCalendar: () => _addToCalendar(e),
+              )),
+      ];
+    }
+
+    final grouped = <String, List<EventLocation>>{};
+    for (final event in _events!) {
+      grouped.putIfAbsent(headingFormat.format(event.eventDate), () => []).add(event);
+    }
+    return [
+      for (final entry in grouped.entries) ...[
+        DsGroupLabel(entry.key, padding: const EdgeInsets.fromLTRB(22, 4, 22, 8)),
+        ...entry.value.map((e) => _EventCard(
+              event: e,
+              langCode: langCode,
+              onAddToCalendar: () => _addToCalendar(e),
+            )),
+        const SizedBox(height: 8),
+      ],
+    ];
   }
 }
 
@@ -268,140 +413,45 @@ class _EventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeFormat = DateFormat('HH:mm');
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+    return DsCard(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(15, 13, 15, 13),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: Ds.green,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(event.getName(langCode), style: Ds.cardTitle(context)),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${timeFormat.format(event.eventDate)} · ${event.address}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Ds.cardBody(context),
+                  ),
+                  const SizedBox(height: 10),
+                  DsOutlineButton(
+                    langCode == 'fr' ? 'Ajouter au calendrier' : 'Add to calendar',
+                    icon: Icons.calendar_month_rounded,
+                    radius: Ds.rPill,
+                    onTap: onAddToCalendar,
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.burundiGreen, Color(0xFF4CAF50)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      timeFormat.format(event.eventDate),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.getName(langCode),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      event.getDescription(langCode),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on_outlined, size: 14, color: AppColors.auGold),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            event.address,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.auGold,
-                              fontSize: 11,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Action buttons row
-                    Row(
-                      children: [
-                        // Add to Calendar button
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: onAddToCalendar,
-                            icon: const Icon(Icons.calendar_today, size: 16),
-                            label: Text(
-                              langCode == 'fr' ? 'Ajouter au calendrier' : 'Add to Calendar',
-                              style: const TextStyle(fontSize: 11),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.burundiGreen,
-                              side: const BorderSide(color: AppColors.burundiGreen),
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Set Reminder button
-                        OutlinedButton.icon(
-                          onPressed: onAddToCalendar,
-                          icon: const Icon(Icons.notifications_outlined, size: 16),
-                          label: Text(
-                            langCode == 'fr' ? 'Rappel' : 'Remind',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.auGold,
-                            side: const BorderSide(color: AppColors.auGold),
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

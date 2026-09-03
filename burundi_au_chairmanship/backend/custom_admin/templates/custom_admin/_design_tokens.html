@@ -1,0 +1,288 @@
+{% comment %}
+Design system for the admin portal — single source of truth for the
+"Admin Portal.dc.html" tokens. Included by base.html AND by the four
+standalone auth pages (login, TOTP verify/setup, forced password change),
+which do not extend base.html. Change a colour or font here, nowhere else.
+{% endcomment %}
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        // --- Design tokens from "Admin Portal.dc.html" ---
+        "deep": "#0b3d2e", "gold": "#c9a227", "cream": "#f2efe6",
+        // slate remapped to the design's green-tinted neutral ramp
+        "slate": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "gray": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        // amber remapped to gold
+        "amber": {
+          "50": "#faf6e8", "100": "#f3ecd7", "200": "#e9dcb0", "300": "#dcc77e",
+          "400": "#d4b54a", "500": "#c9a227", "600": "#a8850f", "700": "#8a6d13",
+          "800": "#6b540d", "900": "#4b3b08", "950": "#2e2405"
+        },
+        "yellow": {
+          "50": "#faf6e8", "100": "#f3ecd7", "200": "#e9dcb0", "300": "#dcc77e",
+          "400": "#d4b54a", "500": "#c9a227", "600": "#a8850f", "700": "#8a6d13",
+          "800": "#6b540d", "900": "#4b3b08", "950": "#2e2405"
+        },
+        // emerald / green remapped to the design green
+        "emerald": {
+          "50": "#e3f2e9", "100": "#cfe6d8", "200": "#a9d3ba", "300": "#7cbd97",
+          "400": "#45a173", "500": "#1a7a4f", "600": "#156943", "700": "#115737",
+          "800": "#0d442b", "900": "#0b3d2e", "950": "#062418"
+        },
+        "green": {
+          "50": "#e3f2e9", "100": "#cfe6d8", "200": "#a9d3ba", "300": "#7cbd97",
+          "400": "#45a173", "500": "#1a7a4f", "600": "#156943", "700": "#115737",
+          "800": "#0d442b", "900": "#0b3d2e", "950": "#062418"
+        },
+        "teal": {
+          "50": "#e3f2e9", "100": "#cfe6d8", "200": "#a9d3ba", "300": "#7cbd97",
+          "400": "#45a173", "500": "#1a7a4f", "600": "#156943", "700": "#115737",
+          "800": "#0d442b", "900": "#0b3d2e", "950": "#062418"
+        },
+        // red toned to the design's muted flag colour
+        "red": {
+          "50": "#f4e3e3", "100": "#ecd0d0", "200": "#dfaeac", "300": "#cd8886",
+          "400": "#bd605d", "500": "#b0413e", "600": "#9c3835", "700": "#83302d",
+          "800": "#682725", "900": "#4c1d1c", "950": "#2c1110"
+        },
+        "rose": {
+          "50": "#f4e3e3", "100": "#ecd0d0", "200": "#dfaeac", "300": "#cd8886",
+          "400": "#bd605d", "500": "#b0413e", "600": "#9c3835", "700": "#83302d",
+          "800": "#682725", "900": "#4c1d1c", "950": "#2c1110"
+        },
+        "blue": {
+          "50": "#faf6e8", "100": "#f3ecd7", "200": "#e9dcb0", "300": "#dcc77e",
+          "400": "#d4b54a", "500": "#c9a227", "600": "#a8850f", "700": "#8a6d13",
+          "800": "#6b540d", "900": "#4b3b08", "950": "#2e2405"
+        },
+        "sky": {
+          "50": "#faf6e8", "100": "#f3ecd7", "200": "#e9dcb0", "300": "#dcc77e",
+          "400": "#d4b54a", "500": "#c9a227", "600": "#a8850f", "700": "#8a6d13",
+          "800": "#6b540d", "900": "#4b3b08", "950": "#2e2405"
+        },
+        "indigo": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "purple": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "violet": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "cyan": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "pink": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "fuchsia": {
+          "50": "#f4f6f3", "100": "#e8efe9", "200": "#e2e8e0", "300": "#c2d2c6",
+          "400": "#93a89a", "500": "#5b6f63", "600": "#45584c", "700": "#2f4438",
+          "800": "#1a3327", "900": "#0b3d2e", "950": "#071f17"
+        },
+        "orange": {
+          "50": "#faf6e8", "100": "#f3ecd7", "200": "#e9dcb0", "300": "#dcc77e",
+          "400": "#d4b54a", "500": "#c9a227", "600": "#a8850f", "700": "#8a6d13",
+          "800": "#6b540d", "900": "#4b3b08", "950": "#2e2405"
+        },
+        // --- Material-ish semantic tokens, re-pointed at the design ---
+        "primary": "#0b3d2e", "on-primary": "#f2efe6",
+        "primary-container": "#0b3d2e", "on-primary-container": "#f2efe6",
+        "primary-fixed": "#e8efe9", "primary-fixed-dim": "#c2d2c6",
+        "on-primary-fixed": "#0f1f17", "on-primary-fixed-variant": "#8fae9e",
+        "inverse-primary": "#c2d2c6",
+        "secondary": "#c9a227", "on-secondary": "#231a02",
+        "secondary-container": "#f3ecd7", "on-secondary-container": "#8a6d13",
+        "secondary-fixed": "#f3ecd7", "secondary-fixed-dim": "#e9dcb0",
+        "on-secondary-fixed": "#4b3b08", "on-secondary-fixed-variant": "#8a6d13",
+        "tertiary": "#1a7a4f", "on-tertiary": "#ffffff",
+        "tertiary-container": "#e3f2e9", "on-tertiary-container": "#115737",
+        "tertiary-fixed": "#e3f2e9", "tertiary-fixed-dim": "#a9d3ba",
+        "on-tertiary-fixed": "#0d442b", "on-tertiary-fixed-variant": "#115737",
+        "error": "#b0413e", "on-error": "#ffffff",
+        "error-container": "#f4e3e3", "on-error-container": "#83302d",
+        "background": "#f4f6f3", "on-background": "#0f1f17",
+        "surface": "#f4f6f3", "on-surface": "#0f1f17",
+        "surface-dim": "#e2e8e0", "surface-bright": "#ffffff",
+        "surface-variant": "#e8efe9", "on-surface-variant": "#5b6f63",
+        "surface-container-lowest": "#ffffff", "surface-container-low": "#ffffff",
+        "surface-container": "#e8efe9", "surface-container-high": "#e2e8e0",
+        "surface-container-highest": "#d9e3db",
+        "surface-tint": "#0b3d2e",
+        "inverse-surface": "#0f1f17", "inverse-on-surface": "#e8efe9",
+        "outline": "#5b6f63", "outline-variant": "#e2e8e0"
+      },
+      fontFamily: {
+        "headline": ["Sora", "sans-serif"],
+        "body": ["Sora", "sans-serif"],
+        "label": ["IBM Plex Mono", "monospace"],
+        "mono": ["IBM Plex Mono", "monospace"]
+      },
+      borderRadius: {"DEFAULT": "0.25rem", "md": "0.5rem", "lg": "0.625rem", "xl": "1rem", "2xl": "1.25rem", "full": "9999px"},
+    },
+  },
+}
+</script>
+<style>
+/* === Design tokens — "Admin Portal.dc.html" === */
+:root{
+  --bg:#f4f6f3; --card:#ffffff; --line:#e2e8e0; --ink:#0f1f17; --sub:#5b6f63;
+  --deep:#0b3d2e; --gold:#c9a227; --green:#1a7a4f; --cream:#f2efe6;
+  --tint:#e8efe9; --hov:#eef2ec;
+}
+html.dark{
+  --bg:#0c120e; --card:#131a15; --line:#223026; --ink:#e8efe9; --sub:#8fa396;
+  --tint:#18271d; --hov:#18271d;
+}
+
+/* List headers, design-style: IBM Plex Mono micro-caps */
+thead th{
+  font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:500;
+  letter-spacing:1.5px; text-transform:uppercase;
+}
+
+/* === Shared component classes from the design === */
+.mono{ font-family:'IBM Plex Mono',monospace; }
+.eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--sub); }
+.pill{ font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:1px;
+  padding:3px 8px; border-radius:99px; display:inline-block; white-space:nowrap; }
+.tab{ padding:9px 18px; border-radius:10px; font-size:13px; font-weight:700;
+  color:var(--sub); cursor:pointer; border:1px solid transparent; }
+.tab:hover{ background:var(--hov); }
+.tab.on{ background:var(--card); color:var(--ink); border-color:var(--line);
+  box-shadow:0 1px 3px rgba(11,61,46,0.08); }
+.hero-banner{ background:linear-gradient(120deg,#0b3d2e,#14503c 60%,#1a5c4a);
+  border-radius:20px; color:var(--cream); }
+.btn-deep{ background:var(--deep); color:var(--cream); border:none; border-radius:12px;
+  padding:11px 20px; font-family:Sora,sans-serif; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-gold{ background:var(--gold); color:#231a02; border:none; border-radius:12px;
+  padding:11px 20px; font-family:Sora,sans-serif; font-size:13px; font-weight:800; cursor:pointer; }
+
+/* ===================================================================
+   Comp component layer — "Admin Portal.dc.html"
+   The screens were authored with ad-hoc Tailwind utilities (12+ different
+   <h1> class combinations alone), so the design's type scale and component
+   metrics are asserted here rather than hand-edited into ~100 templates.
+   Everything is scoped to .content-area so the shell is untouched.
+   =================================================================== */
+
+/* Page header: 22px/800 title over a 12px muted sub */
+.content-area h1{
+  font-size:22px !important; line-height:1.25 !important; font-weight:800 !important;
+  letter-spacing:-0.01em; margin-bottom:2px !important;
+}
+/* …but a title sitting on a deep-green panel keeps its cream, not the ink tone */
+.content-area .hero-banner h1,
+.content-area .bg-primary-container h1{ color:var(--cream) !important; }
+.content-area .hero-banner h1 + p,
+.content-area .hero-banner :has(> h1) + p,
+.content-area .bg-primary-container h1 + p,
+.content-area .bg-primary-container :has(> h1) + p{ color:#cfe0d5 !important; }
+/* …and the sub that follows it, whether or not the title sits in a wrapper */
+.content-area h1 + p,
+.content-area :has(> h1) + p{
+  font-size:12px !important; color:var(--sub) !important; margin-top:2px !important;
+}
+.content-area h1 .material-symbols-outlined,
+.content-area h1 .material-symbols-rounded{ font-size:24px; color:var(--gold); }
+
+/* Section headings inside cards: 14px/700 */
+.content-area h2{ font-size:16px !important; font-weight:700 !important; letter-spacing:-0.01em; }
+.content-area h3{ font-size:14px !important; font-weight:700 !important; }
+
+/* Primary action button — deep green, cream, 12px radius */
+.content-area a.bg-primary-container,
+.content-area button.bg-primary-container,
+.content-area button[type="submit"].bg-primary-container{
+  background:var(--deep) !important; color:var(--cream) !important; border:none;
+  border-radius:12px !important; padding:11px 20px !important;
+  font-family:Sora,sans-serif; font-size:13px !important; font-weight:700 !important;
+}
+.content-area a.bg-primary-container:hover,
+.content-area button.bg-primary-container:hover{ background:#14503c !important; }
+.content-area a.bg-primary-container .material-symbols-outlined,
+.content-area button.bg-primary-container .material-symbols-outlined{ font-size:18px !important; }
+
+/* List/table card: 16px radius, hairline border, comp row rhythm */
+.content-area thead th{ padding:12px 20px !important; color:var(--sub) !important; }
+.content-area tbody td{ padding:14px 20px !important; font-size:12px !important; }
+.content-area tbody tr{ border-bottom:1px solid var(--line); }
+.content-area tbody tr:last-child{ border-bottom:none; }
+.content-area tbody tr:hover{ background:var(--hov); }
+
+/* Status pills: mono micro-caps on a full round */
+.content-area .pill,
+.content-area td .rounded-full[class*="bg-"]:not(img):not([class*="w-"]){
+  font-family:'IBM Plex Mono',monospace; font-size:9px; letter-spacing:1px;
+  padding:3px 8px; border-radius:99px; white-space:nowrap; text-transform:uppercase;
+}
+
+/* The comp puts a hairline border on cards and never a side-tab accent — the
+   one bar it does use is the inset rail on the active nav item. Section
+   heading rails (border-primary-container) are that device, so they stay. */
+.content-area .border-l-4:not(.border-primary-container){ border-left-width:1px !important; }
+
+/* Inputs: 10px radius, hairline border, page-tone fill */
+.content-area input[type="text"], .content-area input[type="search"],
+.content-area input[type="email"], .content-area input[type="url"],
+.content-area input[type="number"], .content-area input[type="password"],
+.content-area input[type="date"], .content-area input[type="datetime-local"],
+.content-area input[type="time"], .content-area select, .content-area textarea{
+  border-radius:10px !important; border:1px solid var(--line) !important;
+  background:var(--bg) !important; color:var(--ink) !important;
+  font-family:Sora,sans-serif; font-size:13px !important;
+}
+.content-area input:focus, .content-area select:focus, .content-area textarea:focus{
+  outline:none; border-color:var(--gold) !important;
+  box-shadow:0 0 0 3px rgba(201,162,39,0.18) !important;
+}
+
+/* Filter chips (comp: mono pills, active = deep green) */
+.fchip{
+  /* inline-flex + align-self so a chip never stretches to a flex row's height */
+  display:inline-flex; align-items:center; justify-content:center; align-self:center;
+  font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.5px; line-height:1;
+  padding:8px 14px; border-radius:99px; background:var(--tint); color:var(--sub);
+  cursor:pointer; border:none; text-transform:uppercase; white-space:nowrap;
+  text-decoration:none;
+}
+.fchip:hover{ background:var(--hov); color:var(--ink); }
+.fchip.on{ background:var(--deep); color:var(--cream); }
+
+/* Feature toggle switch (comp: 42x24 with an 18px knob) */
+.dc-switch{ width:42px; height:24px; border-radius:99px; padding:3px; box-sizing:border-box;
+  background:var(--line); transition:background .2s; cursor:pointer; flex-shrink:0; border:none; }
+.dc-switch > span{ display:block; width:18px; height:18px; border-radius:50%;
+  background:#fff; transition:margin .2s; margin-left:0; }
+.dc-switch.on{ background:var(--green); }
+.dc-switch.on > span{ margin-left:18px; }
+
+/* Form footer: Discard (secondary) + Save (deep) */
+.form-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+
+</style>

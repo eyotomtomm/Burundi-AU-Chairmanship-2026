@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 import '../../widgets/password_strength_meter.dart';
 import '../../utils/input_sanitizer.dart';
+import '../../config/app_ds.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -61,9 +62,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('change_password')),
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

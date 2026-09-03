@@ -1,0 +1,116 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}News Sources - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <div class="flex justify-between items-center gap-4">
+    <div>
+      <h1>News Sources</h1>
+      <p>{{ sources|length }} source{{ sources|length|pluralize }} &middot; where the scraper pulls candidate news from</p>
+    </div>
+    <a href="{% url 'custom_admin:news_scraper' %}"
+       class="bg-surface-container-lowest border border-slate-200 text-on-surface rounded-xl px-5 py-2.5 text-[13px] font-bold inline-flex items-center gap-2 hover:bg-surface-container transition-colors">
+      <span class="material-symbols-rounded text-lg">arrow_back</span>Back to review
+    </a>
+  </div>
+
+  <!-- Add a source -->
+  <form method="post" class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6">
+    {% csrf_token %}
+    <h3 class="mb-4">Add a source</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Name</label>
+        <input type="text" name="name" placeholder="African Union" class="w-full py-2.5 px-3.5" required>
+      </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Type</label>
+        <select name="kind" class="w-full py-2.5 px-3.5">
+          <option value="rss">RSS / Atom feed</option>
+          <option value="x">X / Twitter account</option>
+        </select>
+      </div>
+      <div class="xl:col-span-2">
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Handle or feed URL</label>
+        <input type="text" name="target" placeholder="BurundinAddis   —or—   https://au.int/en/rss/news" class="w-full py-2.5 px-3.5" required>
+      </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Credit line</label>
+        <input type="text" name="attribution" placeholder="African Union" class="w-full py-2.5 px-3.5">
+      </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Category</label>
+        <select name="default_category" class="w-full py-2.5 px-3.5">
+          <option value="">— none —</option>
+          {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="flex items-end gap-5 xl:col-span-2">
+        <label class="inline-flex items-center gap-2 text-[12px] pb-2.5">
+          <input type="checkbox" name="is_own_content" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+          Our own posts
+        </label>
+        <label class="inline-flex items-center gap-2 text-[12px] pb-2.5">
+          <input type="checkbox" name="is_active" checked class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+          Active
+        </label>
+        <button type="submit" class="bg-primary-container ml-auto">Add source</button>
+      </div>
+    </div>
+    <p class="text-[11px] text-on-surface-variant mt-4">
+      Leave <b>Our own posts</b> off for a repost — approved articles then carry a &ldquo;via &lt;credit line&gt;&rdquo; line and link back to the original.
+    </p>
+  </form>
+
+  <!-- Existing sources -->
+  {% if sources %}
+  <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr>
+          <th class="text-left">Source</th>
+          <th class="text-left">Type</th>
+          <th class="text-left">Target</th>
+          <th class="text-left">Use</th>
+          <th class="text-left">Last fetched</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sources %}
+        <tr>
+          <td>
+            <span class="font-semibold text-on-surface">{{ s.name }}</span>
+            {% if not s.is_active %}<span class="pill bg-surface-container text-on-surface-variant ml-1">Paused</span>{% endif %}
+          </td>
+          <td><span class="pill bg-surface-container text-on-surface-variant">{{ s.get_kind_display }}</span></td>
+          <td class="font-label text-[11px] text-on-surface-variant max-w-[280px] truncate">{{ s.target }}</td>
+          <td>
+            {% if s.is_own_content %}
+            <span class="pill bg-emerald-50 text-emerald-700">Ours</span>
+            {% else %}
+            <span class="pill bg-amber-50 text-amber-700">via {{ s.attribution|default:s.name }}</span>
+            {% endif %}
+          </td>
+          <td class="font-label text-[11px] text-on-surface-variant">{{ s.last_fetched_at|date:"d M Y H:i"|default:"—" }}</td>
+          <td>
+            <form method="post" class="flex justify-end"
+                  onsubmit="return confirm('Remove {{ s.name|escapejs }}? Items already in the queue are kept.');">
+              {% csrf_token %}
+              <input type="hidden" name="pk" value="{{ s.pk }}">
+              <input type="hidden" name="delete" value="1">
+              <button type="submit" class="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors" title="Remove">
+                <span class="material-symbols-rounded text-[18px]">delete</span>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

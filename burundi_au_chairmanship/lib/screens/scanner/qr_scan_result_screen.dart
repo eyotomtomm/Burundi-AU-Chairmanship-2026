@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 
 class QrScanResultScreen extends StatelessWidget {
   final Map<String, dynamic> result;
@@ -38,9 +39,6 @@ class QrScanResultScreen extends StatelessWidget {
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: Text(_isYdMode ? 'Credential Result' : 'Scan Result'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../config/app_ds.dart';
 
 class TicketConversationScreen extends StatefulWidget {
   const TicketConversationScreen({super.key});
@@ -240,13 +241,12 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(
           _ticket?['subject'] ?? 'Support Ticket',
           style: const TextStyle(fontSize: 16),
         ),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
         actions: [
           if (_isResolved || _isClosed)
             Padding(

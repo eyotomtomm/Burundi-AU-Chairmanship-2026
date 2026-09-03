@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/event_registration_model.dart';
-import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EventInfoCard extends StatelessWidget {
@@ -24,11 +24,9 @@ class EventInfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFE0E0E0),
-        ),
+        color: Ds.surface(context),
+        borderRadius: BorderRadius.circular(Ds.rCard),
+        boxShadow: Ds.shadow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,9 +35,9 @@ class EventInfoCard extends StatelessWidget {
             Text(
               description,
               style: TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                color: isDark ? Colors.white70 : Colors.black87,
+                fontSize: 14,
+                height: 1.65,
+                color: Ds.body(context),
               ),
             ),
             const SizedBox(height: 16),
@@ -81,11 +79,11 @@ class EventInfoCard extends StatelessWidget {
                 icon: const Icon(Icons.directions, size: 18),
                 label: const Text('Get Directions'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.burundiGreen,
-                  side: const BorderSide(color: AppColors.burundiGreen),
+                  foregroundColor: Ds.green,
+                  side: const BorderSide(color: Ds.green, width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(Ds.rPill),
                   ),
                 ),
               ),
@@ -100,14 +98,14 @@ class EventInfoCard extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: AppColors.burundiGreen),
-        const SizedBox(width: 10),
+        const SizedBox(width: 0),
+        Icon(icon, size: 18, color: Ds.green),
+        const SizedBox(width: 9),
         Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? Colors.white70 : Colors.black87,
+          child: Builder(
+            builder: (context) => Text(
+              text,
+              style: TextStyle(fontSize: 13, color: Ds.ink(context)),
             ),
           ),
         ),

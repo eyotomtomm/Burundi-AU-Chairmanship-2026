@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../config/environment.dart';
 import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
@@ -218,40 +220,33 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
-        appBar: AppBar(
-          title: Text(_programmeTitle(isFr)),
-          backgroundColor: AppColors.burundiGreen,
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
+        backgroundColor: Ds.bg(context),
+        appBar: AppBar(title: Text(_programmeTitle(isFr))),
         body: const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen)),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
-        appBar: AppBar(
-          title: Text(_programmeTitle(isFr)),
-          backgroundColor: AppColors.burundiGreen,
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
+        backgroundColor: Ds.bg(context),
+        appBar: AppBar(title: Text(_programmeTitle(isFr))),
         body: _buildError(isDark),
       );
     }
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(
+        title: Text(_programmeTitle(isFr)),
+        actions: [_buildLanguageToggle()],
+      ),
       body: RefreshIndicator(
         onRefresh: _loadData,
-        color: AppColors.burundiGreen,
-        edgeOffset: 100,
+        color: Ds.green,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            _buildHeroAppBar(isDark, isFr),
+            SliverToBoxAdapter(child: _buildSummaryCard(isFr)),
             SliverToBoxAdapter(child: _buildSponsorsSection(isDark, isFr)),
             SliverToBoxAdapter(child: _buildKeyDatesSection(isDark, isFr)),
             SliverToBoxAdapter(child: _buildInfoBar(isDark, isFr)),
@@ -273,159 +268,125 @@ class _YouthDialogueMainScreenState extends State<YouthDialogueMainScreen> {
     );
   }
 
-  // ── Hero SliverAppBar ──────────────────────────────────────
-  Widget _buildHeroAppBar(bool isDark, bool isFr) {
-    final bannerUrl = _settings?['banner_image_url']?.toString() ?? '';
+  // ── Summary card ───────────────────────────────────────────
+  /// Comp's programme summary: icon square, title, dates, then stat tiles.
+  Widget _buildSummaryCard(bool isFr) {
     final title = _t('programme_title', 'programme_title_fr', isFr);
-    final tagline = _t('event_tagline', 'event_tagline_fr', isFr);
-    final dateRange = _formatDateRange(isFr);
+    final dateRange = _formatDateRange(isFr) ?? '';
     final location = _settings?['location']?.toString() ?? '';
+    final bannerUrl = _settings?['banner_image_url']?.toString() ?? '';
 
-    return SliverAppBar(
-      expandedHeight: 420,
-      pinned: true,
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFF1B3A2D),
-      foregroundColor: Colors.white,
-      actions: [
-        _buildLanguageToggle(),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background: banner/poster image or gradient
-            if (bannerUrl.isNotEmpty)
-              CachedNetworkImage(
-                imageUrl: Environment.fixMediaUrl(bannerUrl),
-                fit: BoxFit.cover,
-                fadeInDuration: const Duration(milliseconds: 200),
-                placeholder: (_, __) => Container(color: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5)),
-                errorWidget: (_, __, ___) => _buildGradientBackground(''),
-              )
-            else
-              _buildGradientBackground(''),
-            // Bottom gradient for readability
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.05),
-                      Colors.black.withValues(alpha: 0.15),
-                      Colors.black.withValues(alpha: 0.75),
-                    ],
-                    stops: const [0.0, 0.35, 1.0],
-                  ),
-                ),
-              ),
-            ),
-            // ── Title + tagline + chips at bottom ──
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      height: 1.2,
-                      shadows: [Shadow(blurRadius: 10, color: Colors.black54)],
-                    ),
-                  ),
-                  if (tagline.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        tagline,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.white.withValues(alpha: 0.9),
-                          shadows: const [Shadow(blurRadius: 8, color: Colors.black54)],
-                        ),
-                      ),
-                    ),
-                  if (dateRange != null || location.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          if (dateRange != null)
-                            _buildHeroChip(Icons.calendar_today_rounded, dateRange),
-                          if (location.isNotEmpty)
-                            _buildHeroChip(Icons.location_on_rounded, location),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+    // Days left until registration closes, when the backend supplies a date.
+    final deadlineStr = _settings?['registration_end_date']?.toString() ?? '';
+    final deadline = DateTime.tryParse(deadlineStr);
+    final daysLeft =
+        deadline == null ? null : deadline.difference(DateTime.now()).inDays;
 
-  Widget _buildGradientBackground(String logoUrl) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.burundiGreen,
-            AppColors.burundiGreen.withValues(alpha: 0.8),
-            const Color(0xFF1B5E20),
-          ],
-        ),
-      ),
-      child: logoUrl.isNotEmpty
-          ? Center(
-              child: Opacity(
-                opacity: 0.15,
-                child: Image.network(
-                  Environment.fixMediaUrl(logoUrl),
-                  height: 240,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            )
-          : null,
-    );
-  }
+    final startStr = _settings?['event_start_date']?.toString() ??
+        _settings?['start_date']?.toString() ??
+        '';
+    final start = DateTime.tryParse(startStr);
 
-  Widget _buildHeroChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return DsCard(
+      margin: const EdgeInsets.all(16),
+      featured: true,
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: Ds.tint(context),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: bannerUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: Environment.fixMediaUrl(bannerUrl),
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) => const Icon(Icons.groups_rounded,
+                            size: 24, color: Ds.green),
+                      )
+                    : const Icon(Icons.groups_rounded, size: 24, color: Ds.green),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                            color: Ds.ink(context))),
+                    if (location.isNotEmpty || dateRange.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [if (location.isNotEmpty) location,
+                         if (dateRange.isNotEmpty) dateRange].join(' · '),
+                        style: Ds.cardBody(context),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _summaryStat(
+                start == null ? '—' : '${start.day}',
+                isFr ? 'Jour 1' : 'Starts',
+              ),
+              const SizedBox(width: 8),
+              _summaryStat(
+                location.isEmpty ? '—' : location.split(',').first.trim(),
+                isFr ? 'Lieu' : 'Venue',
+              ),
+              const SizedBox(width: 8),
+              _summaryStat(
+                daysLeft == null ? '—' : (daysLeft < 0 ? '0d' : '${daysLeft}d'),
+                isFr ? 'Échéance' : 'To deadline',
+                color: Ds.red,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // ── Language Toggle ────────────────────────────────────────
+  Widget _summaryStat(String value, String label, {Color color = Ds.green}) =>
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: Ds.subtle(context),
+            borderRadius: BorderRadius.circular(Ds.rTile),
+          ),
+          child: Column(
+            children: [
+              Text(value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+              const SizedBox(height: 2),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 10, color: Ds.body(context))),
+            ],
+          ),
+        ),
+      );
+
   Widget _buildLanguageToggle() {
     final langProvider = context.watch<LanguageProvider>();
     final currentLang = langProvider.languageCode.toUpperCase();
@@ -2697,7 +2658,7 @@ class _YDPrivacyPolicyScreenState extends State<_YDPrivacyPolicyScreen> {
     final isFr = widget.isFr;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(isFr ? 'Politique de Confidentialité' : 'Privacy Policy'),
         backgroundColor: AppColors.burundiGreen,

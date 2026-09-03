@@ -61,6 +61,18 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="b4africa" />
             </intent-filter>
+            <!-- Verified App Links: https share URLs open the item in the app.
+                 Only /<kind>/<id>/share/ is claimed so the rest of the site
+                 (landing page, legal pages, admin) stays in the browser. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="burundi4africa.com" android:pathPattern="/.*/share/" />
+                <data android:scheme="https" android:host="burundi4africa.com" android:pathPattern="/.*/share" />
+                <data android:scheme="https" android:host="www.burundi4africa.com" android:pathPattern="/.*/share/" />
+                <data android:scheme="https" android:host="www.burundi4africa.com" android:pathPattern="/.*/share" />
+            </intent-filter>
         </activity>
 
         <!-- Apple Sign-In callback activity (for web fallback on Android) -->

@@ -7,6 +7,12 @@ import '../providers/auth_provider.dart';
 import 'api_service.dart';
 import '../screens/news/article_detail_screen.dart';
 import '../screens/events/event_detail_screen.dart';
+import '../screens/magazine/magazine_detail_screen.dart';
+import '../screens/facts/fact_detail_screen.dart';
+import '../screens/videos/video_detail_screen.dart';
+import '../screens/gallery/album_detail_screen.dart';
+import '../screens/discussions/discussion_detail_screen.dart';
+import '../screens/feature_card/feature_card_detail_screen.dart';
 
 /// Central deep link router — all navigation-from-message-sources funnel
 /// through [navigate] so that push notifications, in-app messages, popups,
@@ -27,6 +33,14 @@ class DeepLinkRouter {
     'event': '/events',
     'gallery': '/gallery',
     'video': '/videos',
+    'discussion': '/discussions',
+  };
+
+  /// Priority agendas ship as three fixed screens, keyed by their backend slug.
+  static const Map<String, String> _agendaRoutes = {
+    'water-sanitation': '/water-sanitation',
+    'arise-initiative': '/arise-initiative',
+    'peace-security': '/peace-security',
   };
 
   /// All named routes registered in [MaterialApp.onGenerateRoute].
@@ -48,6 +62,7 @@ class DeepLinkRouter {
     '/arise-initiative',
     '/peace-security',
     '/gallery',
+    '/discussions',
     '/videos',
     '/social-media',
     '/notifications',
@@ -117,6 +132,8 @@ class DeepLinkRouter {
 
     // Try parameterised routes first: /news/123, /events/42
     final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    // Share links look like /articles/12/share/ — drop the trailing marker.
+    if (segments.length == 3 && segments.last == 'share') segments.removeLast();
     if (segments.length == 2) {
       final section = segments[0]; // e.g. "news"
       final id = segments[1]; // e.g. "123"
@@ -182,6 +199,83 @@ class DeepLinkRouter {
           final event = await ApiService().getEventRegistration(eventId);
           navigator.push(
             CupertinoPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)),
+          );
+          return true;
+
+        case 'magazines':
+        case 'magazine':
+          final magazines = await ApiService().getMagazines();
+          final match = magazines.where((m) => m.id == id).toList();
+          if (match.isEmpty) return false;
+          navigator.push(
+            CupertinoPageRoute(builder: (_) => MagazineDetailScreen(magazine: match.first)),
+          );
+          return true;
+
+        case 'facts':
+        case 'fact':
+          final factId = int.tryParse(id);
+          if (factId == null) return false;
+          navigator.push(
+            CupertinoPageRoute(builder: (_) => FactDetailScreen(factId: factId)),
+          );
+          return true;
+
+        case 'gallery':
+        case 'albums':
+          final albums = await ApiService().getGalleryAlbums();
+          final album = albums
+              .where((a) => a['id']?.toString() == id)
+              .toList();
+          if (album.isEmpty) return false;
+          navigator.push(
+            CupertinoPageRoute(builder: (_) => AlbumDetailScreen(album: album.first)),
+          );
+          return true;
+
+        case 'discussions':
+        case 'discussion':
+          final discussionId = int.tryParse(id);
+          if (discussionId == null) return false;
+          navigator.push(
+            CupertinoPageRoute(
+                builder: (_) => DiscussionDetailScreen(discussionId: discussionId)),
+          );
+          return true;
+
+        case 'agendas':
+        case 'agenda':
+          final agendas = await ApiService().getPriorityAgendas();
+          final match = agendas
+              .where((a) => a['id']?.toString() == id)
+              .toList();
+          final route = match.isEmpty ? null : _agendaRoutes[match.first['slug']];
+          if (route == null) return false;
+          navigator.pushNamed(route);
+          return true;
+
+        case 'features':
+        case 'feature':
+          // Feature cards only ship inside the home feed payload.
+          final feed = await ApiService().getHomeFeed();
+          final cards = (feed['feature_cards'] as List<dynamic>? ?? [])
+              .cast<Map<String, dynamic>>()
+              .where((c) => c['id']?.toString() == id)
+              .toList();
+          if (cards.isEmpty) return false;
+          navigator.push(
+            CupertinoPageRoute(
+                builder: (_) => FeatureCardDetailScreen(cardData: cards.first)),
+          );
+          return true;
+
+        case 'videos':
+        case 'video':
+          final videos = await ApiService().getVideos();
+          final match = videos.where((v) => v['id']?.toString() == id).toList();
+          if (match.isEmpty) return false;
+          navigator.push(
+            CupertinoPageRoute(builder: (_) => VideoDetailScreen(video: match.first, scrollToComments: false)),
           );
           return true;
 

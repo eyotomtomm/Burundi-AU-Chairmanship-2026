@@ -11,10 +11,10 @@
   </div>
   <!-- Period Filter -->
   <div class="flex items-center gap-2">
-    <a href="?period=1h" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '1h' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">1h</a>
-    <a href="?period=24h" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '24h' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">24h</a>
-    <a href="?period=7d" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '7d' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">7d</a>
-    <a href="?period=30d" class="px-4 py-2 rounded-lg text-sm font-bold transition-colors {% if period == '30d' %}bg-primary-container text-white{% else %}bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border border-outline-variant/20{% endif %}">30d</a>
+    <a href="?period=1h" class="fchip {% if period == '1h' %}on{% endif %}">1h</a>
+    <a href="?period=24h" class="fchip {% if period == '24h' %}on{% endif %}">24h</a>
+    <a href="?period=7d" class="fchip {% if period == '7d' %}on{% endif %}">7d</a>
+    <a href="?period=30d" class="fchip {% if period == '30d' %}on{% endif %}">30d</a>
   </div>
 </div>
 

@@ -10,6 +10,7 @@ import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
+import '../../config/app_ds.dart';
 
 class YouthDialogueDocumentsScreen extends StatefulWidget {
   const YouthDialogueDocumentsScreen({super.key});
@@ -530,8 +531,6 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
           title: Text(_isFr() == 'fr' ? 'Documents soumis' : 'Documents Submitted'),
-          centerTitle: true,
-          elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),
@@ -753,9 +752,6 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text('Upload Documents'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))

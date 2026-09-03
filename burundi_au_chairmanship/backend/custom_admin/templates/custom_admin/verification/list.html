@@ -74,23 +74,23 @@
   <!-- Filter Tabs -->
   <div class="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-slate-100">
     <a href="{% url 'custom_admin:verification_requests_list' %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if not current_filter %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if not current_filter %}on{% endif %}">
       All Requests
     </a>
     <a href="{% url 'custom_admin:verification_requests_list' %}?status=pending"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'pending' %}bg-amber-500 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'pending' %}on{% endif %}">
       Pending
     </a>
     <a href="{% url 'custom_admin:verification_requests_list' %}?status=appealed"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'appealed' %}bg-blue-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'appealed' %}on{% endif %}">
       Appealed
     </a>
     <a href="{% url 'custom_admin:verification_requests_list' %}?status=approved"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'approved' %}bg-emerald-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'approved' %}on{% endif %}">
       Approved
     </a>
     <a href="{% url 'custom_admin:verification_requests_list' %}?status=rejected"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'rejected' %}bg-red-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'rejected' %}on{% endif %}">
       Rejected
     </a>
   </div>

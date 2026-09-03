@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../utils/name_format.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../../config/app_colors.dart';
+import '../../../config/app_ds.dart';
+import '../../../widgets/ds/ds_widgets.dart';
 import '../../../config/app_constants.dart';
 import '../../../config/environment.dart';
 import '../../../l10n/app_localizations.dart';
@@ -23,6 +26,7 @@ import '../../security/login_history_screen.dart';
 import '../../security/active_sessions_screen.dart';
 import '../../security/change_password_screen.dart';
 import '../../onboarding/onboarding_screen.dart';
+import '../../../services/share_service.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -123,9 +127,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     final name = (realName != null && realName.isNotEmpty) ? realName : (auth.userName ?? 'User');
 
     if (title != null && title.isNotEmpty) {
-      // Use first name only (first word) to keep it short
-      final firstName = name.split(' ').first;
-      return '$title $firstName';
+      // Title + family name — the protocol form, and short enough for the row.
+      return NameFormat.greetingName(name, title: title);
     }
     return name;
   }
@@ -137,502 +140,132 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            HapticFeedback.mediumImpact();
-            await _fetchFeatureFlagsFromApi();
-            if (mounted) setState(() {});
-          },
-          color: AppColors.burundiGreen,
-          child: CustomScrollView(
+      backgroundColor: Ds.bg(context),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          await _fetchFeatureFlagsFromApi();
+          if (mounted) setState(() {});
+        },
+        color: Ds.green,
+        child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
-            // Clean minimal header
+            // Green profile header
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.settings,
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Customize your experience',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Consumer<AuthProvider>(
+                builder: (context, authProvider, _) =>
+                    _buildProfileHeader(context, authProvider, l10n),
               ),
             ),
 
-          // Clean profile card
-          SliverToBoxAdapter(
-            child: Consumer<AuthProvider>(
-              builder: (context, authProvider, _) {
-                final isLoggedIn = authProvider.isAuthenticated;
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (isLoggedIn) {
-                        Navigator.pushNamed(context, '/profile');
-                      } else {
-                        Navigator.pushNamed(context, '/auth');
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isDark
-                                ? theme.shadowColor.withValues(alpha: 0.4)
-                                : theme.shadowColor.withValues(alpha: 0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              color: AppColors.burundiGreen,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: isLoggedIn && authProvider.profilePictureUrl != null && authProvider.profilePictureUrl!.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: Environment.fixMediaUrl(authProvider.profilePictureUrl!),
-                                      width: 64,
-                                      height: 64,
-                                      fit: BoxFit.cover,
-                                      placeholder: (_, _) => Center(
-                                        child: Text(
-                                          (authProvider.userName ?? 'U')[0].toUpperCase(),
-                                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      errorWidget: (_, _, _) => Center(
-                                        child: Text(
-                                          (authProvider.userName ?? 'U')[0].toUpperCase(),
-                                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    )
-                                  : Center(
-                                      child: isLoggedIn && authProvider.userName != null
-                                          ? Text(
-                                              authProvider.userName![0].toUpperCase(),
-                                              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                                            )
-                                          : const Icon(Icons.person_rounded, size: 32, color: Colors.white),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        isLoggedIn
-                                            ? _buildDisplayName(authProvider)
-                                            : 'Guest User',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 18,
-                                          color: theme.colorScheme.onSurface,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                    if (isLoggedIn && authProvider.isVerified && !_hasPendingOrRejectedRequest(context)) ...[
-                                      const SizedBox(width: 6),
-                                      VerifiedBadge(badgeType: authProvider.badgeType ?? Provider.of<VerificationProvider>(context, listen: false).badgeType, size: 18),
-                                    ],
-                                  ],
-                                ),
-                                if (isLoggedIn && authProvider.verificationRole != null && authProvider.verificationRole!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      authProvider.verificationRole!,
-                                      style: TextStyle(
-                                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
-                                        fontSize: 13,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  isLoggedIn ? (authProvider.userEmail ?? '') : l10n.translate('tap_to_sign_in'),
-                                  style: TextStyle(
-                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 18,
-                            color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Quick toggles section
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
+            // ── Community ───────────────────────────────────
+            const SliverToBoxAdapter(child: DsGroupLabel('Community')),
+            SliverToBoxAdapter(
+              child: DsTileGroup(
                 children: [
-                  // Language toggle
-                  Expanded(
-                    child: Consumer<LanguageProvider>(
-                      builder: (context, langProvider, _) {
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            langProvider.toggleLanguage();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isDark
-                                      ? Colors.black.withValues(alpha: 0.4)
-                                      : Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: const Icon(
-                                    Icons.language_rounded,
-                                    color: AppColors.burundiGreen,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  l10n.translate('language'),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  langProvider.isEnglish ? 'English' : 'Français',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                  DsTile(
+                    icon: Icons.flag_rounded,
+                    title: l10n.translate('priority_agenda'),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pushNamed(context, '/arise-initiative');
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Preferences ─────────────────────────────────
+            const SliverToBoxAdapter(child: DsGroupLabel('Preferences')),
+            SliverToBoxAdapter(
+              child: DsTileGroup(
+                children: [
+                  Consumer<LanguageProvider>(
+                    builder: (context, langProvider, _) => DsTile(
+                      icon: Icons.translate_rounded,
+                      title: l10n.translate('language'),
+                      value: langProvider.isEnglish ? 'English' : 'Français',
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        langProvider.toggleLanguage();
                       },
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  // Theme toggle
-                  Expanded(
-                    child: Consumer<ThemeProvider>(
-                      builder: (context, themeProvider, _) {
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            themeProvider.toggleTheme();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isDark
-                                      ? Colors.black.withValues(alpha: 0.4)
-                                      : Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Icon(
-                                    themeProvider.isDarkMode
-                                        ? Icons.dark_mode_rounded
-                                        : Icons.light_mode_rounded,
-                                    color: AppColors.burundiGreen,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  l10n.translate('theme'),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  themeProvider.isDarkMode
-                                      ? l10n.translate('dark')
-                                      : l10n.translate('light'),
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                  Consumer<ThemeProvider>(
+                    builder: (context, themeProvider, _) => DsTile(
+                      icon: themeProvider.isDarkMode
+                          ? Icons.dark_mode_rounded
+                          : Icons.light_mode_rounded,
+                      title: l10n.translate('theme'),
+                      value: themeProvider.isDarkMode
+                          ? l10n.translate('dark')
+                          : l10n.translate('light'),
+                      trailing: DsSwitch(
+                        value: themeProvider.isDarkMode,
+                        onChanged: (_) {
+                          HapticFeedback.lightImpact();
+                          themeProvider.toggleTheme();
+                        },
+                      ),
+                    ),
+                  ),
+                  DsTile(
+                    icon: Icons.data_saver_on_rounded,
+                    title: l10n.dataSaver,
+                    subtitle: l10n.dataSaverDesc,
+                    trailing: DsSwitch(
+                      value: DataSaverService().enabled,
+                      onChanged: (val) async {
+                        await DataSaverService().setEnabled(val);
+                        if (mounted) setState(() {});
                       },
                     ),
                   ),
                 ],
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            Consumer2<AuthProvider, VerificationProvider>(
+              builder: (context, authProvider, verificationProvider, _) {
+                final isLoggedIn = authProvider.isAuthenticated;
+                // A pending or rejected request means the user is NOT yet verified,
+                // even if authProvider.isVerified is stale-cached as true.
+                final hasPendingRequest =
+                    verificationProvider.requestStatus == 'pending' ||
+                        verificationProvider.requestStatus == 'rejected';
+                final isVerified = !hasPendingRequest &&
+                    (authProvider.isVerified ||
+                        verificationProvider.isProfileVerified);
+                final showVerificationItem = isLoggedIn && !isVerified;
 
-          // Menu items
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark
-                          ? theme.shadowColor.withValues(alpha: 0.4)
-                          : theme.shadowColor.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Consumer2<AuthProvider, VerificationProvider>(
-                  builder: (context, authProvider, verificationProvider, _) {
-                    final isLoggedIn = authProvider.isAuthenticated;
-                    // A pending or rejected request means the user is NOT yet verified,
-                    // even if authProvider.isVerified is stale-cached as true.
-                    final hasPendingRequest = verificationProvider.requestStatus == 'pending' || verificationProvider.requestStatus == 'rejected';
-                    final isVerified = !hasPendingRequest && (authProvider.isVerified || verificationProvider.isProfileVerified);
-                    final showVerificationItem = isLoggedIn && !isVerified;
-                    final verificationStatus = verificationProvider.requestStatus;
+                return SliverList.list(
+                  children: [
+                    // ── Verification ────────────────────────────
+                    if (showVerificationItem) ...[
+                      const DsGroupLabel('Verification'),
+                      DsTileGroup(children: [
+                        _buildVerificationMenuItem(
+                          context: context,
+                          verificationStatus: verificationProvider.requestStatus,
+                          l10n: l10n,
+                        ),
+                      ]),
+                    ],
 
-                    return Column(
-                      children: [
-                        // Verification status - Only show if logged in and NOT verified
-                        if (showVerificationItem)
-                          _buildVerificationMenuItem(
-                            context: context,
-                            isDark: isDark,
-                            verificationStatus: verificationStatus,
-                            l10n: l10n,
-                          ),
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.info_outline_rounded,
-                          iconBgColor: AppColors.burundiGreen,
-                          title: l10n.translate('about'),
-                          subtitle: '${AppConstants.appName} v${AppConstants.appVersion}',
-                          isDark: isDark,
-                          isFirst: !showVerificationItem,
-                          onTap: () => _showAboutDialog(context, l10n),
-                        ),
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.help_outline_rounded,
-                          iconBgColor: AppColors.burundiGreen,
-                          title: l10n.appGuide,
-                          subtitle: l10n.appGuideSubtitle,
-                          isDark: isDark,
-                          onTap: () => Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (_) => const OnboardingScreen(isReplay: true),
-                            ),
-                          ),
-                        ),
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.privacy_tip_outlined,
-                          iconBgColor: AppColors.burundiGreen,
-                          title: l10n.translate('privacy_policy'),
-                          isDark: isDark,
-                          onTap: () => launchUrl(
-                            Uri.parse('${Environment.siteBaseUrl}/privacy-policy/'),
-                            mode: LaunchMode.externalApplication,
-                          ),
-                        ),
-                        // Data Saver toggle
-                        SwitchListTile(
-                          secondary: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.data_saver_on,
-                              color: AppColors.burundiGreen,
-                              size: 22,
-                            ),
-                          ),
-                          title: Text(
-                            l10n.dataSaver,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          subtitle: Text(
-                            l10n.dataSaverDesc,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.white54 : Colors.grey[600],
-                            ),
-                          ),
-                          value: DataSaverService().enabled,
-                          activeColor: AppColors.burundiGreen,
-                          onChanged: (val) async {
-                            await DataSaverService().setEnabled(val);
-                            setState(() {});
-                          },
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        ),
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.description_outlined,
-                          iconBgColor: AppColors.burundiGreen,
-                          title: l10n.translate('terms_of_service'),
-                          isDark: isDark,
-                          onTap: () => launchUrl(
-                            Uri.parse('${Environment.siteBaseUrl}/terms-of-service/'),
-                            mode: LaunchMode.externalApplication,
-                          ),
-                        ),
-                        Consumer<AuthProvider>(
-                          builder: (context, auth, _) {
-                            return _buildMenuItem(
-                              context: context,
-                              icon: Icons.headset_mic_rounded,
-                              iconBgColor: AppColors.burundiGreen,
-                              title: l10n.translate('contact_support'),
-                              subtitle: 'Get help and support',
-                              isDark: isDark,
-                              onTap: () {
-                                if (!auth.isAuthenticated) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        Localizations.localeOf(context).languageCode == 'fr'
-                                            ? 'Veuillez vous connecter pour contacter le support'
-                                            : 'Please sign in to contact support',
-                                      ),
-                                      backgroundColor: AppColors.burundiGreen,
-                                      behavior: SnackBarBehavior.floating,
-                                      action: SnackBarAction(
-                                        label: Localizations.localeOf(context).languageCode == 'fr' ? 'Connexion' : 'Sign In',
-                                        textColor: Colors.white,
-                                        onPressed: () => Navigator.pushNamed(context, '/auth'),
-                                      ),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                _showSupportOptions(context, isDark);
-                              },
-                            );
-                          },
-                        ),
-                        // Account management & security (for logged in users)
-                        if (isLoggedIn) ...[
-                          _buildMenuItem(
-                            context: context,
+                    // ── Account ─────────────────────────────────
+                    if (isLoggedIn) ...[
+                      const DsGroupLabel('Account'),
+                      DsTileGroup(
+                        children: [
+                          DsTile(
                             icon: Icons.manage_accounts_rounded,
-                            iconBgColor: Colors.red,
+                            iconTint: Ds.redTintOf(context),
+                            iconColor: Ds.red,
                             title: 'Manage Account',
                             subtitle: 'Deactivate or delete your account',
-                            isDark: isDark,
-                            onTap: () => _showAccountManageSheet(context, isDark, authProvider),
+                            onTap: () => _showAccountManageSheet(
+                                context, isDark, authProvider),
                           ),
                           if (_newsletterEnabled)
                             _buildNewsletterToggle(
@@ -641,156 +274,195 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                               authProvider: authProvider,
                             ),
                           if (authProvider.hasPasswordProvider)
-                            _buildMenuItem(
-                              context: context,
+                            DsTile(
                               icon: Icons.lock_rounded,
-                              iconBgColor: AppColors.burundiGreen,
+                              iconTint: Ds.tint(context),
+                              iconColor: Ds.green,
                               title: l10n.translate('change_password'),
-                              isDark: isDark,
-                              onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ChangePasswordScreen())),
+                              onTap: () => Navigator.push(
+                                  context,
+                                  CupertinoPageRoute(
+                                      builder: (_) =>
+                                          const ChangePasswordScreen())),
                             ),
-                          _buildMenuItem(
-                            context: context,
+                          DsTile(
                             icon: Icons.history_rounded,
-                            iconBgColor: AppColors.burundiGreen,
                             title: l10n.translate('login_history'),
-                            isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const LoginHistoryScreen())),
+                            onTap: () => Navigator.push(
+                                context,
+                                CupertinoPageRoute(
+                                    builder: (_) => const LoginHistoryScreen())),
                           ),
-                          _buildMenuItem(
-                            context: context,
+                          DsTile(
                             icon: Icons.devices_rounded,
-                            iconBgColor: AppColors.burundiGreen,
                             title: l10n.translate('active_sessions'),
-                            isDark: isDark,
-                            onTap: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ActiveSessionsScreen())),
+                            onTap: () => Navigator.push(
+                                context,
+                                CupertinoPageRoute(
+                                    builder: (_) =>
+                                        const ActiveSessionsScreen())),
                           ),
                         ],
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.share_rounded,
-                          iconBgColor: AppColors.burundiGreen,
-                          title: l10n.translate('share_app'),
-                          isDark: isDark,
-                          itemKey: _shareMenuKey,
-                          onTap: () async {
-                            final appLink = Platform.isIOS
-                                ? 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
-                                : 'https://${'play.goo'}${'gle.com'}/store/apps/details?id=com.b4africa.app';
+                      ),
+                    ],
 
-                            Rect? sharePositionOrigin;
-                            final renderObject = _shareMenuKey.currentContext?.findRenderObject();
-                            if (renderObject is RenderBox) {
-                              final offset = renderObject.localToGlobal(Offset.zero);
-                              sharePositionOrigin = offset & renderObject.size;
-                            }
-
-                            await Share.share(
-                              'Check out the Be 4 Africa app! 🇧🇮\n\n$appLink',
-                              subject: 'Be 4 Africa App',
-                              sharePositionOrigin: sharePositionOrigin,
-                            );
-                          },
-                        ),
-                        _buildMenuItem(
-                          context: context,
-                          icon: Icons.star_rounded,
-                          iconBgColor: AppColors.burundiGreen,
-                          title: l10n.translate('rate_app'),
-                          isDark: isDark,
-                          isLast: !isLoggedIn,
-                          onTap: () async {
-                            final InAppReview inAppReview = InAppReview.instance;
-
-                            try {
-                              if (await inAppReview.isAvailable()) {
-                                await inAppReview.requestReview();
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text('Thank you for your support!'),
-                                      backgroundColor: AppColors.burundiGreen,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                await _openStoreListing();
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text('Rating will be available once the app is on the App Store'),
-                                      backgroundColor: AppColors.burundiGreen,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (_) {
-                              await _openStoreListing();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Rating will be available once the app is on the App Store'),
-                                    backgroundColor: AppColors.burundiGreen,
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    // ── Support ─────────────────────────────────
+                    const DsGroupLabel('Support'),
+                    DsTileGroup(
+                      children: [
+                        DsTile(
+                          icon: Icons.headset_mic_rounded,
+                          iconTint: Ds.tint(context),
+                          iconColor: Ds.green,
+                          title: l10n.translate('contact_support'),
+                          subtitle: 'Get help and support',
+                          onTap: () {
+                            if (!authProvider.isAuthenticated) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    Localizations.localeOf(context)
+                                                .languageCode ==
+                                            'fr'
+                                        ? 'Veuillez vous connecter pour contacter le support'
+                                        : 'Please sign in to contact support',
                                   ),
-                                );
-                              }
+                                  backgroundColor: AppColors.burundiGreen,
+                                  behavior: SnackBarBehavior.floating,
+                                  action: SnackBarAction(
+                                    label: Localizations.localeOf(context)
+                                                .languageCode ==
+                                            'fr'
+                                        ? 'Connexion'
+                                        : 'Sign In',
+                                    textColor: Colors.white,
+                                    onPressed: () =>
+                                        Navigator.pushNamed(context, '/auth'),
+                                  ),
+                                ),
+                              );
+                              return;
                             }
+                            _showSupportOptions(context, isDark);
                           },
                         ),
-                        if (isLoggedIn)
-                          _buildMenuItem(
-                            context: context,
-                            icon: Icons.logout_rounded,
-                            iconBgColor: Colors.red,
-                            title: 'Sign Out',
-                            isDark: isDark,
-                            isLast: true,
-                            onTap: () => _showSignOutConfirmation(context, authProvider),
+                        DsTile(
+                          icon: Icons.help_outline_rounded,
+                          title: l10n.appGuide,
+                          subtitle: l10n.appGuideSubtitle,
+                          onTap: () => Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (_) =>
+                                  const OnboardingScreen(isReplay: true),
+                            ),
                           ),
+                        ),
+                        DsTile(
+                          icon: Icons.info_outline_rounded,
+                          title: l10n.translate('about'),
+                          subtitle:
+                              '${AppConstants.appName} v${AppConstants.appVersion}',
+                          onTap: () => _showAboutDialog(context, l10n),
+                        ),
                       ],
-                    );
-                  },
-                ),
-              ),
+                    ),
+
+                    // ── Share the app ───────────────────────────
+                    const DsGroupLabel('Spread the word'),
+                    DsTileGroup(
+                      children: [
+                        DsTile(
+                          key: _shareMenuKey,
+                          icon: Icons.share_rounded,
+                          iconTint: Ds.tint(context),
+                          iconColor: Ds.green,
+                          title: l10n.translate('share_app'),
+                          onTap: () => ShareService.app(
+                              _shareMenuKey.currentContext ?? context),
+                        ),
+                        DsTile(
+                          icon: Icons.star_rounded,
+                          iconTint: Ds.goldTintOf(context),
+                          iconColor: Ds.goldInk,
+                          title: l10n.translate('rate_app'),
+                          onTap: () => _handleRateApp(context),
+                        ),
+                      ],
+                    ),
+
+                    // ── Legal ───────────────────────────────────
+                    const DsGroupLabel('Legal'),
+                    DsTileGroup(
+                      children: [
+                        DsTile(
+                          icon: Icons.privacy_tip_outlined,
+                          title: l10n.translate('privacy_policy'),
+                          onTap: () => launchUrl(
+                            Uri.parse(
+                                '${Environment.siteBaseUrl}/privacy-policy/'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                        ),
+                        DsTile(
+                          icon: Icons.description_outlined,
+                          title: l10n.translate('terms_of_service'),
+                          onTap: () => launchUrl(
+                            Uri.parse(
+                                '${Environment.siteBaseUrl}/terms-of-service/'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // ── Sign out ────────────────────────────────
+                    if (isLoggedIn)
+                      DsTileGroup(
+                        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        children: [
+                          DsTile(
+                            icon: Icons.logout_rounded,
+                            iconTint: Ds.redTintOf(context),
+                            iconColor: Ds.red,
+                            title: 'Sign Out',
+                            titleColor: Ds.red,
+                            onTap: () =>
+                                _showSignOutConfirmation(context, authProvider),
+                          ),
+                        ],
+                      ),
+                  ],
+                );
+              },
             ),
-          ),
+
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
           // Summit theme banner
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
                 decoration: BoxDecoration(
-                  color: AppColors.burundiGreen,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+                  color: Ds.green,
+                  borderRadius: BorderRadius.circular(Ds.rCard),
+                  boxShadow: Ds.shadowLg(context),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(Ds.rIcon),
                       ),
-                      child: const Icon(Icons.stars_rounded, color: Colors.white, size: 24),
+                      child: const Icon(Icons.stars_rounded, color: Colors.white, size: 20),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         AppConstants.summitTheme,
@@ -812,7 +484,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
           // Clean footer
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(top: 32, bottom: 100),
+              padding: EdgeInsets.only(top: 32, bottom: Ds.navSpace(context)),
               child: Column(
                 children: [
                   Text(
@@ -839,7 +511,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
         ],
       ),
       ),
-    ));
+    );
   }
 
   void _showAccountManageSheet(BuildContext context, bool isDark, AuthProvider authProvider) {
@@ -1034,59 +706,40 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
 
   Widget _buildVerificationMenuItem({
     required BuildContext context,
-    required bool isDark,
     required String? verificationStatus,
     required AppLocalizations l10n,
   }) {
-    if (verificationStatus == 'pending') {
-      return _buildMenuItem(
-        context: context,
+    final pending = verificationStatus == 'pending';
+    if (pending || verificationStatus == 'rejected') {
+      return DsTile(
         icon: Icons.hourglass_top_rounded,
-        iconBgColor: AppColors.burundiGreen,
-        title: 'Verification Pending',
-        subtitle: 'Your request is being processed',
-        isDark: isDark,
-        isFirst: true,
+        iconTint: Ds.goldTintOf(context),
+        iconColor: Ds.goldInk,
+        title: pending ? 'Verification Pending' : 'Verification In Review',
+        subtitle:
+            pending ? 'Your request is being processed' : 'Still being processed',
+        chevron: false,
         onTap: () {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Your verification request is being processed. Please wait.'),
+            SnackBar(
+              content: Text(pending
+                  ? 'Your verification request is being processed. Please wait.'
+                  : 'Your verification request is still being processed. Please wait.'),
               behavior: SnackBarBehavior.floating,
             ),
           );
         },
-      );
-    } else if (verificationStatus == 'rejected') {
-      return _buildMenuItem(
-        context: context,
-        icon: Icons.hourglass_top_rounded,
-        iconBgColor: AppColors.burundiGreen,
-        title: 'Verification In Review',
-        subtitle: 'Still being processed',
-        isDark: isDark,
-        isFirst: true,
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Your verification request is still being processed. Please wait.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
-      );
-    } else {
-      // No request exists - show Get Verified
-      return _buildMenuItem(
-        context: context,
-        icon: Icons.verified_rounded,
-        iconBgColor: AppColors.burundiGreen,
-        title: l10n.translate('get_verified'),
-        subtitle: l10n.translate('get_verified_desc'),
-        isDark: isDark,
-        isFirst: true,
-        onTap: () => Navigator.pushNamed(context, '/verification-request'),
       );
     }
+    // No request exists — show Get Verified
+    return DsTile(
+      icon: Icons.verified_rounded,
+      iconTint: Ds.tint(context),
+      iconColor: Ds.green,
+      title: l10n.translate('get_verified'),
+      subtitle: l10n.translate('get_verified_desc'),
+      onTap: () => Navigator.pushNamed(context, '/verification-request'),
+    );
   }
 
   void _showSignOutConfirmation(BuildContext context, AuthProvider authProvider) {
@@ -1281,49 +934,21 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     required AuthProvider authProvider,
   }) {
     final isSubscribed = authProvider.receivesNewsletter;
-    return Column(
-      children: [
-        Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.burundiGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.newspaper_rounded, color: AppColors.burundiGreen, size: 22),
-          ),
-          title: Text(
-            'Monthly Newsletter',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-              color: isDark ? Colors.white : AppColors.burundiGreen,
-            ),
-          ),
-          subtitle: Text(
-            isSubscribed ? 'Subscribed' : 'Subscribe to receive our monthly digest',
-            style: TextStyle(
-              fontSize: 13,
-              color: isSubscribed
-                  ? AppColors.burundiGreen
-                  : (isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.6)),
-            ),
-          ),
-          trailing: isSubscribed
-              ? Icon(Icons.check_circle_rounded, color: AppColors.burundiGreen, size: 24)
-              : Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: isDark ? Colors.white30 : AppColors.burundiGreen.withValues(alpha: 0.4),
-                ),
-          onTap: isSubscribed
-              ? () => _showUnsubscribeDialog(context, isDark, authProvider)
-              : () => _showNewsletterSubscriptionDialog(context, isDark, authProvider),
-        ),
-      ],
+    return DsTile(
+      icon: Icons.newspaper_rounded,
+      iconTint: Ds.tint(context),
+      iconColor: Ds.green,
+      title: 'Monthly Newsletter',
+      subtitle: isSubscribed
+          ? 'Subscribed'
+          : 'Subscribe to receive our monthly digest',
+      trailing: isSubscribed
+          ? const Icon(Icons.check_circle_rounded, color: Ds.green, size: 22)
+          : null,
+      onTap: isSubscribed
+          ? () => _showUnsubscribeDialog(context, isDark, authProvider)
+          : () =>
+              _showNewsletterSubscriptionDialog(context, isDark, authProvider),
     );
   }
 
@@ -1522,59 +1147,131 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMenuItem({
-    required BuildContext context,
-    required IconData icon,
-    required Color iconBgColor,
-    required String title,
-    String? subtitle,
-    required bool isDark,
-    required VoidCallback onTap,
-    bool isFirst = false,
-    bool isLast = false,
-    Key? itemKey,
-  }) {
-    return Column(
-      key: itemKey,
-      children: [
-        if (!isFirst) Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
-        ListTile(
-          onTap: onTap,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: iconBgColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconBgColor, size: 22),
-          ),
-          title: Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-              color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-            ),
-          ),
-          subtitle: subtitle != null
-              ? Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
-                )
-              : null,
-          trailing: Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 16,
-            color: isDark ? Colors.white30 : Colors.black26,
-          ),
+  /// Green header with the member's avatar, name and role — the comp's
+  /// "More / Profile" top block.
+  Widget _buildProfileHeader(
+      BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
+    final isLoggedIn = authProvider.isAuthenticated;
+    final name = isLoggedIn ? _buildDisplayName(authProvider) : 'Guest User';
+    final photo = authProvider.profilePictureUrl;
+    final role = authProvider.verificationRole;
+
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, isLoggedIn ? '/profile' : '/auth'),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+            20, MediaQuery.paddingOf(context).top + 20, 20, 22),
+        decoration: const BoxDecoration(
+          color: Ds.green,
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(Ds.rHeader)),
         ),
-      ],
+        child: Row(
+          children: [
+            ClipOval(
+              child: SizedBox(
+                width: 58,
+                height: 58,
+                child: isLoggedIn && photo != null && photo.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: Environment.fixMediaUrl(photo),
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) => _avatarInitials(name, isLoggedIn),
+                        errorWidget: (_, _, _) => _avatarInitials(name, isLoggedIn),
+                      )
+                    : _avatarInitials(name, isLoggedIn),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white),
+                        ),
+                      ),
+                      if (isLoggedIn &&
+                          authProvider.isVerified &&
+                          !_hasPendingOrRejectedRequest(context)) ...[
+                        const SizedBox(width: 6),
+                        VerifiedBadge(
+                            badgeType: authProvider.badgeType ??
+                                Provider.of<VerificationProvider>(context, listen: false)
+                                    .badgeType,
+                            size: 17),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isLoggedIn
+                        ? (role != null && role.isNotEmpty
+                            ? role
+                            : (authProvider.userEmail ?? ''))
+                        : l10n.translate('tap_to_sign_in'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.8)),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.edit_rounded, size: 20, color: Colors.white),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _avatarInitials(String name, bool isLoggedIn) => Container(
+        color: Colors.white,
+        alignment: Alignment.center,
+        child: isLoggedIn && name.isNotEmpty
+            ? Text(name[0].toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 19, fontWeight: FontWeight.w800, color: Ds.green))
+            : const Icon(Icons.person_rounded, size: 28, color: Ds.green),
+      );
+
+  Future<void> _handleRateApp(BuildContext context) async {
+    void toast(String msg) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.burundiGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+
+    const unavailable =
+        'Rating will be available once the app is on the App Store';
+    try {
+      final inAppReview = InAppReview.instance;
+      if (await inAppReview.isAvailable()) {
+        await inAppReview.requestReview();
+        toast('Thank you for your support!');
+        return;
+      }
+    } catch (_) {
+      // Fall through to the store listing below.
+    }
+    await _openStoreListing();
+    toast(unavailable);
   }
 }
 

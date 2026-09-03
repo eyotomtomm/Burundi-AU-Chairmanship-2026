@@ -6,6 +6,7 @@ import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../services/firebase_auth_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../config/app_ds.dart';
 
 /// Screen that displays all auth providers linked to the user's account
 /// and allows linking/unlinking Google, Apple, and email/password providers.
@@ -455,12 +456,9 @@ class _LinkedAccountsScreenState extends State<LinkedAccountsScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: const Text('Linked Accounts'),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))

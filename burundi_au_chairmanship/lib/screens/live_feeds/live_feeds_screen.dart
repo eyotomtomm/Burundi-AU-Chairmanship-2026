@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../widgets/ds/ds_widgets.dart';
+import '../../config/app_ds.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../services/live_feed_socket_service.dart';
 import '../../widgets/shimmer_loading.dart';
-import '../../widgets/translate_button.dart';
 import 'video_player_screen.dart';
 import 'youtube_player_screen.dart';
 import 'in_app_webview_screen.dart';
@@ -197,6 +197,45 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(
+        title: Text(l10n.translate('live')),
+        actions: [
+          if (_liveFeeds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Ds.red,
+                    borderRadius: BorderRadius.circular(Ds.rPill),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 6,
+                        height: 6,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                              color: Colors.white, shape: BoxShape.circle),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text('${_liveFeeds.length} LIVE',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                              color: Colors.white)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: _isLoading
           ? const ShimmerLiveFeedsSkeleton()
           : RefreshIndicator(
@@ -204,12 +243,9 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                 HapticFeedback.mediumImpact();
                 await _loadData();
               },
-              color: AppColors.burundiGreen,
+              color: Ds.green,
               child: CustomScrollView(
               slivers: [
-                // Hero App Bar
-                _buildHeroAppBar(isDark, l10n),
-
                 // Live Now featured section
                 if (_liveFeeds.isNotEmpty) ...[
                   _buildSectionHeader(
@@ -267,14 +303,7 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
                   ),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.78,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
+                    sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) => _buildRecordedCard(
                             _recordedFeeds[index], isDark, l10n),
@@ -300,83 +329,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
 
   // ── Hero App Bar ──────────────────────────────────────────────────────
 
-  Widget _buildHeroAppBar(bool isDark, AppLocalizations l10n) {
-    return SliverAppBar(
-      expandedHeight: 200,
-      pinned: true,
-      backgroundColor: isDark ? AppColors.darkSurface : AppColors.burundiGreen,
-      foregroundColor: Colors.white,
-      actions: const [TranslateButton()],
-      flexibleSpace: FlexibleSpaceBar(
-        title: Text(
-          l10n.liveFeeds,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
-            shadows: [Shadow(color: Colors.black26, blurRadius: 4)],
-          ),
-        ),
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1A5C2A),
-                AppColors.burundiGreen,
-                Color(0xFF2ECC71),
-              ],
-            ),
-          ),
-          child: Stack(
-            children: [
-              // Decorative circles
-              Positioned(
-                top: -30,
-                right: -30,
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -40,
-                left: -20,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 20,
-                left: 30,
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Section Header ────────────────────────────────────────────────────
-
   SliverToBoxAdapter _buildSectionHeader({
     required IconData icon,
     required String title,
@@ -387,85 +339,18 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
   }) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: isLive
-                  ? AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) => Icon(
-                        icon,
-                        size: 20,
-                        color: color.withValues(alpha: _pulseAnimation.value),
-                      ),
-                    )
-                  : Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF1A1A2E),
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      if (isLive) ...[
-                        const SizedBox(width: 8),
-                        AnimatedBuilder(
-                          animation: _pulseAnimation,
-                          builder: (context, _) => Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: AppColors.burundiRed
-                                  .withValues(alpha: _pulseAnimation.value),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.burundiRed
-                                      .withValues(alpha: _pulseAnimation.value * 0.5),
-                                  blurRadius: 6,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? Colors.white54 : Colors.black45,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Expanded(child: Text(title, style: Ds.sectionTitle(context))),
+            Text(subtitle, style: Ds.meta(context)),
           ],
         ),
       ),
     );
   }
-
-  // ── Featured Live Card (large, prominent) ─────────────────────────────
 
   Widget _buildFeaturedLiveCard(
       ApiLiveFeed feed, bool isDark, AppLocalizations l10n) {
@@ -1062,194 +947,76 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
 
   // ── Recorded Card (grid item) ─────────────────────────────────────────
 
+  /// Replay row from the comp: 120x70 thumbnail, title, duration + date.
   Widget _buildRecordedCard(
       ApiLiveFeed feed, bool isDark, AppLocalizations l10n) {
     final langCode = Localizations.localeOf(context).languageCode;
 
-    return GestureDetector(
+    return DsCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
       onTap: () => _openFeed(feed),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Thumbnail
-            Expanded(
-              flex: 3,
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(14)),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    feed.thumbnail.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: feed.thumbnail,
-                            fit: BoxFit.cover,
-                            placeholder: (_, _) => Container(
-                              color: AppColors.burundiGreen
-                                  .withValues(alpha: 0.1),
-                            ),
-                            errorWidget: (_, _, _) => Container(
-                              color: AppColors.burundiGreen
-                                  .withValues(alpha: 0.1),
-                              child: const Icon(Icons.videocam_rounded,
-                                  color: AppColors.burundiGreen, size: 32),
-                            ),
-                          )
-                        : Container(
-                            color:
-                                AppColors.burundiGreen.withValues(alpha: 0.1),
-                            child: const Icon(Icons.videocam_rounded,
-                                color: AppColors.burundiGreen, size: 32),
-                          ),
-
-                    // Dark overlay for play
-                    Container(
-                      color: Colors.black.withValues(alpha: 0.15),
-                    ),
-
-                    // Play icon center
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 22),
-                      ),
-                    ),
-
-                    // Platform badge (top-left) for external platforms
-                    if (feed.isExternalPlatform)
-                      Positioned(
-                        top: 6,
-                        left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: _getPlatformColor(feed.streamType),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(_getPlatformIcon(feed.streamType),
-                                  color: Colors.white, size: 12),
-                              const SizedBox(width: 2),
-                              Text(
-                                feed.platformName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                    // Duration badge
-                    if (feed.parsedDuration != null)
-                      Positioned(
-                        bottom: 6,
-                        right: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.75),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _formatDuration(feed.parsedDuration!),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(Ds.rTile),
+            child: SizedBox(
+              width: 120,
+              height: 70,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  feed.thumbnail.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: feed.thumbnail,
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
+                          errorWidget: (_, _, _) => const DsImagePlaceholder(
+                              radius: 0, icon: Icons.videocam_rounded),
+                        )
+                      : const DsImagePlaceholder(
+                          radius: 0, icon: Icons.videocam_rounded),
+                  const Center(
+                    child: Icon(Icons.play_arrow_rounded,
+                        size: 22, color: Ds.green),
+                  ),
+                ],
               ),
             ),
-
-            // Title + meta
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      feed.getTitle(langCode),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color:
-                            isDark ? Colors.white : const Color(0xFF1A1A2E),
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Icon(Icons.visibility_outlined,
-                            size: 12,
-                            color:
-                                isDark ? Colors.white38 : Colors.black38),
-                        const SizedBox(width: 3),
-                        Text(
-                          _formatViewerCount(feed.viewerCount),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                isDark ? Colors.white38 : Colors.black38,
-                          ),
-                        ),
-                        if (feed.scheduledTime != null) ...[
-                          const Spacer(),
-                          Text(
-                            _formatShortDate(feed.scheduledTime!),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color:
-                                  isDark ? Colors.white38 : Colors.black38,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  feed.getTitle(langCode),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                      color: Ds.ink(context)),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(_formatFeedMeta(feed), style: Ds.meta(context)),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // ── Empty State ───────────────────────────────────────────────────────
+  /// Duration and/or date shown under a replay title.
+  String _formatFeedMeta(ApiLiveFeed feed) {
+    final when = feed.scheduledTime;
+    return [
+      if (feed.duration.isNotEmpty) feed.duration,
+      if (when != null) _formatShortDate(when),
+    ].join(' · ');
+  }
 
   Widget _buildEmptyState(bool isDark, AppLocalizations l10n) {
     final isError = _error != null;
@@ -1323,16 +1090,6 @@ class _LiveFeedsScreenState extends State<LiveFeedsScreen>
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   String? _getCountdown(DateTime time) {

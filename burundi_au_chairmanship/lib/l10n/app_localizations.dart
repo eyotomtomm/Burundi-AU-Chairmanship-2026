@@ -68,6 +68,7 @@ class AppLocalizations {
       'upcoming_events': g.upcoming_events,
       'quick_access': g.quick_access,
       'priority_agenda': g.priority_agenda,
+      'agenda': g.agenda,
       'digital_magazine': g.digital_magazine,
       'digital_magazine_desc': g.digital_magazine_desc,
       'embassy_locations': g.embassy_locations,

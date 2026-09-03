@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 
 class PollsScreen extends StatefulWidget {
   const PollsScreen({super.key});
@@ -50,9 +51,9 @@ class _PollsScreenState extends State<PollsScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('polls')),
-        elevation: 0,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

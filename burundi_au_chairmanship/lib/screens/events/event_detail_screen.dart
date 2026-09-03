@@ -8,6 +8,8 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../config/environment.dart';
 import '../../models/event_registration_model.dart';
 import '../../services/api_service.dart';
@@ -16,13 +18,13 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/events/event_countdown.dart';
 import '../../widgets/events/event_info_card.dart';
-import '../../widgets/translate_button.dart';
 import '../../widgets/confetti_overlay.dart';
 import 'event_ticket_screen.dart';
 import '../../services/like_service.dart';
 import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
+import '../../services/share_service.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -265,25 +267,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       body: CustomScrollView(
         slivers: [
           // Hero poster
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            backgroundColor: AppColors.burundiGreen,
-            actions: [
-              IconButton(
-                icon: Icon(
-                  _likeService.getState(EntityType.event, _event.id).isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: _likeService.getState(EntityType.event, _event.id).isLiked ? Colors.redAccent : Colors.white,
-                ),
-                onPressed: _toggleLike,
-              ),
-              const TranslateButton(),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
+          // Comp hero: a plain 240px photo with floating circular controls,
+          // then the title card lifted over its lower edge.
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 240,
+              child: Stack(
                 fit: StackFit.expand,
                 children: [
                   if (_event.eventPoster != null && _event.eventPoster!.isNotEmpty)
@@ -295,51 +288,67 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     )
                   else
                     _posterFallback(),
-                  // Gradient overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                        stops: const [0.4, 1.0],
-                      ),
-                    ),
-                  ),
-                  // Title at the bottom
                   Positioned(
-                    bottom: 16,
                     left: 16,
+                    top: MediaQuery.paddingOf(context).top + 8,
+                    child: _heroCircleButton(Icons.arrow_back_rounded,
+                        () => Navigator.pop(context)),
+                  ),
+                  Positioned(
                     right: 16,
-                    child: Text(
-                      _event.getTitle(langCode),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        height: 1.3,
-                        shadows: [
-                          Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2)),
-                        ],
-                      ),
-                    ),
+                    top: MediaQuery.paddingOf(context).top + 8,
+                    child: Builder(builder: (_) {
+                      final liked =
+                          _likeService.getState(EntityType.event, _event.id).isLiked;
+                      return _heroCircleButton(
+                        liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        _toggleLike,
+                        color: liked ? Ds.red : Colors.white,
+                      );
+                    }),
                   ),
                 ],
               ),
             ),
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
+          ),
+
+          SliverToBoxAdapter(
+            child: Transform.translate(
+              offset: const Offset(0, -28),
+              child: DsCard(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (_event.eventType == 'online' || _event.eventType == 'hybrid')
+                          const DsPill('LIVE STREAMED', tone: DsTone.red),
+                        if (_event.isRegistrationEnabled && _event.isRegistrationOpen)
+                          DsPill(langCode == 'fr'
+                              ? 'INSCRIPTIONS OUVERTES'
+                              : 'REGISTRATION OPEN'),
+                        if (_event.hasRegistered)
+                          DsPill(langCode == 'fr' ? 'INSCRIT' : 'REGISTERED'),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _event.getTitle(langCode),
+                      style: TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        height: 1.25,
+                        color: Ds.ink(context),
+                      ),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white),
               ),
-              onPressed: () => Navigator.pop(context),
             ),
           ),
 
@@ -467,6 +476,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       ),
     );
   }
+
+  /// Circular control floated over the hero photo.
+  Widget _heroCircleButton(IconData icon, VoidCallback onTap,
+          {Color color = Colors.white}) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: color),
+        ),
+      );
 
   // ── Greeting / Holiday Postcard Screen ─────────────────────
 
@@ -697,12 +722,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     label: 'Share',
                     color: AppColors.burundiGreen,
                     isDark: isDark,
-                    onTap: () {
-                      // Share functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Sharing coming soon!')),
-                      );
-                    },
+                    onTap: () => ShareService.item(
+                      context,
+                      kind: 'events',
+                      id: _event.id,
+                      title: title,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

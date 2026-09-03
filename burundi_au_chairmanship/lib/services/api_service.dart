@@ -1371,13 +1371,20 @@ class ApiService {
     return await _get('discussions/$id/', auth: true);
   }
 
-  Future<Map<String, dynamic>> createDiscussion(String title, String content, String category) async {
+  Future<Map<String, dynamic>> createDiscussion(
+    String title,
+    String content,
+    String category, {
+    int? topicId,
+  }) async {
     return await _post('discussions/', {
       'title': title,
       'content': content,
       'category': category,
+      if (topicId != null) 'topic': topicId,
     }, auth: true);
   }
+
 
   Future<List<Map<String, dynamic>>> getDiscussionReplies(int discussionId) async {
     final data = await _get('discussions/$discussionId/replies/', auth: true);
@@ -1409,6 +1416,150 @@ class ApiService {
 
   Future<Map<String, dynamic>> toggleDiscussionLike(int discussionId) async {
     return await _post('discussions/$discussionId/toggle-like/', {}, auth: true);
+  }
+
+  // ── Explore feed (social) ─────────────────────────────────
+  /// The Explore feed. [following] narrows it to people the caller follows;
+  /// [authorId] narrows it to one person's posts for their profile page.
+  Future<List<Map<String, dynamic>>> getFeed({
+    bool following = false,
+    int? authorId,
+    String? tag,
+    int? topicId,
+  }) async {
+    final params = <String>[];
+    if (following) params.add('feed=following');
+    if (authorId != null) params.add('author=$authorId');
+    if (tag != null && tag.isNotEmpty) params.add('tag=${Uri.encodeComponent(tag)}');
+    if (topicId != null) params.add('topic=$topicId');
+    final query = params.isEmpty ? '' : '?${params.join('&')}';
+    final data = await _get('discussions/$query', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  /// Shares a post into the caller's own feed. A plain repost toggles off.
+  Future<Map<String, dynamic>> toggleRepost(int discussionId, {String content = ''}) async {
+    return await _post('discussions/$discussionId/repost/', {'content': content}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> getUserProfile(int userId) async {
+    return await _get('users/$userId/profile/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> toggleFollow(int userId) async {
+    return await _post('users/$userId/follow/', {}, auth: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getFollowList(int userId, {bool following = false}) async {
+    final data = await _get(
+        'users/$userId/followers/${following ? '?direction=following' : ''}', auth: true);
+    return _extractResults(data).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> getExploreNotifications() async {
+    return await _get('explore/notifications/', auth: true);
+  }
+
+  Future<void> markExploreNotificationsRead() async {
+    await _post('explore/notifications/read/', {}, auth: true);
+  }
+
+  /// The hashtags people are actually using right now.
+  Future<List<Map<String, dynamic>>> getTrendingTags() async {
+    final data = await _get('explore/tags/');
+    return (data is List ? data : _extractResults(data)).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getDiscussionTopics() async {
+    final data = await _get('discussion-topics/');
+    return (data is List ? data : _extractResults(data)).cast<Map<String, dynamic>>();
+  }
+
+  /// Explore's own consent + readiness check: terms accepted, info complete.
+  Future<Map<String, dynamic>> getExploreTerms() async {
+    return await _get('explore/terms/', auth: true);
+  }
+
+  Future<Map<String, dynamic>> acceptExploreTerms() async {
+    return await _post('explore/terms/', {}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> addPostPoll(
+      int discussionId, String question, List<String> options) async {
+    return await _post('discussions/$discussionId/poll/',
+        {'question': question, 'options': options}, auth: true);
+  }
+
+  Future<Map<String, dynamic>> reportContent({
+    int? discussionId,
+    int? userId,
+    required String reason,
+    String detail = '',
+  }) async {
+    return await _post('reports/', {
+      if (discussionId != null) 'discussion': discussionId,
+      if (userId != null) 'user': userId,
+      'reason': reason,
+      'detail': detail,
+    }, auth: true);
+  }
+
+  /// Attaches one photo or video to a discussion the caller authored.
+  Future<Map<String, dynamic>> uploadDiscussionMedia(
+    int discussionId,
+    File file, {
+    required bool isVideo,
+    String caption = '',
+    void Function(double fraction)? onProgress,
+  }) async {
+    _validateUploadFile(file,
+      allowedExtensions: isVideo
+          ? const ['mp4', 'mov', 'webm', 'avi']
+          : const ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+      maxSizeBytes: isVideo ? 500 * 1024 * 1024 : 10 * 1024 * 1024,
+    );
+    try {
+      final uri = Uri.parse('$_baseUrl/discussions/$discussionId/media/');
+      final request = http.MultipartRequest('POST', uri);
+
+      final headers = await _headers(auth: true);
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+
+      request.fields['media_type'] = isVideo ? 'video' : 'image';
+      request.fields['caption'] = caption;
+
+      final total = file.lengthSync();
+      var sent = 0;
+      // Wrap the file stream so every chunk handed to the socket is counted —
+      // http has no progress hook of its own.
+      final stream = file.openRead().transform<List<int>>(
+        StreamTransformer.fromHandlers(handleData: (chunk, sink) {
+          sent += chunk.length;
+          if (onProgress != null && total > 0) onProgress(sent / total);
+          sink.add(chunk);
+        }),
+      );
+      request.files.add(http.MultipartFile('file', stream, total,
+          filename: file.path.split('/').last));
+
+      final streamedResponse =
+          await _client.send(request).timeout(const Duration(minutes: 5));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return json.decode(response.body);
+      }
+      String detail = 'Failed to upload attachment';
+      try {
+        detail = json.decode(response.body)['detail'] as String? ?? detail;
+      } catch (_) {}
+      throw ApiException(detail, response.statusCode);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Connection failed. Check your network.', 0);
+    }
   }
 
   // ── Polls ─────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../config/app_ds.dart';
 
 class LoginHistoryScreen extends StatefulWidget {
   const LoginHistoryScreen({super.key});
@@ -45,9 +46,9 @@ class _LoginHistoryScreenState extends State<LoginHistoryScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('login_history')),
-        elevation: 0,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

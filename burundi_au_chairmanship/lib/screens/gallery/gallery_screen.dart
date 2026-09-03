@@ -5,7 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_protector/screen_protector.dart';
-import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -13,7 +14,6 @@ import '../../services/content_cache_service.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/async_content_view.dart';
-import '../../widgets/translate_button.dart';
 import 'album_detail_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -95,7 +95,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
   @override
   Widget build(BuildContext context) {
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
-    final featuredAlbums = albums.where((a) => a['is_featured'] == true).toList();
+    final featured = albums.where((a) => a['is_featured'] == true).toList();
+    final rest = albums.where((a) => a['is_featured'] != true).toList();
 
     if (_isLoading || _hasError || albums.isEmpty) {
       final AsyncContentState state;
@@ -107,6 +108,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
         state = AsyncContentState.empty;
       }
       return Scaffold(
+        backgroundColor: Ds.bg(context),
+        appBar: AppBar(title: const Text('Gallery')),
         body: AsyncContentView(
           state: state,
           loadingWidget: const ShimmerVideoGridSkeleton(),
@@ -131,197 +134,119 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
 
     return Scaffold(
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            onRefresh: () async {
-              HapticFeedback.mediumImpact();
-              await _loadAlbums();
-            },
-            child: CustomScrollView(
-              key: const PageStorageKey<String>('gallery_scroll'),
-              slivers: [
-                // App Bar
-                SliverAppBar(
-                  expandedHeight: 120,
-                  pinned: true,
-                  backgroundColor: AppColors.burundiGreen,
-                  actions: const [TranslateButton()],
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: const Text(
-                      'Photo Gallery',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    background: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.burundiGreen,
-                            AppColors.burundiGreen.withValues(alpha: 0.8),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Featured Albums
-                if (featuredAlbums.isNotEmpty) ...[
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
-                        children: [
-                          Icon(Icons.star, color: AppColors.auGold, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Featured Albums',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final slot = LoginGate.slotFor(
-                            index: index,
-                            actualCount: featuredAlbums.length,
-                            isAuthenticated: isAuth,
-                          );
-                          switch (slot) {
-                            case LoginGateSlot.free:
-                              return _buildFeaturedAlbumCard(featuredAlbums[index], isAuth);
-                            case LoginGateSlot.banner:
-                              return const LoginGateBanner(
-                                margin: EdgeInsets.only(bottom: 16),
-                              );
-                            case LoginGateSlot.blurred:
-                              final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
-                              if (dataIndex == null || dataIndex >= featuredAlbums.length) {
-                                return const SizedBox.shrink();
-                              }
-                              return LockedContentWrap(
-                                locked: true,
-                                child: _buildFeaturedAlbumCard(featuredAlbums[dataIndex], isAuth),
-                              );
-                            case LoginGateSlot.hidden:
-                              return const SizedBox.shrink();
-                          }
-                        },
-                        childCount: LoginGate.itemCountFor(
-                          actualCount: featuredAlbums.length,
-                          isAuthenticated: isAuth,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-
-                // All Albums
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                  sliver: SliverToBoxAdapter(
-                    child: const Text(
-                      'All Albums',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.85,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final slot = LoginGate.slotFor(
-                          index: index,
-                          actualCount: albums.length,
-                          isAuthenticated: isAuth,
-                        );
-                        switch (slot) {
-                          case LoginGateSlot.free:
-                            return _buildAlbumGridItem(albums[index], isAuth);
-                          case LoginGateSlot.banner:
-                            return const LoginGateBanner(
-                              margin: EdgeInsets.only(bottom: 12),
-                            );
-                          case LoginGateSlot.blurred:
-                            final dataIndex = LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
-                            if (dataIndex == null || dataIndex >= albums.length) {
-                              return const SizedBox.shrink();
-                            }
-                            return LockedContentWrap(
-                              locked: true,
-                              borderRadius: const BorderRadius.all(Radius.circular(12)),
-                              child: _buildAlbumGridItem(albums[dataIndex], isAuth),
-                            );
-                          case LoginGateSlot.hidden:
-                            return const SizedBox.shrink();
-                        }
-                      },
-                      childCount: LoginGate.itemCountFor(
-                        actualCount: albums.length,
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: const Text('Gallery')),
+      body: RefreshIndicator(
+        color: Ds.green,
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          await _loadAlbums();
+        },
+        child: CustomScrollView(
+          key: const PageStorageKey<String>('gallery_scroll'),
+          slivers: [
+            // Featured album spans the full width, like the comp's mosaic hero.
+            if (featured.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final slot = LoginGate.slotFor(
+                        index: index,
+                        actualCount: featured.length,
                         isAuthenticated: isAuth,
-                      ),
+                      );
+                      switch (slot) {
+                        case LoginGateSlot.free:
+                          return _buildFeaturedAlbumCard(featured[index], isAuth);
+                        case LoginGateSlot.banner:
+                          return const LoginGateBanner(
+                              margin: EdgeInsets.only(bottom: 12));
+                        case LoginGateSlot.blurred:
+                          final dataIndex = LoginGate.dataIndexFor(
+                              index, LoginGate.defaultFreeItems);
+                          if (dataIndex == null || dataIndex >= featured.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return LockedContentWrap(
+                            locked: true,
+                            child: _buildFeaturedAlbumCard(featured[dataIndex], isAuth),
+                          );
+                        case LoginGateSlot.hidden:
+                          return const SizedBox.shrink();
+                      }
+                    },
+                    childCount: LoginGate.itemCountFor(
+                      actualCount: featured.length,
+                      isAuthenticated: isAuth,
                     ),
                   ),
                 ),
+              ),
 
-                const SliverPadding(padding: EdgeInsets.only(bottom: 60)),
-              ],
-            ),
-          ),
-          // Protected content badge
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.security, size: 14, color: Colors.white.withValues(alpha: 0.8)),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Protected content',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 11,
-                    ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  mainAxisExtent: 130,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final slot = LoginGate.slotFor(
+                      index: index,
+                      actualCount: rest.length,
+                      isAuthenticated: isAuth,
+                    );
+                    switch (slot) {
+                      case LoginGateSlot.free:
+                        return _buildAlbumGridItem(rest[index], isAuth);
+                      case LoginGateSlot.banner:
+                        return const LoginGateBanner();
+                      case LoginGateSlot.blurred:
+                        final dataIndex =
+                            LoginGate.dataIndexFor(index, LoginGate.defaultFreeItems);
+                        if (dataIndex == null || dataIndex >= rest.length) {
+                          return const SizedBox.shrink();
+                        }
+                        return LockedContentWrap(
+                          locked: true,
+                          borderRadius: const BorderRadius.all(Radius.circular(14)),
+                          child: _buildAlbumGridItem(rest[dataIndex], isAuth),
+                        );
+                      case LoginGateSlot.hidden:
+                        return const SizedBox.shrink();
+                    }
+                  },
+                  childCount: LoginGate.itemCountFor(
+                    actualCount: rest.length,
+                    isAuthenticated: isAuth,
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+  /// Dark caption chip the comp overlays on each tile.
+  Widget _captionChip(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+      );
 
   Widget _buildCoverImage(String? coverUrl, {double iconSize = 50}) {
     if (coverUrl != null && coverUrl.isNotEmpty) {
@@ -329,150 +254,53 @@ class _GalleryScreenState extends State<GalleryScreen> {
       return CachedNetworkImage(
         imageUrl: fixedUrl,
         fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: Colors.grey[300],
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey[300],
-          child: Icon(Icons.photo_library, size: iconSize, color: Colors.grey),
-        ),
+        placeholder: (context, url) =>
+            const DsImagePlaceholder(radius: 0, icon: Icons.photo_library_rounded),
+        errorWidget: (context, url, error) =>
+            const DsImagePlaceholder(radius: 0, icon: Icons.photo_library_rounded),
       );
     }
-    return Container(
-      color: Colors.grey[300],
-      child: Icon(Icons.photo_library, size: iconSize, color: Colors.grey),
-    );
+    return const DsImagePlaceholder(radius: 0, icon: Icons.photo_library_rounded);
   }
 
   Widget _buildFeaturedAlbumCard(Map<String, dynamic> album, bool isAuth) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Ds.rCard),
         child: Material(
           child: InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                CupertinoPageRoute(
-                  builder: (context) => AlbumDetailScreen(album: album, scrollToComments: false),
-                ),
-              );
-            },
-            child: Stack(
-              children: [
-                // Cover Image
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: _buildCoverImage(album['cover_image']),
-                ),
-
-                // Gradient Overlay
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                      ),
+            onTap: () => Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (context) =>
+                    AlbumDetailScreen(album: album, scrollToComments: false),
+              ),
+            ),
+            child: SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _buildCoverImage(album['cover_image']),
+                  Positioned(
+                    left: 12,
+                    bottom: 12,
+                    right: 12,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _captionChip(
+                          '${album['title'] ?? ''} · ${album['photo_count'] ?? 0} photos'),
                     ),
                   ),
-                ),
-
-                // Content
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          album['title'] ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.photo, color: Colors.white70, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${album['photo_count'] ?? 0}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
-                            ),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.visibility, color: Colors.white70, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${album['view_count'] ?? 0}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
-                            ),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.favorite, color: Colors.white70, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${album['like_count'] ?? 0}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: DsPill('FEATURED', tone: DsTone.white, dense: true),
                   ),
-                ),
-
-                // Featured Badge
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.auGold,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.star, color: Colors.white, size: 14),
-                        SizedBox(width: 4),
-                        Text(
-                          'Featured',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -482,76 +310,25 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   Widget _buildAlbumGridItem(Map<String, dynamic> album, bool isAuth) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Material(
         child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (context) => AlbumDetailScreen(album: album),
-              ),
-            );
-          },
+          onTap: () => Navigator.push(
+            context,
+            CupertinoPageRoute(builder: (context) => AlbumDetailScreen(album: album)),
+          ),
           child: Stack(
             fit: StackFit.expand,
             children: [
               _buildCoverImage(album['cover_image'], iconSize: 40),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.6),
-                    ],
-                  ),
-                ),
-              ),
               Positioned(
-                bottom: 8,
                 left: 8,
                 right: 8,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      album['title'] ?? '',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.photo, color: Colors.white70, size: 12),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${album['photo_count'] ?? 0}',
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.visibility, color: Colors.white70, size: 12),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${album['view_count'] ?? 0}',
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.favorite, color: Colors.white70, size: 12),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${album['like_count'] ?? 0}',
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ],
+                bottom: 8,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _captionChip(
+                      '${album['title'] ?? ''} · ${album['photo_count'] ?? 0}'),
                 ),
               ),
             ],

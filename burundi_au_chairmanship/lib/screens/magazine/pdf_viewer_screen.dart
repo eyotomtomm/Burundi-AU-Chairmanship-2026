@@ -9,6 +9,7 @@ import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -647,26 +648,32 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ? _likeService.getState(EntityType.magazine, widget.magazineId!)
         : const LikeState();
     return Scaffold(
+      // Reading room: the comp darkens the whole screen around the page.
+      backgroundColor: const Color(0xFF1A2E1D),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF132A16),
+        // Square header — the rounded app-bar shape belongs to light screens.
+        shape: const RoundedRectangleBorder(),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               widget.title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
             ),
             if (_totalPages > 0)
               Text(
-                'Page ${_currentPage + 1} of $_totalPages  •  ${(_currentZoom * 100).toInt()}%',
+                'Page ${_currentPage + 1} of $_totalPages · ${(_currentZoom * 100).toInt()}%',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
           ],
         ),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
         actions: [
           // Download button
           if (!_isDownloaded && !_isDownloading && widget.magazineId != null)
@@ -678,7 +685,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           // Downloaded indicator / delete button
           if (_isDownloaded && widget.magazineId != null)
             PopupMenuButton<String>(
-              icon: const Icon(Icons.download_done, color: AppColors.auGold),
+              icon: const Icon(Icons.download_done, color: Ds.gold),
               tooltip: 'Downloaded',
               onSelected: (value) {
                 if (value == 'delete') {

@@ -6257,6 +6257,28 @@ def mark_explore_notifications_read(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def trending_tags(request):
+    """The hashtags people are actually using, so tags are discoverable
+    instead of only reachable by already knowing one exists."""
+    from collections import Counter
+
+    recent = Discussion.objects.order_by('-created_at').values_list(
+        'content', flat=True)[:500]
+    counter = Counter()
+    for content in recent:
+        # Count each tag once per post, so repeating it in one post can't
+        # push it up the list.
+        found = {m.lower() for m in re.findall(r'#([\w\u00C0-\u024F]+)', content or '')}
+        for tag in found:
+            counter[tag] += 1
+
+    return Response([
+        {'tag': tag, 'count': count} for tag, count in counter.most_common(12)
+    ])
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def discussion_topics(request):
     """Admin-authored prompts shown across the top of the Explore feed."""
     topics = DiscussionTopic.objects.filter(is_active=True).annotate(
@@ -6825,131 +6847,247 @@ class EventAgendaItemViewSet(viewsets.ReadOnlyModelViewSet):
 # Article Share Cards (#34) - OG meta tags for social sharing
 # ══════════════════════════════════════════════════════════════
 
-# Shareable content types: kind -> (model, title field, description field, image field)
+# Shareable content types:
+#   kind -> (model, title field, body field, image field, (EN label, FR label))
 SHARE_KINDS = {
-    'articles': ('Article', 'title', 'content', 'image'),
-    'magazines': ('MagazineEdition', 'title', 'description', 'cover_image'),
-    'events': ('EventRegistration', 'event_title', 'event_description', 'event_poster'),
-    'facts': ('Fact', 'title', 'content', 'image'),
-    'videos': ('Video', 'title', 'description', 'thumbnail'),
+    'articles': ('Article', 'title', 'content', 'image', ('Article', 'Article')),
+    'magazines': ('MagazineEdition', 'title', 'description', 'cover_image', ('Magazine', 'Magazine')),
+    'events': ('EventRegistration', 'event_title', 'event_description', 'event_poster', ('Event', 'Événement')),
+    'facts': ('Fact', 'title', 'content', 'image', ('Did you know', 'Le saviez-vous')),
+    'videos': ('Video', 'title', 'description', 'thumbnail', ('Video', 'Vidéo')),
+    'gallery': ('GalleryAlbum', 'title', 'description', 'cover_image', ('Photo album', 'Album photo')),
+    'features': ('FeatureCard', 'title', 'description', 'image', ('Spotlight', 'À la une')),
+    'agendas': ('PriorityAgenda', 'title', 'description', 'hero_image', ('Our agenda', 'Notre agenda')),
+    'discussions': ('Discussion', 'title', 'content', None, ('Discussion', 'Discussion')),
 }
 
+# Kinds whose headline reads better as the body text: a fact's title is the
+# generic "Did You Know?", and most Explore posts carry no title at all.
+_HEADLINE_FROM_BODY = {'facts', 'discussions'}
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def share_card(request, kind, pk):
-    """Public HTML page with Open Graph tags so a shared item previews properly.
+APP_STORE_URL = 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
+PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.b4africa.app'
 
-    One page for every shareable content type — `/articles/5/share/`,
-    `/magazines/2/share/`, `/events/7/share/`, and so on.
-    """
-    from django.http import HttpResponse, Http404
-    from django.utils.html import escape as esc
+
+def _share_lang(request):
+    return 'fr' if (request.GET.get('lang') or '').lower().startswith('fr') else 'en'
+
+
+def _share_site(request):
+    """Absolute origin for share links — the live domain outside development."""
+    if django_settings.DEBUG:
+        return request.build_absolute_uri('/').rstrip('/')
+    return 'https://burundi4africa.com'
+
+
+def _share_localised(obj, field, lang):
+    """Value of `field`, preferring its `_fr` twin when the link asks for French."""
+    if lang == 'fr':
+        translated = getattr(obj, f'{field}_fr', '') or ''
+        if translated:
+            return translated
+    return getattr(obj, field, '') or ''
+
+
+def _share_image(obj, image_field):
+    if image_field:
+        return getattr(obj, image_field, None) or None
+    # Explore posts keep their photos on a related media model.
+    media = getattr(obj, 'media', None)
+    photo = media.filter(media_type='image').exclude(image='').first() if media else None
+    return photo.image if photo else None
+
+
+def _resolve_share(kind, pk, lang):
+    """Load one shareable object and pull out everything a preview needs."""
+    from django.http import Http404
     import re
 
     if kind not in SHARE_KINDS:
         raise Http404('Unknown share type')
-    model_name, title_field, desc_field, image_field = SHARE_KINDS[kind]
+    model_name, title_field, body_field, image_field, labels = SHARE_KINDS[kind]
     obj = get_object_or_404(globals()[model_name], pk=pk)
 
-    title = getattr(obj, title_field, '') or ''
-    clean_content = re.sub(r'<[^>]+>', '', getattr(obj, desc_field, '') or '')
-    description = clean_content[:160].strip()
-    if len(clean_content) > 160:
-        description += '...'
+    # A public URL must never expose a draft, an archived item or a hidden card.
+    if getattr(obj, 'is_active', True) is False:
+        raise Http404('Not available')
+    if getattr(obj, 'status', 'published') not in ('published', None):
+        raise Http404('Not available')
 
-    image = getattr(obj, image_field, None)
-    image_url = request.build_absolute_uri(image.url) if image else ''
+    body = re.sub(r'<[^>]+>', ' ', _share_localised(obj, body_field, lang))
+    body = re.sub(r'\s+', ' ', body).strip()
+    title = _share_localised(obj, title_field, lang).strip()
+    if (kind in _HEADLINE_FROM_BODY or not title) and body:
+        title = body[:130].strip()
+    label = labels[1 if lang == 'fr' else 0]
+    return obj, title, body, _share_image(obj, image_field), label
 
-    share_url = f'https://burundi4africa.com/{kind}/{obj.pk}/share/'
 
-    # Try to hand the visitor over to the app; send everyone else to their store.
+@api_view(['GET'])
+@permission_classes([AllowAny])
+# Link previews are fetched by crawlers and by every recipient at once;
+# the shared anon rate limit would turn a popular post into a broken card.
+@throttle_classes([])
+def share_card_image(request, kind, pk):
+    """The 1200x630 JPEG a chat app shows for a shared link.
+
+    Served as JPEG on purpose: the stored photos are all WebP, which WhatsApp
+    and LinkedIn silently drop from a link preview.
+    """
+    from django.core.cache import cache
+    from django.http import HttpResponse
+    from . import share_cards
+
+    lang = _share_lang(request)
+    obj, title, _body, image, label = _resolve_share(kind, pk, lang)
+
+    # Stamped with the object's last edit so a re-uploaded photo makes a new card.
+    stamp = getattr(obj, 'updated_at', None) or getattr(obj, 'created_at', '')
+    version = hashlib.sha1(f'{stamp}|{title}'.encode()).hexdigest()[:12]
+    cache_key = f'sharecard:{kind}:{pk}:{lang}:{version}'
+    jpeg = cache.get(cache_key)
+    if jpeg is None:
+        photo = None
+        if image:
+            try:
+                with image.storage.open(image.name) as fh:
+                    photo = fh.read()
+            except Exception:
+                photo = None  # Missing file — the card falls back to the brand fill.
+        jpeg = share_cards.render(label, title, 'burundi4africa.com', photo)
+        cache.set(cache_key, jpeg, 60 * 60 * 12)
+
+    response = HttpResponse(jpeg, content_type='image/jpeg')
+    response['Cache-Control'] = 'public, max-age=86400, s-maxage=604800'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+# Link previews are fetched by crawlers and by every recipient at once;
+# the shared anon rate limit would turn a popular post into a broken card.
+@throttle_classes([])
+def share_card(request, kind, pk):
+    """Public landing page with Open Graph tags so a shared item previews well.
+
+    One page for every shareable type — `/articles/5/share/`,
+    `/events/7/share/`, `/gallery/3/share/`, and so on. Phones are handed
+    straight to the app; crawlers get the plain page so the preview builds.
+    """
+    from django.http import HttpResponse
+    from django.utils.html import escape as esc
+
+    lang = _share_lang(request)
+    obj, title, body, _image, label = _resolve_share(kind, pk, lang)
+
+    site = _share_site(request)
+    qs = '?lang=fr' if lang == 'fr' else ''
+    share_url = f'{site}/{kind}/{obj.pk}/share/{qs}'
+    card_url = f'{site}/{kind}/{obj.pk}/card.jpg{qs}'
+
+    description = body[:200].strip()
+    if len(body) > 200:
+        description += '…'
+
     ua = (request.META.get('HTTP_USER_AGENT', '') or '').lower()
     is_bot = any(b in ua for b in (
         'bot', 'crawler', 'spider', 'facebookexternalhit', 'whatsapp',
         'slack', 'discord', 'embedly', 'preview', 'skypeuripreview',
     ))
     is_android = 'android' in ua
-    store_url = (
-        'https://play.google.com/store/apps/details?id=com.b4africa.app'
-        if is_android
-        else 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
-    )
+    store_url = PLAY_STORE_URL if is_android else APP_STORE_URL
     deep_link = f'b4africa://{kind}/{obj.pk}'
     is_mobile = is_android or 'iphone' in ua or 'ipad' in ua
     # Crawlers must keep getting the plain page, or the link preview breaks.
     auto_open = '' if (is_bot or not is_mobile) else f"""
     <script>
-        // Installed app answers the scheme and backgrounds this page; if it is
-        // still visible a moment later, nothing handled it — go to the store.
+        // The installed app answers the scheme and backgrounds this page; if it
+        // is still visible a moment later, nothing handled it — go to the store.
         window.location.href = "{deep_link}";
         setTimeout(function() {{
             if (!document.hidden) window.location.href = "{store_url}";
         }}, 2000);
     </script>"""
 
-    # Escape all user-controlled values to prevent XSS
-    safe_title = esc(title)
-    safe_desc = esc(description)
-    safe_image = esc(image_url)
-    safe_share = esc(share_url)
-    safe_body = esc(clean_content[:500] + ('...' if len(clean_content) > 500 else ''))
+    open_label = 'Ouvrir dans l’app' if lang == 'fr' else 'Open in the app'
+    get_label = 'Télécharger l’app' if lang == 'fr' else 'Get the app'
+
+    safe = {
+        'title': esc(title),
+        'desc': esc(description),
+        'card': esc(card_url),
+        'share': esc(share_url),
+        'label': esc(label),
+        'body': esc(body[:700] + ('…' if len(body) > 700 else '')),
+    }
 
     html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{safe_title}</title>
+    <title>{safe['title']} · Be 4 Africa</title>
+    <meta name="description" content="{safe['desc']}" />
 
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="{safe_title}" />
-    <meta property="og:description" content="{safe_desc}" />
-    <meta property="og:image" content="{safe_image}" />
-    <meta property="og:url" content="{safe_share}" />
+    <meta property="og:title" content="{safe['title']}" />
+    <meta property="og:description" content="{safe['desc']}" />
+    <meta property="og:image" content="{safe['card']}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="{safe['title']}" />
+    <meta property="og:url" content="{safe['share']}" />
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="Be 4 Africa" />
+    <meta property="og:locale" content="{'fr_FR' if lang == 'fr' else 'en_US'}" />
 
-    <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="{safe_title}" />
-    <meta name="twitter:description" content="{safe_desc}" />
-    <meta name="twitter:image" content="{safe_image}" />
+    <meta name="twitter:title" content="{safe['title']}" />
+    <meta name="twitter:description" content="{safe['desc']}" />
+    <meta name="twitter:image" content="{safe['card']}" />
 
     <style>
+        :root {{ --green:#409843; --deep:#0b2612; --gold:#FCD116; }}
+        * {{ box-sizing: border-box; }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f8f9fa;
-            color: #333;
+            margin: 0; padding: 24px 20px 56px; background: #f4f6f4; color: #17251a;
+            display: flex; flex-direction: column; align-items: center;
         }}
-        .header {{ text-align: center; padding: 20px 0; }}
-        .header img {{ max-width: 100%; border-radius: 12px; }}
-        h1 {{ font-size: 28px; line-height: 1.3; color: #1a1a1a; }}
-        .content {{ font-size: 16px; line-height: 1.7; }}
+        .card {{
+            width: 100%; max-width: 640px; background: #fff; border-radius: 20px;
+            overflow: hidden; box-shadow: 0 18px 50px rgba(11,38,18,.13);
+        }}
+        .card img {{ display: block; width: 100%; aspect-ratio: 1200/630; object-fit: cover; }}
+        .body {{ padding: 26px 26px 30px; }}
+        .kind {{
+            display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .16em;
+            text-transform: uppercase; color: var(--green); margin: 0 0 12px;
+        }}
+        h1 {{ font-size: 26px; line-height: 1.28; margin: 0 0 14px; letter-spacing: -.015em; }}
+        p.text {{ font-size: 16px; line-height: 1.65; color: #4b5a4e; margin: 0 0 24px; }}
         .cta {{
-            display: inline-block;
-            margin-top: 24px;
-            padding: 12px 24px;
-            background: #1EB53A;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
+            display: block; text-align: center; padding: 15px 24px; border-radius: 12px;
+            text-decoration: none; font-weight: 700; font-size: 16px;
+            background: var(--green); color: #fff; margin-bottom: 10px;
         }}
-        .cta.secondary {{ background: #fff; color: #1EB53A; border: 1px solid #1EB53A; }}
+        .cta.secondary {{ background: #fff; color: var(--green); border: 1.5px solid #d6e3d7; }}
+        footer {{ text-align: center; font-size: 12px; letter-spacing: .12em;
+                  text-transform: uppercase; color: #8b9b8d; margin-top: 22px; }}
     </style>
 </head>
 <body>
-    <div class="header">
-        {"<img src='" + safe_image + "' alt='" + safe_title + "' />" if image_url else ""}
-    </div>
-    <h1>{safe_title}</h1>
-    <div class="content">{safe_body}</div>
-    <a href="{deep_link}" class="cta">Open in the app</a>
-    <a href="{store_url}" class="cta secondary">Get the app</a>
+    <article class="card">
+        <img src="{safe['card']}" alt="{safe['title']}" />
+        <div class="body">
+            <span class="kind">{safe['label']}</span>
+            <h1>{safe['title']}</h1>
+            <p class="text">{safe['body']}</p>
+            <a href="{deep_link}" class="cta">{open_label}</a>
+            <a href="{store_url}" class="cta secondary">{get_label}</a>
+        </div>
+    </article>
+    <footer>Be 4 Africa · burundi4africa.com</footer>
     {auto_open}
 </body>
 </html>"""

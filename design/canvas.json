@@ -1,0 +1,12 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 402, "h": 874, "title": "Explore feed" },
+    { "file": "PostDetail.dc.html", "x": 502, "y": 0, "w": 402, "h": 874, "title": "Post detail" },
+    { "file": "Profile.dc.html", "x": 1004, "y": 0, "w": 402, "h": 874, "title": "Profile" },
+    { "file": "Compose.dc.html", "x": 1506, "y": 0, "w": 402, "h": 874, "title": "Compose sheet" }
+  ],
+  "annotations": [
+    { "id": "tokens", "x": 0, "y": -150, "w": 500, "text": "Values lifted from lib/config/app_ds.dart — #F5F5F5 canvas, #409843 header with a 28px bottom radius, white 16px cards at 0 2px 8px rgba(0,0,0,.06), #1A1A1A / #666 / #999 text, badge blue #1DA1F2 and gold #FFD700.\nBottom bar order is Magazine · News · Home · Explore · More, so the raised notch lands dead centre on Home." }
+  ],
+  "launch": { "view": "canvas" }
+}

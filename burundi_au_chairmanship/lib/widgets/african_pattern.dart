@@ -369,29 +369,54 @@ class KaryendaDrumAnimated extends StatefulWidget {
 
 class _KaryendaDrumAnimatedState extends State<KaryendaDrumAnimated>
     with SingleTickerProviderStateMixin {
-  late AnimationController _glowController;
+  /// One call-and-response phrase of the Karyenda: a strong strike, a lighter
+  /// answering strike, then silence before the phrase comes round again.
+  static const _phrase = Duration(milliseconds: 1800);
+
+  late AnimationController _beat;
 
   @override
   void initState() {
     super.initState();
+    _beat = AnimationController(duration: _phrase, vsync: this);
+    if (widget.playing) _beat.repeat();
+  }
 
-    _glowController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat(reverse: true);
+  @override
+  void didUpdateWidget(KaryendaDrumAnimated oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.playing == oldWidget.playing) return;
+    if (widget.playing) {
+      _beat.repeat();
+    } else {
+      _beat.stop();
+    }
   }
 
   @override
   void dispose() {
-    _glowController.dispose();
+    _beat.dispose();
     super.dispose();
+  }
+
+  /// Sharp attack then exponential decay — how a struck hide actually behaves.
+  /// Decay is steep enough that the first strike is silent again by the time
+  /// the phrase loops, so there is no visible jump at the seam.
+  static double _strike(double t, double at) {
+    final d = t - at;
+    return d < 0 ? 0 : math.exp(-d * 7.0);
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _glowController,
-      builder: (context, child) {
+      animation: _beat,
+      builder: (context, _) {
+        final t = _beat.value;
+        final hit = widget.playing
+            ? (_strike(t, 0.0) + 0.55 * _strike(t, 0.24)).clamp(0.0, 1.0)
+            : 0.0;
+
         return SizedBox(
           width: widget.size * 1.2,
           height: widget.size * 1.5,
@@ -399,30 +424,41 @@ class _KaryendaDrumAnimatedState extends State<KaryendaDrumAnimated>
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              // Glow behind drum
-              Positioned.fill(
-                child: Center(
-                  child: Container(
-                    width: widget.size * 0.8,
-                    height: widget.size,
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.auGold.withValues(alpha: 0.3 * _glowController.value),
-                          blurRadius: 30 + 20 * _glowController.value,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
+              // Sound rings travelling out from the head on each strike
+              if (widget.playing)
+                Positioned.fill(
+                  child: CustomPaint(painter: _DrumRipplePainter(t)),
+                ),
+
+              // Glow swells with the hit instead of breathing on its own
+              Center(
+                child: Container(
+                  width: widget.size * 0.8,
+                  height: widget.size,
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.auGold
+                            .withValues(alpha: 0.16 + 0.34 * hit),
+                        blurRadius: 26 + 28 * hit,
+                        spreadRadius: 4 + 7 * hit,
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // Drum body
+              // Drum body — a struck drum widens and squats a little, pivoting
+              // on its base, then springs back.
               Center(
-                child: CustomPaint(
-                  size: Size(widget.size, widget.size * 1.2),
-                  painter: _KaryendaDrumPainter(),
+                child: Transform(
+                  alignment: Alignment.bottomCenter,
+                  transform: Matrix4.diagonal3Values(
+                      1 + 0.045 * hit, 1 - 0.03 * hit, 1),
+                  child: CustomPaint(
+                    size: Size(widget.size, widget.size * 1.2),
+                    painter: _KaryendaDrumPainter(),
+                  ),
                 ),
               ),
             ],
@@ -433,6 +469,35 @@ class _KaryendaDrumAnimatedState extends State<KaryendaDrumAnimated>
   }
 }
 
+/// Gold rings radiating from the drum head, one per strike in the phrase.
+class _DrumRipplePainter extends CustomPainter {
+  final double t;
+  const _DrumRipplePainter(this.t);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final head = Offset(size.width / 2, size.height * 0.32);
+    _ring(canvas, size, head, t, 1.0);
+    _ring(canvas, size, head, t - 0.24, 0.6);
+  }
+
+  void _ring(Canvas canvas, Size size, Offset c, double p, double strength) {
+    if (p < 0 || p > 0.85) return;
+    final k = p / 0.85;
+    canvas.drawCircle(
+      c,
+      size.width * (0.22 + 0.32 * k),
+      Paint()
+        ..color = AppColors.auGold.withValues(alpha: (1 - k) * 0.32 * strength)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.5 + 2.5 * (1 - k),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrumRipplePainter oldDelegate) =>
+      oldDelegate.t != t;
+}
 
 class _KaryendaDrumPainter extends CustomPainter {
   static const Color _red = Color(0xFFE11C23);

@@ -12,6 +12,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
 import '../../widgets/confetti_overlay.dart';
@@ -320,15 +322,10 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF0F2F5),
-      appBar: AppBar(
-        title: const Text('Digital ID Card'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: const Text('My credential')),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
           : _error != null
               ? _buildError(isDark)
               : _buildCredential(isDark),
@@ -337,19 +334,26 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
 
   Widget _buildError(bool isDark) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: isDark ? Colors.white38 : Colors.black26),
-          const SizedBox(height: 16),
-          Text(_error!, style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () { setState(() { _isLoading = true; _error = null; }); _loadCredential(); },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.burundiGreen),
-            child: const Text('Retry', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 56, color: Ds.muted(context)),
+            const SizedBox(height: 16),
+            Text(_error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Ds.body(context))),
+            const SizedBox(height: 20),
+            DsOutlineButton('Retry', radius: Ds.rPill, onTap: () {
+              setState(() {
+                _isLoading = true;
+                _error = null;
+              });
+              _loadCredential();
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -833,7 +837,7 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           // Download PDF button (admin-controlled)
           if (cred.allowPdfDownload && cred.isIdCardFieldVisible('allow_pdf_download'))
@@ -881,22 +885,9 @@ class _YouthDialogueCredentialScreenState extends State<YouthDialogueCredentialS
               ),
             ),
 
-          // Protected content badge
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.security, size: 14, color: isDark ? Colors.white24 : Colors.black26),
-              const SizedBox(width: 6),
-              Text(
-                'Protected content',
-                style: TextStyle(
-                  color: isDark ? Colors.white24 : Colors.black26,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
+          DsFootnote(
+              'Works offline — show at every venue gate.',
+              center: true),
           const SizedBox(height: 20),
         ],
       ),

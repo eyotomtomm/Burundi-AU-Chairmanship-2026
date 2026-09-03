@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../models/magazine_model.dart';
@@ -20,6 +19,9 @@ import '../../widgets/comment_ban_dialog.dart';
 import '../../utils/input_sanitizer.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import 'pdf_viewer_screen.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
+import '../../services/share_service.dart';
 
 class MagazineDetailScreen extends StatefulWidget {
   final MagazineEdition magazine;
@@ -264,92 +266,89 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
     final coverWidth = screenWidth * 0.75;
     final coverHeight = coverWidth * 1.4;
 
-    final bg = isDark ? AppColors.darkBackground : Colors.white;
-    final textPrimary = isDark ? AppColors.darkText : AppColors.lightText;
-    final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final bg = Ds.bg(context);
+    final textPrimary = Ds.ink(context);
+    final textSecondary = Ds.body(context);
 
     return Scaffold(
       backgroundColor: bg,
-      body: Stack(
+      // Same pinned action bar as the article page: reactions left, CTA right.
+      bottomNavigationBar: DsBottomBar(
         children: [
-          // ── Elegant warm background behind cover area ──
-          Positioned(
-            top: 0, left: 0, right: 0, height: 500,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? [
-                          const Color(0xFF1C2A1C),
-                          const Color(0xFF162016),
-                          AppColors.darkBackground,
-                        ]
-                      : [
-                          const Color(0xFFF8F6F2),
-                          const Color(0xFFF3F1ED),
-                          bg,
-                        ],
-                  stops: const [0.0, 0.5, 1.0],
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleLike,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                    _magazine.isLiked
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 26,
+                    color: _magazine.isLiked ? Ds.red : Ds.body(context)),
+                const SizedBox(width: 7),
+                Text('${_magazine.likeCount}',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _magazine.isLiked ? Ds.red : Ds.body(context))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Icon(Icons.mode_comment_outlined, size: 24, color: Ds.body(context)),
+          const SizedBox(width: 7),
+          Text('$commentCount',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Ds.body(context))),
+          const Spacer(),
+          DsPrimaryButton(
+            langCode == 'fr' ? 'Commenter' : 'Comment',
+            icon: Icons.mode_comment_rounded,
+            expand: false,
+            radius: Ds.rPill,
+            onTap: () {
+              final ctx = _commentsSectionKey.currentContext;
+              if (ctx != null) {
+                Scrollable.ensureVisible(ctx,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOutCubic);
+              }
+            },
+          ),
+        ],
+      ),
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          // Green header from the comp (replaces the transparent app bar).
+          SliverToBoxAdapter(
+            child: DsHeader(
+              title: l10n.translate('magazine'),
+              actions: [
+                Builder(
+                  builder: (btnContext) => DsHeaderAction(
+                    Icons.share_rounded,
+                    onTap: () => ShareService.item(
+                      btnContext,
+                      kind: 'magazines',
+                      id: _magazine.id,
+                      title: _magazine.getTitle(langCode),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
 
-          // ── Main content ──
-          CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              // Simple transparent app bar
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                leading: IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.arrow_back_rounded, color: textPrimary, size: 20),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                actions: [
-                  Builder(
-                    builder: (btnContext) => IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.share_rounded, color: textPrimary, size: 20),
-                      ),
-                      onPressed: () {
-                        HapticService.light();
-                        final box = btnContext.findRenderObject() as RenderBox?;
-                        final origin = box != null
-                            ? box.localToGlobal(Offset.zero) & box.size
-                            : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
-                        Share.share(
-                          '${_magazine.getTitle(langCode)}\n\n${Environment.siteBaseUrl}/magazines/${_magazine.id}/share/',
-                          sharePositionOrigin: origin,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              // ═══ Cover + Info (Apple Books style) ═══
+              // ═══ Cover + Info ═══
               SliverToBoxAdapter(
                 child: Column(
                   children: [
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 20),
 
                     // ── Centered cover — always slidable ──
                     SizedBox(
@@ -383,7 +382,7 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
                               margin: const EdgeInsets.symmetric(horizontal: 3),
                               width: active ? 18 : 6, height: 6,
                               decoration: BoxDecoration(
-                                color: active ? AppColors.burundiGreen : textSecondary.withValues(alpha: 0.3),
+                                color: active ? Ds.green : Ds.outline(context),
                                 borderRadius: BorderRadius.circular(3),
                               ),
                             );
@@ -393,169 +392,76 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
 
                     const SizedBox(height: 20),
 
+                    // ── Issue pill ──
+                    if (_magazine.isFeatured)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: DsPill(
+                          langCode == 'fr' ? 'ÉDITION VEDETTE' : 'FEATURED EDITION',
+                          tone: DsTone.gold,
+                        ),
+                      ),
+
                     // ── Title (centered) ──
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: Text(
                         title,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 23,
                           fontWeight: FontWeight.w800,
-                          fontFamily: 'HeatherGreen',
+                          letterSpacing: -0.3,
+                          height: 1.25,
                           color: textPrimary,
-                          height: 1.2,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
-                    // ── Date + meta (centered) ──
+                    // ── Date · pages · size ──
                     Text(
-                      DateFormat('MMMM yyyy').format(_magazine.publishDate),
-                      style: TextStyle(fontSize: 15, color: textSecondary, fontWeight: FontWeight.w500),
+                      [
+                        DateFormat('MMMM yyyy').format(_magazine.publishDate),
+                        if (_magazine.pageCount > 0) '${_magazine.pageCount} pages',
+                        if (_magazine.fileSize.isNotEmpty) _magazine.fileSize,
+                      ].join('  ·  '),
+                      style: Ds.meta(context),
                     ),
-                    if (_magazine.pageCount > 0 || _magazine.fileSize.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          [
-                            if (_magazine.pageCount > 0) '${_magazine.pageCount} pages',
-                            if (_magazine.fileSize.isNotEmpty) _magazine.fileSize,
-                          ].join('  ·  '),
-                          style: TextStyle(fontSize: 13, color: textSecondary),
-                        ),
-                      ),
 
-                    // ── Featured badge ──
-                    if (_magazine.isFeatured)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFFD4A017), Color(0xFFF4C430)]),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text('FEATURED EDITION',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1)),
-                        ),
-                      ),
+                    const SizedBox(height: 18),
 
-                    const SizedBox(height: 20),
-
-                    // ── Read Now button (full width) ──
+                    // ── Read Now ──
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: GestureDetector(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: DsPrimaryButton(
+                        _magazine.hasPdf
+                            ? (langCode == 'fr' ? 'Commencer la lecture' : 'Start Reading')
+                            : (langCode == 'fr' ? 'PDF non disponible' : 'PDF Not Available'),
+                        icon: Icons.auto_stories_rounded,
                         onTap: _magazine.hasPdf ? _openPdf : null,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            color: _magazine.hasPdf ? AppColors.burundiGreen : Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.auto_stories_rounded, size: 22,
-                                color: _magazine.hasPdf ? Colors.white : Colors.grey),
-                              const SizedBox(width: 10),
-                              Text(
-                                _magazine.hasPdf
-                                    ? (langCode == 'fr' ? 'Commencer la lecture' : 'Start Reading')
-                                    : (langCode == 'fr' ? 'PDF non disponible' : 'PDF Not Available'),
-                                style: TextStyle(
-                                  fontSize: 17, fontWeight: FontWeight.w700,
-                                  color: _magazine.hasPdf ? Colors.white : Colors.grey,
-                                ),
-                              ),
-                              if (_magazine.hasPdf) ...[
-                                const SizedBox(width: 6),
-                                const Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white70),
-                              ],
-                            ],
-                          ),
-                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
 
-                    // ── Engagement row (inline, like live feed) ──
+                    // ── Views / likers ──
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Row(
                         children: [
-                          // Views
-                          Icon(Icons.visibility_rounded, size: 18, color: textSecondary),
+                          Icon(Icons.visibility_rounded, size: 16, color: textSecondary),
                           const SizedBox(width: 5),
-                          Text('${_magazine.viewCount}',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textSecondary)),
-                          const SizedBox(width: 4),
-                          Text(l10n.translate('views'),
-                            style: TextStyle(fontSize: 14, color: textSecondary)),
-
-                          const SizedBox(width: 20),
-
-                          // Like — tappable
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: _toggleLike,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _magazine.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                    size: 22,
-                                    color: _magazine.isLiked ? AppColors.burundiRed : textSecondary,
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text('${_magazine.likeCount}',
-                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-                                      color: _magazine.isLiked ? AppColors.burundiRed : textSecondary)),
-                                  const SizedBox(width: 4),
-                                  Text(l10n.translate('like'),
-                                    style: TextStyle(fontSize: 14,
-                                      color: _magazine.isLiked ? AppColors.burundiRed : textSecondary)),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // Liked-by avatars
+                          Text('${_magazine.viewCount} ${l10n.translate('views')}',
+                              style: Ds.meta(context)),
                           if (_magazine.recentLikers.isNotEmpty) ...[
-                            const SizedBox(width: 8),
+                            const Spacer(),
                             LikedByAvatars(
                               likers: _magazine.recentLikers,
                               totalLikes: _magazine.likeCount,
                               avatarRadius: 10,
                             ),
                           ],
-
-                          const Spacer(),
-
-                          // Comments — tappable, scrolls to section
-                          GestureDetector(
-                            onTap: () {
-                              final ctx = _commentsSectionKey.currentContext;
-                              if (ctx != null) {
-                                Scrollable.ensureVisible(ctx,
-                                  duration: const Duration(milliseconds: 500),
-                                  curve: Curves.easeOutCubic);
-                              }
-                            },
-                            child: Row(
-                              children: [
-                                Icon(Icons.chat_bubble_outline_rounded, size: 18, color: textSecondary),
-                                const SizedBox(width: 5),
-                                Text('$commentCount',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textSecondary)),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -637,13 +543,11 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
                           );
                         }),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
         ],
       ),
     );
@@ -652,36 +556,43 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
   // ─── Cover image with shadow (Apple Books style) ───────────────
 
   Widget _buildCover(String imageUrl, double width, double height, List<String> allImages, String langCode, {int index = 0}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // The frame hugs the artwork: covers are not all the same shape, and a
+    // fixed box left white bands (contain) or cropped the masthead (cover).
+    Widget frame(Widget child) => Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Ds.surface(context),
+            borderRadius: BorderRadius.circular(Ds.rCard),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 28,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 12)),
+            ],
+          ),
+          child: child,
+        );
+
     return GestureDetector(
       onTap: () {
         if (allImages.isEmpty) return;
         HapticService.light();
         ImageGalleryViewer.show(context, images: allImages, initialIndex: index, captions: _allCaptions(langCode));
       },
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey.shade900 : Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 28, spreadRadius: 2, offset: const Offset(0, 12)),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: imageUrl.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.contain,
-                  width: width,
-                  height: height,
-                  placeholder: (_, _) => _coverPlaceholder(),
-                  errorWidget: (_, _, _) => _coverPlaceholder(),
-                )
-              : _coverPlaceholder(),
-        ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: width, maxHeight: height),
+        child: imageUrl.isEmpty
+            ? frame(SizedBox(width: width, height: height, child: _coverPlaceholder()))
+            : CachedNetworkImage(
+                imageUrl: imageUrl,
+                imageBuilder: (_, provider) =>
+                    frame(Image(image: provider, fit: BoxFit.contain)),
+                placeholder: (_, _) =>
+                    frame(SizedBox(width: width, height: height, child: _coverPlaceholder())),
+                errorWidget: (_, _, _) =>
+                    frame(SizedBox(width: width, height: height, child: _coverPlaceholder())),
+              ),
       ),
     );
   }

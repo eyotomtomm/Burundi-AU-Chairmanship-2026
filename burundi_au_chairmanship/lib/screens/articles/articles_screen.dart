@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
+import '../../config/environment.dart';
 import '../../models/magazine_model.dart';
 import '../../services/api_service.dart';
 import '../../services/content_cache_service.dart';
@@ -15,10 +17,10 @@ import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/async_content_view.dart';
 import '../../widgets/sliver_async_content_view.dart';
-import '../../widgets/translate_button.dart';
-import '../../widgets/liked_by_avatars.dart';
 import '../../services/like_service.dart';
 import '../news/article_detail_screen.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 
 class ArticlesScreen extends StatefulWidget {
   const ArticlesScreen({super.key});
@@ -32,13 +34,13 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   int? _selectedCategoryId;
-  int _featuredPage = 0;
-  final _featuredController = PageController(viewportFraction: 0.92);
   final LikeService _likeService = LikeService();
+  // Featured articles ride a horizontal carousel rather than stacking.
+  final PageController _featuredController = PageController();
+  int _featuredPage = 0;
+  Timer? _featuredTimer;
   VoidCallback? _removeLikeListener;
 
-  static const _accent = AppColors.auGold;
-  static const _accentDark = Color(0xFFB8960E);
 
   List<Category> _categories = [];
 
@@ -55,6 +57,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   @override
   void dispose() {
     _removeLikeListener?.call();
+    _featuredTimer?.cancel();
     _featuredController.dispose();
     super.dispose();
   }
@@ -126,6 +129,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     final featured = allArticles.where((a) => a.isFeatured).toList();
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       body: contentState != AsyncContentState.content
           ? CustomScrollView(
               slivers: [
@@ -163,12 +167,8 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 
                   if (featured.isNotEmpty)
                     SliverToBoxAdapter(
-                      child: _buildFeaturedCarousel(featured, langCode, isDark, l10n, isAuth),
+                      child: _buildFeaturedCarousel(featured, langCode, l10n),
                     ),
-
-                  SliverToBoxAdapter(
-                    child: _buildCategoryChips(l10n, langCode),
-                  ),
 
                   filtered.isEmpty
                       ? SliverFillRemaining(
@@ -194,7 +194,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                           ),
                         )
                       : SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
@@ -205,7 +205,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                                 );
                                 switch (slot) {
                                   case LoginGateSlot.free:
-                                    return _buildArticleCard(context, filtered[index], langCode, isDark, l10n, isAuth);
+                                    return _buildArticleRow(filtered[index], langCode);
                                   case LoginGateSlot.banner:
                                     return const LoginGateBanner(
                                       margin: EdgeInsets.only(bottom: 12),
@@ -217,7 +217,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                                     }
                                     return LockedContentWrap(
                                       locked: true,
-                                      child: _buildArticleCard(context, filtered[dataIndex], langCode, isDark, l10n, isAuth),
+                                      child: _buildArticleRow(filtered[dataIndex], langCode),
                                     );
                                   case LoginGateSlot.hidden:
                                     return const SizedBox.shrink();
@@ -236,442 +236,218 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     );
   }
 
+  /// Green header carrying the category filters, as on the News tab.
   Widget _buildSliverAppBar(AppLocalizations l10n, String langCode) {
-    return SliverAppBar(
-      expandedHeight: 120,
-      floating: false,
-      pinned: true,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
-      actions: const [TranslateButton()],
-      flexibleSpace: FlexibleSpaceBar(
-        title: Text(
-          langCode == 'fr' ? 'Actualités' : 'News',
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 22,
-            color: Colors.white,
-          ),
-        ),
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.auGold, _accentDark],
-            ),
+    return SliverToBoxAdapter(
+      child: DsHeader(
+        title: langCode == 'fr' ? 'Actualités' : 'News',
+        large: true,
+        bottomPad: 16,
+        bottom: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: DsFilterChip(
+                  l10n.translate('all_categories'),
+                  selected: _selectedCategoryId == null,
+                  onGreen: true,
+                  onTap: () => setState(() => _selectedCategoryId = null),
+                ),
+              ),
+              for (final cat in _categories)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: DsFilterChip(
+                    cat.getDisplayName(langCode),
+                    selected: _selectedCategoryId == cat.id,
+                    onGreen: true,
+                    onTap: () => setState(() => _selectedCategoryId = cat.id),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildFeaturedCarousel(List<Article> featured, String langCode, bool isDark, AppLocalizations l10n, bool isAuth) {
+  Widget _articleImage(Article article) => CachedNetworkImage(
+        imageUrl: Environment.fixMediaUrl(article.imageUrl),
+        fit: BoxFit.cover,
+        placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
+        errorWidget: (_, _, _) =>
+            const DsImagePlaceholder(radius: 0, icon: Icons.article_rounded),
+      );
+
+  /// Featured articles slide horizontally; a single one just renders flat.
+  Widget _buildFeaturedCarousel(
+      List<Article> featured, String langCode, AppLocalizations l10n) {
+    if (featured.length == 1) {
+      return _buildFeaturedCard(featured.first, langCode, l10n);
+    }
+
+    _startFeaturedAutoSlide(featured.length);
+
     return Column(
       children: [
         SizedBox(
-          height: 230,
+          // Fixed so every page is the same height regardless of headline length.
+          height: 372,
           child: PageView.builder(
             controller: _featuredController,
             itemCount: featured.length,
             onPageChanged: (i) => setState(() => _featuredPage = i),
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
-                child: _buildFeaturedCard(featured[index], langCode, isDark, l10n, isAuth),
-              );
-            },
+            itemBuilder: (context, index) =>
+                _buildFeaturedCard(featured[index], langCode, l10n),
           ),
         ),
-        if (featured.length > 1)
-          Row(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(featured.length, (i) {
+              final active = i == _featuredPage;
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: _featuredPage == i ? 20 : 8,
+                width: active ? 18 : 6,
                 height: 6,
                 decoration: BoxDecoration(
+                  color: active ? Ds.green : Ds.outline(context),
                   borderRadius: BorderRadius.circular(3),
-                  color: _featuredPage == i ? _accent : _accent.withValues(alpha: 0.3),
                 ),
               );
             }),
           ),
+        ),
       ],
     );
   }
 
-  Widget _buildFeaturedCard(Article article, String langCode, bool isDark, AppLocalizations l10n, bool isAuth) {
-    return GestureDetector(
-      onTap: () => _openDetail(article),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            CachedNetworkImage(
-              imageUrl: article.imageUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => Container(color: _accent.withValues(alpha: 0.2)),
-              errorWidget: (_, _, _) => Container(
-                color: _accent.withValues(alpha: 0.2),
-                child: const Icon(Icons.article_rounded, size: 48, color: Colors.white54),
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.75),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _accent,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  l10n.translate('featured').toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    article.getTitle(langCode),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      height: 1.2,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _buildStatChip(Icons.visibility_rounded, '${article.viewCount}', Colors.white70),
-                      const SizedBox(width: 12),
-                      _buildStatChip(Icons.chat_bubble_outline_rounded, '${article.commentCount}', Colors.white70),
-                      const SizedBox(width: 12),
-                      Builder(builder: (_) {
-                        _likeService.seed(EntityType.article, article.id,
-                          isLiked: article.isLiked, likeCount: article.likeCount, recentLikers: article.recentLikers);
-                        final ls = _likeService.getState(EntityType.article, article.id);
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildStatChip(
-                              ls.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              '${ls.likeCount}', Colors.white70),
-                            if (ls.recentLikers.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              LikedByAvatars(likers: ls.recentLikers, totalLikes: ls.likeCount, avatarRadius: 10, overlap: 7),
-                            ],
-                          ],
-                        );
-                      }),
-                      const Spacer(),
-                      Flexible(
-                        child: Text(
-                          article.author,
-                          style: const TextStyle(fontSize: 12, color: Colors.white70),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  /// Advances the featured carousel every few seconds, wrapping at the end.
+  void _startFeaturedAutoSlide(int count) {
+    if (_featuredTimer != null || count <= 1) return;
+    _featuredTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted || !_featuredController.hasClients) return;
+      final next = (_featuredPage + 1) % count;
+      _featuredController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
-  Widget _buildCategoryChips(AppLocalizations l10n, String langCode) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+  Widget _buildFeaturedCard(Article article, String langCode, AppLocalizations l10n) {
+    _likeService.seed(EntityType.article, article.id,
+        isLiked: article.isLiked,
+        likeCount: article.likeCount,
+        recentLikers: article.recentLikers);
+    final ls = _likeService.getState(EntityType.article, article.id);
+
+    return DsCard(
+      margin: const EdgeInsets.all(16),
+      featured: true,
+      clip: true,
+      onTap: () => _openDetail(article),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(height: 190, width: double.infinity, child: _articleImage(article)),
           Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(
-                l10n.translate('all_categories'),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _selectedCategoryId == null ? Colors.white : _accent,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    DsPill(l10n.translate('featured').toUpperCase()),
+                    const SizedBox(width: 8),
+                    Text(DateFormat('MMM d · HH:mm').format(article.publishDate),
+                        style: Ds.meta(context)),
+                  ],
                 ),
-              ),
-              selected: _selectedCategoryId == null,
-              selectedColor: _accent,
-              backgroundColor: _accent.withValues(alpha: 0.08),
-              side: BorderSide(
-                color: _selectedCategoryId == null ? _accent : _accent.withValues(alpha: 0.3),
-              ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              onSelected: (_) {
-                setState(() => _selectedCategoryId = null);
-              },
+                const SizedBox(height: 10),
+                Text(
+                  article.getTitle(langCode),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                      letterSpacing: -0.3,
+                      color: Ds.ink(context)),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                        ls.isLiked
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 17,
+                        color: ls.isLiked ? Ds.red : Ds.muted(context)),
+                    const SizedBox(width: 5),
+                    Text('${ls.likeCount}', style: Ds.meta(context)),
+                    const SizedBox(width: 14),
+                    Icon(Icons.mode_comment_outlined,
+                        size: 17, color: Ds.muted(context)),
+                    const SizedBox(width: 5),
+                    Text('${article.commentCount}', style: Ds.meta(context)),
+                    const Spacer(),
+                    Icon(Icons.visibility_rounded, size: 17, color: Ds.muted(context)),
+                    const SizedBox(width: 5),
+                    Text('${article.viewCount}', style: Ds.meta(context)),
+                  ],
+                ),
+              ],
             ),
           ),
-          ..._categories.map((cat) {
-            final isSelected = _selectedCategoryId == cat.id;
-            final chipColor = cat.parsedColor;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(
-                  cat.getDisplayName(langCode),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : chipColor,
-                  ),
-                ),
-                selected: isSelected,
-                selectedColor: chipColor,
-                backgroundColor: chipColor.withValues(alpha: 0.08),
-                side: BorderSide(
-                  color: isSelected ? chipColor : chipColor.withValues(alpha: 0.3),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                onSelected: (_) {
-                  setState(() => _selectedCategoryId = cat.id);
-                },
-              ),
-            );
-          }),
         ],
       ),
     );
   }
 
-  Widget _buildArticleCard(BuildContext context, Article article, String langCode, bool isDark, AppLocalizations l10n, bool isAuth) {
-    final catColor = article.category?.parsedColor ?? AppColors.burundiGreen;
+  Widget _buildArticleRow(Article article, String langCode) {
     final catLabel = article.category?.getDisplayName(langCode) ?? '';
+    final when = DateFormat('MMM d').format(article.publishDate);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
-      child: InkWell(
-        onTap: () => _openDetail(article),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 10,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: article.imageUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) => Container(
-                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    ),
-                    errorWidget: (_, _, _) => Container(
-                      color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                      child: const Icon(Icons.article_rounded, size: 48, color: AppColors.burundiGreen),
-                    ),
-                  ),
-                  if (catLabel.isNotEmpty)
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: catColor,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          catLabel,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (article.media.where((m) => m.isImage).isNotEmpty)
-                    Positioned(
-                      bottom: 10,
-                      right: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.photo_library_rounded, size: 14, color: Colors.white),
-                            const SizedBox(width: 4),
-                            Text(
-                              '+${article.media.where((m) => m.isImage).length}',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    article.getTitle(langCode),
-                    style: TextStyle(
-                      fontSize: 17,
+    return DsCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      onTap: () => _openDetail(article),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(Ds.rTile),
+            child: SizedBox(width: 92, height: 78, child: _articleImage(article)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  article.getTitle(langCode),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                      height: 1.25,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.person_rounded, size: 14,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          article.author,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(Icons.schedule_rounded, size: 14,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        DateFormat('MMM d, yyyy').format(article.publishDate),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _buildStatChip(
-                        Icons.visibility_rounded,
-                        '${article.viewCount}',
-                        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      ),
-                      const SizedBox(width: 14),
-                      _buildStatChip(
-                        Icons.chat_bubble_outline_rounded,
-                        '${article.commentCount}',
-                        isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      ),
-                      const SizedBox(width: 14),
-                      Builder(builder: (_) {
-                        _likeService.seed(EntityType.article, article.id,
-                          isLiked: article.isLiked, likeCount: article.likeCount, recentLikers: article.recentLikers);
-                        final ls = _likeService.getState(EntityType.article, article.id);
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildStatChip(
-                              ls.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              '${ls.likeCount}',
-                              ls.isLiked ? AppColors.burundiRed : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                            ),
-                            if (ls.recentLikers.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              LikedByAvatars(
-                                likers: ls.recentLikers,
-                                totalLikes: ls.likeCount,
-                                avatarRadius: 10,
-                                overlap: 7,
-                              ),
-                            ],
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
-                ],
-              ),
+                      height: 1.35,
+                      color: Ds.ink(context)),
+                ),
+                const SizedBox(height: 5),
+                Text([if (catLabel.isNotEmpty) catLabel, when].join(' · '),
+                    style: Ds.meta(context)),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildStatChip(IconData icon, String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 3),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: color),
-        ),
-      ],
     );
   }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/input_sanitizer.dart';
@@ -86,105 +88,59 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contact Support'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: const Text('Contact support')),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            // Header
-            Container(
+            DsCard(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.grey[850]
-                    : Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                ),
-              ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.support_agent,
-                    color: AppColors.burundiGreen,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 12),
+                  DsIconSquare(Icons.support_agent_rounded,
+                      tint: Ds.tint(context),
+                      color: Ds.green,
+                      size: 44,
+                      radius: Ds.rTile),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'How can we help?',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'We typically respond within 24 hours',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.7)
-                                : Colors.black.withValues(alpha: 0.6),
-                          ),
-                        ),
+                        Text('How can we help?',
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Ds.ink(context))),
+                        const SizedBox(height: 3),
+                        Text('We typically respond within 24 hours',
+                            style: Ds.cardBody(context)),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // Email Field (auto-filled)
-            TextFormField(
+            _field(
               controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                hintText: 'your.email@example.com',
-                prefixIcon: const Icon(Icons.email_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.grey.withValues(alpha: 0.1),
-              ),
+              label: 'EMAIL',
+              hint: 'your.email@example.com',
+              icon: Icons.mail_rounded,
               keyboardType: TextInputType.emailAddress,
               validator: InputSanitizer.validateEmail,
             ),
-            const SizedBox(height: 16),
-
-            // Subject Field
-            TextFormField(
+            const SizedBox(height: 10),
+            _field(
               controller: _subjectController,
+              label: 'SUBJECT',
+              hint: 'Brief description of your issue',
+              icon: Icons.subject_rounded,
               maxLength: InputSanitizer.maxSubjectLength,
-              decoration: InputDecoration(
-                labelText: 'Subject',
-                hintText: 'Brief description of your issue',
-                prefixIcon: const Icon(Icons.subject_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.grey.withValues(alpha: 0.1),
-              ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a subject';
@@ -195,24 +151,12 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-
-            // Message Field
-            TextFormField(
+            const SizedBox(height: 10),
+            _field(
               controller: _messageController,
-              decoration: InputDecoration(
-                labelText: 'Message',
-                hintText: 'Describe your issue or question in detail...',
-                prefixIcon: const Icon(Icons.message_outlined),
-                alignLabelWithHint: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.grey.withValues(alpha: 0.1),
-              ),
+              label: 'MESSAGE',
+              hint: 'Describe your issue or question in detail…',
+              icon: Icons.chat_rounded,
               maxLines: 6,
               maxLength: InputSanitizer.maxMessageLength,
               validator: (value) {
@@ -225,38 +169,77 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // Submit Button
-            ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitSupport,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.burundiGreen,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text(
-                      'Submit Support Request',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-            ),
+            if (_isSubmitting)
+              const Center(
+                  child: SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green)))
+            else
+              DsPrimaryButton('Submit request',
+                  radius: 14, onTap: _submitSupport),
           ],
         ),
+      ),
+    );
+  }
+
+  /// White card field with the comp's small-caps label and green leading icon.
+  Widget _field({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    int? maxLength,
+    String? Function(String?)? validator,
+  }) {
+    return DsCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Icon(icon, size: 20, color: Ds.green),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              keyboardType: keyboardType,
+              maxLines: maxLines,
+              maxLength: maxLength,
+              validator: validator,
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w600, color: Ds.ink(context)),
+              decoration: InputDecoration(
+                labelText: label,
+                hintText: hint,
+                labelStyle: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Ds.muted(context)),
+                floatingLabelBehavior: FloatingLabelBehavior.always,
+                hintStyle: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                    color: Ds.muted(context)),
+                filled: false,
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

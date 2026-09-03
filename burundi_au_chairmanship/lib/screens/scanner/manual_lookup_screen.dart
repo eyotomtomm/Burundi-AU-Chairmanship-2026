@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import 'qr_scan_result_screen.dart';
+import '../../config/app_ds.dart';
 
 class ManualLookupScreen extends StatefulWidget {
   final String? mode;
@@ -271,11 +272,9 @@ class _ManualLookupScreenState extends State<ManualLookupScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: const Text('Manual Lookup'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,

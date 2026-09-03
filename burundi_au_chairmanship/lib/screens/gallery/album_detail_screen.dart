@@ -15,6 +15,8 @@ import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 import '../../services/data_saver_service.dart';
 import '../../utils/input_sanitizer.dart';
+import '../../config/app_ds.dart';
+import '../../services/share_service.dart';
 
 class AlbumDetailScreen extends StatefulWidget {
   final Map<String, dynamic> album;
@@ -317,14 +319,26 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         : widget.album['description'];
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Text(title ?? 'Album'),
         ),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
         actions: [
+          // Share button
+          Builder(
+            builder: (btnContext) => IconButton(
+              icon: const Icon(Icons.share_rounded, color: Colors.white),
+              tooltip: 'Share',
+              onPressed: () => ShareService.item(
+                btnContext,
+                kind: 'gallery',
+                id: widget.album['id'],
+                title: title ?? 'Album',
+              ),
+            ),
+          ),
           // Comments button
           IconButton(
             icon: Badge(

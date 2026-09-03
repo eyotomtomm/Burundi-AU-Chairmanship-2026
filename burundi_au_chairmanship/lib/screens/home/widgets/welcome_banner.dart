@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
-import '../../../widgets/verified_badge.dart';
 
 class WelcomeBanner extends StatefulWidget {
   final Map<String, dynamic>? countdownConfig;
@@ -66,26 +64,13 @@ class _WelcomeBannerState extends State<WelcomeBanner> {
     final authProvider = context.watch<AuthProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (!authProvider.isAuthenticated) {
+    // The redesigned home header owns the greeting, so this banner is now
+    // only the summit countdown — and disappears when there isn't one.
+    final showCountdown = _targetDate != null && _remaining > Duration.zero;
+    if (!authProvider.isAuthenticated || !showCountdown) {
       return const SizedBox.shrink();
     }
 
-    final hour = DateTime.now().hour;
-    String greeting;
-    if (hour >= 5 && hour < 12) {
-      greeting = 'Good Morning';
-    } else if (hour >= 12 && hour < 17) {
-      greeting = 'Good Afternoon';
-    } else {
-      greeting = 'Good Evening';
-    }
-
-    final userName = authProvider.userName ?? 'User';
-    final isVerified = authProvider.isVerified;
-    final badgeType = authProvider.badgeType;
-    final greetingColor = isDark ? const Color(0xFF8FB7A3) : const Color(0xFF4A7C5D);
-
-    final showCountdown = _targetDate != null && _remaining > Duration.zero;
     final config = widget.countdownConfig;
     final locale = Localizations.localeOf(context).languageCode;
     final countdownLabel = locale == 'fr'
@@ -93,59 +78,8 @@ class _WelcomeBannerState extends State<WelcomeBanner> {
         : (config?['countdown_label'] ?? '');
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Greeting (left side)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting,',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'HeatherGreen',
-                    color: greetingColor,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          userName,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'HeatherGreen',
-                            color: greetingColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (isVerified) ...[
-                      const SizedBox(width: 6),
-                      VerifiedBadge(badgeType: badgeType, size: 20),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Countdown (right side)
-          if (showCountdown) ...[
-            const SizedBox(width: 12),
-            _buildCountdown(countdownLabel.toString(), isDark),
-          ],
-        ],
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: _buildCountdown(countdownLabel.toString(), isDark),
     );
   }
 

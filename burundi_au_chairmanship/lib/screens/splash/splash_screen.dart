@@ -16,6 +16,7 @@ import '../../services/heartbeat_service.dart';
 import '../../services/splash_preloader.dart';
 import '../maintenance/maintenance_screen.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../../main.dart' show navigatorKey;
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -24,12 +25,32 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
+/// Cinzel — Roman inscriptional capitals. One family carries the whole crest;
+/// weight and tracking do the work instead of a second typeface.
+TextStyle _carved({
+  required double size,
+  required double weight,
+  required Color color,
+  double height = 1.0,
+}) =>
+    TextStyle(
+      fontFamily: 'Cinzel',
+      fontSize: size,
+      height: height,
+      color: color,
+      fontVariations: [FontVariation('wght', weight)],
+    );
+
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _scaleController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  /// Drives the staggered entrance of the crest, wordmark, drum and quote.
+  late AnimationController _intro;
+
+  /// Slow highlight sweeping across the gold "AFRICAN UNION" wordmark.
+  late AnimationController _sheen;
+
+  /// Shares the drum's 1800ms phrase so the loading dots pulse on the beat.
+  late AnimationController _pulse;
 
   @override
   void initState() {
@@ -40,22 +61,17 @@ class _SplashScreenState extends State<SplashScreen>
       statusBarIconBrightness: Brightness.light,
     ));
 
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+    _intro = AnimationController(
+      duration: const Duration(milliseconds: 1600),
       vsync: this,
     );
-
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _sheen = AnimationController(
+      duration: const Duration(milliseconds: 2600),
       vsync: this,
     );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutBack),
+    _pulse = AnimationController(
+      duration: const Duration(milliseconds: 1800),
+      vsync: this,
     );
 
     _startAnimations();
@@ -64,9 +80,10 @@ class _SplashScreenState extends State<SplashScreen>
   void _startAnimations() async {
     FlutterNativeSplash.remove();
 
-    // Start animations immediately — frame 0 is invisible (opacity 0, scale 0.85)
-    _fadeController.forward();
-    _scaleController.forward();
+    // Start animations immediately — every staggered item is invisible at frame 0
+    _intro.forward();
+    _sheen.repeat();
+    _pulse.repeat();
 
     // Start preloading home-feed data in parallel with the splash animation
     SplashPreloader.instance.startPreload();
@@ -97,73 +114,72 @@ class _SplashScreenState extends State<SplashScreen>
           return <String, dynamic>{};
         }),
       ]).timeout(AppConstants.splashMaxDuration);
-    } catch (_) {
+    } catch (e) {
       // Hard ceiling reached — proceed with whatever we have
-      if (kDebugMode) print('Splash max duration reached — proceeding');
+      if (kDebugMode) print('Splash max duration reached — proceeding ($e)');
     }
-    if (!mounted) return;
+    // Startup navigation must survive this State being disposed mid-splash.
+    // Routing through the widget's own context and bailing out on `mounted`
+    // meant a disposed splash aborted here silently and left the app sitting
+    // on the splash forever, with no crash and no log. Use the global
+    // navigator key instead so the app always lands somewhere.
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    final navContext = navigatorKey.currentContext;
 
     // Re-sync language with backend + FCM topics on every cold start.
-    unawaited(context.read<LanguageProvider>().ensureSynced(authProvider));
+    if (navContext != null) {
+      // Safe across the await: this is the navigator's context, not this
+      // State's, so it stays valid even after the splash is disposed.
+      // ignore: use_build_context_synchronously
+      unawaited(navContext.read<LanguageProvider>().ensureSynced(authProvider));
+    }
 
     // Start presence heartbeat so "users online now" reflects real usage.
     HeartbeatService.instance.start();
 
     // Check maintenance result from the parallel fetch
     if (maintenanceStatus != null && maintenanceStatus!['in_maintenance'] == true) {
-      Navigator.of(context).pushReplacement(
+      navigator.pushReplacement(
         MaterialPageRoute(
           builder: (_) => MaintenanceScreen(maintenanceData: maintenanceStatus!),
         ),
       );
       return;
     }
-    if (!mounted) return;
-
-    // App update check removed from splash — HomeScreen already runs it
-    // via _checkForAppUpdate() in addPostFrameCallback, so it no longer
-    // blocks navigation here.
 
     // Show onboarding on first launch (SharedPreferences is fast — ~1ms)
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool(AppConstants.onboardingKey) ?? false;
     if (!onboardingDone) {
-      final result = await Navigator.push(
-        context,
+      final result = await navigator.push(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       );
       if (result == true) {
         await prefs.setBool(AppConstants.onboardingKey, true);
       }
-      if (!mounted) return;
     }
 
     // Navigate based on authentication status.
-    // Only require isAuthenticated — profile data may be partially cached
-    // and that's OK; it will be refreshed in the background once the user
-    // reaches the home screen.
     if (authProvider.isAuthenticated) {
       // Block unverified users — they must complete email verification first
       if (authProvider.requiresEmailVerification) {
-        Navigator.of(context).pushReplacementNamed('/email-verification');
+        navigator.pushReplacementNamed('/email-verification');
       } else {
-        Navigator.of(context).pushReplacementNamed('/home');
+        navigator.pushReplacementNamed('/home');
       }
     } else {
       // If user previously chose to continue as guest, skip auth screen
       final isGuest = prefs.getBool('guest_mode') ?? false;
-      if (isGuest) {
-        Navigator.of(context).pushReplacementNamed('/home');
-      } else {
-        Navigator.of(context).pushReplacementNamed('/auth');
-      }
+      navigator.pushReplacementNamed(isGuest ? '/home' : '/auth');
     }
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _scaleController.dispose();
+    _intro.dispose();
+    _sheen.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -192,7 +208,7 @@ class _SplashScreenState extends State<SplashScreen>
             // Decorative pattern — hidden from screen readers
             ExcludeSemantics(
               child: Opacity(
-                opacity: 0.1,
+                opacity: 0.16,
                 child: CustomPaint(
                   size: screenSize,
                   painter: const _SplashPatternPainter(),
@@ -204,117 +220,177 @@ class _SplashScreenState extends State<SplashScreen>
             Semantics(
               label: 'Republic of Burundi, African Union Chairmanship 2026. Loading application.',
               child: SafeArea(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(
-                    scale: _scaleAnimation,
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                          const SizedBox(height: 30),
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 30),
 
-                          // Republic of Burundi text
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: AppColors.auGold.withValues(alpha: 0.5),
-                                width: 2,
-                              ),
-                            ),
-                            child: Text(
-                              'REPUBLIC OF BURUNDI',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.burundiWhite.withValues(alpha: 0.95),
-                                letterSpacing: 4,
-                              ),
+                        // Eyebrow. Small caps carry the wide tracking; the
+                        // wordmark below deliberately does not.
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.00,
+                          end: 0.42,
+                          child: _Tracked(
+                            'REPUBLIC OF BURUNDI',
+                            spacing: 5.5,
+                            style: _carved(
+                              size: 11.5,
+                              weight: 600,
+                              color: AppColors.auGold.withValues(alpha: 0.95),
                             ),
                           ),
+                        ),
 
-                          const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                          // African Union text
-                          ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [AppColors.auGold, Color(0xFFFFD700)],
-                            ).createShader(bounds),
-                            child: Text(
-                              'AFRICAN UNION',
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 3,
-                              ),
+                        // Wordmark — the one loud element. Large type needs
+                        // tight tracking, not the eyebrow's wide tracking.
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.08,
+                          end: 0.50,
+                          child: AnimatedBuilder(
+                            animation: _sheen,
+                            builder: (context, child) => ShaderMask(
+                              shaderCallback: (bounds) {
+                                final x = _sheen.value;
+                                return LinearGradient(
+                                  colors: const [
+                                    AppColors.auGold,
+                                    Color(0xFFFFF3B0),
+                                    AppColors.auGold,
+                                  ],
+                                  stops: [
+                                    (x - 0.2).clamp(0.0, 0.98),
+                                    x.clamp(0.01, 0.99),
+                                    (x + 0.2).clamp(0.02, 1.0),
+                                  ],
+                                ).createShader(bounds);
+                              },
+                              child: child,
                             ),
-                          ),
-
-                          // Chairmanship 2026
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildDiamondIcon(),
-                              const SizedBox(width: 15),
-                              Text(
-                                'CHAIRMANSHIP 2026',
-                                style: TextStyle(
-                                  fontSize: 25,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.burundiWhite,
-                                  letterSpacing: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 28),
+                              child: _Tracked(
+                                'AFRICAN UNION',
+                                spacing: 1.5,
+                                style: _carved(
+                                  size: 29,
+                                  weight: 700,
+                                  color: Colors.white,
+                                  height: 1.05,
                                 ),
                               ),
-                              const SizedBox(width: 15),
-                              _buildDiamondIcon(),
-                            ],
+                            ),
                           ),
+                        ),
 
-                          const SizedBox(height: 24),
+                        const SizedBox(height: 14),
 
-                          // Animated Gishora Drum
-                          const KaryendaDrumAnimated(
-                            size: 160,
+                        // Hairline rule with a single diamond at its centre —
+                        // quieter than the pair of diamonds that used to flank
+                        // the line, and it separates wordmark from subline.
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.14,
+                          end: 0.56,
+                          child: SizedBox(
+                            width: 210,
+                            child: Row(
+                              children: [
+                                const Expanded(child: _GoldRule(fadeLeft: true)),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 10),
+                                  child: _buildDiamondIcon(),
+                                ),
+                                const Expanded(child: _GoldRule()),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Subline — steps down hard from the wordmark instead
+                        // of competing with it.
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.18,
+                          end: 0.60,
+                          child: _Tracked(
+                            'CHAIRMANSHIP 2026',
+                            spacing: 4.5,
+                            style: _carved(
+                              size: 12.5,
+                              weight: 500,
+                              color: AppColors.burundiWhite
+                                  .withValues(alpha: 0.82),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Animated Karyenda drum — arrives last and largest,
+                        // so the beat starts once the titles have settled.
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.24,
+                          end: 0.78,
+                          lift: 26,
+                          child: const KaryendaDrumAnimated(
+                            size: 170,
                             playing: true,
                           ),
+                        ),
 
-                          const SizedBox(height: 20),
+                        const SizedBox(height: 26),
 
-                          // Ambassador's quote
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Text(
-                              '"The sacred drums resound from Burundi, the heart of Africa, so does our commitment to guide our continent toward the Africa we want."',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontStyle: FontStyle.italic,
-                                color: AppColors.burundiWhite.withValues(alpha: 0.85),
-                                height: 1.5,
+                        // Ambassador's quote
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.52,
+                          end: 0.94,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 28),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 292),
+                              child: Text(
+                                '\u201CThe sacred drums resound from Burundi, the heart of Africa, so does our commitment to guide our continent toward the Africa we want.\u201D',
+                                textAlign: TextAlign.center,
+                                style: _carved(
+                                  size: 12,
+                                  weight: 400,
+                                  color: AppColors.burundiWhite
+                                      .withValues(alpha: 0.75),
+                                  height: 1.9,
+                                ).copyWith(letterSpacing: 0.3),
                               ),
                             ),
                           ),
+                        ),
 
-                          const SizedBox(height: 20),
+                        const SizedBox(height: 22),
 
-                          // Loading indicator
-                          _buildLoadingIndicator(),
+                        // Loading indicator
+                        _Rise(
+                          parent: _intro,
+                          begin: 0.64,
+                          end: 1.00,
+                          child: _buildLoadingIndicator(),
+                        ),
 
-                          const SizedBox(height: 20),
-                        ],
-                      ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
                 ),
               ),
-            ),
             ),
           ],
         ),
@@ -326,12 +402,9 @@ class _SplashScreenState extends State<SplashScreen>
     return Transform.rotate(
       angle: math.pi / 4,
       child: Container(
-        width: 12,
-        height: 12,
-        decoration: BoxDecoration(
-          color: AppColors.auGold,
-          border: Border.all(color: AppColors.burundiWhite, width: 1),
-        ),
+        width: 7,
+        height: 7,
+        decoration: const BoxDecoration(color: AppColors.auGold),
       ),
     );
   }
@@ -339,39 +412,110 @@ class _SplashScreenState extends State<SplashScreen>
   Widget _buildLoadingIndicator() {
     return Column(
       children: [
-        SizedBox(
-          width: 50,
-          height: 50,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.auGold.withValues(alpha: 0.8),
+        AnimatedBuilder(
+          animation: _pulse,
+          builder: (context, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(3, (i) {
+              // Each dot trails the one before it, so the row reads as a
+              // travelling pulse rather than three separate blinks.
+              final phase = (_pulse.value - i * 0.14) % 1.0;
+              final lift = math.exp(-phase * 6);
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Transform.translate(
+                  offset: Offset(0, -5 * lift),
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.auGold
+                          .withValues(alpha: 0.55 + 0.45 * lift),
+                    ),
+                  ),
                 ),
-              ),
-              Transform.rotate(
-                angle: math.pi / 4,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  color: AppColors.auGold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 15),
-        Text(
-          'Loading...',
-          style: TextStyle(
-            color: AppColors.burundiWhite.withValues(alpha: 0.7),
-            fontSize: 12,
-            letterSpacing: 2,
+              );
+            }),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Centred all-caps text with tracking. Flutter appends letter-spacing after
+/// the final glyph too, which pushes centred text visibly off-axis; the left
+/// pad cancels that out.
+class _Tracked extends StatelessWidget {
+  final String text;
+  final double spacing;
+  final TextStyle style;
+
+  const _Tracked(this.text, {required this.spacing, required this.style});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(left: spacing),
+        child: Text(text, style: style.copyWith(letterSpacing: spacing)),
+      );
+}
+
+/// A 1px gold rule that fades out towards the far end.
+class _GoldRule extends StatelessWidget {
+  final bool fadeLeft;
+  const _GoldRule({this.fadeLeft = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = [
+      AppColors.auGold.withValues(alpha: 0.0),
+      AppColors.auGold.withValues(alpha: 0.55),
+    ];
+    return Container(
+      height: 1,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: fadeLeft ? colors : colors.reversed.toList(),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fades and lifts a splash element into place over a slice of [parent],
+/// so the screen assembles itself instead of appearing all at once.
+class _Rise extends StatelessWidget {
+  final Animation<double> parent;
+  final double begin;
+  final double end;
+  final double lift;
+  final Widget child;
+
+  const _Rise({
+    required this.parent,
+    required this.begin,
+    required this.end,
+    required this.child,
+    this.lift = 18,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final a = CurvedAnimation(
+      parent: parent,
+      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+    );
+    return FadeTransition(
+      opacity: a,
+      child: AnimatedBuilder(
+        animation: a,
+        builder: (context, c) => Transform.translate(
+          offset: Offset(0, lift * (1 - a.value)),
+          child: c,
+        ),
+        child: child,
+      ),
     );
   }
 }
@@ -381,41 +525,82 @@ class _SplashPatternPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.auGold
+    final rect = Offset.zero & size;
+
+    // Draw the motif into a layer so the mask below can fade it as one piece.
+    canvas.saveLayer(rect, Paint());
+
+    final gold = AppColors.auGold;
+    final outer = Paint()
+      ..color = gold
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1.1;
+    final inner = Paint()
+      ..color = gold
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.7;
 
-    final spacing = 100.0;
-
-    for (double x = -spacing; x < size.width + spacing; x += spacing) {
-      for (double y = -spacing; y < size.height + spacing; y += spacing) {
-        final offset = Offset(x, y);
-        _drawDiamond(canvas, paint, offset, 30);
+    // Sparse imigongo lattice — alternate rows shift half a cell so it reads
+    // as woven rather than as a square grid. Wider spacing and thinner strokes
+    // than a literal imigongo panel: this is texture, not the subject.
+    const cell = 116.0;
+    var row = 0;
+    for (double y = -cell; y < size.height + cell; y += cell * 0.68) {
+      final shift = row.isEven ? 0.0 : cell / 2;
+      for (double x = -cell; x < size.width + cell; x += cell) {
+        final c = Offset(x + shift, y);
+        _diamond(canvas, outer, c, 25);
+        _diamond(canvas, inner, c, 11);
       }
+      row++;
     }
 
-    paint.strokeWidth = 1.5;
-    for (double y = 0; y < size.height; y += spacing * 1.5) {
-      final path = Path();
-      path.moveTo(0, y);
-      for (double x = 0; x < size.width; x += 40) {
-        final peakY = y + ((x ~/ 40) % 2 == 0 ? -20 : 20);
-        path.lineTo(x + 20, peakY);
-        path.lineTo(x + 40, y);
+    // Chevron bands frame the top and bottom only. Running them through the
+    // middle was what made the field read as busy behind the drum.
+    final chevron = Paint()
+      ..color = gold
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    for (final y in [size.height * 0.10, size.height * 0.90]) {
+      final path = Path()..moveTo(-cell, y);
+      var up = true;
+      for (double x = -cell; x < size.width + cell; x += 30) {
+        path.lineTo(x + 15, y + (up ? -15 : 15));
+        path.lineTo(x + 30, y);
+        up = !up;
       }
-      canvas.drawPath(path, paint);
+      canvas.drawPath(path, chevron);
     }
+
+    // Hold the middle right back so the drum and the wordmark own the centre,
+    // and let the pattern carry the corners.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..blendMode = BlendMode.dstIn
+        ..shader = RadialGradient(
+          radius: 0.85,
+          colors: [
+            Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.35),
+            Colors.white,
+          ],
+          stops: const [0.28, 0.62, 1.0],
+        ).createShader(rect),
+    );
+    canvas.restore();
   }
 
-  void _drawDiamond(Canvas canvas, Paint paint, Offset center, double s) {
-    final path = Path();
-    path.moveTo(center.dx, center.dy - s);
-    path.lineTo(center.dx + s, center.dy);
-    path.lineTo(center.dx, center.dy + s);
-    path.lineTo(center.dx - s, center.dy);
-    path.close();
-    canvas.drawPath(path, paint);
+  void _diamond(Canvas canvas, Paint paint, Offset c, double s) {
+    canvas.drawPath(
+      Path()
+        ..moveTo(c.dx, c.dy - s)
+        ..lineTo(c.dx + s, c.dy)
+        ..lineTo(c.dx, c.dy + s)
+        ..lineTo(c.dx - s, c.dy)
+        ..close(),
+      paint,
+    );
   }
 
   @override

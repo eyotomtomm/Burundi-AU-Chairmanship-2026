@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/language_provider.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
@@ -55,13 +57,6 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         });
       }
     }
-  }
-
-  Color _parseHexColor(String? hex) {
-    if (hex == null || hex.isEmpty) return AppColors.burundiRed;
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.parse(hex, radix: 16));
   }
 
   IconData _iconFromName(String? name) {
@@ -175,488 +170,204 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     }
   }
 
-  String _actionLabel(String? actionType) {
-    switch (actionType) {
-      case 'call':
-        return 'Call';
-      case 'whatsapp':
-        return 'WhatsApp';
-      case 'sms':
-        return 'SMS';
-      case 'email':
-        return 'Email';
-      case 'url':
-        return 'Open';
-      case 'route':
-        return 'Open';
-      default:
-        return 'Contact';
+  /// The number the big SOS control dials — the first "call" contact the
+  /// backend returns, so admins control it without an app release.
+  Map<String, dynamic>? get _primaryCall {
+    for (final c in _contacts) {
+      if ((c['action_type'] as String? ?? 'call') == 'call') return c;
     }
-  }
-
-  IconData _actionIcon(String? actionType) {
-    switch (actionType) {
-      case 'call':
-        return Icons.call;
-      case 'whatsapp':
-        return Icons.chat;
-      case 'sms':
-        return Icons.sms;
-      case 'email':
-        return Icons.email;
-      case 'url':
-        return Icons.open_in_new;
-      case 'route':
-        return Icons.arrow_forward;
-      default:
-        return Icons.call;
-    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final langCode = context.watch<LanguageProvider>().languageCode;
-    final title = langCode == 'fr' ? _sosTitleFr : _sosTitle;
+    final fr = langCode == 'fr';
+    final title = fr ? _sosTitleFr : _sosTitle;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : _error != null
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.error_outline, size: 48,
-                          color: isDark ? Colors.white54 : Colors.grey),
+                      Icon(Icons.error_outline, size: 48, color: Ds.muted(context)),
                       const SizedBox(height: 12),
-                      Text(_error!,
-                          style: TextStyle(
-                              color: isDark ? Colors.white54 : Colors.grey)),
+                      Text(_error!, style: TextStyle(color: Ds.body(context))),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _isLoading = true;
-                            _error = null;
-                          });
-                          _loadContacts();
-                        },
-                        child: const Text('Retry'),
-                      ),
+                      DsOutlineButton(fr ? 'Réessayer' : 'Retry',
+                          radius: Ds.rPill,
+                          onTap: () {
+                            setState(() {
+                              _isLoading = true;
+                              _error = null;
+                            });
+                            _loadContacts();
+                          }),
                     ],
                   ),
                 )
               : RefreshIndicator(
+                  color: Ds.green,
                   onRefresh: () async {
                     HapticFeedback.mediumImpact();
                     await _loadContacts();
                   },
-                  child: CustomScrollView(
-                    slivers: [
-                      // App Bar
-                      SliverAppBar(
-                        expandedHeight: 140,
-                        pinned: true,
-                        backgroundColor: const Color(0xFFE53935),
-                        flexibleSpace: FlexibleSpaceBar(
-                          title: Text(
-                            title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          background: Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFE53935),
-                                  Color(0xFFB71C1C),
-                                ],
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const SizedBox(height: 40),
-                                Icon(
-                                  Icons.sos,
-                                  size: 48,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                  child: ListView(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    children: [
+                      DsHeader(
+                        title: title,
+                        color: Ds.redDeep,
+                        bottomPad: 24,
+                        bottom: _buildSosDial(fr),
                       ),
-
-                      // Info banner
-                      SliverPadding(
-                        padding: const EdgeInsets.all(16),
-                        sliver: SliverToBoxAdapter(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE53935)
-                                  .withValues(alpha: isDark ? 0.15 : 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: const Color(0xFFE53935)
-                                      .withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.warning_amber_rounded,
-                                    color: Color(0xFFE53935)),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    langCode == 'fr'
-                                        ? 'Services d\'urgence au Burundi. En cas d\'urgence, contactez immédiatement les services ci-dessous.'
-                                        : 'Emergency services in Burundi. In case of emergency, immediately contact the services below.',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: isDark
-                                          ? Colors.white70
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Live Agent card
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        sliver: SliverToBoxAdapter(
-                          child: _buildLiveAgentCard(isDark, langCode),
-                        ),
-                      ),
-
-                      // Contacts grouped by category
-                      ..._buildCategorySections(isDark, langCode),
-
-                      const SliverPadding(
-                          padding: EdgeInsets.only(bottom: 20)),
+                      const SizedBox(height: 16),
+                      _buildLiveAgentCard(fr),
+                      ..._buildCategorySections(fr),
                     ],
                   ),
                 ),
     );
   }
 
-  Widget _buildLiveAgentCard(bool isDark, String langCode) {
-    final cardColor = isDark ? AppColors.darkSurface : Colors.white;
-    final agentColor = _liveAgentOnline ? AppColors.burundiGreen : Colors.grey;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _liveAgentOnline ? () => _handleLiveAgent() : null,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+  Widget _buildSosDial(bool fr) {
+    final primary = _primaryCall;
+    return Column(
+      children: [
+        const SizedBox(height: 6),
+        GestureDetector(
+          onLongPress: primary == null ? null : () => _handleAction(primary),
+          child: Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+              color: Ds.red,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    spreadRadius: 14,
+                    blurRadius: 0),
+                BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    spreadRadius: 28,
+                    blurRadius: 0),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Icon
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: agentColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.support_agent_rounded,
-                        color: agentColor, size: 28),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Live Agent',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: _liveAgentOnline
-                                  ? (isDark ? Colors.white : Colors.black87)
-                                  : Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _liveAgentOnline
-                                  ? Colors.green
-                                  : Colors.grey[400],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              _liveAgentOnline ? 'ONLINE' : 'OFFLINE',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _liveAgentOnline
-                            ? (langCode == 'fr'
-                                ? 'Réponse rapide via le chat support'
-                                : 'Quick response via support chat')
-                            : (langCode == 'fr'
-                                ? 'Aucun agent disponible pour le moment'
-                                : 'No agents available right now'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: _liveAgentOnline
-                              ? (isDark ? Colors.white60 : Colors.grey[600])
-                              : Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_liveAgentOnline)
-                  Icon(Icons.chevron_right,
-                      color: isDark ? Colors.white54 : Colors.grey),
+                const Text('SOS',
+                    style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                        color: Colors.white)),
+                const SizedBox(height: 2),
+                Text(fr ? 'Maintenir 3 s' : 'Hold 3 sec',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white.withValues(alpha: 0.85))),
               ],
             ),
           ),
         ),
-      ),
+        const SizedBox(height: 18),
+        Text(
+          fr
+              ? "Appelle le service d'urgence principal · Envoie votre position"
+              : 'Calls the primary emergency line · Sends your location',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
+        ),
+      ],
     );
   }
 
-  List<Widget> _buildCategorySections(bool isDark, String langCode) {
-    // Group contacts by category
+  Widget _buildLiveAgentCard(bool fr) {
+    return DsTileGroup(children: [
+      DsTile(
+        icon: Icons.support_agent_rounded,
+        iconTint: _liveAgentOnline ? Ds.tint(context) : Ds.subtle(context),
+        iconColor: _liveAgentOnline ? Ds.green : Ds.muted(context),
+        title: fr ? 'Agent en direct' : 'Live agent',
+        subtitle: _liveAgentOnline
+            ? (fr ? 'En ligne · Répond maintenant' : 'Online · Responding now')
+            : (fr ? 'Hors ligne' : 'Offline'),
+        chevron: _liveAgentOnline,
+        onTap: _liveAgentOnline ? _handleLiveAgent : null,
+      ),
+    ]);
+  }
+
+  List<Widget> _buildCategorySections(bool fr) {
     final grouped = <String, List<Map<String, dynamic>>>{};
     for (final c in _contacts) {
-      final cat = c['category'] as String? ?? 'other';
-      grouped.putIfAbsent(cat, () => []);
-      grouped[cat]!.add(c);
+      grouped.putIfAbsent(c['category'] as String? ?? 'other', () => []).add(c);
     }
 
     if (grouped.isEmpty) {
       return [
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.phone_disabled, size: 48,
-                    color: isDark ? Colors.white38 : Colors.grey[400]),
-                const SizedBox(height: 12),
-                Text(
-                  langCode == 'fr'
-                      ? 'Aucun contact d\'urgence disponible'
-                      : 'No emergency contacts available',
-                  style: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.grey),
-                ),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
+          child: Column(
+            children: [
+              Icon(Icons.phone_disabled_rounded, size: 48, color: Ds.muted(context)),
+              const SizedBox(height: 12),
+              Text(
+                fr
+                    ? "Aucun contact d'urgence disponible"
+                    : 'No emergency contacts available',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Ds.body(context)),
+              ),
+            ],
           ),
         ),
       ];
     }
 
-    // Render each category section
-    final sections = <Widget>[];
-    for (final entry in grouped.entries) {
-      // Section header
-      sections.add(
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          sliver: SliverToBoxAdapter(
-            child: Text(
-              _categoryLabel(entry.key, langCode),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white70 : Colors.black87,
-              ),
-            ),
-          ),
+    final langCode = fr ? 'fr' : 'en';
+    return [
+      for (final entry in grouped.entries) ...[
+        DsGroupLabel(_categoryLabel(entry.key, langCode),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
+        DsTileGroup(
+          children: [
+            for (final contact in entry.value) _buildContactTile(contact, langCode),
+          ],
         ),
-      );
-
-      // Contact cards
-      sections.add(
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                if (index >= entry.value.length) return null;
-                return _buildContactCard(entry.value[index], isDark, langCode);
-              },
-              childCount: entry.value.length,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return sections;
+      ],
+    ];
   }
 
-  Widget _buildContactCard(
-      Map<String, dynamic> contact, bool isDark, String langCode) {
-    final color = _parseHexColor(contact['color'] as String?);
+  Widget _buildContactTile(Map<String, dynamic> contact, String langCode) {
+    final fr = langCode == 'fr';
     final icon = _iconFromName(contact['icon_name'] as String?);
-    final name = (langCode == 'fr' && (contact['name_fr'] as String? ?? '').isNotEmpty)
+    final name = (fr && (contact['name_fr'] as String? ?? '').isNotEmpty)
         ? contact['name_fr'] as String
         : contact['name_en'] as String? ?? '';
-    final description =
-        (langCode == 'fr' && (contact['description_fr'] as String? ?? '').isNotEmpty)
-            ? contact['description_fr'] as String
-            : contact['description_en'] as String? ?? '';
+    final description = (fr && (contact['description_fr'] as String? ?? '').isNotEmpty)
+        ? contact['description_fr'] as String
+        : contact['description_en'] as String? ?? '';
     final actionType = contact['action_type'] as String? ?? 'call';
     final contactValue = contact['contact_value'] as String? ?? '';
-    final cardColor = isDark ? AppColors.darkSurface : Colors.white;
+    final isEmergencyLine = actionType == 'call';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _handleAction(contact),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Icon
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Icon(icon, color: Colors.white, size: 28),
-                  ),
-                ),
-
-                const SizedBox(width: 16),
-
-                // Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      if (description.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          description,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? Colors.white60 : Colors.grey[600],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      if (actionType == 'call' ||
-                          actionType == 'sms' ||
-                          actionType == 'email') ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          contactValue,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: color,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Action button
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(_actionIcon(actionType), size: 16, color: color),
-                      const SizedBox(width: 4),
-                      Text(
-                        _actionLabel(actionType),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return DsTile(
+      icon: icon,
+      // Emergency lines get the red tint; support contacts get the green one.
+      iconTint: isEmergencyLine ? Ds.redTintOf(context) : Ds.tint(context),
+      iconColor: isEmergencyLine ? Ds.red : Ds.green,
+      title: name,
+      subtitle: description.isEmpty ? null : description,
+      value: contactValue.isEmpty ? null : contactValue,
+      onTap: () => _handleAction(contact),
     );
   }
 }

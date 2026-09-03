@@ -1,4 +1,5 @@
 import UserNotifications
+import UIKit
 import os.log
 import UniformTypeIdentifiers
 
@@ -63,16 +64,31 @@ class NotificationService: UNNotificationServiceExtension {
 
             // Determine file extension from URL path, response MIME type, or default to jpg
             let ext = Self.fileExtension(from: imageURL, response: response)
+            // UNNotificationAttachment only accepts JPEG/PNG/GIF. The backend
+            // auto-converts every uploaded image to WebP (see _auto_optimize_image),
+            // which iOS rejects outright — so anything else gets transcoded to JPEG.
+            let attachExt = Self.attachableExtensions.contains(ext) ? ext : "jpg"
             let tmpFile = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension(ext)
+                .appendingPathExtension(attachExt)
 
             do {
-                try FileManager.default.moveItem(at: location, to: tmpFile)
+                if attachExt == ext {
+                    try FileManager.default.moveItem(at: location, to: tmpFile)
+                } else {
+                    guard let data = try? Data(contentsOf: location),
+                          let image = UIImage(data: data),
+                          let jpeg = image.jpegData(compressionQuality: 0.9) else {
+                        logger.error("Could not transcode \(ext, privacy: .public) image to JPEG")
+                        return
+                    }
+                    try jpeg.write(to: tmpFile)
+                    logger.info("Transcoded \(ext, privacy: .public) → jpg for attachment")
+                }
 
                 // Provide a type hint so iOS can decode the image even if the extension is ambiguous
                 var options: [String: Any] = [:]
-                if let utType = UTType(filenameExtension: ext) {
+                if let utType = UTType(filenameExtension: attachExt) {
                     options[UNNotificationAttachmentOptionsTypeHintKey] = utType.identifier
                 }
 
@@ -82,7 +98,7 @@ class NotificationService: UNNotificationServiceExtension {
                     options: options.isEmpty ? nil : options
                 )
                 bestAttemptContent.attachments = [attachment]
-                logger.info("Image attached successfully (ext=\(ext, privacy: .public))")
+                logger.info("Image attached successfully (ext=\(attachExt, privacy: .public))")
             } catch {
                 logger.error("Failed to attach image: \(error.localizedDescription, privacy: .public)")
                 // Clean up temp file on failure
@@ -99,6 +115,9 @@ class NotificationService: UNNotificationServiceExtension {
             contentHandler(bestAttemptContent)
         }
     }
+
+    /// Image formats iOS will accept directly as a notification attachment.
+    private static let attachableExtensions: Set<String> = ["jpg", "jpeg", "png", "gif"]
 
     /// Determine the best file extension for the downloaded image.
     /// Priority: response Content-Type → URL path extension → fallback "jpg"

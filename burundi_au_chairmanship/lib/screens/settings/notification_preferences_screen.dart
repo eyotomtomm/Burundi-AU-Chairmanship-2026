@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
-import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 
 class NotificationPreferencesScreen extends StatefulWidget {
   const NotificationPreferencesScreen({super.key});
@@ -52,90 +53,75 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
     try {
       await _api.updateNotificationPreferences({key: value});
     } catch (_) {
-      setState(() => _prefs[key] = !value);
+      if (mounted) setState(() => _prefs[key] = !value);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final fr = Localizations.localeOf(context).languageCode == 'fr';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.translate('notification_preferences')),
-        elevation: 0,
-      ),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: Text(l10n.translate('notification_preferences'))),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.only(top: 16, bottom: 32),
               children: [
-                _buildSection('General', [
-                  _buildToggle('push_enabled', 'Push Notifications', 'Receive push notifications', Icons.notifications),
-                  _buildToggle('email_enabled', 'Email Notifications', 'Receive email updates', Icons.email),
-                ], isDark),
-                const SizedBox(height: 16),
-                _buildSection('Content', [
-                  _buildToggle('articles_enabled', 'News', 'New news published', Icons.article),
-                  _buildToggle('magazines_enabled', 'Magazines', 'New magazine editions', Icons.menu_book),
-                  _buildToggle('events_enabled', 'Events', 'Upcoming events', Icons.event),
-                  _buildToggle('live_feeds_enabled', 'Live Feeds', 'Live stream notifications', Icons.live_tv),
-                ], isDark),
-                const SizedBox(height: 16),
-                _buildSection('Engagement', [
+                // Master switch sits alone in the comp, on a green-tinted icon.
+                DsTileGroup(children: [
+                  _toggle('push_enabled', fr ? 'Notifications push' : 'Push notifications',
+                      Icons.notifications_active_rounded, primary: true),
+                  _toggle('email_enabled', fr ? 'Notifications e-mail' : 'Email notifications',
+                      Icons.mail_rounded, primary: true),
+                ]),
+                DsGroupLabel(fr ? 'Sujets' : 'Topics',
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
+                DsTileGroup(children: [
+                  _toggle('articles_enabled',
+                      fr ? 'Actualités' : 'Breaking news', Icons.newspaper_rounded),
+                  _toggle('events_enabled',
+                      fr ? 'Rappels d’événements' : 'Event reminders', Icons.event_rounded),
+                  _toggle('live_feeds_enabled',
+                      fr ? 'Alertes de direct' : 'Live stream alerts', Icons.live_tv_rounded),
+                  _toggle('magazines_enabled',
+                      fr ? 'Nouveaux numéros' : 'New magazine issues', Icons.auto_stories_rounded),
+                ]),
+                DsGroupLabel(fr ? 'Participation' : 'Engagement',
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
+                DsTileGroup(children: [
                   if (_discussionsFeatureEnabled)
-                    _buildToggle('discussions_enabled', 'Discussions', 'Forum replies and mentions', Icons.forum),
+                    _toggle('discussions_enabled',
+                        fr ? 'Discussions' : 'Discussions', Icons.forum_rounded),
                   if (_pollsFeatureEnabled)
-                    _buildToggle('polls_enabled', 'Polls', 'New polls available', Icons.ballot),
-                  _buildToggle('messages_enabled', 'Messages', 'Direct messages', Icons.chat),
-                ], isDark),
-                const SizedBox(height: 16),
-                _buildSection('Schedule', [
-                  _buildToggle('quiet_hours_enabled', 'Quiet Hours', 'Mute notifications during set hours', Icons.nights_stay),
-                ], isDark),
+                    _toggle('polls_enabled', fr ? 'Sondages' : 'Polls', Icons.ballot_rounded),
+                  _toggle('messages_enabled', fr ? 'Messages' : 'Messages', Icons.chat_rounded),
+                ]),
+                DsGroupLabel(fr ? 'Horaires' : 'Schedule',
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 8)),
+                DsTileGroup(children: [
+                  _toggle('quiet_hours_enabled',
+                      fr ? 'Heures silencieuses' : 'Quiet hours', Icons.nights_stay_rounded),
+                ]),
+                DsFootnote(fr
+                    ? 'Heures silencieuses 22:00–07:00 · Les notifications sont muettes la nuit.'
+                    : 'Quiet hours 22:00–07:00.'),
               ],
             ),
     );
   }
 
-  Widget _buildSection(String title, List<Widget> children, bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          ),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggle(String key, String title, String subtitle, IconData icon) {
-    return SwitchListTile(
-      value: _prefs[key] ?? true,
-      onChanged: (v) => _updatePref(key, v),
-      title: Row(
-        children: [
-          Icon(icon, size: 20, color: AppColors.burundiGreen),
-          const SizedBox(width: 12),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-        ],
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(left: 32),
-        child: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-      ),
-      activeColor: AppColors.burundiGreen,
+  Widget _toggle(String key, String title, IconData icon, {bool primary = false}) {
+    final value = _prefs[key] ?? true;
+    return DsTile(
+      icon: icon,
+      iconTint: primary ? Ds.tint(context) : null,
+      iconColor: primary ? Ds.green : null,
+      title: title,
+      onTap: () => _updatePref(key, !value),
+      trailing: DsSwitch(value: value, onChanged: (v) => _updatePref(key, v)),
     );
   }
 }

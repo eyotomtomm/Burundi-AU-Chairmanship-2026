@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import 'discussion_detail_screen.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/verified_badge.dart';
+import '../../widgets/feed/post_composer.dart';
 
 class DiscussionsScreen extends StatefulWidget {
-  const DiscussionsScreen({super.key});
+  /// Pre-selects a category chip, e.g. opening straight into A-RISE.
+  final String? initialCategory;
+
+  const DiscussionsScreen({super.key, this.initialCategory});
 
   @override
   State<DiscussionsScreen> createState() => _DiscussionsScreenState();
@@ -22,16 +26,18 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
 
   final List<Map<String, String>> _categories = [
     {'value': 'general', 'label': 'General'},
+    {'value': 'arise', 'label': 'A-RISE'},
     {'value': 'events', 'label': 'Events'},
     {'value': 'culture', 'label': 'Culture'},
-    {'value': 'diplomacy', 'label': 'Diplomacy'},
-    {'value': 'development', 'label': 'Development'},
-    {'value': 'youth', 'label': 'Youth'},
+    {'value': 'politics', 'label': 'Politics & Diplomacy'},
+    {'value': 'business', 'label': 'Business & Trade'},
+    {'value': 'announcements', 'label': 'Announcements'},
   ];
 
   @override
   void initState() {
     super.initState();
+    _selectedCategory = widget.initialCategory;
     _loadDiscussions();
   }
 
@@ -43,63 +49,12 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  void _showCreateDialog() {
-    final titleCtrl = TextEditingController();
-    final contentCtrl = TextEditingController();
-    String category = 'general';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Start a Discussion', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: contentCtrl,
-              maxLines: 4,
-              decoration: const InputDecoration(labelText: 'Content', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: category,
-              decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-              items: _categories.map((c) => DropdownMenuItem(value: c['value'], child: Text(c['label']!))).toList(),
-              onChanged: (v) => category = v ?? 'general',
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                if (titleCtrl.text.isEmpty || contentCtrl.text.isEmpty) return;
-                Navigator.pop(ctx);
-                try {
-                  await _api.createDiscussion(titleCtrl.text, contentCtrl.text, category);
-                  _loadDiscussions();
-                } catch (_) {}
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.burundiGreen,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Post Discussion', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    );
+  Future<void> _showCreateDialog() async {
+    // Same sheet the Explore feed uses; the forum keeps its title field.
+    if (await PostComposer.open(context,
+        category: _selectedCategory, requireTitle: true)) {
+      _loadDiscussions();
+    }
   }
 
   @override
@@ -108,9 +63,9 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('discussions')),
-        elevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateDialog,
@@ -210,6 +165,19 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                                             d['author_name'] ?? 'Anonymous',
                                             style: TextStyle(color: Colors.grey[500], fontSize: 12),
                                           ),
+                                          if (d['author_badge'] != null) ...[
+                                            const SizedBox(width: 4),
+                                            VerifiedBadge(badgeType: d['author_badge'] as String?, size: 13),
+                                          ],
+                                          if ((d['media'] as List?)?.isNotEmpty == true) ...[
+                                            const SizedBox(width: 8),
+                                            Icon(Icons.photo_library_rounded, size: 13, color: Colors.grey[500]),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              '${(d['media'] as List).length}',
+                                              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                            ),
+                                          ],
                                           const Spacer(),
                                           Icon(Icons.comment, size: 14, color: Colors.grey[500]),
                                           const SizedBox(width: 4),

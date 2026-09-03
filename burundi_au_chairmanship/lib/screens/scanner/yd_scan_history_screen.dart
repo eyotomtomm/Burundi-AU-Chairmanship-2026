@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../config/app_ds.dart';
 
 class YdScanHistoryScreen extends StatefulWidget {
   const YdScanHistoryScreen({super.key});
@@ -46,9 +47,6 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text('Scan History'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))

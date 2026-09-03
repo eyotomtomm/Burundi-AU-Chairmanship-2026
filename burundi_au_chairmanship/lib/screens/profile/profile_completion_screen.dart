@@ -5,6 +5,7 @@ import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../config/app_ds.dart';
 
 class ProfileCompletionScreen extends StatefulWidget {
   const ProfileCompletionScreen({super.key});
@@ -80,7 +81,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
       appBar: AppBar(
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black87),
           onPressed: () => _confirmSkip(context),

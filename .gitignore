@@ -65,3 +65,8 @@ APP_STORE_SUBMISSION_NOTES.md
 
 # macOS build
 burundi_au_chairmanship/macos/Flutter/ephemeral/
+
+# Build artifacts and scratch files
+burundi_au_chairmanship/ios/build/
+.impeccable/
+burundi_au_chairmanship/android/WhatsApp Image*

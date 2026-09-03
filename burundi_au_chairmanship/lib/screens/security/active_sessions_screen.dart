@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 
 class ActiveSessionsScreen extends StatefulWidget {
   const ActiveSessionsScreen({super.key});
@@ -59,9 +60,9 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.translate('active_sessions')),
-        elevation: 0,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

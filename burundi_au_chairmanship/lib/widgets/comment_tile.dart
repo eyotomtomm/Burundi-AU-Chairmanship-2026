@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../config/app_colors.dart';
+import '../config/app_ds.dart';
 import '../services/api_service.dart' show ApiException;
 import 'comment_ban_dialog.dart';
 
@@ -321,70 +322,84 @@ class _CommentTileState extends State<CommentTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header row: name, badge, handle, time
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            widget.userName,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: nameSize,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? AppColors.darkText : AppColors.lightText,
-                            ),
-                          ),
+                    // Speech bubble: name + body, per the comp.
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Ds.surface(context),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(Ds.rCard),
+                          bottomLeft: Radius.circular(Ds.rCard),
+                          bottomRight: Radius.circular(Ds.rCard),
                         ),
-                        if (widget.badgeType != null && widget.badgeType!.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.verified,
-                            size: 14,
-                            color: widget.badgeType == 'GOLD'
-                                ? const Color(0xFFD4AF37)
-                                : AppColors.burundiGreen,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
                           ),
                         ],
-                        if (widget.username != null && widget.username!.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              '@${widget.username}',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: isDark
-                                    ? AppColors.darkTextSecondary
-                                    : AppColors.lightTextSecondary,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  widget.userName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: nameSize,
+                                    fontWeight: FontWeight.w700,
+                                    color: Ds.ink(context),
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (widget.badgeType != null &&
+                                  widget.badgeType!.isNotEmpty) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.verified,
+                                  size: 13,
+                                  color: widget.badgeType == 'GOLD'
+                                      ? const Color(0xFFD4AF37)
+                                      : Ds.green,
+                                ),
+                              ],
+                              if (widget.username != null &&
+                                  widget.username!.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    '@${widget.username}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Ds.muted(context),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
+                          const SizedBox(height: 3),
+                          if (_isEditing)
+                            _buildEditField(isDark)
+                          else
+                            _buildContentText(isDark),
                         ],
-                        const SizedBox(width: 6),
-                        Text(
-                          '· ${_timeAgo(widget.createdAt)}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark
-                                ? AppColors.darkTextSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
 
-                    // Content or edit mode
-                    if (_isEditing)
-                      _buildEditField(isDark)
-                    else
-                      _buildContentText(isDark),
-
-                    // Action row
-                    const SizedBox(height: 6),
-                    _buildActionRow(isDark),
+                    // Meta + actions sit under the bubble.
+                    Padding(
+                      padding: const EdgeInsets.only(left: 14, top: 5),
+                      child: _buildActionRow(isDark),
+                    ),
                   ],
                 ),
               ),
@@ -602,6 +617,13 @@ class _CommentTileState extends State<CommentTile> {
 
     return Row(
       children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 14),
+          child: Text(
+            _timeAgo(widget.createdAt),
+            style: TextStyle(fontSize: 11, color: secondaryColor),
+          ),
+        ),
         // Like button
         if (widget.isAuthenticated)
           GestureDetector(

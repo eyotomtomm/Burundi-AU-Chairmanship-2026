@@ -142,8 +142,8 @@ REDIS_URL = os.environ.get('REDIS_URL', '')
 if not REDIS_URL and not DEBUG:
     import logging as _redis_log
     _redis_log.getLogger('django').warning(
-        'REDIS_URL not set — falling back to LocMemCache and eager Celery. '
-        'Add a Valkey/Redis database and set REDIS_URL for production use.'
+        'REDIS_URL not set — using the database cache and running Celery tasks '
+        'inline. Works, but Redis/Valkey is faster; set REDIS_URL when available.'
     )
 if REDIS_URL:
     CACHES = {
@@ -175,16 +175,29 @@ if REDIS_URL:
     # separate from the default 5-minute cache that was evicting sessions.
     SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
     SESSION_CACHE_ALIAS = 'sessions'
-else:
-    # WARNING: LocMemCache is per-process.  With multiple gunicorn workers,
-    # DRF throttle counters are NOT shared — each worker tracks its own
-    # counts, effectively multiplying the allowed rate by the worker count.
-    # Redis MUST be available in production for throttles to be accurate.
+elif not DEBUG:
+    # No Redis in production: fall back to the database cache, not LocMem.
+    # LocMemCache is per-process, so DRF throttle counters would not be shared
+    # between gunicorn workers — each worker would track its own counts and the
+    # allowed rate would be multiplied by the worker count. The DB cache is
+    # shared by every process, so throttles hold and the home feed is cached
+    # once instead of once per worker. Costs a few small queries per request;
+    # Redis is still faster if the budget allows.
+    # Requires: python manage.py createcachetable (run in the pre-deploy job).
     import logging as _logging
     _logging.getLogger('django').warning(
-        'REDIS_URL not set — using LocMemCache. '
-        'DRF throttles will be per-process and weaker than configured.'
+        'REDIS_URL not set — using the database cache. Throttles stay accurate '
+        'but Redis/Valkey is faster; set REDIS_URL when one is available.'
     )
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'django_cache_table',
+            'TIMEOUT': 300,
+        }
+    }
+else:
+    # Local development — no Redis, no cache table to create.
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -255,9 +268,12 @@ if not DEBUG:
     AWS_STORAGE_BUCKET_NAME = os.environ.get('DO_SPACES_BUCKET', '').strip()
     AWS_S3_ENDPOINT_URL = os.environ.get('DO_SPACES_ENDPOINT', '').strip()
     AWS_S3_REGION_NAME = 'fra1'
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
+    # Names are never reused (AWS_S3_FILE_OVERWRITE = False), so media is immutable:
+    # cache it for a year at the CDN edge and on device instead of re-fetching daily.
+    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'public, max-age=31536000, immutable'}
     AWS_DEFAULT_ACL = 'public-read'
     AWS_QUERYSTRING_AUTH = False
+    AWS_S3_SIGNATURE_VERSION = 's3v4'  # SigV2 is legacy; sign private URLs with v4
     AWS_S3_FILE_OVERWRITE = False
     AWS_LOCATION = 'media'
     DEFAULT_FILE_STORAGE = 'config.storage_backends.SpacesMediaStorage'
@@ -322,7 +338,9 @@ ALLOWED_VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'avi']
 ALLOWED_SUBTITLE_EXTENSIONS = ['srt', 'vtt']
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
-MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
+# 500 MB of progressive MP4 is ~2,000 plays per TiB of Spaces bandwidth and
+# unwatchable on a slow mobile link. Long videos belong on YouTube (Video.video_url).
+MAX_VIDEO_SIZE = int(os.environ.get('MAX_VIDEO_SIZE_MB', '200')) * 1024 * 1024
 MAX_SUBTITLE_SIZE = 2 * 1024 * 1024  # 2 MB
 
 # ─── CORS — allow Flutter app to connect ──────────────────────

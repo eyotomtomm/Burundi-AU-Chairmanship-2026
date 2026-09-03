@@ -69,35 +69,35 @@
   <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
     <div class="flex items-center gap-1.5 flex-wrap">
       <a href="?type=all{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'all' %}bg-slate-900 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'all' %}on{% endif %}">
         All
       </a>
       <a href="?type=article{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'article' %}bg-blue-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'article' %}on{% endif %}">
         Article
       </a>
       <a href="?type=event{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'event' %}bg-purple-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'event' %}on{% endif %}">
         Event
       </a>
       <a href="?type=magazine{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'magazine' %}bg-emerald-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'magazine' %}on{% endif %}">
         Magazine
       </a>
       <a href="?type=livefeed{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'livefeed' %}bg-rose-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'livefeed' %}on{% endif %}">
         Live Feed
       </a>
       <a href="?type=video{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'video' %}bg-amber-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'video' %}on{% endif %}">
         Video
       </a>
       <a href="?type=gallery{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'gallery' %}bg-cyan-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'gallery' %}on{% endif %}">
         Gallery
       </a>
       <a href="?type=discussion{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="px-3.5 py-2 text-sm font-semibold rounded-lg transition-colors {% if current_filter == 'discussion' %}bg-indigo-600 text-white{% else %}bg-white text-slate-600 border border-slate-200 hover:bg-slate-50{% endif %}">
+         class="fchip {% if current_filter == 'discussion' %}on{% endif %}">
         Discussion
       </a>
     </div>

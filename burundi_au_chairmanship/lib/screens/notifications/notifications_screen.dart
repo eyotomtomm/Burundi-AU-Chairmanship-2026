@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../l10n/app_localizations.dart';
-import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
@@ -32,6 +32,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // Keep the pill filters in sync when the user swipes between tabs.
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadNotifications();
   }
 
@@ -150,7 +154,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Provider.of<ThemeProvider>(context).isDarkMode;
     final langCode = Provider.of<LanguageProvider>(context).languageCode;
     final loc = AppLocalizations.of(context);
     final isFr = langCode == 'fr';
@@ -160,100 +163,71 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     final totalUnread = adminUnread + systemUnread;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(loc.translate('notifications')),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
         actions: [
           if (totalUnread > 0)
-            TextButton.icon(
+            TextButton(
               onPressed: _markAllAsRead,
-              icon: const Icon(Icons.done_all_rounded, size: 18, color: Colors.white),
-              label: Text(
-                isFr ? 'Tout lire' : 'Read All',
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+              child: Text(
+                isFr ? 'Tout lire' : 'Mark all read',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withValues(alpha: 0.85)),
               ),
             ),
+          const SizedBox(width: 4),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-          tabs: [
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.campaign_rounded, size: 18),
-                  const SizedBox(width: 6),
-                  Text(isFr ? 'Annonces' : 'Announcements'),
-                  if (adminUnread > 0) ...[
-                    const SizedBox(width: 6),
-                    _unreadBadge(adminUnread),
-                  ],
-                ],
-              ),
-            ),
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.settings_rounded, size: 18),
-                  const SizedBox(width: 6),
-                  Text(isFr ? 'Système' : 'System'),
-                  if (systemUnread > 0) ...[
-                    const SizedBox(width: 6),
-                    _unreadBadge(systemUnread),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildTabContent(_adminNotifications, isDarkMode, langCode, loc, isSystem: false, storageKey: 'notif_admin'),
-          _buildTabContent(_systemNotifications, isDarkMode, langCode, loc, isSystem: true, storageKey: 'notif_system'),
+          // The comp uses pill filters rather than an underlined tab bar.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Row(
+              children: [
+                _tabChip(0, isFr ? 'Annonces' : 'Announcements', adminUnread),
+                const SizedBox(width: 8),
+                _tabChip(1, isFr ? 'Système' : 'System', systemUnread),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTabContent(_adminNotifications, langCode, loc,
+                    isSystem: false, storageKey: 'notif_admin'),
+                _buildTabContent(_systemNotifications, langCode, loc,
+                    isSystem: true, storageKey: 'notif_system'),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _unreadBadge(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        count > 99 ? '99+' : count.toString(),
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: AppColors.burundiGreen,
-        ),
-      ),
+  Widget _tabChip(int index, String label, int unread) {
+    final selected = _tabController.index == index;
+    return DsFilterChip(
+      unread > 0 ? '$label ($unread)' : label,
+      selected: selected,
+      onTap: () => setState(() => _tabController.animateTo(index)),
     );
   }
 
   Widget _buildTabContent(
     List<Map<String, dynamic>> notifications,
-    bool isDarkMode,
     String langCode,
     AppLocalizations? loc, {
     required bool isSystem,
     String storageKey = 'notif',
   }) {
-    if (_isLoading) {
-      return const ShimmerListItemSkeleton();
-    }
+    if (_isLoading) return const ShimmerListItemSkeleton();
+    final isFr = langCode == 'fr';
 
     if (_error != null) {
       return Center(
@@ -262,36 +236,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.wifi_off_rounded, size: 64, color: isDarkMode ? Colors.grey[500] : Colors.grey[400]),
+              Icon(Icons.wifi_off_rounded, size: 56, color: Ds.muted(context)),
               const SizedBox(height: 16),
               Text(
-                loc?.translate('error_loading_notifications') ?? 'Could not load notifications',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: isDarkMode ? Colors.white : Colors.black87,
-                ),
+                loc?.translate('error_loading_notifications') ??
+                    'Could not load notifications',
                 textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: Ds.ink(context)),
               ),
               const SizedBox(height: 8),
-              Text(
-                'Check your connection and try again',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
+              Text('Check your connection and try again',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Ds.body(context))),
               const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _loadNotifications,
-                icon: const Icon(Icons.refresh, size: 18),
-                label: Text(loc?.translate('retry') ?? 'Retry'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.burundiGreen,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-              ),
+              DsOutlineButton(loc?.translate('retry') ?? 'Retry',
+                  radius: Ds.rPill, onTap: _loadNotifications),
             ],
           ),
         ),
@@ -300,66 +260,113 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
     if (notifications.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSystem ? Icons.notifications_active_outlined : Icons.campaign_outlined,
-              size: 72,
-              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              isSystem
-                  ? (langCode == 'fr' ? 'Aucune notification système' : 'No system notifications')
-                  : (langCode == 'fr' ? 'Aucune annonce' : 'No announcements yet'),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 48),
-              child: Text(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
                 isSystem
-                    ? (langCode == 'fr'
+                    ? Icons.notifications_active_outlined
+                    : Icons.campaign_outlined,
+                size: 64,
+                color: Ds.muted(context),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isSystem
+                    ? (isFr ? 'Aucune notification système' : 'No system notifications')
+                    : (isFr ? 'Aucune annonce' : 'No announcements yet'),
+                style: TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700, color: Ds.ink(context)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isSystem
+                    ? (isFr
                         ? 'Les mises à jour de votre compte et vérifications apparaîtront ici'
                         : 'Account updates and verifications will appear here')
-                    : (langCode == 'fr'
+                    : (isFr
                         ? 'Les actualités et annonces apparaîtront ici'
                         : 'News and announcements will appear here'),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
-                ),
                 textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Ds.body(context)),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
+    // Split into Today / Earlier the way the comp groups the inbox.
+    final today = <Map<String, dynamic>>[];
+    final earlier = <Map<String, dynamic>>[];
+    final now = DateTime.now();
+    for (final n in notifications) {
+      final created = DateTime.tryParse(n['created_at']?.toString() ?? '');
+      final isToday = created != null &&
+          created.year == now.year &&
+          created.month == now.month &&
+          created.day == now.day;
+      (isToday ? today : earlier).add(n);
+    }
+
     return RefreshIndicator(
+      color: Ds.green,
       onRefresh: () async {
         HapticFeedback.mediumImpact();
         await _loadNotifications();
       },
-      child: ListView.builder(
+      child: ListView(
         key: PageStorageKey<String>(storageKey),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: notifications.length,
-        itemBuilder: (context, index) {
-          final notification = notifications[index];
-          return _buildNotificationCard(notification, isDarkMode, langCode);
-        },
+        padding: const EdgeInsets.only(top: 8, bottom: 32),
+        children: [
+          if (today.isNotEmpty) ...[
+            DsGroupLabel(isFr ? "Aujourd'hui" : "Today",
+                padding: const EdgeInsets.fromLTRB(22, 8, 22, 8)),
+            DsTileGroup(
+              children: [for (final n in today) _buildNotificationRow(n, langCode)],
+            ),
+          ],
+          if (earlier.isNotEmpty) ...[
+            DsGroupLabel(isFr ? 'Plus tôt' : 'Earlier',
+                padding: const EdgeInsets.fromLTRB(22, 8, 22, 8)),
+            DsTileGroup(
+              children: [for (final n in earlier) _buildNotificationRow(n, langCode)],
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildNotificationCard(Map<String, dynamic> notification, bool isDarkMode, String langCode) {
+  /// Tint + icon for each notification type, using the redesign palette.
+  (IconData, Color, Color) _typeStyle(String type) {
+    switch (type) {
+      case 'article':
+        return (Icons.newspaper_rounded, Ds.greenTint, Ds.green);
+      case 'magazine':
+        return (Icons.auto_stories_rounded, Ds.greenTint, Ds.green);
+      case 'event':
+        return (Icons.event_rounded, Ds.goldTint, Ds.goldDeep);
+      case 'live_feed':
+        return (Icons.live_tv_rounded, Ds.redTint, Ds.red);
+      case 'youth_dialogue':
+        return (Icons.groups_rounded, Ds.greenTint, Ds.green);
+      case 'credential':
+        return (Icons.badge_rounded, Ds.greenTint, Ds.green);
+      case 'verification':
+        return (Icons.verified_rounded, Ds.blueTint, Ds.blue);
+      case 'security':
+        return (Icons.security_rounded, Ds.goldTint, Ds.goldDeep);
+      case 'account':
+        return (Icons.person_rounded, Ds.greenTint, Ds.green);
+      default:
+        return (Icons.notifications_rounded, Ds.greenTint, Ds.green);
+    }
+  }
+
+  Widget _buildNotificationRow(Map<String, dynamic> notification, String langCode) {
     final isRead = notification['is_read'] == true;
     final title = langCode == 'fr'
         ? (notification['title_fr'] ?? notification['title'] ?? '')
@@ -367,154 +374,83 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     final message = langCode == 'fr'
         ? (notification['message_fr'] ?? notification['message'] ?? '')
         : (notification['message'] ?? '');
-    final notificationType = notification['notification_type'] as String? ?? 'general';
+    final type = notification['notification_type'] as String? ?? 'general';
     final imageUrl = notification['image'] as String?;
     final createdAt = notification['created_at'] as String?;
+    final (icon, tint, color) = _typeStyle(type);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Icon based on notification type
-    IconData icon;
-    Color iconColor;
-    switch (notificationType) {
-      case 'article':
-        icon = Icons.article;
-        iconColor = AppColors.burundiGreen;
-        break;
-      case 'magazine':
-        icon = Icons.auto_stories;
-        iconColor = AppColors.auGold;
-        break;
-      case 'event':
-        icon = Icons.event;
-        iconColor = AppColors.burundiRed;
-        break;
-      case 'system':
-        icon = Icons.info_rounded;
-        iconColor = AppColors.burundiGreen;
-        break;
-      case 'youth_dialogue':
-        icon = Icons.groups_rounded;
-        iconColor = Colors.purple;
-        break;
-      case 'credential':
-        icon = Icons.badge_rounded;
-        iconColor = Colors.purple;
-        break;
-      case 'verification':
-        icon = Icons.verified_rounded;
-        iconColor = Colors.blue;
-        break;
-      case 'security':
-        icon = Icons.security_rounded;
-        iconColor = Colors.orange;
-        break;
-      case 'account':
-        icon = Icons.person_rounded;
-        iconColor = Colors.teal;
-        break;
-      default:
-        icon = Icons.notifications;
-        iconColor = Colors.grey;
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      elevation: isRead ? 0 : 2,
-      color: isRead
-          ? (isDarkMode ? Colors.grey[850] : Colors.grey[100])
-          : (isDarkMode ? Colors.grey[800] : Colors.white),
-      child: InkWell(
-        onTap: () => _handleNotificationTap(notification),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 24),
-              ),
-              const SizedBox(width: 12),
-
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ),
-                        if (!isRead)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: AppColors.burundiGreen,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
+    return InkWell(
+      onTap: () => _handleNotificationTap(notification),
+      child: Container(
+        // Unread rows sit on a faint green wash in the comp.
+        color: isRead
+            ? Colors.transparent
+            : (isDark ? Ds.green.withValues(alpha: 0.08) : const Color(0xFFF4FAF4)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DsIconSquare(icon,
+                tint: isDark ? color.withValues(alpha: 0.18) : tint, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isRead ? FontWeight.w600 : FontWeight.w700,
+                      color: Ds.ink(context),
                     ),
-                    const SizedBox(height: 4),
+                  ),
+                  if (message.toString().isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
                       message,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
-                      ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                    if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 160),
-                          child: CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              height: 100,
-                              color: isDarkMode ? Colors.grey[700] : Colors.grey[200],
-                              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            ),
-                            errorWidget: (context, url, error) => const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (createdAt != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _formatDateTime(createdAt),
-                        style: TextStyle(
+                      style: TextStyle(
                           fontSize: 12,
-                          color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+                          height: 1.35,
+                          color: isRead ? Ds.muted(context) : Ds.body(context)),
+                    ),
+                  ],
+                  if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(Ds.rTile),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 160),
+                        child: CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              const DsImagePlaceholder(height: 100),
+                          errorWidget: (context, url, error) => const SizedBox.shrink(),
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                  if (createdAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(_formatDateTime(createdAt), style: Ds.meta(context)),
+                  ],
+                ],
               ),
-            ],
-          ),
+            ),
+            if (!isRead)
+              Container(
+                margin: const EdgeInsets.only(left: 10, top: 6),
+                width: 8,
+                height: 8,
+                decoration:
+                    const BoxDecoration(color: Ds.green, shape: BoxShape.circle),
+              ),
+          ],
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -64,54 +65,23 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top bar: Language toggle + Skip
-            _buildTopBar(l10n, isDark),
+      backgroundColor: Ds.bg(context),
+      body: Column(
+        children: [
+          // Top bar: Language toggle + Skip
+          SafeArea(bottom: false, child: _buildTopBar(l10n, isDark)),
 
-            // Scrollable content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 12),
-
-                    // Logo — switches between light/dark variants
-                    Image.asset(
-                      isDark
-                          ? 'assets/images/b4africa_logo_white.png'
-                          : 'assets/images/b4africa_logo.png',
-                      height: 80,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => _buildLogo(),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // App title
-                    Text(
-                      '#B4Africa',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.burundiGreen,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'BE FOR AFRICA',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                        letterSpacing: 3,
-                      ),
-                    ),
-
+          // Scrollable content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.zero,
+              child: Column(
+                children: [
+                  _buildWelcomeHeader(l10n),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                    child: Column(
+                      children: [
                     const SizedBox(height: 20),
 
                     // Tab switch
@@ -133,13 +103,65 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         );
                       },
                     ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Green welcome header from the comp: B4 mark, greeting, subtitle.
+  Widget _buildWelcomeHeader(AppLocalizations l10n) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+          24, MediaQuery.paddingOf(context).top + 12, 24, 30),
+      decoration: const BoxDecoration(
+        color: Ds.green,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 66,
+            height: 66,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(Ds.rSheet),
+            ),
+            alignment: Alignment.center,
+            child: const Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: 'B'),
+                  TextSpan(text: '4', style: TextStyle(color: Ds.gold)),
+                ],
+              ),
+              style: TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800, color: Ds.green),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            l10n.signIn,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sign in to continue',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
+          ),
+        ],
       ),
     );
   }
@@ -222,34 +244,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildLogo() {
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.burundiGreen.withValues(alpha: 0.2), width: 2),
-      ),
-      child: ClipOval(
-        child: Image.asset(
-          'assets/images/Burundi Embassy in Addis Ababa.png',
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => const Icon(
-            Icons.shield_rounded,
-            size: 40,
-            color: AppColors.burundiGreen,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTabSwitch(AppLocalizations l10n, bool isDark) {
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        borderRadius: BorderRadius.circular(12),
+        color: Ds.surface(context),
+        borderRadius: BorderRadius.circular(Ds.rTile),
+        boxShadow: Ds.shadow(context),
       ),
       child: TabBar(
         controller: _tabController,
@@ -258,8 +259,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           setState(() {});
         },
         indicator: BoxDecoration(
-          color: AppColors.burundiGreen,
-          borderRadius: BorderRadius.circular(12),
+          color: Ds.green,
+          borderRadius: BorderRadius.circular(Ds.rTile),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
@@ -486,40 +487,34 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     String? Function(String?)? validator,
     ValueChanged<String>? onChanged,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      validator: validator,
-      onChanged: onChanged,
-      style: TextStyle(fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-          color: isDark ? AppColors.darkTextSecondary : Colors.grey[400],
-          fontSize: 15,
+    return Container(
+      decoration: BoxDecoration(
+        color: Ds.surface(context),
+        borderRadius: BorderRadius.circular(Ds.rCard),
+        boxShadow: Ds.shadow(context),
+      ),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        obscureText: obscureText,
+        validator: validator,
+        onChanged: onChanged,
+        style: TextStyle(
+            fontSize: 15, fontWeight: FontWeight.w600, color: Ds.ink(context)),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w400, color: Ds.muted(context)),
+          prefixIcon: Icon(icon, size: 20, color: Ds.green),
+          suffixIcon: suffixIcon,
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          focusedErrorBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
         ),
-        prefixIcon: Icon(icon, size: 20, color: isDark ? AppColors.darkTextSecondary : Colors.grey[500]),
-        suffixIcon: suffixIcon,
-        filled: true,
-        fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.burundiGreen, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       ),
     );
   }
@@ -530,8 +525,18 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     required bool isLoading,
     required Color color,
   }) {
-    return SizedBox(
+    return Container(
       height: 52,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -539,7 +544,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
         child: isLoading
@@ -563,22 +568,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   Widget _buildOrDivider(bool isDark) {
     return Row(
       children: [
-        Expanded(
-          child: Divider(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-        ),
+        Expanded(child: Divider(color: Ds.outline(context))),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'OR',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-            ),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('or continue with',
+              style: TextStyle(fontSize: 12, color: Ds.muted(context))),
         ),
-        Expanded(
-          child: Divider(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-        ),
+        Expanded(child: Divider(color: Ds.outline(context))),
       ],
     );
   }
@@ -629,16 +625,20 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     return Semantics(
       button: true,
       label: 'Sign in with $label',
-      child: SizedBox(
-        height: 46,
+      child: Container(
+        height: 48,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(Ds.rCard),
+          boxShadow: Ds.shadow(context),
+        ),
         child: OutlinedButton(
           onPressed: isLoading ? null : onPressed,
           style: OutlinedButton.styleFrom(
             backgroundColor: backgroundColor,
             foregroundColor: textColor,
-            side: BorderSide(color: borderColor),
+            side: BorderSide.none,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(Ds.rCard),
             ),
           ),
           child: Row(

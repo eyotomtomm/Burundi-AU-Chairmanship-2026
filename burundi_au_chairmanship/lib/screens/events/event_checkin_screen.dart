@@ -5,6 +5,7 @@ import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../config/app_ds.dart';
 
 class EventCheckInScreen extends StatefulWidget {
   final int eventId;
@@ -132,7 +133,6 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
           ),
         ),
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        elevation: 0,
         iconTheme: IconThemeData(
           color: isDark ? AppColors.darkText : AppColors.lightText,
         ),

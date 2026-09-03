@@ -4,50 +4,30 @@
 {% block title %}Notifications - Be 4 Africa{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-emerald-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="mb-8">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="flex items-center gap-3 mb-2">
-                        <span class="material-symbols-outlined text-4xl text-blue-600 dark:text-blue-400">
-                            notifications_active
-                        </span>
-                        <h1 class="text-3xl font-bold text-slate-900 dark:text-white">Notifications</h1>
-                    </div>
-                    <p class="text-slate-600 dark:text-slate-400">Manage push notifications and alerts for app users</p>
-                </div>
-                <div class="flex items-center gap-3" id="header-actions">
-                    <a href="{% url 'custom_admin:push_diagnostics' %}"
-                       class="inline-flex items-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors duration-150 border border-slate-300 dark:border-slate-600"
-                       title="Diagnose push notification pipeline">
-                        <span class="material-symbols-outlined">troubleshoot</span>
-                        <span>Push Diagnostics</span>
-                    </a>
-                    <a href="{% url 'custom_admin:notification_create' %}" id="create-btn"
-                       class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200">
-                        <span class="material-symbols-outlined">add</span>
-                        <span>Create Notification</span>
-                    </a>
-                </div>
+<div>
+    <div>
+        <!-- Comp header -->
+        <div class="flex items-center justify-between gap-4 mb-5">
+            <div>
+                <h1>Push Notifications</h1>
+                <p>{{ manual_count }} announcement{{ manual_count|pluralize }} &middot; {{ system_count }} system message{{ system_count|pluralize }}</p>
+            </div>
+            <div class="flex items-center gap-2.5" id="header-actions">
+                <a href="{% url 'custom_admin:push_diagnostics' %}"
+                   class="bg-surface-container-lowest border border-slate-200 text-on-surface rounded-xl px-5 py-2.5 text-[13px] font-bold inline-flex items-center gap-2 hover:bg-surface-container transition-colors"
+                   title="Diagnose push notification pipeline">
+                    <span class="material-symbols-rounded text-lg">troubleshoot</span>Diagnostics
+                </a>
+                <a href="{% url 'custom_admin:notification_create' %}" id="create-btn" class="bg-primary-container inline-flex items-center gap-2">
+                    <span class="material-symbols-rounded">add</span>Compose
+                </a>
             </div>
         </div>
 
-        <!-- Tab Bar -->
-        <div class="mb-4 flex gap-2">
-            <button id="tab-announcements" onclick="switchTab('announcements')"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 focus:outline-none">
-                <span class="material-symbols-outlined text-lg">campaign</span>
-                Announcements
-                <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-xs font-bold rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">{{ manual_count }}</span>
-            </button>
-            <button id="tab-system" onclick="switchTab('system')"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 focus:outline-none">
-                <span class="material-symbols-outlined text-lg">settings</span>
-                System
-                <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-xs font-bold rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300">{{ system_count }}</span>
-            </button>
+        <!-- Comp filter chips -->
+        <div class="mb-4 flex gap-2.5">
+            <button id="tab-announcements" onclick="switchTab('announcements')" class="fchip on">Announcements {{ manual_count }}</button>
+            <button id="tab-system" onclick="switchTab('system')" class="fchip">System {{ system_count }}</button>
         </div>
 
         <!-- ==================== ANNOUNCEMENTS TAB ==================== -->
@@ -402,22 +382,9 @@ function switchTab(tab) {
     document.getElementById('panel-announcements').style.display = tab === 'announcements' ? '' : 'none';
     document.getElementById('panel-system').style.display = tab === 'system' ? '' : 'none';
 
-    // Toggle tab button styles
-    const annBtn = document.getElementById('tab-announcements');
-    const sysBtn = document.getElementById('tab-system');
-    const activeClass = 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md border border-slate-200 dark:border-slate-700';
-    const inactiveClass = 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60';
-
-    annBtn.className = annBtn.className.replace(/bg-white|dark:bg-slate-800|text-slate-900|dark:text-white|shadow-md|border|border-slate-200|dark:border-slate-700|text-slate-500|dark:text-slate-400|hover:bg-white\/60|dark:hover:bg-slate-800\/60/g, '').trim();
-    sysBtn.className = sysBtn.className.replace(/bg-white|dark:bg-slate-800|text-slate-900|dark:text-white|shadow-md|border|border-slate-200|dark:border-slate-700|text-slate-500|dark:text-slate-400|hover:bg-white\/60|dark:hover:bg-slate-800\/60/g, '').trim();
-
-    if (tab === 'announcements') {
-        annBtn.className += ' ' + activeClass;
-        sysBtn.className += ' ' + inactiveClass;
-    } else {
-        sysBtn.className += ' ' + activeClass;
-        annBtn.className += ' ' + inactiveClass;
-    }
+    // Toggle chip state
+    document.getElementById('tab-announcements').classList.toggle('on', tab === 'announcements');
+    document.getElementById('tab-system').classList.toggle('on', tab === 'system');
 
     // Show/hide Create button (only for announcements)
     document.getElementById('create-btn').style.display = tab === 'announcements' ? '' : 'none';

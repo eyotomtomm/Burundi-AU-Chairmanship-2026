@@ -8,6 +8,7 @@ import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../config/app_ds.dart';
 
 class YouthDialogueApplyScreen extends StatefulWidget {
   final List<RegistrationFormField> formFields;
@@ -507,9 +508,6 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
           title: Text(isFr ? 'Candidature envoyée' : 'Application Submitted'),
-          backgroundColor: AppColors.burundiGreen,
-          foregroundColor: Colors.white,
-          elevation: 0,
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -680,9 +678,6 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: Text('Apply for ${widget.programmeTitle}'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: Form(
         key: _formKey,

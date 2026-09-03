@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../services/api_service.dart';
@@ -35,7 +36,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
 
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
     ));
 
     _fadeController = AnimationController(
@@ -217,479 +218,201 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
   Widget build(BuildContext context) {
     final isFrench = context.watch<LanguageProvider>().isFrench;
     final contactEmail = _getContactEmail();
-    final screenSize = MediaQuery.of(context).size;
     final hasImage = _imageUrl != null && _imageUrl!.isNotEmpty;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background: Image or gradient
-            if (hasImage)
-              CachedNetworkImage(
-                imageUrl: _imageUrl!,
-                fit: BoxFit.cover,
-                width: screenSize.width,
-                height: screenSize.height,
-                placeholder: (context, url) => Container(
-                  color: const Color(0xFF101c2e),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.auGold,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _LanguageToggle(
+                      isFrench: isFrench,
+                      onToggle: () =>
+                          context.read<LanguageProvider>().toggleLanguage(),
                     ),
-                  ),
-                ),
-                errorWidget: (context, url, error) =>
-                    _buildGradientBackground(),
-              )
-            else
-              _buildGradientBackground(),
-
-            // Dark overlay for readability
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: hasImage ? 0.3 : 0.0),
-                    Colors.black.withValues(alpha: hasImage ? 0.7 : 0.0),
                   ],
                 ),
               ),
-            ),
-
-            // Content overlay at bottom
-            SafeArea(
-              child: Column(
-                children: [
-                  // Top bar with language toggle
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _LanguageToggle(
-                          isFrench: isFrench,
-                          onToggle: () => context
-                              .read<LanguageProvider>()
-                              .toggleLanguage(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-
-                  // App logo
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Image.asset(
-                      'assets/images/b4africa_logo_white.png',
-                      height: 140,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ),
-
-                  // Bottom card with info
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.15),
-                            ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(36, 24, 36, 32),
+                  children: [
+                    // Admin-supplied artwork, when one is configured.
+                    if (hasImage)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(Ds.rCard),
+                          child: CachedNetworkImage(
+                            imageUrl: _imageUrl!,
+                            height: 160,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, _, _) => const SizedBox.shrink(),
                           ),
-                          child: Column(
+                        ),
+                      ),
+
+                    // Pulsing gold badge
+                    Center(
+                      child: AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (context, child) => Opacity(
+                          opacity: 0.75 + (_pulseController.value * 0.25),
+                          child: child,
+                        ),
+                        child: Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            color: Ds.goldTintOf(context),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.engineering_rounded,
+                              size: 44, color: Ds.goldDeep),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      _getTitle(isFrench),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: Ds.ink(context)),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _getDescription(isFrench),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 14, height: 1.55, color: Ds.body(context)),
+                    ),
+
+                    if (_remaining.inSeconds > 0) ...[
+                      const SizedBox(height: 20),
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Ds.goldTintOf(context),
+                            borderRadius: BorderRadius.circular(Ds.rTile),
+                          ),
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Pulsing icon
-                              AnimatedBuilder(
-                                animation: _pulseController,
-                                builder: (context, child) {
-                                  return Opacity(
-                                    opacity:
-                                        0.6 + (_pulseController.value * 0.4),
-                                    child: Icon(
-                                      Icons.build_circle_outlined,
-                                      size: 40,
-                                      color: AppColors.auGold,
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              const SizedBox(height: 16),
-
-                              // Title
+                              const Icon(Icons.timer_outlined,
+                                  size: 20, color: Ds.goldDeep),
+                              const SizedBox(width: 10),
                               Text(
-                                _getTitle(isFrench),
-                                textAlign: TextAlign.center,
+                                _formatCountdown(_remaining),
                                 style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: 0.3,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Ds.goldInk,
+                                  fontFeatures: [FontFeature.tabularFigures()],
                                 ),
-                              ),
-
-                              const SizedBox(height: 10),
-
-                              // Gold divider
-                              Container(
-                                width: 50,
-                                height: 2.5,
-                                decoration: BoxDecoration(
-                                  color: AppColors.auGold,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // Description
-                              Text(
-                                _getDescription(isFrench),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  height: 1.5,
-                                  color:
-                                      Colors.white.withValues(alpha: 0.85),
-                                ),
-                              ),
-
-                              // Countdown timer
-                              if (_remaining.inSeconds > 0) ...[
-                                const SizedBox(height: 20),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.auGold
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: AppColors.auGold
-                                          .withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.timer_outlined,
-                                        size: 20,
-                                        color: AppColors.auGold,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        _formatCountdown(_remaining),
-                                        style: const TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                          fontFeatures: [
-                                            FontFeature.tabularFigures()
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-
-                              const SizedBox(height: 20),
-
-                              // Email chip — tap to copy address
-                              if (contactEmail != null &&
-                                  contactEmail.isNotEmpty) ...[
-                                InkWell(
-                                  onTap: () => _copyEmail(contactEmail),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white
-                                          .withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.2),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.mail_outline_rounded,
-                                          size: 18,
-                                          color: AppColors.auGold,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                isFrench
-                                                    ? 'Nous contacter'
-                                                    : 'Contact us',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.white
-                                                      .withValues(alpha: 0.7),
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                contactEmail,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Icon(
-                                          Icons.content_copy_rounded,
-                                          size: 18,
-                                          color: Colors.white
-                                              .withValues(alpha: 0.8),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-
-                              // Buttons row
-                              Row(
-                                children: [
-                                  // Retry button
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 48,
-                                      child: ElevatedButton.icon(
-                                        onPressed:
-                                            _isRetrying ? null : _retry,
-                                        icon: _isRetrying
-                                            ? const SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
-                                                ),
-                                              )
-                                            : const Icon(
-                                                Icons.refresh_rounded,
-                                                size: 20),
-                                        label: Text(
-                                          _isRetrying
-                                              ? (isFrench
-                                                  ? 'Vérif...'
-                                                  : 'Checking...')
-                                              : (isFrench
-                                                  ? 'Réessayer'
-                                                  : 'Retry'),
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white
-                                              .withValues(alpha: 0.2),
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            side: BorderSide(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.25),
-                                            ),
-                                          ),
-                                          elevation: 0,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  // Email button
-                                  if (contactEmail != null &&
-                                      contactEmail.isNotEmpty) ...[
-                                    const SizedBox(width: 12),
-                                    SizedBox(
-                                      height: 48,
-                                      child: OutlinedButton.icon(
-                                        onPressed: () =>
-                                            _launchEmail(contactEmail),
-                                        icon: const Icon(
-                                            Icons.email_outlined,
-                                            size: 18),
-                                        label: Text(
-                                          isFrench ? 'Contact' : 'Email',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.auGold,
-                                          side: BorderSide(
-                                            color: AppColors.auGold
-                                                .withValues(alpha: 0.5),
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
                               ),
                             ],
                           ),
                         ),
                       ),
+                    ],
+
+                    const SizedBox(height: 24),
+                    Center(
+                      child: _isRetrying
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Ds.green),
+                            )
+                          : DsOutlineButton(
+                              isFrench ? 'Réessayer' : 'Try again',
+                              radius: Ds.rPill,
+                              onTap: _retry,
+                            ),
                     ),
-                  ),
-                ],
+
+                    if (contactEmail != null && contactEmail.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      DsTileGroup(
+                        margin: EdgeInsets.zero,
+                        children: [
+                          DsTile(
+                            icon: Icons.mail_rounded,
+                            title: isFrench ? 'Nous contacter' : 'Contact us',
+                            subtitle: contactEmail,
+                            onTap: () => _launchEmail(contactEmail),
+                          ),
+                          DsTile(
+                            icon: Icons.content_copy_rounded,
+                            title: isFrench
+                                ? "Copier l'adresse"
+                                : 'Copy email address',
+                            chevron: false,
+                            onTap: () => _copyEmail(contactEmail),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildGradientBackground() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF101c2e),
-            Color(0xFF1a2d47),
-            Color(0xFF0f1923),
-          ],
-        ),
-      ),
-      child: CustomPaint(
-        size: MediaQuery.of(context).size,
-        painter: _MaintenancePatternPainter(),
-      ),
-    );
-  }
 }
 
 class _LanguageToggle extends StatelessWidget {
   final bool isFrench;
   final VoidCallback onToggle;
 
-  const _LanguageToggle({
-    required this.isFrench,
-    required this.onToggle,
-  });
+  const _LanguageToggle({required this.isFrench, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Material(
-          color: Colors.white.withValues(alpha: 0.15),
-          child: InkWell(
-            onTap: onToggle,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.25),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.language_rounded,
-                    size: 16,
-                    color: AppColors.auGold,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isFrench ? 'FR' : 'EN',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.swap_horiz_rounded,
-                    size: 14,
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
-                ],
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Ds.surface(context),
+          borderRadius: BorderRadius.circular(Ds.rPill),
+          boxShadow: Ds.shadow(context),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.translate_rounded, size: 16, color: Ds.green),
+            const SizedBox(width: 6),
+            Text(
+              isFrench ? 'FR' : 'EN',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: Ds.ink(context),
               ),
             ),
-          ),
+            const SizedBox(width: 4),
+            Icon(Icons.swap_horiz_rounded, size: 14, color: Ds.muted(context)),
+          ],
         ),
       ),
     );
   }
-}
-
-class _MaintenancePatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.auGold.withValues(alpha: 0.06)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    const spacing = 100.0;
-    for (double x = -spacing; x < size.width + spacing; x += spacing) {
-      for (double y = -spacing; y < size.height + spacing; y += spacing) {
-        final path = Path();
-        path.moveTo(x, y - 25);
-        path.lineTo(x + 25, y);
-        path.lineTo(x, y + 25);
-        path.lineTo(x - 25, y);
-        path.close();
-        canvas.drawPath(path, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

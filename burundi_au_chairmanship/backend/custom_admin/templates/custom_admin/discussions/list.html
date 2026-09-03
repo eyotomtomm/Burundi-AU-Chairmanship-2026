@@ -15,6 +15,10 @@
       </div>
     </div>
     <div class="flex items-center gap-3">
+      <a href="{% url 'custom_admin:discussion_create' %}"
+         class="bg-primary-container inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold">
+        <span class="material-symbols-rounded">add</span>New post
+      </a>
       <select onchange="window.location.href='?category='+this.value" class="border border-slate-200 bg-white rounded-lg py-2.5 px-4 text-sm">
         <option value="">All Categories</option>
         {% for val, label in category_choices %}
@@ -60,6 +64,7 @@
                 {% if d.is_pinned %}<span class="material-symbols-outlined text-blue-500 text-sm">push_pin</span>{% endif %}
                 {% if d.is_locked %}<span class="material-symbols-outlined text-amber-500 text-sm">lock</span>{% endif %}
                 <p class="font-semibold text-slate-900 text-sm">{{ d.title|truncatewords:10 }}</p>
+                {% if d.media_count %}<span class="flex items-center gap-0.5 text-xs text-slate-500" title="{{ d.media_count }} attachment{{ d.media_count|pluralize }}"><span class="material-symbols-outlined text-sm">perm_media</span>{{ d.media_count }}</span>{% endif %}
               </div>
             </td>
             <td class="px-6 py-4"><span class="text-sm text-slate-700">{{ d.author.username }}</span></td>

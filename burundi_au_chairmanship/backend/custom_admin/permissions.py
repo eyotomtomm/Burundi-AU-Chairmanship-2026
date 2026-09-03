@@ -38,6 +38,7 @@ ADMIN_MENU_GROUPS = [
         ('hero_slides_list',          'Hero Slides',            'slideshow'),
         ('hero_text_list',            'Hero Text',              'text_fields'),
         ('articles_list',             'Articles',               'article'),
+        ('news_scraper',              'News Scraper',           'travel_explore'),
         ('categories_list',           'Categories',             'folder'),
         ('magazines_list',            'Magazines',              'auto_stories'),
         ('feature_cards_list',        'Feature Cards',          'view_carousel'),
@@ -62,6 +63,7 @@ ADMIN_MENU_GROUPS = [
     ]),
     ('Users & Verification', [
         ('users_list',                'User Management',        'group'),
+        ('device_bans_list',          'Device Bans',            'phonelink_erase'),
         ('verification_requests_list','Verification Requests',  'verified'),
     ]),
     ('Continental Dialogue', [
@@ -83,6 +85,9 @@ ADMIN_MENU_GROUPS = [
     ]),
     ('Directory & Locations', [
         ('contact_directory_list',    'Contact Directory',      'contacts'),
+        ('discussion_topics_list',    'Explore Topics',         'forum'),
+        ('content_reports_list',      'Reported Content',       'flag'),
+        ('emergency_contacts_list',   'Emergency Contacts',     'emergency'),
         ('social_media_list',         'Social Media Links',     'share'),
         ('weather_cities_list',       'Weather Cities',         'partly_cloudy_day'),
         ('resources_list',            'Resources',              'folder_zip'),

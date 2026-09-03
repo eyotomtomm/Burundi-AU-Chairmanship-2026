@@ -815,6 +815,12 @@ abstract class AppLocalizationsGenerated {
   /// **'Complete your profile'**
   String get complete_your_profile;
 
+  /// No description provided for @agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore'**
+  String get agenda;
+
   /// No description provided for @news.
   ///
   /// In en, this message translates to:

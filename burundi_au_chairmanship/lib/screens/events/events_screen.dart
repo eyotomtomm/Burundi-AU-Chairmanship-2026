@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
-import '../../config/environment.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../models/event_registration_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -11,7 +11,6 @@ import '../../services/haptic_service.dart';
 import '../../services/content_cache_service.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/async_content_view.dart';
-import '../../widgets/translate_button.dart';
 import 'event_detail_screen.dart';
 import '../youth_dialogue/youth_dialogue_main_screen.dart';
 
@@ -26,7 +25,6 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   List<EventRegistrationModel> _allEvents = [];
   bool _isLoading = true;
   String? _error;
-  String? _ydBannerUrl;
   bool _isYdBanned = false;
   late TabController _tabController;
 
@@ -34,6 +32,10 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Keeps the pill filters in sync with swipes between tabs.
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadData();
   }
 
@@ -67,7 +69,6 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
 
       events = results[0] as List<EventRegistrationModel>;
       final ydSettings = results[1] as Map<String, dynamic>;
-      final bannerUrl = ydSettings['banner_image_url']?.toString() ?? '';
       final ydBanned = ydSettings['is_device_banned'] == true;
 
       if (!mounted) return;
@@ -75,7 +76,6 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
       ContentCacheService().cacheEvents(events);
       setState(() {
         _allEvents = events;
-        _ydBannerUrl = bannerUrl.isNotEmpty ? Environment.fixMediaUrl(bannerUrl) : null;
         _isYdBanned = ydBanned;
         _isLoading = false;
       });
@@ -111,395 +111,220 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
+    final fr = lang == 'fr';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        title: Text(lang == 'fr' ? '\u00c9v\u00e9nements' : 'Events'),
-        centerTitle: true,
-        foregroundColor: Colors.white,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.burundiGreen, Color(0xFF0A5C1E)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
+        title: Text(fr ? 'Événements' : 'Events'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_month_outlined),
-            tooltip: lang == 'fr' ? 'Calendrier' : 'Calendar',
+            icon: const Icon(Icons.calendar_month_rounded),
+            tooltip: fr ? 'Calendrier' : 'Calendar',
             onPressed: () => Navigator.pushNamed(context, '/calendar'),
           ),
-          const TranslateButton(),
+          const SizedBox(width: 4),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.auGold,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          tabs: [
-            Tab(text: lang == 'fr' ? 'Tous' : 'All'),
-            Tab(text: lang == 'fr' ? '\u00c0 venir' : 'Upcoming'),
-            Tab(text: lang == 'fr' ? 'Pass\u00e9s' : 'Past'),
-          ],
-        ),
       ),
-      body: _isLoading
-          ? _buildShimmer()
-          : _error != null
-              ? AsyncContentView(
-                  state: AsyncContentState.error,
-                  onRetry: _loadData,
-                  onRefresh: () async => _loadData(),
-                  child: const SizedBox.shrink(),
-                )
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildEventList(_allEvents, lang, isDark, showEmpty: true, storageKey: 'events_all'),
-                    _buildEventList(_upcomingEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'De nouveaux événements arrivent bientôt' : 'New events coming soon', storageKey: 'events_upcoming'),
-                    _buildEventList(_pastEvents, lang, isDark, emptyMessage: lang == 'fr' ? 'Les événements passés apparaîtront ici' : 'Past events will appear here', storageKey: 'events_past'),
-                  ],
-                ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Row(
+              children: [
+                _tabChip(0, fr ? 'Tous' : 'All'),
+                const SizedBox(width: 8),
+                _tabChip(1, fr ? 'À venir' : 'Upcoming'),
+                const SizedBox(width: 8),
+                _tabChip(2, fr ? 'Passés' : 'Past'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _isLoading
+                ? _buildShimmer()
+                : _error != null
+                    ? AsyncContentView(
+                        state: AsyncContentState.error,
+                        onRetry: _loadData,
+                        onRefresh: () async => _loadData(),
+                        child: const SizedBox.shrink(),
+                      )
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildEventList(_allEvents, lang, isDark,
+                              showEmpty: true, storageKey: 'events_all'),
+                          _buildEventList(_upcomingEvents, lang, isDark,
+                              emptyMessage: fr
+                                  ? 'De nouveaux événements arrivent bientôt'
+                                  : 'New events coming soon',
+                              storageKey: 'events_upcoming'),
+                          _buildEventList(_pastEvents, lang, isDark,
+                              emptyMessage: fr
+                                  ? 'Les événements passés apparaîtront ici'
+                                  : 'Past events will appear here',
+                              storageKey: 'events_past'),
+                        ],
+                      ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildEventList(List<EventRegistrationModel> events, String lang, bool isDark, {bool showEmpty = false, String? emptyMessage, String storageKey = 'events'}) {
+  Widget _tabChip(int index, String label) => DsFilterChip(
+        label,
+        selected: _tabController.index == index,
+        onTap: () => setState(() => _tabController.animateTo(index)),
+      );
+
+  Widget _buildEventList(List<EventRegistrationModel> events, String lang, bool isDark,
+      {bool showEmpty = false, String? emptyMessage, String storageKey = 'events'}) {
     final isAuth = context.watch<AuthProvider>().isAuthenticated;
 
-    if (events.isEmpty && !isAuth) {
-      return _buildSignInPrompt(lang, isDark);
-    }
-
-    if (events.isEmpty) {
-      return _buildEmpty(lang, isDark, emptyMessage);
-    }
+    if (events.isEmpty && !isAuth) return _buildSignInPrompt(lang, isDark);
+    if (events.isEmpty) return _buildEmpty(lang, isDark, emptyMessage);
 
     return RefreshIndicator(
       onRefresh: () async {
         HapticService.medium();
         await _loadData();
       },
-      color: AppColors.burundiGreen,
+      color: Ds.green,
       child: ListView.builder(
         key: PageStorageKey<String>(storageKey),
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         itemCount: events.length,
         itemBuilder: (context, index) => _buildEventCard(events[index], lang, isDark),
       ),
     );
   }
 
+  /// Agenda row from the comp: time column, coloured rail, then the details.
   Widget _buildEventCard(EventRegistrationModel event, String lang, bool isDark) {
     final isAuth = context.read<AuthProvider>().isAuthenticated;
-    final cardBg = isDark ? AppColors.darkSurface : Colors.white;
-    final textSecondary = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+    final fr = lang == 'fr';
     final isPast = event.isEventPast;
-    final hasVenue = event.getVenue(lang).isNotEmpty;
+    final venue = event.getVenue(lang);
+    final date = event.eventDate;
 
-    // Status badge
-    String statusLabel;
-    Color statusColor;
-    IconData statusIcon;
+    // The rail colour encodes urgency: green live/soon, gold open, grey past.
+    final Color rail;
     if (isPast) {
-      statusLabel = lang == 'fr' ? 'Termin\u00e9' : 'Ended';
-      statusColor = Colors.grey;
-      statusIcon = Icons.check_circle_outline;
+      rail = Ds.outline(context);
     } else if (event.hasRegistered) {
-      statusLabel = lang == 'fr' ? 'Inscrit' : 'Registered';
-      statusColor = AppColors.burundiGreen;
-      statusIcon = Icons.how_to_reg;
+      rail = Ds.green;
     } else if (event.isRegistrationEnabled && event.isRegistrationOpen) {
-      statusLabel = lang == 'fr' ? 'Inscription ouverte' : 'Registration Open';
-      statusColor = AppColors.auGold;
-      statusIcon = Icons.app_registration;
-    } else if (event.isRegistrationEnabled && !event.isRegistrationOpen) {
-      statusLabel = lang == 'fr' ? 'Inscription ferm\u00e9e' : 'Registration Closed';
-      statusColor = AppColors.burundiRed;
-      statusIcon = Icons.event_busy;
+      rail = Ds.gold;
     } else {
-      statusLabel = lang == 'fr' ? 'Information' : 'Info';
-      statusColor = AppColors.lightTextSecondary;
-      statusIcon = Icons.info_outline;
+      rail = Ds.outline(context);
     }
 
-    // Event type badge
-    String typeLabel;
-    IconData typeIcon;
-    Color typeColor;
-    switch (event.eventType) {
-      case 'online':
-        typeLabel = lang == 'fr' ? 'En ligne' : 'Online';
-        typeIcon = Icons.videocam;
-        typeColor = AppColors.burundiGreen;
-        break;
-      case 'hybrid':
-        typeLabel = lang == 'fr' ? 'Hybride' : 'Hybrid';
-        typeIcon = Icons.swap_horiz;
-        typeColor = Colors.deepPurple;
-        break;
-      case 'info':
-        typeLabel = 'Info';
-        typeIcon = Icons.info_outline;
-        typeColor = AppColors.lightTextSecondary;
-        break;
-      default:
-        typeLabel = lang == 'fr' ? 'En personne' : 'In Person';
-        typeIcon = Icons.location_on;
-        typeColor = AppColors.burundiGreen;
-    }
+    final pills = <Widget>[
+      if (isPast)
+        DsPill(fr ? 'Terminé' : 'Ended', tone: DsTone.neutral, dense: true)
+      else if (event.hasRegistered)
+        DsPill(fr ? 'Inscrit' : 'Registered', dense: true)
+      else if (event.isRegistrationEnabled && !event.isRegistrationOpen)
+        DsPill(fr ? 'Inscription fermée' : 'Registration closed',
+            tone: DsTone.gold, dense: true),
+    ];
 
-    return GestureDetector(
-      onTap: () {
-        HapticService.light();
-        if (!isAuth) {
-          Navigator.pushNamed(context, '/auth');
-          return;
-        }
-        if (event.isYouthDialogue) {
+    return Opacity(
+      opacity: isPast ? 0.7 : 1,
+      child: DsCard(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        onTap: () {
+          HapticService.light();
+          if (!isAuth) {
+            Navigator.pushNamed(context, '/auth');
+            return;
+          }
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const YouthDialogueMainScreen()),
+            MaterialPageRoute(
+              builder: (_) => event.isYouthDialogue
+                  ? const YouthDialogueMainScreen()
+                  : EventDetailScreen(event: event, scrollToComments: false),
+            ),
           );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => EventDetailScreen(event: event, scrollToComments: false)),
-          );
-        }
-      },
-      child: Opacity(
-        opacity: isPast ? 0.7 : 1.0,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        },
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Poster image or gradient header
-              if ((event.eventPoster != null && event.eventPoster!.isNotEmpty) ||
-                  (event.isYouthDialogue && _ydBannerUrl != null))
-                Stack(
+              SizedBox(
+                width: 52,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: CachedNetworkImage(
-                        imageUrl: event.eventPoster?.isNotEmpty == true
-                            ? event.eventPoster!
-                            : _ydBannerUrl!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        placeholder: (_, s) => Container(
-                          height: 180,
-                          color: isDark ? Colors.grey[800] : Colors.grey[200],
-                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                        ),
-                        errorWidget: (_, u, e) => Container(
-                          height: 180,
-                          decoration: const BoxDecoration(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                            gradient: LinearGradient(
-                              colors: [AppColors.burundiGreen, Color(0xFF0A5C1E)],
-                            ),
-                          ),
-                          child: const Center(child: Icon(Icons.event, size: 48, color: Colors.white54)),
-                        ),
-                      ),
+                    Text(
+                      date == null ? '--:--' : DateFormat('HH:mm').format(date),
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800, color: Ds.green),
                     ),
-                    // Dark gradient overlay at bottom for readability
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: Container(
-                        height: 60,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Colors.black.withValues(alpha: 0.5)],
-                          ),
-                        ),
-                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      date == null
+                          ? (fr ? 'à confirmer' : 'TBC')
+                          : DateFormat('d MMM', lang).format(date),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, color: Ds.muted(context)),
                     ),
-                    // Status badge
-                    Positioned(
-                      top: 10, right: 10,
-                      child: _buildBadge(statusLabel, statusColor, statusIcon),
-                    ),
-                    // Type badge
-                    Positioned(
-                      top: 10, left: 10,
-                      child: _buildBadge(typeLabel, typeColor, typeIcon),
-                    ),
-                    // Date overlay at bottom
-                    if (event.eventDate != null)
-                      Positioned(
-                        bottom: 8, left: 12,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.calendar_today, size: 14, color: Colors.white),
-                            const SizedBox(width: 6),
-                            Text(
-                              _formatDate(event, lang),
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
                   ],
-                )
-              else
-                Container(
-                  height: 100,
-                  decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                    gradient: LinearGradient(
-                      colors: [AppColors.burundiGreen, Color(0xFF0A5C1E)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      const Center(child: Icon(Icons.event, size: 40, color: Colors.white30)),
-                      Positioned(
-                        top: 10, right: 10,
-                        child: _buildBadge(statusLabel, statusColor, statusIcon),
-                      ),
-                      Positioned(
-                        top: 10, left: 10,
-                        child: _buildBadge(typeLabel, typeColor, typeIcon),
-                      ),
-                      if (event.eventDate != null)
-                        Positioned(
-                          bottom: 10, left: 12,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_today, size: 14, color: Colors.white70),
-                              const SizedBox(width: 6),
-                              Text(
-                                _formatDate(event, lang),
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
                 ),
-
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(14),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                width: 3,
+                decoration:
+                    BoxDecoration(color: rail, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (event.getCategoryName(lang) != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: _hexToColor(event.categoryColor ?? '#455A64').withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          event.getCategoryName(lang)!,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: _hexToColor(event.categoryColor ?? '#455A64'),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                    ],
                     Text(
                       event.getTitle(lang),
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3),
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
+                          color: Ds.ink(context)),
                     ),
-                    if (event.getDescription(lang).isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        event.getDescription(lang),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: textSecondary, height: 1.4),
+                    if (venue.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on_rounded,
+                              size: 15, color: Ds.body(context)),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(venue,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Ds.cardBody(context)),
+                          ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    // Info chips row
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        if (hasVenue)
-                          _buildInfoChip(Icons.location_on_outlined, event.getVenue(lang), textSecondary),
-                        if (event.spotsRemaining != null && event.isRegistrationOpen && !isPast)
-                          _buildInfoChip(
-                            Icons.people_outline,
-                            lang == 'fr'
-                                ? '${event.spotsRemaining} places'
-                                : '${event.spotsRemaining} spots',
-                            event.spotsRemaining! < 10 ? AppColors.burundiRed : textSecondary,
-                          ),
-                        if (event.isMultiDay)
-                          _buildInfoChip(
-                            Icons.date_range,
-                            lang == 'fr' ? '${event.totalDays} jours' : '${event.totalDays} days',
-                            textSecondary,
-                          ),
-                        if (event.currentDayNumber != null)
-                          _buildInfoChip(
-                            Icons.play_circle_outline,
-                            lang == 'fr'
-                                ? 'Jour ${event.currentDayNumber}/${event.totalDays}'
-                                : 'Day ${event.currentDayNumber}/${event.totalDays}',
-                            AppColors.burundiGreen,
-                          ),
-                      ],
-                    ),
-                    // Countdown for upcoming events
-                    if (!isPast && event.timeUntilEvent != null && event.timeUntilEvent!.inDays <= 7) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.auGold.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.auGold.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.timer_outlined, size: 14, color: AppColors.auGold),
-                            const SizedBox(width: 6),
-                            Text(
-                              _formatCountdown(event.timeUntilEvent!, lang),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.auGold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    if (pills.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 6, runSpacing: 6, children: pills),
+                    ],
+                    if (!isPast &&
+                        !event.hasRegistered &&
+                        event.isRegistrationEnabled &&
+                        event.isRegistrationOpen) ...[
+                      const SizedBox(height: 8),
+                      DsOutlineButton(fr ? "S'inscrire" : "Register",
+                          radius: Ds.rPill),
                     ],
                   ],
                 ),
@@ -509,82 +334,6 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
         ),
       ),
     );
-  }
-
-  static Color _hexToColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    try {
-      return Color(int.parse(hex, radix: 16));
-    } catch (_) {
-      return AppColors.lightTextSecondary;
-    }
-  }
-
-  Widget _buildBadge(String label, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: Colors.white),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoChip(IconData icon, String text, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatDate(EventRegistrationModel event, String lang) {
-    final fmt = DateFormat('MMM d, yyyy', lang);
-    if (event.eventDate == null) return lang == 'fr' ? 'Date \u00e0 confirmer' : 'Date TBC';
-    final start = fmt.format(event.eventDate!);
-    if (event.eventEndDate != null && event.isMultiDay) {
-      return '$start - ${fmt.format(event.eventEndDate!)}';
-    }
-    final time = DateFormat('HH:mm').format(event.eventDate!);
-    return '$start \u2022 $time';
-  }
-
-  String _formatCountdown(Duration d, String lang) {
-    if (d.inDays > 0) {
-      return lang == 'fr'
-          ? 'Dans ${d.inDays}j ${d.inHours % 24}h'
-          : 'In ${d.inDays}d ${d.inHours % 24}h';
-    }
-    if (d.inHours > 0) {
-      return lang == 'fr'
-          ? 'Dans ${d.inHours}h ${d.inMinutes % 60}m'
-          : 'In ${d.inHours}h ${d.inMinutes % 60}m';
-    }
-    return lang == 'fr'
-        ? 'Dans ${d.inMinutes}min'
-        : 'In ${d.inMinutes}min';
   }
 
   Widget _buildShimmer() {

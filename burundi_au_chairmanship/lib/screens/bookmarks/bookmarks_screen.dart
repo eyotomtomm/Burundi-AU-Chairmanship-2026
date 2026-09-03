@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
-import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({super.key});
@@ -46,70 +47,65 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   IconData _iconForType(String type) {
     switch (type) {
-      case 'article': return Icons.article;
-      case 'magazine': return Icons.menu_book;
-      case 'video': return Icons.videocam;
-      case 'event': return Icons.event;
-      case 'feature_card': return Icons.auto_awesome;
-      default: return Icons.bookmark;
+      case 'article': return Icons.newspaper_rounded;
+      case 'magazine': return Icons.auto_stories_rounded;
+      case 'video': return Icons.smart_display_rounded;
+      case 'event': return Icons.event_rounded;
+      case 'feature_card': return Icons.auto_awesome_rounded;
+      default: return Icons.bookmark_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.translate('bookmarks')),
-        elevation: 0,
-      ),
+      backgroundColor: Ds.bg(context),
       body: Column(
         children: [
-          // Filter chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _buildFilterChip('all', l10n.translate('all'), theme),
-                const SizedBox(width: 8),
-                _buildFilterChip('article', l10n.translate('articles'), theme),
-                const SizedBox(width: 8),
-                _buildFilterChip('magazine', l10n.translate('magazines'), theme),
-                const SizedBox(width: 8),
-                _buildFilterChip('video', l10n.translate('videos'), theme),
-                const SizedBox(width: 8),
-                _buildFilterChip('event', l10n.translate('events'), theme),
-              ],
+          DsHeader(title: l10n.translate('bookmarks')),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _chip('all', l10n.translate('all')),
+                  _chip('article', l10n.translate('articles')),
+                  _chip('magazine', l10n.translate('magazines')),
+                  _chip('video', l10n.translate('videos')),
+                  _chip('event', l10n.translate('events')),
+                ],
+              ),
             ),
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : _filteredBookmarks.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
+                            Icon(Icons.bookmark_border_rounded,
+                                size: 56, color: Ds.muted(context)),
                             const SizedBox(height: 16),
-                            Text(
-                              l10n.translate('no_bookmarks'),
-                              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                            ),
+                            Text(l10n.translate('no_bookmarks'),
+                                style: TextStyle(color: Ds.body(context), fontSize: 15)),
                           ],
                         ),
                       )
                     : RefreshIndicator(
+                        color: Ds.green,
                         onRefresh: () async {
                           HapticFeedback.mediumImpact();
                           await _loadBookmarks();
                         },
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                           itemCount: _filteredBookmarks.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final bookmark = _filteredBookmarks[index];
                             return Dismissible(
@@ -118,34 +114,14 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                               background: Container(
                                 alignment: Alignment.centerRight,
                                 padding: const EdgeInsets.only(right: 20),
-                                color: Colors.red,
-                                child: const Icon(Icons.delete, color: Colors.white),
+                                decoration: BoxDecoration(
+                                  color: Ds.red,
+                                  borderRadius: BorderRadius.circular(Ds.rCard),
+                                ),
+                                child: const Icon(Icons.delete_rounded, color: Colors.white),
                               ),
                               onDismissed: (_) => _removeBookmark(bookmark['id']),
-                              child: Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: AppColors.burundiGreen.withValues(alpha: 0.1),
-                                    child: Icon(_iconForType(bookmark['content_type'] ?? ''), color: AppColors.burundiGreen),
-                                  ),
-                                  title: Text(
-                                    bookmark['content_title'] ?? 'Untitled',
-                                    style: const TextStyle(fontWeight: FontWeight.w600),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    (bookmark['content_type'] ?? '').toString().toUpperCase(),
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w600),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.bookmark_remove, color: Colors.red),
-                                    onPressed: () => _removeBookmark(bookmark['id']),
-                                  ),
-                                ),
-                              ),
+                              child: _bookmarkCard(bookmark),
                             );
                           },
                         ),
@@ -156,18 +132,51 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     );
   }
 
-  Widget _buildFilterChip(String value, String label, ThemeData theme) {
-    final selected = _filterType == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (s) => setState(() => _filterType = value),
-      selectedColor: AppColors.burundiGreen,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : theme.textTheme.bodyMedium?.color,
-        fontWeight: FontWeight.w600,
-        fontSize: 12,
+  Widget _bookmarkCard(Map<String, dynamic> bookmark) {
+    final type = (bookmark['content_type'] ?? '').toString();
+    return DsCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          DsIconSquare(_iconForType(type),
+              tint: Ds.tint(context), color: Ds.green, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  bookmark['content_title'] ?? 'Untitled',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                      color: Ds.ink(context)),
+                ),
+                const SizedBox(height: 3),
+                Text(type.isEmpty ? '' : type[0].toUpperCase() + type.substring(1),
+                    style: Ds.meta(context)),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _removeBookmark(bookmark['id']),
+            child: const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.bookmark_rounded, size: 19, color: Ds.gold),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  Widget _chip(String value, String label) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: DsFilterChip(label,
+            selected: _filterType == value,
+            onTap: () => setState(() => _filterType = value)),
+      );
 }

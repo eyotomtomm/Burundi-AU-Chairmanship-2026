@@ -1,7 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_ds.dart';
 
 class AppTheme {
+  /// The redesign header (`B4Africa Redesign.dc.html`): green, left-aligned
+  /// 19px/w800 title, no elevation, 28px bottom corner radius. Shared by both
+  /// themes — the comp keeps the header green in dark mode too.
+  static const AppBarTheme _dsAppBar = AppBarTheme(
+    backgroundColor: Ds.green,
+    foregroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    centerTitle: false,
+    toolbarHeight: 64,
+    titleSpacing: 12,
+    systemOverlayStyle: SystemUiOverlayStyle(
+      statusBarBrightness: Brightness.dark,
+      statusBarIconBrightness: Brightness.light,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(bottom: Radius.circular(Ds.rHeader)),
+    ),
+    titleTextStyle: TextStyle(
+      fontSize: 19,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.3,
+      color: Colors.white,
+    ),
+    iconTheme: IconThemeData(color: Colors.white, size: 22),
+    actionsIconTheme: IconThemeData(color: Colors.white, size: 22),
+  );
+
   /// Returns a theme-aware BoxShadow for cards and elevated surfaces.
   /// Shadow opacity adapts based on light/dark theme.
   static BoxShadow cardShadow(BuildContext context) {
@@ -35,15 +66,11 @@ class AppTheme {
       surface: AppColors.lightSurface,
       error: AppColors.error,
     ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.burundiGreen,
-      foregroundColor: AppColors.burundiWhite,
-      elevation: 0,
-      centerTitle: true,
-    ),
+    appBarTheme: _dsAppBar,
     cardTheme: CardThemeData(
       color: AppColors.lightSurface,
-      elevation: 2,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -133,6 +160,17 @@ class AppTheme {
         color: AppColors.lightText,
       ),
     ),
+    // Any remaining native Switch matches the design system's pill toggle.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+          (states) => Colors.white),
+      trackColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? AppColors.burundiGreen
+              : const Color(0xFFE0E0E0)),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      trackOutlineWidth: WidgetStateProperty.all(0),
+    ),
     dividerTheme: const DividerThemeData(
       color: AppColors.lightDivider,
       thickness: 1,
@@ -146,9 +184,11 @@ class AppTheme {
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: AppColors.lightSurface,
       selectedItemColor: AppColors.burundiGreen,
-      unselectedItemColor: AppColors.lightTextSecondary,
+      unselectedItemColor: Color(0xFF8A8A8A),
       type: BottomNavigationBarType.fixed,
-      elevation: 8,
+      elevation: 0,
+      selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
     ),
   );
 
@@ -165,15 +205,11 @@ class AppTheme {
       surface: AppColors.darkSurface,
       error: AppColors.error,
     ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.darkSurface,
-      foregroundColor: AppColors.darkText,
-      elevation: 0,
-      centerTitle: true,
-    ),
+    appBarTheme: _dsAppBar,
     cardTheme: CardThemeData(
       color: AppColors.darkSurface,
-      elevation: 2,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -263,6 +299,17 @@ class AppTheme {
         color: AppColors.darkText,
       ),
     ),
+    // Any remaining native Switch matches the design system's pill toggle.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+          (states) => Colors.white),
+      trackColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? AppColors.burundiGreen
+              : const Color(0xFFE0E0E0)),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      trackOutlineWidth: WidgetStateProperty.all(0),
+    ),
     dividerTheme: const DividerThemeData(
       color: AppColors.darkDivider,
       thickness: 1,
@@ -276,9 +323,11 @@ class AppTheme {
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: AppColors.darkSurface,
       selectedItemColor: AppColors.burundiGreen,
-      unselectedItemColor: AppColors.darkTextSecondary,
+      unselectedItemColor: Color(0xFF8A8A8A),
       type: BottomNavigationBarType.fixed,
-      elevation: 8,
+      elevation: 0,
+      selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
     ),
   );
 }

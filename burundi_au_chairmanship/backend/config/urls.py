@@ -2,9 +2,9 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView, RedirectView
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-from core.views import verify_qr_web, register_web
+from core.views import verify_qr_web, register_web, share_card, share_card_image
 
 
 def open_app(request):
@@ -35,6 +35,49 @@ setTimeout(function() {{ window.location.href = "{fallback}"; }}, 2500);
     return HttpResponse(html)
 
 
+
+# ══════════════════════════════════════════════════════════════
+# Universal Links (iOS) / App Links (Android) site association
+# Both platforms fetch these over HTTPS with no redirects; they must be
+# served as JSON from the apex domain itself.
+# ══════════════════════════════════════════════════════════════
+
+APPLE_APP_ID = '4P52QG4BDR.com.b4africa.app'
+ANDROID_PACKAGE = 'com.b4africa.app'
+# Upload key. Add the Play App Signing certificate SHA-256 here too, or links
+# from the Play build will not verify.
+ANDROID_SHA256_FINGERPRINTS = [
+    '2E:76:17:60:16:F9:E0:31:54:64:0F:47:91:12:C0:5F:45:AD:C6:B5:18:A0:D9:4B:A4:6E:FD:9D:E0:DC:D0:67',
+]
+
+
+def apple_app_site_association(request):
+    """Claim /<kind>/<id>/share/ for the iOS app; the rest of the site stays web."""
+    return JsonResponse({
+        'applinks': {
+            'details': [{
+                'appIDs': [APPLE_APP_ID],
+                'components': [
+                    {'/': '/*/*/share/', 'comment': 'Shared content opens in the app'},
+                    {'/': '/*/*/share', 'comment': 'Shared content opens in the app'},
+                ],
+            }],
+        },
+    }, content_type='application/json')
+
+
+def android_assetlinks(request):
+    """Same claim for Android App Links verification."""
+    return JsonResponse([{
+        'relation': ['delegate_permission/common.handle_all_urls'],
+        'target': {
+            'namespace': 'android_app',
+            'package_name': ANDROID_PACKAGE,
+            'sha256_cert_fingerprints': ANDROID_SHA256_FINGERPRINTS,
+        },
+    }], safe=False, content_type='application/json')
+
+
 def handler500_view(request):
     """Generic 500 error page. Detailed tracebacks are handled by Sentry."""
     return HttpResponse('<h1>Server Error (500)</h1>', status=500)
@@ -60,6 +103,14 @@ urlpatterns = [
     path('register', register_web, name='register-web'),
     # Smart app redirect — detects iOS/Android and opens the right store
     path('app', open_app, name='open-app'),
+    # App/site association for Universal Links and App Links
+    path('.well-known/apple-app-site-association', apple_app_site_association),
+    path('apple-app-site-association', apple_app_site_association),
+    path('.well-known/assetlinks.json', android_assetlinks),
+    # Public share cards: /articles/5/share/, /magazines/2/share/, /events/7/share/, ...
+    path('<slug:kind>/<int:pk>/share/', share_card, name='share-card'),
+    # Rendered 1200x630 preview image referenced by the share page's og:image.
+    path('<slug:kind>/<int:pk>/card.jpg', share_card_image, name='share-card-image'),
 ]
 
 # OpenAPI schema & documentation — staff-only in production, open in DEBUG

@@ -1,212 +1,67 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../config/app_colors.dart';
+import '../../../config/app_ds.dart';
 import '../../../config/environment.dart';
 import '../../../models/event_registration_model.dart';
-import '../../../providers/auth_provider.dart';
 import '../../../services/api_service.dart';
 import '../../feature_card/feature_card_detail_screen.dart';
 import '../../events/event_detail_screen.dart';
 import '../../news/article_detail_screen.dart';
 import '../../magazine/magazine_detail_screen.dart';
 import '../../videos/video_detail_screen.dart';
-import '../painters/card_pattern_painter.dart';
+import '../../../widgets/ds/ds_widgets.dart';
+import 'section_title.dart';
 
 class FeatureCardsSection extends StatelessWidget {
-  final PageController pageController;
   final List<Map<String, dynamic>> featureCards;
-  final int currentRawPage;
-  final ValueChanged<int> onPageChanged;
   final List<EventRegistrationModel>? eventCards;
 
   const FeatureCardsSection({
     super.key,
-    required this.pageController,
     required this.featureCards,
-    required this.currentRawPage,
-    required this.onPageChanged,
     this.eventCards,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 180,
-          child: PageView.builder(
-            controller: pageController,
-            onPageChanged: onPageChanged,
-            itemBuilder: (context, index) {
-              if (featureCards.isEmpty) return const SizedBox.shrink();
-              final card = featureCards[index % featureCards.length];
-              final gradientColors = card['gradient'] as List<Color>;
-              final imageUrl = card['imageUrl'] as String?;
+    if (featureCards.isEmpty) return const SizedBox.shrink();
+    final fr = Localizations.localeOf(context).languageCode == 'fr';
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                child: GestureDetector(
-                  onTap: () => _handleFeatureCardTap(context, card),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: gradientColors[0].withValues(alpha: 0.4),
-                            blurRadius: 15,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (imageUrl != null && imageUrl.isNotEmpty)
-                            CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: gradientColors,
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: gradientColors,
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: gradientColors,
-                                ),
-                              ),
-                            ),
-                          // Gradient overlay
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  gradientColors[0].withValues(alpha: 0.4),
-                                  gradientColors[1].withValues(alpha: 0.85),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Pattern overlay
-                          CustomPaint(
-                            size: const Size(double.infinity, 180),
-                            painter: CardPatternPainter(),
-                          ),
-                          // Content
-                          Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        card['title'] as String,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontFamily: 'HeatherGreen',
-                                          fontWeight: FontWeight.bold,
-                                          shadows: [
-                                            Shadow(
-                                              color: Colors.black45,
-                                              blurRadius: 3,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        card['description'] as String,
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.95),
-                                          fontSize: 13,
-                                          height: 1.4,
-                                          shadows: const [
-                                            Shadow(
-                                              color: Colors.black38,
-                                              blurRadius: 2,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ],
-                                        ),
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: _buildCardIcon(card, 40),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
+          child: SectionTitle(
+              title: fr ? 'Découvrir le Burundi' : 'Discover Burundi'),
+        ),
+        // Wide photo rail — big enough for the image to actually carry the
+        // section, with the next card peeking to invite the swipe.
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: featureCards.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final card = featureCards[index];
+              return SizedBox(
+                width: 268,
+                child: _FeatureCard(
+                  card: card,
+                  index: index,
+                  langCode: fr ? 'fr' : 'en',
+                  icon: _buildCardIcon(card, 18),
+                  onTap: () => handleFeatureCardTap(context, card,
+                      eventCards: eventCards),
                 ),
               );
             },
           ),
         ),
-        const SizedBox(height: 8),
-        // Dot indicators
-        if (featureCards.isNotEmpty)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(featureCards.length, (index) {
-              final activeIndex = currentRawPage % featureCards.length;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: activeIndex == index ? 24 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: activeIndex == index
-                      ? AppColors.burundiGreen
-                      : AppColors.burundiGreen.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              );
-            }),
-          ),
       ],
     );
   }
@@ -238,7 +93,11 @@ class FeatureCardsSection extends StatelessWidget {
     );
   }
 
-  void _handleFeatureCardTap(BuildContext context, Map<String, dynamic> card) {
+
+  /// Opens whatever a feature card points at. Static so other surfaces
+  /// (the home "New today" rail) route admin cards the same way.
+  static void handleFeatureCardTap(BuildContext context, Map<String, dynamic> card,
+      {List<EventRegistrationModel>? eventCards}) {
     final actionType = card['actionType'] as String?;
     final actionValue = card['actionValue'] as String?;
 
@@ -259,7 +118,7 @@ class FeatureCardsSection extends StatelessWidget {
     if (actionType == 'event' && actionValue != null && actionValue.isNotEmpty) {
       final eventId = int.tryParse(actionValue);
       if (eventId != null && eventCards != null) {
-        final matchingEvent = eventCards!.where((e) => e.id == eventId).toList();
+        final matchingEvent = eventCards.where((e) => e.id == eventId).toList();
         if (matchingEvent.isNotEmpty) {
           Navigator.push(
             context,
@@ -302,7 +161,7 @@ class FeatureCardsSection extends StatelessWidget {
     );
   }
 
-  void _navigateToArticle(BuildContext context, String articleId) async {
+  static void _navigateToArticle(BuildContext context, String articleId) async {
     try {
       final article = await ApiService().getArticle(articleId);
       if (!context.mounted) return;
@@ -321,7 +180,7 @@ class FeatureCardsSection extends StatelessWidget {
     }
   }
 
-  void _navigateToMagazine(BuildContext context, String magazineId) async {
+  static void _navigateToMagazine(BuildContext context, String magazineId) async {
     try {
       final magazines = await ApiService().getMagazines();
       final match = magazines.where((m) => m.id == magazineId).toList();
@@ -343,7 +202,7 @@ class FeatureCardsSection extends StatelessWidget {
     }
   }
 
-  void _navigateToVideo(BuildContext context, String videoId) async {
+  static void _navigateToVideo(BuildContext context, String videoId) async {
     try {
       final videos = await ApiService().getVideos();
       final match = videos.where((v) => v['id']?.toString() == videoId).toList();
@@ -365,5 +224,178 @@ class FeatureCardsSection extends StatelessWidget {
       if (!context.mounted) return;
       Navigator.pushNamed(context, '/videos');
     }
+  }
+}
+
+/// Photo card with a bottom scrim — the comp's featured-card treatment.
+class _FeatureCard extends StatelessWidget {
+  final Map<String, dynamic> card;
+  final VoidCallback onTap;
+  final Widget icon;
+  final int index;
+  final String langCode;
+
+  const _FeatureCard({
+    required this.card,
+    required this.onTap,
+    required this.icon,
+    required this.index,
+    required this.langCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fr = langCode == 'fr';
+    final imageUrl = Environment.fixMediaUrl(card['imageUrl'] as String? ?? '');
+    final gradient = (card['gradient'] as List<Color>?) ?? const [Ds.green, Ds.greenDeep];
+    final description = card['description'] as String? ?? '';
+
+    // Cards without a photo still get something to look at: the admin's
+    // gradient plus an oversized icon bleeding off the corner.
+    // NOTE: this fallback MUST stay in its own `final`. Assigning it to a
+    // mutable `background` and then reassigning that variable to the
+    // CachedNetworkImage makes the placeholder/errorWidget closures capture the
+    // *variable* — which by then is the image itself. The placeholder then
+    // resolves to the image, forever: StackOverflowError building OctoImage,
+    // HomeScreen never finishes its first build, and the app hangs on the
+    // splash with no crash and no log. This has regressed twice; don't inline it.
+    final Widget fallbackBackground = Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradient,
+            ),
+          ),
+        ),
+        Positioned(
+          right: -20,
+          bottom: -26,
+          child: Icon(card['icon'] as IconData? ?? Icons.stars_rounded,
+              size: 150, color: Colors.white.withValues(alpha: 0.13)),
+        ),
+      ],
+    );
+    final Widget background = imageUrl.isEmpty
+        ? fallbackBackground
+        : CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => fallbackBackground,
+            errorWidget: (_, _, _) => fallbackBackground,
+          );
+
+    return DsCard(
+      featured: true,
+      clip: true,
+      onTap: onTap,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          background,
+          // Bottom scrim so the title stays legible over any photo.
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x1A000000), Color(0x00000000), Color(0xE0000000)],
+                stops: [0.0, 0.32, 1.0],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 12,
+            left: 12,
+            right: 12,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.32),
+                    borderRadius: BorderRadius.circular(Ds.rPill),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 18, height: 18, child: FittedBox(child: icon)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${(index + 1).toString().padLeft(2, '0')} · ${fr ? 'DÉCOUVRIR' : 'DISCOVER'}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.9,
+                          color: Ds.gold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 14,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        card['title'] as String? ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                  ),
+                  child: const Icon(Icons.arrow_forward_rounded,
+                      size: 17, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -101,6 +101,15 @@ urlpatterns = [
     path('quick-access/<int:pk>/delete/', views.quick_access_delete, name='quick_access_delete'),
 
     # Emergency Contacts
+    # Explore topics + moderation queue
+    path('discussion-topics/', views.discussion_topics_list, name='discussion_topics_list'),
+    path('discussion-topics/create/', views.discussion_topic_create, name='discussion_topic_create'),
+    path('discussion-topics/<int:pk>/edit/', views.discussion_topic_edit, name='discussion_topic_edit'),
+    path('discussion-topics/<int:pk>/delete/', views.discussion_topic_delete, name='discussion_topic_delete'),
+    path('content-reports/', views.content_reports_list, name='content_reports_list'),
+    path('content-reports/<int:pk>/status/<str:new_status>/', views.content_report_set_status, name='content_report_set_status'),
+    path('content-reports/<int:pk>/delete-post/', views.content_report_delete_post, name='content_report_delete_post'),
+
     path('emergency-contacts/', views.emergency_contacts_list, name='emergency_contacts_list'),
     path('emergency-contacts/create/', views.emergency_contact_create, name='emergency_contact_create'),
     path('emergency-contacts/<int:pk>/edit/', views.emergency_contact_edit, name='emergency_contact_edit'),
@@ -172,6 +181,7 @@ urlpatterns = [
 
     # Discussions / Forums
     path('discussions/', views.discussions_list, name='discussions_list'),
+    path('discussions/create/', views.discussion_create, name='discussion_create'),
     path('discussions/<int:pk>/toggle-pin/', views.discussion_toggle_pin, name='discussion_toggle_pin'),
     path('discussions/<int:pk>/toggle-lock/', views.discussion_toggle_lock, name='discussion_toggle_lock'),
     path('discussions/<int:pk>/delete/', views.discussion_delete, name='discussion_delete'),
@@ -406,4 +416,9 @@ urlpatterns = [
     path('reviewer/action/<int:pk>/', views.reviewer_action, name='reviewer_action'),
     path('reviewer/set-lang/', views.reviewer_set_lang, name='reviewer_set_lang'),
     path('reviewer/document/<int:doc_pk>/', views.reviewer_document_proxy, name='reviewer_document_proxy'),
+
+    # News Scraper
+    path('news-scraper/', views.news_scraper, name='news_scraper'),
+    path('news-scraper/review/', views.news_scraper_review, name='news_scraper_review'),
+    path('news-scraper/sources/', views.news_sources_list, name='news_sources_list'),
 ]

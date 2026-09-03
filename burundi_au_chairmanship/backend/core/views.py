@@ -1,3 +1,4 @@
+import re
 import logging
 import threading
 import urllib.request
@@ -39,7 +40,8 @@ from .models import (
     LoginHistory, ActiveSession, PasswordChangeHistory, Bookmark, Reaction,
     ReadingProgress, ArticleDraft, ArticleSeries, TrendingContent,
     EventReminder, EventWaitlist, EventSpeaker, EventFeedback, EventCheckIn, EventPhoto,
-    Conversation, DirectMessage, Discussion, DiscussionReply,
+    Conversation, DirectMessage, Discussion, DiscussionLike, DiscussionReply, DiscussionMedia, Follow, ContentReport, DiscussionTopic,
+    ExploreNotification,
     Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
     ScheduledMaintenance, PromotionalSplash, AppRelease, ContentAnalytics,
@@ -84,6 +86,7 @@ from .serializers import (
     EventReminderSerializer, EventWaitlistSerializer, EventSpeakerSerializer,
     EventFeedbackSerializer, EventCheckInSerializer, EventPhotoSerializer,
     ConversationSerializer, DirectMessageSerializer, DiscussionSerializer,
+    DiscussionMediaSerializer, DiscussionTopicSerializer, PostPollSerializer,
     DiscussionReplySerializer, PollSerializer, PollOptionSerializer,
     NotificationPreferenceSerializer, AnnouncementBannerSerializer,
     ContactDirectorySerializer, LiveQASessionSerializer, LiveQAQuestionSerializer,
@@ -125,6 +128,48 @@ def _require_verified_email(request):
     if not profile or not profile.is_email_verified:
         return Response(
             {'detail': 'Please verify your email address to perform this action.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
+# Fields a user must fill before they can author a post. Verification is
+# deliberately absent: it is an admin approval that only adds a badge.
+PROFILE_REQUIRED_FOR_POSTING = (
+    'name', 'email', 'profile_picture', 'nationality', 'gender', 'date_of_birth', 'phone',
+)
+
+
+def profile_completion_fields(user):
+    """Which profile fields the user has filled in.
+
+    One definition, shared by the completion-percentage endpoint and the
+    post-creation gate, so the two can never drift apart.
+    """
+    profile = getattr(user, 'profile', None)
+    return {
+        'name': bool(user.first_name or user.last_name),
+        'email': bool(user.email),
+        'profile_picture': bool(profile and profile.profile_picture),
+        'nationality': bool(profile and profile.nationality),
+        'gender': bool(profile and profile.gender),
+        'date_of_birth': bool(profile and profile.date_of_birth),
+        'phone': bool(profile and profile.phone_number),
+        'verified': bool(profile and profile.is_verified),
+    }
+
+
+def _require_complete_profile(request):
+    """Return a 403 Response if the user's profile is too empty to author a
+    post, else None."""
+    fields = profile_completion_fields(request.user)
+    missing = [f for f in PROFILE_REQUIRED_FOR_POSTING if not fields[f]]
+    if missing:
+        return Response(
+            {
+                'detail': 'Complete your profile before posting.',
+                'missing_fields': missing,
+            },
             status=status.HTTP_403_FORBIDDEN,
         )
     return None
@@ -3314,6 +3359,9 @@ def home_feed(request):
             is_liked=Exists(MagazineLike.objects.filter(user=request.user, edition=OuterRef('pk')))
         )
 
+    # Latest videos (featured first) — feeds the "New today" rail
+    videos = Video.objects.filter(status='published').order_by('-is_featured', '-publish_date')[:5]
+
     # Featured facts & quotes
     facts_data = []
     if settings and settings.facts_enabled:
@@ -3335,6 +3383,7 @@ def home_feed(request):
         'feature_cards': FeatureCardSerializer(feature_cards, many=True, context={'request': request}).data,
         'event_cards': all_event_cards,
         'magazines': MagazineEditionSerializer(magazines, many=True, context={'request': request}).data,
+        'videos': VideoSerializer(videos, many=True, context={'request': request}).data,
         'categories': CategorySerializer(categories, many=True).data,
         'settings': AppSettingsSerializer(settings).data if settings else {},
         'facts': facts_data,
@@ -5067,7 +5116,42 @@ class DiscussionViewSet(viewsets.ModelViewSet):
     filterset_fields = ['category']
 
     def get_queryset(self):
-        return Discussion.objects.select_related('author', 'author__profile').all()
+        qs = Discussion.objects.select_related(
+            'author', 'author__profile', 'repost_of', 'repost_of__author',
+            'repost_of__author__profile', 'poll',
+        ).prefetch_related('media', 'repost_of__media', 'poll__options')
+
+        # Counting reposts and checking "did I like this" per row turned the
+        # feed into one query per post; both are annotations now.
+        qs = qs.annotate(repost_total=Count('reposts', distinct=True))
+        if self.request.user.is_authenticated:
+            qs = qs.annotate(liked_by_me=Exists(
+                DiscussionLike.objects.filter(
+                    discussion=OuterRef('pk'), user=self.request.user)))
+
+        # ?feed=following narrows the Explore feed to people the caller follows.
+        if self.request.query_params.get('feed') == 'following':
+            if not self.request.user.is_authenticated:
+                return qs.none()
+            followed = Follow.objects.filter(
+                follower=self.request.user).values_list('following_id', flat=True)
+            qs = qs.filter(author_id__in=list(followed))
+
+        author = self.request.query_params.get('author')
+        if author:
+            qs = qs.filter(author_id=author)
+
+        topic = self.request.query_params.get('topic')
+        if topic:
+            qs = qs.filter(topic_id=topic)
+
+        # ?tag=water matches "#water" but not "#watershed" — a bare icontains
+        # would collide with every longer tag that starts the same way.
+        tag = (self.request.query_params.get('tag') or '').lstrip('#').strip()
+        if tag:
+            escaped = re.escape(tag)
+            qs = qs.filter(content__iregex=r'#' + escaped + r'\b')
+        return qs.order_by('-is_pinned', '-created_at')
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -5075,13 +5159,124 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         return [AllowAny()]
 
     def create(self, request, *args, **kwargs):
-        resp = _require_verified_email(request)
+        resp = _require_verified_email(request) or _require_complete_profile(request)
         if resp:
             return resp
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated],
+            parser_classes=[MultiPartParser, FormParser])
+    def media(self, request, pk=None):
+        """Attach a photo or video to your own discussion."""
+        discussion = self.get_object()
+        if discussion.author != request.user:
+            return Response({'detail': 'You can only add media to your own discussions.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        resp = _require_verified_email(request) or _require_complete_profile(request)
+        if resp:
+            return resp
+
+        count = discussion.media.count()
+        if count >= DiscussionMedia.MAX_PER_DISCUSSION:
+            return Response(
+                {'detail': f'Maximum {DiscussionMedia.MAX_PER_DISCUSSION} attachments per post.'},
+                status=status.HTTP_400_BAD_REQUEST)
+
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'file required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        media_type = 'video' if request.data.get('media_type') == 'video' else 'image'
+        item = DiscussionMedia(
+            discussion=discussion,
+            media_type=media_type,
+            caption=(request.data.get('caption') or '')[:300],
+            order=count,
+        )
+        setattr(item, 'image' if media_type == 'image' else 'video', upload)
+
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            # Runs validate_image_file / validate_video_file (size, extension,
+            # magic bytes) before anything touches storage.
+            item.full_clean(exclude=['discussion'])
+        except DjangoValidationError as e:
+            return Response({'detail': ' '.join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+
+        item.save()
+        return Response(DiscussionMediaSerializer(item, context={'request': request}).data,
+                        status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def repost(self, request, pk=None):
+        """Share someone's post into your own feed, with optional commentary."""
+        original = self.get_object()
+        resp = _require_verified_email(request) or _require_complete_profile(request)
+        if resp:
+            return resp
+
+        # Sharing a share credits the original, so the chain never nests.
+        target = original.repost_of or original
+        if target.author_id == request.user.id and not (request.data.get('content') or '').strip():
+            return Response({'detail': 'Add a comment when sharing your own post.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        existing = Discussion.objects.filter(
+            author=request.user, repost_of=target, content='').first()
+        if existing:
+            # A plain repost toggles off, the way like does.
+            existing.delete()
+            return Response({'reposted': False, 'repost_count': target.reposts.count()})
+
+        post = Discussion.objects.create(
+            author=request.user,
+            repost_of=target,
+            title='',
+            content=(request.data.get('content') or '').strip(),
+            category=target.category,
+        )
+        notify_explore(target.author, request.user, 'repost', target)
+        data = DiscussionSerializer(post, context={'request': request}).data
+        data['reposted'] = True
+        data['repost_count'] = target.reposts.count()
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def poll(self, request, pk=None):
+        """Attach a poll to your own post. One poll per post."""
+        discussion = self.get_object()
+        if discussion.author_id != request.user.id:
+            return Response({'detail': 'You can only add a poll to your own post.'},
+                            status=status.HTTP_403_FORBIDDEN)
+        resp = _require_verified_email(request) or _require_complete_profile(request)
+        if resp:
+            return resp
+        if Poll.objects.filter(discussion=discussion).exists():
+            return Response({'detail': 'This post already has a poll.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        question = (request.data.get('question') or '').strip()
+        options = request.data.get('options') or []
+        if isinstance(options, str):
+            options = [o for o in options.split('|') if o.strip()]
+        options = [str(o).strip()[:200] for o in options if str(o).strip()][:4]
+        if not question or len(options) < 2:
+            return Response({'detail': 'A poll needs a question and at least two options.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        poll = Poll.objects.create(
+            title=question[:300],
+            created_by=request.user,
+            discussion=discussion,
+            multiple_choice=False,
+        )
+        for i, text in enumerate(options):
+            PollOption.objects.create(poll=poll, text=text, order=i, display_order=i)
+        return Response(PostPollSerializer(poll, context={'request': request}).data,
+                        status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -5146,6 +5341,7 @@ class DiscussionViewSet(viewsets.ModelViewSet):
         discussion.reply_count = discussion.replies.count()
         discussion.last_reply_at = reply.created_at
         discussion.save(update_fields=['reply_count', 'last_reply_at'])
+        notify_explore(discussion.author, request.user, 'reply', discussion)
 
         return Response(DiscussionReplySerializer(reply, context={'request': request}).data, status=201)
 
@@ -5163,6 +5359,8 @@ class DiscussionViewSet(viewsets.ModelViewSet):
             Discussion, DiscussionLike,
             {'user': request.user, 'discussion': discussion}, discussion,
         )
+        if is_liked:
+            notify_explore(discussion.author, request.user, 'like', discussion)
         return Response({
             'like_count': new_count,
             'is_liked': is_liked,
@@ -5978,6 +6176,276 @@ def validate_password_strength(request):
 
 
 # ══════════════════════════════════════════════════════════════
+# Explore notifications — follows, likes, replies, reposts
+# ══════════════════════════════════════════════════════════════
+
+def notify_explore(recipient, actor, verb, discussion=None):
+    """Record a social event and push it, unless you did it to yourself."""
+    if not recipient or not actor or recipient.id == actor.id:
+        return None
+
+    note = ExploreNotification.objects.create(
+        recipient=recipient, actor=actor, verb=verb, discussion=discussion)
+
+    name = f'{actor.first_name} {actor.last_name}'.strip() or actor.username
+    body = {
+        'follow': f'{name} started following you',
+        'like': f'{name} liked your post',
+        'reply': f'{name} replied to your post',
+        'repost': f'{name} reposted your post',
+    }[verb]
+    try:
+        from .push_service import send_push_to_users
+        send_push_to_users(
+            [recipient.id], 'Explore', body,
+            data={
+                'type': 'explore',
+                'verb': verb,
+                'discussion_id': str(discussion.id) if discussion else '',
+                'actor_id': str(actor.id),
+            },
+        )
+    except Exception:
+        # A push failure must never cost the in-app notification.
+        logger.warning('Explore push failed for user %s', recipient.id)
+    return note
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def explore_notifications(request):
+    """The caller's Explore activity, newest first."""
+    notes = ExploreNotification.objects.filter(
+        recipient=request.user).select_related('actor', 'actor__profile', 'discussion')[:100]
+
+    from .utils import user_handle
+    out = []
+    for n in notes:
+        profile = getattr(n.actor, 'profile', None)
+        avatar = None
+        if profile and profile.profile_picture:
+            avatar = request.build_absolute_uri(profile.profile_picture.url)
+        out.append({
+            'id': n.id,
+            'verb': n.verb,
+            'is_read': n.is_read,
+            'created_at': n.created_at,
+            'actor_id': n.actor_id,
+            'actor_name': f'{n.actor.first_name} {n.actor.last_name}'.strip() or user_handle(n.actor),
+            'actor_avatar': avatar,
+            'actor_badge': profile.badge_type if profile and profile.is_verified else None,
+            'discussion_id': n.discussion_id,
+            'excerpt': (n.discussion.content[:80] if n.discussion else ''),
+        })
+    return Response({
+        'results': out,
+        'unread': ExploreNotification.objects.filter(
+            recipient=request.user, is_read=False).count(),
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_explore_notifications_read(request):
+    ExploreNotification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    return Response({'status': 'ok'})
+
+
+# ══════════════════════════════════════════════════════════════
+# Explore topics and community terms
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def trending_tags(request):
+    """The hashtags people are actually using, so tags are discoverable
+    instead of only reachable by already knowing one exists."""
+    from collections import Counter
+
+    recent = Discussion.objects.order_by('-created_at').values_list(
+        'content', flat=True)[:500]
+    counter = Counter()
+    for content in recent:
+        # Count each tag once per post, so repeating it in one post can't
+        # push it up the list.
+        found = {m.lower() for m in re.findall(r'#([\w\u00C0-\u024F]+)', content or '')}
+        for tag in found:
+            counter[tag] += 1
+
+    return Response([
+        {'tag': tag, 'count': count} for tag, count in counter.most_common(12)
+    ])
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def discussion_topics(request):
+    """Admin-authored prompts shown across the top of the Explore feed."""
+    topics = DiscussionTopic.objects.filter(is_active=True).annotate(
+        post_count=Count('posts'))
+    return Response(DiscussionTopicSerializer(topics, many=True, context={'request': request}).data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def explore_terms(request):
+    """Whether the caller has accepted the Explore community terms, and what
+    they still need before they can post. POST records acceptance."""
+    profile = getattr(request.user, 'profile', None)
+    if request.method == 'POST':
+        if profile and not profile.explore_terms_accepted_at:
+            profile.explore_terms_accepted_at = timezone.now()
+            profile.save(update_fields=['explore_terms_accepted_at'])
+
+    fields = profile_completion_fields(request.user)
+    missing = [f for f in PROFILE_REQUIRED_FOR_POSTING if not fields[f]]
+    return Response({
+        'accepted': bool(profile and profile.explore_terms_accepted_at),
+        'accepted_at': profile.explore_terms_accepted_at if profile else None,
+        'missing_fields': missing,
+        'can_post': bool(profile and profile.explore_terms_accepted_at) and not missing,
+    })
+
+
+# ══════════════════════════════════════════════════════════════
+# Reporting
+# ══════════════════════════════════════════════════════════════
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def report_content(request):
+    """Flag a post or a user for moderator review.
+
+    Body: ``reason`` (see ContentReport.REASON_CHOICES), optional ``detail``,
+    and exactly one of ``discussion`` or ``user``.
+    """
+    discussion_id = request.data.get('discussion')
+    user_id = request.data.get('user')
+    if bool(discussion_id) == bool(user_id):
+        return Response({'detail': 'Report either a post or a user.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    reason = request.data.get('reason') or 'other'
+    valid = {c[0] for c in ContentReport.REASON_CHOICES}
+    if reason not in valid:
+        return Response({'detail': 'Unknown reason.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    discussion = reported_user = None
+    if discussion_id:
+        discussion = get_object_or_404(Discussion, pk=discussion_id)
+        if discussion.author_id == request.user.id:
+            return Response({'detail': 'You cannot report your own post.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+    else:
+        reported_user = get_object_or_404(User, pk=user_id, is_active=True)
+        if reported_user.id == request.user.id:
+            return Response({'detail': 'You cannot report yourself.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+    report, created = ContentReport.objects.get_or_create(
+        reporter=request.user,
+        discussion=discussion,
+        reported_user=reported_user,
+        defaults={'reason': reason, 'detail': (request.data.get('detail') or '')[:2000]},
+    )
+    # Re-reporting the same thing is a no-op rather than an error — the user
+    # only needs to know it has been passed on.
+    return Response(
+        {'detail': 'Thanks — our moderators will take a look.', 'created': created},
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+# ══════════════════════════════════════════════════════════════
+# Social graph — follow / public profiles
+# ══════════════════════════════════════════════════════════════
+
+def _public_profile_payload(user, request):
+    """Everything the profile header and a feed avatar need."""
+    from .utils import user_handle
+    profile = getattr(user, 'profile', None)
+    avatar = None
+    if profile and profile.profile_picture:
+        avatar = request.build_absolute_uri(profile.profile_picture.url)
+    is_following = False
+    if request.user.is_authenticated and request.user.id != user.id:
+        is_following = Follow.objects.filter(
+            follower=request.user, following=user).exists()
+    # A verified user's approved request carries their honorific and official
+    # role — surface those automatically rather than making them retype it.
+    honorific = ''
+    official_role = ''
+    if profile and profile.is_verified:
+        approved = user.verification_requests.filter(
+            status='approved').order_by('-created_at').first()
+        if approved:
+            honorific = approved.get_title_display().split('(')[0].strip()
+            if honorific.lower() in ('mr.', 'mrs.', 'ms.'):
+                honorific = ''  # only honours worth showing
+            official_role = approved.position_role or ''
+
+    return {
+        'id': user.id,
+        'name': f'{user.first_name} {user.last_name}'.strip() or user_handle(user),
+        'handle': user_handle(user),
+        'avatar': avatar,
+        'badge': profile.badge_type if profile and profile.is_verified else None,
+        'honorific': honorific,
+        'bio': profile.bio if profile else '',
+        'organization': profile.organization if profile else '',
+        'role': (profile.role if profile else '') or official_role,
+        'post_count': Discussion.objects.filter(author=user).count(),
+        'follower_count': Follow.objects.filter(following=user).count(),
+        'following_count': Follow.objects.filter(follower=user).count(),
+        'is_following': is_following,
+        'is_self': request.user.is_authenticated and request.user.id == user.id,
+    }
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_user_profile(request, user_id):
+    """Public profile header for the feed's author pages."""
+    user = get_object_or_404(User, pk=user_id, is_active=True)
+    return Response(_public_profile_payload(user, request))
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_follow(request, user_id):
+    """Follow or unfollow another user."""
+    target = get_object_or_404(User, pk=user_id, is_active=True)
+    if target.id == request.user.id:
+        return Response({'detail': 'You cannot follow yourself.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    existing = Follow.objects.filter(follower=request.user, following=target).first()
+    if existing:
+        existing.delete()
+        is_following = False
+    else:
+        Follow.objects.create(follower=request.user, following=target)
+        is_following = True
+        notify_explore(target, request.user, 'follow')
+    return Response({
+        'is_following': is_following,
+        'follower_count': Follow.objects.filter(following=target).count(),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def user_followers(request, user_id):
+    """Who follows this user, or who they follow with ?direction=following."""
+    user = get_object_or_404(User, pk=user_id, is_active=True)
+    if request.GET.get('direction') == 'following':
+        users = User.objects.filter(follower_set__follower=user)
+    else:
+        users = User.objects.filter(following_set__following=user)
+    users = users.select_related('profile')[:200]
+    return Response([_public_profile_payload(u, request) for u in users])
+
+
+# ══════════════════════════════════════════════════════════════
 # Profile Completion
 # ══════════════════════════════════════════════════════════════
 
@@ -5985,18 +6453,7 @@ def validate_password_strength(request):
 @permission_classes([IsAuthenticated])
 def profile_completion(request):
     """Calculate profile completion percentage."""
-    user = request.user
-    profile = getattr(user, 'profile', None)
-    fields_check = {
-        'name': bool(user.first_name or user.last_name),
-        'email': bool(user.email),
-        'profile_picture': bool(profile and profile.profile_picture),
-        'nationality': bool(profile and profile.nationality),
-        'gender': bool(profile and profile.gender),
-        'date_of_birth': bool(profile and profile.date_of_birth),
-        'phone': bool(profile and profile.phone_number),
-        'verified': bool(profile and profile.is_verified),
-    }
+    fields_check = profile_completion_fields(request.user)
     completed = sum(1 for v in fields_check.values() if v)
     total = len(fields_check)
     return Response({
@@ -6390,94 +6847,259 @@ class EventAgendaItemViewSet(viewsets.ReadOnlyModelViewSet):
 # Article Share Cards (#34) - OG meta tags for social sharing
 # ══════════════════════════════════════════════════════════════
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def article_share_card(request, pk):
-    """Return an HTML page with Open Graph meta tags for article sharing."""
-    from django.http import HttpResponse
-    from django.utils.html import escape as esc
+# Shareable content types:
+#   kind -> (model, title field, body field, image field, (EN label, FR label))
+SHARE_KINDS = {
+    'articles': ('Article', 'title', 'content', 'image', ('Article', 'Article')),
+    'magazines': ('MagazineEdition', 'title', 'description', 'cover_image', ('Magazine', 'Magazine')),
+    'events': ('EventRegistration', 'event_title', 'event_description', 'event_poster', ('Event', 'Événement')),
+    'facts': ('Fact', 'title', 'content', 'image', ('Did you know', 'Le saviez-vous')),
+    'videos': ('Video', 'title', 'description', 'thumbnail', ('Video', 'Vidéo')),
+    'gallery': ('GalleryAlbum', 'title', 'description', 'cover_image', ('Photo album', 'Album photo')),
+    'features': ('FeatureCard', 'title', 'description', 'image', ('Spotlight', 'À la une')),
+    'agendas': ('PriorityAgenda', 'title', 'description', 'hero_image', ('Our agenda', 'Notre agenda')),
+    'discussions': ('Discussion', 'title', 'content', None, ('Discussion', 'Discussion')),
+}
+
+# Kinds whose headline reads better as the body text: a fact's title is the
+# generic "Did You Know?", and most Explore posts carry no title at all.
+_HEADLINE_FROM_BODY = {'facts', 'discussions'}
+
+APP_STORE_URL = 'https://apps.apple.com/app/b4africa-burundi-chairmanship/id6740047505'
+PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.b4africa.app'
+
+
+def _share_lang(request):
+    return 'fr' if (request.GET.get('lang') or '').lower().startswith('fr') else 'en'
+
+
+def _share_site(request):
+    """Absolute origin for share links — the live domain outside development."""
+    if django_settings.DEBUG:
+        return request.build_absolute_uri('/').rstrip('/')
+    return 'https://burundi4africa.com'
+
+
+def _share_localised(obj, field, lang):
+    """Value of `field`, preferring its `_fr` twin when the link asks for French."""
+    if lang == 'fr':
+        translated = getattr(obj, f'{field}_fr', '') or ''
+        if translated:
+            return translated
+    return getattr(obj, field, '') or ''
+
+
+def _share_image(obj, image_field):
+    if image_field:
+        return getattr(obj, image_field, None) or None
+    # Explore posts keep their photos on a related media model.
+    media = getattr(obj, 'media', None)
+    photo = media.filter(media_type='image').exclude(image='').first() if media else None
+    return photo.image if photo else None
+
+
+def _resolve_share(kind, pk, lang):
+    """Load one shareable object and pull out everything a preview needs."""
+    from django.http import Http404
     import re
 
-    article = get_object_or_404(Article, pk=pk)
+    if kind not in SHARE_KINDS:
+        raise Http404('Unknown share type')
+    model_name, title_field, body_field, image_field, labels = SHARE_KINDS[kind]
+    obj = get_object_or_404(globals()[model_name], pk=pk)
 
-    # Strip HTML tags from content for description
-    clean_content = re.sub(r'<[^>]+>', '', article.content)
-    description = clean_content[:160].strip()
-    if len(clean_content) > 160:
-        description += '...'
+    # A public URL must never expose a draft, an archived item or a hidden card.
+    if getattr(obj, 'is_active', True) is False:
+        raise Http404('Not available')
+    if getattr(obj, 'status', 'published') not in ('published', None):
+        raise Http404('Not available')
 
-    # Build absolute image URL
-    image_url = ''
-    if article.image:
-        image_url = request.build_absolute_uri(article.image.url)
+    body = re.sub(r'<[^>]+>', ' ', _share_localised(obj, body_field, lang))
+    body = re.sub(r'\s+', ' ', body).strip()
+    title = _share_localised(obj, title_field, lang).strip()
+    if (kind in _HEADLINE_FROM_BODY or not title) and body:
+        title = body[:130].strip()
+    label = labels[1 if lang == 'fr' else 0]
+    return obj, title, body, _share_image(obj, image_field), label
 
-    share_url = f'https://burundi4africa.com/articles/{article.pk}/share/'
 
-    # Escape all user-controlled values to prevent XSS
-    safe_title = esc(article.title)
-    safe_desc = esc(description)
-    safe_image = esc(image_url)
-    safe_share = esc(share_url)
+@api_view(['GET'])
+@permission_classes([AllowAny])
+# Link previews are fetched by crawlers and by every recipient at once;
+# the shared anon rate limit would turn a popular post into a broken card.
+@throttle_classes([])
+def share_card_image(request, kind, pk):
+    """The 1200x630 JPEG a chat app shows for a shared link.
+
+    Served as JPEG on purpose: the stored photos are all WebP, which WhatsApp
+    and LinkedIn silently drop from a link preview.
+    """
+    from django.core.cache import cache
+    from django.http import HttpResponse
+    from . import share_cards
+
+    lang = _share_lang(request)
+    obj, title, _body, image, label = _resolve_share(kind, pk, lang)
+
+    # Stamped with the object's last edit so a re-uploaded photo makes a new card.
+    stamp = getattr(obj, 'updated_at', None) or getattr(obj, 'created_at', '')
+    version = hashlib.sha1(f'{stamp}|{title}'.encode()).hexdigest()[:12]
+    cache_key = f'sharecard:{kind}:{pk}:{lang}:{version}'
+    jpeg = cache.get(cache_key)
+    if jpeg is None:
+        photo = None
+        if image:
+            try:
+                with image.storage.open(image.name) as fh:
+                    photo = fh.read()
+            except Exception:
+                photo = None  # Missing file — the card falls back to the brand fill.
+        jpeg = share_cards.render(label, title, 'burundi4africa.com', photo)
+        cache.set(cache_key, jpeg, 60 * 60 * 12)
+
+    response = HttpResponse(jpeg, content_type='image/jpeg')
+    response['Cache-Control'] = 'public, max-age=86400, s-maxage=604800'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+# Link previews are fetched by crawlers and by every recipient at once;
+# the shared anon rate limit would turn a popular post into a broken card.
+@throttle_classes([])
+def share_card(request, kind, pk):
+    """Public landing page with Open Graph tags so a shared item previews well.
+
+    One page for every shareable type — `/articles/5/share/`,
+    `/events/7/share/`, `/gallery/3/share/`, and so on. Phones are handed
+    straight to the app; crawlers get the plain page so the preview builds.
+    """
+    from django.http import HttpResponse
+    from django.utils.html import escape as esc
+
+    lang = _share_lang(request)
+    obj, title, body, _image, label = _resolve_share(kind, pk, lang)
+
+    site = _share_site(request)
+    qs = '?lang=fr' if lang == 'fr' else ''
+    share_url = f'{site}/{kind}/{obj.pk}/share/{qs}'
+    card_url = f'{site}/{kind}/{obj.pk}/card.jpg{qs}'
+
+    description = body[:200].strip()
+    if len(body) > 200:
+        description += '…'
+
+    ua = (request.META.get('HTTP_USER_AGENT', '') or '').lower()
+    is_bot = any(b in ua for b in (
+        'bot', 'crawler', 'spider', 'facebookexternalhit', 'whatsapp',
+        'slack', 'discord', 'embedly', 'preview', 'skypeuripreview',
+    ))
+    is_android = 'android' in ua
+    store_url = PLAY_STORE_URL if is_android else APP_STORE_URL
+    deep_link = f'b4africa://{kind}/{obj.pk}'
+    is_mobile = is_android or 'iphone' in ua or 'ipad' in ua
+    # Crawlers must keep getting the plain page, or the link preview breaks.
+    auto_open = '' if (is_bot or not is_mobile) else f"""
+    <script>
+        // The installed app answers the scheme and backgrounds this page; if it
+        // is still visible a moment later, nothing handled it — go to the store.
+        window.location.href = "{deep_link}";
+        setTimeout(function() {{
+            if (!document.hidden) window.location.href = "{store_url}";
+        }}, 2000);
+    </script>"""
+
+    open_label = 'Ouvrir dans l’app' if lang == 'fr' else 'Open in the app'
+    get_label = 'Télécharger l’app' if lang == 'fr' else 'Get the app'
+
+    safe = {
+        'title': esc(title),
+        'desc': esc(description),
+        'card': esc(card_url),
+        'share': esc(share_url),
+        'label': esc(label),
+        'body': esc(body[:700] + ('…' if len(body) > 700 else '')),
+    }
 
     html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{safe_title}</title>
+    <title>{safe['title']} · Be 4 Africa</title>
+    <meta name="description" content="{safe['desc']}" />
 
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="{safe_title}" />
-    <meta property="og:description" content="{safe_desc}" />
-    <meta property="og:image" content="{safe_image}" />
-    <meta property="og:url" content="{safe_share}" />
+    <meta property="og:title" content="{safe['title']}" />
+    <meta property="og:description" content="{safe['desc']}" />
+    <meta property="og:image" content="{safe['card']}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="{safe['title']}" />
+    <meta property="og:url" content="{safe['share']}" />
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="Be 4 Africa" />
+    <meta property="og:locale" content="{'fr_FR' if lang == 'fr' else 'en_US'}" />
 
-    <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="{safe_title}" />
-    <meta name="twitter:description" content="{safe_desc}" />
-    <meta name="twitter:image" content="{safe_image}" />
+    <meta name="twitter:title" content="{safe['title']}" />
+    <meta name="twitter:description" content="{safe['desc']}" />
+    <meta name="twitter:image" content="{safe['card']}" />
 
     <style>
+        :root {{ --green:#409843; --deep:#0b2612; --gold:#FCD116; }}
+        * {{ box-sizing: border-box; }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f8f9fa;
-            color: #333;
+            margin: 0; padding: 24px 20px 56px; background: #f4f6f4; color: #17251a;
+            display: flex; flex-direction: column; align-items: center;
         }}
-        .header {{ text-align: center; padding: 20px 0; }}
-        .header img {{ max-width: 100%; border-radius: 12px; }}
-        h1 {{ font-size: 28px; line-height: 1.3; color: #1a1a1a; }}
-        .meta {{ color: #666; font-size: 14px; margin: 10px 0 20px; }}
-        .content {{ font-size: 16px; line-height: 1.7; }}
+        .card {{
+            width: 100%; max-width: 640px; background: #fff; border-radius: 20px;
+            overflow: hidden; box-shadow: 0 18px 50px rgba(11,38,18,.13);
+        }}
+        .card img {{ display: block; width: 100%; aspect-ratio: 1200/630; object-fit: cover; }}
+        .body {{ padding: 26px 26px 30px; }}
+        .kind {{
+            display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .16em;
+            text-transform: uppercase; color: var(--green); margin: 0 0 12px;
+        }}
+        h1 {{ font-size: 26px; line-height: 1.28; margin: 0 0 14px; letter-spacing: -.015em; }}
+        p.text {{ font-size: 16px; line-height: 1.65; color: #4b5a4e; margin: 0 0 24px; }}
         .cta {{
-            display: inline-block;
-            margin-top: 24px;
-            padding: 12px 24px;
-            background: #1EB53A;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
+            display: block; text-align: center; padding: 15px 24px; border-radius: 12px;
+            text-decoration: none; font-weight: 700; font-size: 16px;
+            background: var(--green); color: #fff; margin-bottom: 10px;
         }}
+        .cta.secondary {{ background: #fff; color: var(--green); border: 1.5px solid #d6e3d7; }}
+        footer {{ text-align: center; font-size: 12px; letter-spacing: .12em;
+                  text-transform: uppercase; color: #8b9b8d; margin-top: 22px; }}
     </style>
 </head>
 <body>
-    <div class="header">
-        {"<img src='" + image_url + "' alt='" + article.title + "' />" if image_url else ""}
-    </div>
-    <h1>{article.title}</h1>
-    <div class="meta">By {article.author} | {article.publish_date.strftime('%B %d, %Y')}</div>
-    <div class="content">{clean_content[:500]}{"..." if len(clean_content) > 500 else ""}</div>
-    <a href="https://burundi4africa.com" class="cta">Read more in the app</a>
+    <article class="card">
+        <img src="{safe['card']}" alt="{safe['title']}" />
+        <div class="body">
+            <span class="kind">{safe['label']}</span>
+            <h1>{safe['title']}</h1>
+            <p class="text">{safe['body']}</p>
+            <a href="{deep_link}" class="cta">{open_label}</a>
+            <a href="{store_url}" class="cta secondary">{get_label}</a>
+        </div>
+    </article>
+    <footer>Be 4 Africa · burundi4africa.com</footer>
+    {auto_open}
 </body>
 </html>"""
 
     return HttpResponse(html, content_type='text/html')
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def article_share_card(request, pk):
+    """Backwards-compatible alias for links shared before /articles/<pk>/share/."""
+    return share_card(request._request, 'articles', pk)
 
 
 # ══════════════════════════════════════════════════════════════

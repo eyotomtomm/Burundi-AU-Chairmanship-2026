@@ -4,25 +4,27 @@
 {% block title %}Settings - Be 4 Africa Admin{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-surface py-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Page Header -->
-        <div class="mb-8">
-            <div class="flex items-center gap-3">
-                <span class="material-symbols-outlined text-4xl text-primary">
-                    settings
-                </span>
-                <h1 class="font-headline text-4xl font-bold text-on-surface">Settings</h1>
-            </div>
-            <p class="mt-2 text-on-surface-variant font-body">Configure application settings and view audit logs</p>
-        </div>
+<div>
+    <div class="mb-5">
+        <h1>Settings</h1>
+        <p>Application configuration &middot; changes apply to the mobile app</p>
+    </div>
 
-        <!-- Application Configuration Section -->
-        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8 mb-8">
-            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6">Application Configuration</h2>
+    <!-- Comp: 210px tab rail beside the active panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-[210px_1fr] gap-4 items-start">
+      <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-2.5 flex flex-col gap-0.5" id="settingsTabs">
+        <button type="button" class="tab on text-left" data-stab="config">Configuration</button>
+        <button type="button" class="tab text-left" data-stab="labels">Labels &amp; Titles</button>
+        <button type="button" class="tab text-left" data-stab="features">Features</button>
+        <button type="button" class="tab text-left" data-stab="herorail">Home Rail</button>
+        <button type="button" class="tab text-left" data-stab="support">Support</button>
+        <button type="button" class="tab text-left" data-stab="audit">Audit Log</button>
+      </div>
 
-            <form method="POST" class="space-y-6">
+      <div>
+            <form method="POST">
                 {% csrf_token %}
+                <div data-spanel="config" class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-6">
 
                 <!-- Summit Year -->
                 <div>
@@ -439,6 +441,8 @@
                     </div>
                 </div>
 
+                </div>
+                <div data-spanel="support" hidden class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-6">
                 <!-- Live Agent Support -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Live Agent Support</h3>
@@ -463,6 +467,8 @@
                     </label>
                 </div>
 
+                </div>
+                <div data-spanel="labels" hidden class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-6">
                 <!-- Section Titles -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Section Titles</h3>
@@ -577,6 +583,8 @@
                     </div>
                 </div>
 
+                </div>
+                <div data-spanel="features" hidden class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-6">
                 <!-- Feature Toggles -->
                 <div class="pt-6 border-t border-outline-variant mt-6">
                     <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Feature Toggles</h3>
@@ -693,22 +701,107 @@
                     </div>
                 </div>
 
-                <!-- Submit Button -->
-                <div class="pt-6 border-t border-outline-variant mt-6">
-                    <button
-                        type="submit"
-                        class="inline-flex items-center gap-2 bg-emerald-600 text-white font-headline font-bold rounded-lg py-3.5 px-10 hover:bg-emerald-700 transition-colors duration-200 shadow-lg text-base"
-                    >
-                        <span class="material-symbols-outlined">save</span>
-                        Save Settings
-                    </button>
+                </div>
+
+                <div data-spanel="herorail" hidden class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-6">
+                <!-- Home "New today" rail -->
+                <div>
+                    <h3 class="font-headline text-lg font-bold text-on-surface mb-1">Home &ldquo;New today&rdquo; Rail</h3>
+                    <p class="text-sm text-on-surface-variant mb-4">The swipeable cards at the very top of the home screen. Set how many of each content type appear &mdash; set a number to <strong>0</strong> to leave that type out. Cards show in the order listed below.</p>
+
+                    <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-surface-container-low transition-colors mb-2">
+                        <input type="checkbox" name="hero_rail_enabled"
+                            {% if settings.hero_rail_enabled %}checked{% endif %}
+                            class="w-5 h-5 rounded border-outline-variant text-emerald-600 focus:ring-emerald-600" />
+                        <span class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-lg text-emerald-600">view_carousel</span>
+                            <span class="font-body text-on-surface font-medium">Show the rail</span>
+                        </span>
+                        {% if settings.hero_rail_enabled %}
+                        <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">ON</span>
+                        {% else %}
+                        <span class="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">OFF</span>
+                        {% endif %}
+                    </label>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span class="material-symbols-outlined text-lg text-primary">sensors</span>
+                            <span class="flex-1">
+                                <span class="block font-body text-on-surface font-medium">Live feeds</span>
+                                <span class="block text-xs text-on-surface-variant">Streams that are on air right now</span>
+                            </span>
+                            <input type="number" min="0" max="10" name="hero_rail_live_count"
+                                value="{{ settings.hero_rail_live_count }}"
+                                class="w-20 rounded-xl border border-outline bg-surface-container-low px-3 py-2 text-on-surface font-body text-center focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span class="material-symbols-outlined text-lg text-primary">newspaper</span>
+                            <span class="flex-1">
+                                <span class="block font-body text-on-surface font-medium">News &amp; articles</span>
+                                <span class="block text-xs text-on-surface-variant">Newest published stories</span>
+                            </span>
+                            <input type="number" min="0" max="10" name="hero_rail_news_count"
+                                value="{{ settings.hero_rail_news_count }}"
+                                class="w-20 rounded-xl border border-outline bg-surface-container-low px-3 py-2 text-on-surface font-body text-center focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span class="material-symbols-outlined text-lg text-primary">event</span>
+                            <span class="flex-1">
+                                <span class="block font-body text-on-surface font-medium">Events</span>
+                                <span class="block text-xs text-on-surface-variant">Next upcoming events</span>
+                            </span>
+                            <input type="number" min="0" max="10" name="hero_rail_event_count"
+                                value="{{ settings.hero_rail_event_count }}"
+                                class="w-20 rounded-xl border border-outline bg-surface-container-low px-3 py-2 text-on-surface font-body text-center focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span class="material-symbols-outlined text-lg text-primary">auto_stories</span>
+                            <span class="flex-1">
+                                <span class="block font-body text-on-surface font-medium">Magazines</span>
+                                <span class="block text-xs text-on-surface-variant">Latest published editions</span>
+                            </span>
+                            <input type="number" min="0" max="10" name="hero_rail_magazine_count"
+                                value="{{ settings.hero_rail_magazine_count }}"
+                                class="w-20 rounded-xl border border-outline bg-surface-container-low px-3 py-2 text-on-surface font-body text-center focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span class="material-symbols-outlined text-lg text-primary">play_circle</span>
+                            <span class="flex-1">
+                                <span class="block font-body text-on-surface font-medium">Videos</span>
+                                <span class="block text-xs text-on-surface-variant">Featured videos first</span>
+                            </span>
+                            <input type="number" min="0" max="10" name="hero_rail_video_count"
+                                value="{{ settings.hero_rail_video_count }}"
+                                class="w-20 rounded-xl border border-outline bg-surface-container-low px-3 py-2 text-on-surface font-body text-center focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+
+                        <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container-low transition-colors">
+                            <span class="material-symbols-outlined text-lg text-primary">stars</span>
+                            <span class="flex-1">
+                                <span class="block font-body text-on-surface font-medium">Discover cards</span>
+                                <span class="block text-xs text-on-surface-variant">Your Feature Cards</span>
+                            </span>
+                            <input type="number" min="0" max="10" name="hero_rail_feature_count"
+                                value="{{ settings.hero_rail_feature_count }}"
+                                class="w-20 rounded-xl border border-outline bg-surface-container-low px-3 py-2 text-on-surface font-body text-center focus:outline-none focus:ring-2 focus:ring-secondary">
+                        </div>
+                    </div>
+                    <p class="text-xs text-on-surface-variant mt-4">Changes reach the app within about a minute (home feed cache). If nothing is published for a type, the rail simply skips it.</p>
+                </div>
+                </div>
+
+                <div class="form-actions" id="settingsActions">
+                    <button type="reset" class="bg-surface-container-lowest border border-slate-200 text-on-surface rounded-xl px-5 py-2.5 text-[13px] font-bold">Discard</button>
+                    <button type="submit" class="bg-primary-container">Save changes</button>
                 </div>
             </form>
-        </div>
 
-        <!-- Audit Log Section -->
-        <div class="bg-surface-container-lowest rounded-xl shadow-sm p-8">
-            <h2 class="font-headline text-2xl font-bold text-on-surface mb-6">Audit Log</h2>
+            <div data-spanel="audit" hidden class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6">
 
             {% if audit_logs %}
             <div class="overflow-x-auto">
@@ -778,7 +871,35 @@
                 <p class="font-body text-on-surface-variant">No audit log entries found.</p>
             </div>
             {% endif %}
-        </div>
+            </div>
+      </div>
     </div>
 </div>
+
+<script>
+(function () {
+  var rail = document.getElementById('settingsTabs');
+  if (!rail) return;
+  var actions = document.getElementById('settingsActions');
+  var KEY = 'settingsTab';
+  function show(key) {
+    rail.querySelectorAll('[data-stab]').forEach(function (b) {
+      b.classList.toggle('on', b.dataset.stab === key);
+    });
+    document.querySelectorAll('[data-spanel]').forEach(function (p) {
+      p.hidden = p.dataset.spanel !== key;
+    });
+    // Audit is read-only, so the save/discard footer has nothing to act on.
+    if (actions) actions.hidden = key === 'audit';
+    try { localStorage.setItem(KEY, key); } catch (e) {}
+  }
+  rail.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-stab]');
+    if (btn) show(btn.dataset.stab);
+  });
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  show(saved && document.querySelector('[data-spanel="' + saved + '"]') ? saved : 'config');
+})();
+</script>
 {% endblock %}

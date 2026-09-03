@@ -129,27 +129,27 @@
   <!-- Filter Tabs -->
   <div class="bg-white rounded-xl shadow-sm p-1.5 mb-6 flex gap-1 border border-slate-100 flex-wrap">
     <a href="{% url 'custom_admin:youth_dialogue_applications_list' event_pk=yd_event.pk %}{% if search_query %}?q={{ search_query }}{% endif %}{% for nc in nationality_filter %}{% if search_query or not forloop.first %}&{% else %}?{% endif %}nationality={{ nc }}{% endfor %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if not current_filter %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if not current_filter %}on{% endif %}">
       All
     </a>
     <a href="?status=pending_review{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'pending_review' %}bg-amber-500 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'pending_review' %}on{% endif %}">
       Pending Review
     </a>
     <a href="?status=accepted{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'accepted' %}bg-emerald-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'accepted' %}on{% endif %}">
       Accepted
     </a>
     <a href="?status=documents{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'documents' %}bg-cyan-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'documents' %}on{% endif %}">
       Documents
     </a>
     <a href="?status=credentials{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'credentials' %}bg-indigo-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'credentials' %}on{% endif %}">
       Credentials
     </a>
     <a href="?status=rejected{% if search_query %}&q={{ search_query }}{% endif %}{% for nc in nationality_filter %}&nationality={{ nc }}{% endfor %}"
-       class="flex-1 text-center py-2.5 px-4 rounded-lg font-semibold text-sm transition-all {% if current_filter == 'rejected' %}bg-red-600 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+       class="fchip {% if current_filter == 'rejected' %}on{% endif %}">
       Rejected
     </a>
   </div>

@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../services/api_service.dart' show ApiService, ApiException;
@@ -435,99 +437,170 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
   Widget _buildPendingStatusScreen(bool isDark) {
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-      appBar: AppBar(
-        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_rounded, color: isDark ? Colors.white : Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Verification Status',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: const Text('Verification')),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 16, bottom: 40),
+        children: [
+          // Status summary
+          DsCard(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.hourglass_top_rounded, size: 56, color: Colors.orange),
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Application Under Review',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
+                      color: Ds.goldTintOf(context), shape: BoxShape.circle),
+                  child: const Icon(Icons.shield_outlined,
+                      size: 32, color: Ds.goldDeep),
                 ),
                 const SizedBox(height: 12),
+                Text('In review',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Ds.ink(context))),
+                const SizedBox(height: 6),
                 Text(
-                  'Your verification request has been submitted and is currently being reviewed by our team. You will be notified once a decision is made.',
+                  'Your verification request has been submitted. Reviews usually take up to 5 working days.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
+                      fontSize: 13, height: 1.5, color: Ds.body(context)),
                 ),
-                const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.schedule_rounded, size: 18, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Status: Pending',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.orange.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: 12),
+                const DsPill('PENDING', tone: DsTone.gold),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Progress timeline
+          DsCard(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Progress',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Ds.ink(context))),
+                const SizedBox(height: 14),
+                _timelineStep(
+                  done: true,
+                  title: 'Documents submitted',
+                  subtitle: 'Government ID + selfie',
                 ),
-                const SizedBox(height: 40),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                    label: const Text('Go Back'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.burundiGreen,
-                      side: BorderSide(color: AppColors.burundiGreen.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
+                _timelineStep(
+                  active: true,
+                  title: 'Under review',
+                  subtitle: 'Our team is checking your documents',
+                ),
+                _timelineStep(
+                  title: 'Badge issued',
+                  subtitle: 'Verified badge appears on your profile',
+                  isLast: true,
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: DsOutlineButton('Go back',
+                expand: true, onTap: () => Navigator.pop(context)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One node of the review timeline: filled, active, or upcoming.
+  Widget _timelineStep({
+    bool done = false,
+    bool active = false,
+    bool isLast = false,
+    required String title,
+    required String subtitle,
+  }) {
+    final Widget marker;
+    if (done) {
+      marker = Container(
+        width: 26,
+        height: 26,
+        decoration: const BoxDecoration(color: Ds.green, shape: BoxShape.circle),
+        child: const Icon(Icons.check, size: 15, color: Colors.white),
+      );
+    } else if (active) {
+      marker = Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          color: Ds.goldTintOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: Ds.goldDeep, width: 2),
         ),
+        child: Center(
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+                color: Ds.goldDeep, shape: BoxShape.circle),
+          ),
+        ),
+      );
+    } else {
+      marker = Container(
+        width: 26,
+        height: 26,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Ds.outline(context), width: 2),
+        ),
+      );
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              marker,
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    color: done ? Ds.green : Ds.outline(context),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: done || active ? Ds.ink(context) : Ds.muted(context))),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: Ds.meta(context)),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -545,20 +618,12 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        elevation: 0,
+        title: const Text('Verification'),
         leading: IconButton(
-          icon: Icon(Icons.close, color: isDark ? Colors.white : Colors.black87),
+          icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Request Verification',
-          style: TextStyle(
-            color: isDark ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.w700,
-          ),
         ),
       ),
       body: SafeArea(

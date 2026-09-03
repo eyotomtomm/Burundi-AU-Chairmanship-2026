@@ -171,6 +171,9 @@ class MagazineEdition {
   }
 
   /// Returns the best available PDF URL (uploaded file > external link)
+  /// 300px WebP variant for lists and rails; full image only if missing.
+  String get listImage => thumbnailUrl.isNotEmpty ? thumbnailUrl : coverImageUrl;
+
   String get openablePdfUrl {
     if (effectivePdfUrl.isNotEmpty) return effectivePdfUrl;
     if (pdfUrl.isNotEmpty) return pdfUrl;
@@ -393,6 +396,9 @@ class Article {
       };
 
   /// Lowercase slug for backward-compat filtering
+  /// 300px WebP variant for lists and rails; full image only if missing.
+  String get listImage => thumbnailUrl.isNotEmpty ? thumbnailUrl : imageUrl;
+
   String get categorySlug => category?.name.toLowerCase() ?? '';
 
   Article copyWith({

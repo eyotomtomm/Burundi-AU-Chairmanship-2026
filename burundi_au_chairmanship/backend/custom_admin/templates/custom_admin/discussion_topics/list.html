@@ -1,0 +1,76 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Explore Topics - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <div class="flex justify-between items-center gap-4">
+    <div>
+      <h1>Explore Topics</h1>
+      <p>{{ items|length }} topic{{ items|length|pluralize }} &middot; prompts shown across the top of the Explore feed</p>
+    </div>
+    <a href="{% url 'custom_admin:discussion_topic_create' %}" class="bg-primary-container inline-flex items-center gap-2">
+      <span class="material-symbols-rounded">add</span>New Topic
+    </a>
+  </div>
+
+  {% if items %}
+  <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr>
+          <th class="text-left">Topic</th>
+          <th class="text-left">Category</th>
+          <th class="text-left">Answers</th>
+          <th class="text-left">Order</th>
+          <th class="text-left">Status</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            <div class="min-w-0">
+              <div class="font-semibold text-on-surface">{{ item.title }}</div>
+              {% if item.title_fr %}<div class="text-[11px] text-on-surface-variant truncate">{{ item.title_fr }}</div>{% endif %}
+              {% if item.description %}<div class="text-[11px] text-on-surface-variant truncate max-w-[380px]">{{ item.description }}</div>{% endif %}
+            </div>
+          </td>
+          <td><span class="pill bg-surface-container text-on-surface-variant">{{ item.get_category_display }}</span></td>
+          <td class="font-label text-[11px] text-on-surface-variant">{{ item.answers }}</td>
+          <td class="font-label text-[11px] text-on-surface-variant">{{ item.order }}</td>
+          <td>
+            {% if item.is_active %}
+            <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">Live</span>
+            {% else %}
+            <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">Hidden</span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            <div class="flex justify-end gap-1">
+              <a href="{% url 'custom_admin:discussion_topic_edit' item.pk %}" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                <span class="material-symbols-outlined text-xl">edit</span>
+              </a>
+              <a href="{% url 'custom_admin:discussion_topic_delete' item.pk %}" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete"
+                 onclick="return confirm('Delete this topic? Posts already made under it are kept.')">
+                <span class="material-symbols-outlined text-xl">delete</span>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-10 text-center">
+    <span class="material-symbols-rounded text-4xl text-on-surface-variant">forum</span>
+    <p class="mt-2 font-semibold text-on-surface">No topics yet</p>
+    <p class="text-sm text-on-surface-variant">Topics invite people to weigh in on a question. They appear across the top of the Explore feed.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

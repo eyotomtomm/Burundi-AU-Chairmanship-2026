@@ -1,0 +1,118 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}Reported Content - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <div>
+    <h1>Reported Content</h1>
+    <p>Posts and accounts flagged by people using Explore.</p>
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    {% for value, label in status_choices %}
+    <a href="?status={{ value }}"
+       class="px-3 py-1.5 rounded-full text-sm font-semibold border {% if current_status == value %}bg-primary-container border-transparent{% else %}border-slate-300 text-on-surface-variant{% endif %}">
+      {{ label }}
+      {% if value == 'open' %}<span class="ml-1 font-label">{{ counts.open }}</span>
+      {% elif value == 'reviewed' %}<span class="ml-1 font-label">{{ counts.reviewed }}</span>
+      {% elif value == 'actioned' %}<span class="ml-1 font-label">{{ counts.actioned }}</span>
+      {% elif value == 'dismissed' %}<span class="ml-1 font-label">{{ counts.dismissed }}</span>{% endif %}
+    </a>
+    {% endfor %}
+    <a href="?status=all"
+       class="px-3 py-1.5 rounded-full text-sm font-semibold border {% if current_status == 'all' %}bg-primary-container border-transparent{% else %}border-slate-300 text-on-surface-variant{% endif %}">All</a>
+  </div>
+
+  {% if reports %}
+  <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <table class="w-full">
+      <thead>
+        <tr>
+          <th class="text-left">Reported</th>
+          <th class="text-left">Reason</th>
+          <th class="text-left">By</th>
+          <th class="text-left">When</th>
+          <th class="text-left">Status</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td>
+            {% if r.discussion %}
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-rounded text-[17px] text-on-surface-variant">article</span>
+              <div class="min-w-0">
+                <div class="font-semibold text-on-surface truncate max-w-[320px]">{{ r.discussion.content|truncatechars:70 }}</div>
+                <div class="text-[11px] text-on-surface-variant">post by {{ r.discussion.author.username }}</div>
+              </div>
+            </div>
+            {% else %}
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-rounded text-[17px] text-on-surface-variant">person</span>
+              <div>
+                <div class="font-semibold text-on-surface">{{ r.reported_user.get_full_name|default:r.reported_user.username }}</div>
+                <div class="text-[11px] text-on-surface-variant">account</div>
+              </div>
+            </div>
+            {% endif %}
+          </td>
+          <td><span class="pill bg-amber-50 text-amber-700">{{ r.get_reason_display }}</span></td>
+          <td class="text-[11px] text-on-surface-variant">{{ r.reporter.username }}</td>
+          <td class="font-label text-[11px] text-on-surface-variant">{{ r.created_at|date:"j M, H:i" }}</td>
+          <td>
+            {% if r.status == 'open' %}<span class="px-2 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full">Open</span>
+            {% elif r.status == 'reviewed' %}<span class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">Reviewed</span>
+            {% elif r.status == 'actioned' %}<span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">Actioned</span>
+            {% else %}<span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">Dismissed</span>{% endif %}
+          </td>
+          <td class="text-right">
+            <div class="flex justify-end gap-1">
+              {% if r.discussion %}
+              <a href="{% url 'custom_admin:content_report_delete_post' r.pk %}"
+                 class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove post"
+                 onclick="return confirm('Remove this post permanently and close the report?')">
+                <span class="material-symbols-outlined text-xl">delete</span>
+              </a>
+              {% endif %}
+              <a href="{% url 'custom_admin:content_report_set_status' r.pk 'reviewed' %}?from={{ current_status }}"
+                 class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Mark reviewed">
+                <span class="material-symbols-outlined text-xl">visibility</span>
+              </a>
+              <a href="{% url 'custom_admin:content_report_set_status' r.pk 'dismissed' %}?from={{ current_status }}"
+                 class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Dismiss">
+                <span class="material-symbols-outlined text-xl">close</span>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if reports.has_other_pages %}
+  <div class="flex justify-center gap-2">
+    {% if reports.has_previous %}
+    <a href="?status={{ current_status }}&page={{ reports.previous_page_number }}" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">Previous</a>
+    {% endif %}
+    <span class="px-3 py-1.5 text-sm text-on-surface-variant">Page {{ reports.number }} of {{ reports.paginator.num_pages }}</span>
+    {% if reports.has_next %}
+    <a href="?status={{ current_status }}&page={{ reports.next_page_number }}" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-10 text-center">
+    <span class="material-symbols-rounded text-4xl text-on-surface-variant">flag</span>
+    <p class="mt-2 font-semibold text-on-surface">Nothing here</p>
+    <p class="text-sm text-on-surface-variant">No reports with this status.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

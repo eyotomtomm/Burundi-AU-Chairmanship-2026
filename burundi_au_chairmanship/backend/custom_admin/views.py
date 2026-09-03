@@ -51,6 +51,7 @@ def _sanitize_csv_row(row):
 
 from core.utils import log_admin_action, compute_model_diff
 from core.models import (
+    DiscussionTopic, ContentReport,
     HeroSlide, FeatureCard, Article, MagazineEdition, Event,
     LiveFeed, Video, GalleryAlbum, GalleryPhoto, EmbassyLocation, Resource,
     Notification, Category, PriorityAgenda, SocialMediaLink,
@@ -70,7 +71,7 @@ from core.models import (
     ABTest, ABTestParticipant,
     TranslationRequest, VideoChapter,
     ArticleComment, EventComment, MagazineComment, LiveFeedComment,
-    VideoComment, GalleryComment, DiscussionReply,
+    VideoComment, GalleryComment, DiscussionReply, DiscussionMedia,
     DeviceToken,
     AppRelease, AppReleaseHighlight,
     ArticleLike,
@@ -1811,6 +1812,9 @@ def user_edit(request, pk):
         profile.social_media_url = request.POST.get('social_media_url', '').strip()
         profile.is_government_official = request.POST.get('is_government_official') == 'on'
         profile.is_usher = request.POST.get('is_usher') == 'on'
+        profile.bio = request.POST.get('bio', '').strip()
+        if request.FILES.get('profile_picture'):
+            profile.profile_picture = request.FILES['profile_picture']
         if profile.is_verified and not was_verified:
             profile.verified_at = timezone.now()
         profile.save()
@@ -3176,6 +3180,119 @@ def quick_access_delete(request, pk):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+def discussion_topics_list(request):
+    items = DiscussionTopic.objects.all().annotate(answers=Count('posts')).order_by('order', '-created_at')
+    return render(request, 'custom_admin/discussion_topics/list.html', {'items': items})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def discussion_topic_create(request):
+    if request.method == 'POST':
+        DiscussionTopic.objects.create(
+            title=request.POST.get('title', '').strip(),
+            title_fr=request.POST.get('title_fr', '').strip(),
+            description=request.POST.get('description', '').strip(),
+            description_fr=request.POST.get('description_fr', '').strip(),
+            category=request.POST.get('category', 'general'),
+            order=request.POST.get('order') or 0,
+            is_active=request.POST.get('is_active') == 'on',
+        )
+        messages.success(request, 'Topic created — it now shows on the Explore feed.')
+        return redirect('custom_admin:discussion_topics_list')
+    return render(request, 'custom_admin/discussion_topics/form.html', {
+        'action': 'Create',
+        'category_choices': Discussion.CATEGORY_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def discussion_topic_edit(request, pk):
+    item = get_object_or_404(DiscussionTopic, pk=pk)
+    if request.method == 'POST':
+        item.title = request.POST.get('title', '').strip()
+        item.title_fr = request.POST.get('title_fr', '').strip()
+        item.description = request.POST.get('description', '').strip()
+        item.description_fr = request.POST.get('description_fr', '').strip()
+        item.category = request.POST.get('category', 'general')
+        item.order = request.POST.get('order') or 0
+        item.is_active = request.POST.get('is_active') == 'on'
+        item.save()
+        messages.success(request, 'Topic updated.')
+        return redirect('custom_admin:discussion_topics_list')
+    return render(request, 'custom_admin/discussion_topics/form.html', {
+        'action': 'Edit',
+        'item': item,
+        'category_choices': Discussion.CATEGORY_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def discussion_topic_delete(request, pk):
+    item = get_object_or_404(DiscussionTopic, pk=pk)
+    item.delete()
+    messages.success(request, 'Topic deleted.')
+    return redirect('custom_admin:discussion_topics_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def content_reports_list(request):
+    """The moderation queue for posts and accounts users have flagged."""
+    reports = ContentReport.objects.select_related(
+        'reporter', 'discussion', 'discussion__author', 'reported_user'
+    ).order_by('-created_at')
+
+    status_filter = request.GET.get('status') or 'open'
+    if status_filter != 'all':
+        reports = reports.filter(status=status_filter)
+
+    counts = {
+        'open': ContentReport.objects.filter(status='open').count(),
+        'reviewed': ContentReport.objects.filter(status='reviewed').count(),
+        'actioned': ContentReport.objects.filter(status='actioned').count(),
+        'dismissed': ContentReport.objects.filter(status='dismissed').count(),
+    }
+    paginator = Paginator(reports, 25)
+    return render(request, 'custom_admin/content_reports/list.html', {
+        'reports': paginator.get_page(request.GET.get('page')),
+        'counts': counts,
+        'current_status': status_filter,
+        'status_choices': ContentReport.STATUS_CHOICES,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def content_report_set_status(request, pk, new_status):
+    report = get_object_or_404(ContentReport, pk=pk)
+    valid = {c[0] for c in ContentReport.STATUS_CHOICES}
+    if new_status in valid:
+        report.status = new_status
+        report.reviewed_at = timezone.now()
+        report.save(update_fields=['status', 'reviewed_at'])
+        messages.success(request, f'Report marked {report.get_status_display().lower()}.')
+    return redirect(f"{reverse('custom_admin:content_reports_list')}?status={request.GET.get('from', 'open')}")
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def content_report_delete_post(request, pk):
+    """Take down the reported post and close the report in one action."""
+    report = get_object_or_404(ContentReport, pk=pk)
+    if report.discussion_id:
+        report.discussion.delete()
+        messages.success(request, 'Post removed and report actioned.')
+    report.status = 'actioned'
+    report.reviewed_at = timezone.now()
+    report.save(update_fields=['status', 'reviewed_at'])
+    return redirect('custom_admin:content_reports_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def emergency_contacts_list(request):
     items = EmergencyContact.objects.all().order_by('order')
     return render(request, 'custom_admin/emergency_contacts/list.html', {'items': items})
@@ -3200,7 +3317,11 @@ def emergency_contact_create(request):
         )
         messages.success(request, 'Emergency contact created successfully!')
         return redirect('custom_admin:emergency_contacts_list')
-    return render(request, 'custom_admin/emergency_contacts/form.html', {'action': 'Create'})
+    return render(request, 'custom_admin/emergency_contacts/form.html', {
+        'action': 'Create',
+        'category_choices': EmergencyContact.CATEGORY_CHOICES,
+        'action_type_choices': EmergencyContact.ACTION_TYPE_CHOICES,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -3222,7 +3343,12 @@ def emergency_contact_edit(request, pk):
         item.save()
         messages.success(request, 'Emergency contact updated successfully!')
         return redirect('custom_admin:emergency_contacts_list')
-    return render(request, 'custom_admin/emergency_contacts/form.html', {'item': item, 'action': 'Edit'})
+    return render(request, 'custom_admin/emergency_contacts/form.html', {
+        'item': item,
+        'action': 'Edit',
+        'category_choices': EmergencyContact.CATEGORY_CHOICES,
+        'action_type_choices': EmergencyContact.ACTION_TYPE_CHOICES,
+    })
 
 
 @login_required(login_url='custom_admin:login')
@@ -3811,6 +3937,12 @@ def app_settings(request):
         settings.newsletter_enabled = request.POST.get('newsletter_enabled') == 'on'
         settings.facts_enabled = request.POST.get('facts_enabled') == 'on'
         settings.live_feeds_enabled = request.POST.get('live_feeds_enabled') == 'on'
+        # Home "New today" rail
+        settings.hero_rail_enabled = request.POST.get('hero_rail_enabled') == 'on'
+        for _f in ('live', 'news', 'event', 'magazine', 'video', 'feature'):
+            _raw = request.POST.get(f'hero_rail_{_f}_count', '')
+            if _raw.isdigit():
+                setattr(settings, f'hero_rail_{_f}_count', min(int(_raw), 10))
         settings.app_store_url = request.POST.get('app_store_url', '')
         settings.play_store_url = request.POST.get('play_store_url', '')
         settings.app_store_id = request.POST.get('app_store_id', '')
@@ -4828,7 +4960,9 @@ def poll_delete(request, pk):
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 def discussions_list(request):
-    discussions = Discussion.objects.all().select_related('author').order_by('-is_pinned', '-created_at')
+    discussions = Discussion.objects.all().select_related('author').annotate(
+        media_count=Count('media')
+    ).order_by('-is_pinned', '-created_at')
     category_filter = request.GET.get('category')
     if category_filter:
         discussions = discussions.filter(category=category_filter)
@@ -4845,6 +4979,50 @@ def discussions_list(request):
         'locked': locked,
         'category_choices': Discussion.CATEGORY_CHOICES,
         'current_category': category_filter,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def discussion_create(request):
+    """Post to the Explore feed as one of the official identities."""
+    identities = User.objects.filter(
+        profile__is_government_official=True
+    ).select_related('profile').order_by('first_name', 'username')
+
+    if request.method == 'POST':
+        author = get_object_or_404(
+            User, pk=request.POST.get('author'), profile__is_government_official=True)
+        content = request.POST.get('content', '').strip()
+        if not content:
+            messages.error(request, 'A post needs some text.')
+            return redirect('custom_admin:discussion_create')
+
+        topic_id = request.POST.get('topic') or None
+        discussion = Discussion.objects.create(
+            author=author,
+            title=request.POST.get('title', '').strip(),
+            content=content,
+            category=request.POST.get('category', 'general'),
+            topic_id=topic_id,
+            is_pinned=request.POST.get('is_pinned') == 'on',
+        )
+
+        for order, image in enumerate(
+                request.FILES.getlist('images')[:DiscussionMedia.MAX_PER_DISCUSSION]):
+            DiscussionMedia.objects.create(
+                discussion=discussion, media_type='image', image=image, order=order)
+
+        messages.success(
+            request,
+            f'Posted to Explore as {author.first_name or author.username}.')
+        return redirect('custom_admin:discussions_list')
+
+    return render(request, 'custom_admin/discussions/form.html', {
+        'identities': identities,
+        'category_choices': Discussion.CATEGORY_CHOICES,
+        'topics': DiscussionTopic.objects.filter(is_active=True).order_by('order', 'id'),
+        'max_media': DiscussionMedia.MAX_PER_DISCUSSION,
     })
 
 
@@ -11764,3 +11942,188 @@ def reviewer_document_proxy(request, doc_pk):
     response._skip_admin_csp = True
     return response
 
+
+
+# ═══════════════════════════════════════════════════════════════
+#  NEWS SCRAPER — fetch candidates, review, approve into Articles
+# ═══════════════════════════════════════════════════════════════
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def news_scraper(request):
+    """Review queue: pick sources + a date range, fetch, then approve/reject."""
+    from datetime import datetime, time as _time, timedelta
+    from core.models import NewsSource, ScrapedItem
+    from core.news_scraper import fetch_source, ScrapeError
+
+    sources = NewsSource.objects.all()
+    status = request.GET.get('status') or 'pending'
+
+    # Default window: the last 30 days.
+    today = timezone.localdate()
+    date_from = request.GET.get('from') or (today - timedelta(days=30)).isoformat()
+    date_to = request.GET.get('to') or today.isoformat()
+
+    def _bounds():
+        """Parse the range, returning tz-aware datetimes covering whole days."""
+        try:
+            d1 = datetime.strptime(date_from, '%Y-%m-%d').date()
+            d2 = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except ValueError:
+            raise ScrapeError('Dates must be in YYYY-MM-DD format.')
+        if d1 > d2:
+            raise ScrapeError('The "from" date is after the "to" date.')
+        return (
+            timezone.make_aware(datetime.combine(d1, _time.min)),
+            timezone.make_aware(datetime.combine(d2, _time.max)),
+        )
+
+    if request.method == 'POST' and request.POST.get('action') == 'fetch':
+        selected = request.POST.getlist('source_ids')
+        chosen = sources.filter(is_active=True)
+        if selected:
+            chosen = chosen.filter(pk__in=selected)
+        if not chosen:
+            messages.error(request, 'Select at least one active source to fetch from.')
+        else:
+            try:
+                start, end = _bounds()
+                total_new = total_seen = 0
+                for src in chosen:
+                    try:
+                        created, skipped = fetch_source(src, start, end)
+                        total_new += created
+                        total_seen += skipped
+                    except ScrapeError as exc:
+                        messages.error(request, f'{src.name}: {exc}')
+                if total_new or total_seen:
+                    messages.success(
+                        request,
+                        f'Fetched {total_new} new item{"" if total_new == 1 else "s"} '
+                        f'({total_seen} already in the queue).'
+                    )
+                elif not any(m.level_tag == 'error' for m in messages.get_messages(request)):
+                    messages.info(request, 'No posts found in that date range.')
+            except ScrapeError as exc:
+                messages.error(request, str(exc))
+        return redirect(
+            f"{reverse('custom_admin:news_scraper')}?from={date_from}&to={date_to}&status={status}"
+        )
+
+    items = (ScrapedItem.objects.select_related('source', 'article')
+             .filter(status=status))
+    source_filter = request.GET.get('source')
+    if source_filter:
+        items = items.filter(source_id=source_filter)
+
+    paginator = Paginator(items, 24)
+    page = paginator.get_page(request.GET.get('page'))
+
+    counts = {
+        s: ScrapedItem.objects.filter(status=s).count()
+        for s in ('pending', 'approved', 'rejected')
+    }
+    return render(request, 'custom_admin/news_scraper/review.html', {
+        'sources': sources,
+        'items': page,
+        'counts': counts,
+        'current_status': status,
+        'current_source': source_filter or '',
+        'date_from': date_from,
+        'date_to': date_to,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def news_scraper_review(request):
+    """Approve or reject scraped items. Approving creates the Article."""
+    from core.models import ScrapedItem, Article
+
+    decision = request.POST.get('decision')
+    ids = request.POST.getlist('item_ids')
+    if decision not in ('approve', 'reject') or not ids:
+        messages.error(request, 'Nothing selected.')
+        return redirect(request.META.get('HTTP_REFERER', 'custom_admin:news_scraper'))
+
+    items = ScrapedItem.objects.select_related('source').filter(pk__in=ids, status='pending')
+    done = 0
+
+    for item in items:
+        if decision == 'reject':
+            item.status = 'rejected'
+        else:
+            src = item.source
+            # Credit reposts in the body; our own posts carry no credit line.
+            body = item.content or ''
+            if not src.is_own_content and src.attribution:
+                credit = f'via {src.attribution}'
+                link = f' — {item.source_url}' if item.source_url else ''
+                body = f'{body}\n\n{credit}{link}'.strip()
+
+            article = Article.objects.create(
+                title=item.title[:300],
+                content=body,
+                author=src.attribution or src.name,
+                category=src.default_category,
+                publish_date=item.published_at,
+                content_type='news',
+                # Approved here means reviewed — publish straight away.
+                status='published',
+            )
+            if item.image:
+                # Reuse the already-downloaded file rather than re-fetching.
+                item.image.open('rb')
+                article.image.save(item.image.name.rsplit('/', 1)[-1],
+                                   ContentFile(item.image.read()), save=True)
+                item.image.close()
+            item.article = article
+            item.status = 'approved'
+        item.reviewed_at = timezone.now()
+        item.reviewed_by = request.user
+        item.save()
+        done += 1
+
+    verb = 'approved and published' if decision == 'approve' else 'rejected'
+    messages.success(request, f'{done} item{"" if done == 1 else "s"} {verb}.')
+    log_admin_action(request, decision, 'ScrapedItem', object_repr=f'{done} items')
+    return redirect(request.META.get('HTTP_REFERER', 'custom_admin:news_scraper'))
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def news_sources_list(request):
+    """Manage the feeds the scraper pulls from."""
+    from core.models import NewsSource, Category
+
+    if request.method == 'POST':
+        pk = request.POST.get('pk')
+        if request.POST.get('delete') and pk:
+            NewsSource.objects.filter(pk=pk).delete()
+            messages.success(request, 'Source removed.')
+        else:
+            fields = dict(
+                name=request.POST.get('name', '').strip(),
+                kind=request.POST.get('kind', 'rss'),
+                target=request.POST.get('target', '').strip(),
+                attribution=request.POST.get('attribution', '').strip(),
+                is_own_content=bool(request.POST.get('is_own_content')),
+                is_active=bool(request.POST.get('is_active')),
+            )
+            cat = request.POST.get('default_category')
+            fields['default_category'] = Category.objects.filter(pk=cat).first() if cat else None
+            if not fields['name'] or not fields['target']:
+                messages.error(request, 'Name and target are both required.')
+            elif pk:
+                NewsSource.objects.filter(pk=pk).update(**fields)
+                messages.success(request, 'Source updated.')
+            else:
+                NewsSource.objects.create(**fields)
+                messages.success(request, 'Source added.')
+        return redirect('custom_admin:news_sources_list')
+
+    return render(request, 'custom_admin/news_scraper/sources.html', {
+        'sources': NewsSource.objects.all(),
+        'categories': Category.objects.all(),
+    })

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../config/app_ds.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
@@ -16,12 +17,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/popup_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/api_service.dart';
+import '../../services/app_link_service.dart';
 import '../../main.dart' show messagingService;
 import '../../config/app_constants.dart';
 import '../../widgets/promotional_splash_overlay.dart';
 import '../maintenance/maintenance_screen.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/magazine_tab.dart';
+import 'tabs/explore_tab.dart';
+import 'widgets/home_nav_bar.dart';
 import '../news/news_screen.dart';
 import 'tabs/more_tab.dart';
 
@@ -32,8 +36,17 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  int _currentIndex = 0;
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  int _currentIndex = 2;
+
+  /// Drives the fade/rise of the incoming tab. Short on purpose: long enough
+  /// to read as a transition, short enough that the bar still feels instant.
+  late final AnimationController _tabAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+    value: 1,
+  );
   Timer? _maintenanceTimer;
   bool _showingVerificationPopup = false;
 
@@ -43,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // Check verification status and show popups after screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Any link the app was launched with is routed here, once home exists.
+      AppLinkService().flushPendingLink();
       _checkVerificationStatus();
       _checkAndShowPopups();
       _checkPromotionalSplash();
@@ -262,9 +277,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _tabAnim.dispose();
     _maintenanceTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Every tab change goes through here.
+  void _goToTab(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
+    _tabAnim.forward(from: 0);
   }
 
   @override
@@ -272,18 +295,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
+      // The notch bar floats over the content; every tab pads its scrollable
+      // by Ds.navSpace so nothing is trapped underneath it.
+      extendBody: true,
       body: Column(
         children: [
           const OfflineBanner(),
           Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: [
-                HomeTab(onSwitchTab: (index) => setState(() => _currentIndex = index)),
-                MagazineTab(onBackToHome: () => setState(() => _currentIndex = 0)),
-                NewsScreen(isTab: true, onBackToHome: () => setState(() => _currentIndex = 0)),
-                MoreTab(),
-              ],
+            // IndexedStack keeps every tab alive, so switching back is instant
+            // and scroll positions survive; the fade/rise is layered on top so
+            // the swap reads as a transition without costing a rebuild.
+            child: FadeTransition(
+              opacity: CurvedAnimation(parent: _tabAnim, curve: Curves.easeOut),
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.012),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(parent: _tabAnim, curve: Curves.easeOutCubic)),
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: [
+                    MagazineTab(onBackToHome: () => _goToTab(2)),
+                    NewsScreen(isTab: true, onBackToHome: () => _goToTab(2)),
+                    HomeTab(onSwitchTab: _goToTab),
+                    ExploreTab(onBackToHome: () => _goToTab(2)),
+                    MoreTab(),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -293,48 +333,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildBottomNav(AppLocalizations l10n) {
-    return Container(
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            HapticService.selection();
-            setState(() => _currentIndex = index);
-          },
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.home_rounded),
-              activeIcon: const Icon(Icons.home_rounded),
-              label: l10n.home,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.auto_stories_rounded),
-              activeIcon: const Icon(Icons.auto_stories_rounded),
-              label: l10n.magazine,
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.newspaper_rounded),
-              activeIcon: const Icon(Icons.newspaper_rounded),
-              label: l10n.translate('news'),
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.more_horiz_rounded),
-              activeIcon: const Icon(Icons.more_horiz_rounded),
-              label: l10n.more,
-            ),
-          ],
-        ),
-      ),
+    // Home is pinned to the raised centre button and never moves.
+    return HomeNavBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        HapticService.selection();
+        _goToTab(index);
+      },
+      items: [
+        HomeNavItem(Icons.auto_stories_rounded, l10n.magazine),
+        HomeNavItem(Icons.newspaper_rounded, l10n.translate('news')),
+        HomeNavItem(Icons.home_rounded, l10n.home),
+        HomeNavItem(Icons.explore_rounded, l10n.translate('agenda')),
+        HomeNavItem(Icons.more_horiz_rounded, l10n.more),
+      ],
     );
   }
 }

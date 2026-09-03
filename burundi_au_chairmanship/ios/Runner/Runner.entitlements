@@ -6,6 +6,11 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:burundi4africa.com</string>
+		<string>applinks:www.burundi4africa.com</string>
+	</array>
 	<key>aps-environment</key>
 	<string>production</string>
 </dict>

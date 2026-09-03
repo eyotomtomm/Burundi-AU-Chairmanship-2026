@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../services/share_service.dart';
 
 /// A full-screen swipeable image gallery viewer with zoom/pan support.
 ///
@@ -24,12 +25,22 @@ class ImageGalleryViewer extends StatefulWidget {
   final List<String>? captions;
   final String? heroTagPrefix;
 
+  /// Share kind and id of the item these photos belong to, e.g.
+  /// `('discussions', 42)`. When set, the share button hands out that item's
+  /// share card instead of a bare image URL.
+  final String? shareKind;
+  final Object? shareId;
+  final String? shareTitle;
+
   const ImageGalleryViewer({
     super.key,
     required this.images,
     this.initialIndex = 0,
     this.captions,
     this.heroTagPrefix,
+    this.shareKind,
+    this.shareId,
+    this.shareTitle,
   });
 
   /// Static convenience method to open the gallery viewer.
@@ -45,6 +56,9 @@ class ImageGalleryViewer extends StatefulWidget {
     int initialIndex = 0,
     List<String>? captions,
     String? heroTagPrefix,
+    String? shareKind,
+    Object? shareId,
+    String? shareTitle,
   }) {
     if (images.isEmpty) return;
 
@@ -61,6 +75,9 @@ class ImageGalleryViewer extends StatefulWidget {
           initialIndex: clampedIndex,
           captions: captions,
           heroTagPrefix: heroTagPrefix,
+          shareKind: shareKind,
+          shareId: shareId,
+          shareTitle: shareTitle,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
@@ -331,22 +348,11 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             // Share button (left)
-                            _buildCircleButton(
-                              icon: Icons.share_rounded,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Clipboard.setData(ClipboardData(
-                                  text: widget.images[_currentIndex],
-                                ));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content:
-                                        Text('Image link copied to clipboard'),
-                                    duration: Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
+                            Builder(
+                              builder: (btnContext) => _buildCircleButton(
+                                icon: Icons.share_rounded,
+                                onTap: () => _share(btnContext),
+                              ),
                             ),
                             // Image counter
                             if (total > 1)
@@ -523,6 +529,32 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
     }
 
     return imageWidget;
+  }
+
+  /// Share the item these photos belong to when we know it, so the receiver
+  /// gets a preview card and a link back into the app; otherwise fall back to
+  /// the photo URL itself.
+  void _share(BuildContext btnContext) {
+    final caption = widget.captions != null &&
+            _currentIndex < widget.captions!.length
+        ? widget.captions![_currentIndex]
+        : '';
+    if (widget.shareKind != null && widget.shareId != null) {
+      ShareService.item(
+        btnContext,
+        kind: widget.shareKind!,
+        id: widget.shareId!,
+        title: widget.shareTitle?.trim().isNotEmpty == true
+            ? widget.shareTitle!
+            : caption,
+      );
+      return;
+    }
+    final image = widget.images[_currentIndex];
+    ShareService.text(
+      btnContext,
+      caption.isEmpty ? image : '$caption\n\n$image',
+    );
   }
 
   Widget _buildCircleButton({

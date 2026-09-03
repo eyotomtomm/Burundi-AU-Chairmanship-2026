@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../config/app_colors.dart';
+import '../config/app_ds.dart';
+import 'ds/ds_widgets.dart';
 import '../services/api_service.dart';
 
 /// A modal bottom sheet that shows release highlights ("What's New").
@@ -27,39 +28,39 @@ class WhatsNewDialog {
 
   static const List<_ChangelogItem> _changelog = [
     _ChangelogItem(
-      icon: Icons.auto_awesome_rounded,
-      titleEn: 'Discover Africa Redesigned',
-      titleFr: 'Decouvrir l\'Afrique redesigne',
-      subtitleEn: 'Facts and quotes now feature rich African-inspired patterns and vibrant new card designs.',
-      subtitleFr: 'Les faits et citations presentent desormais des motifs inspires de l\'Afrique et un design vibrant.',
+      icon: Icons.palette_rounded,
+      titleEn: 'A brand new look',
+      titleFr: 'Un tout nouveau look',
+      subtitleEn: 'Every screen has been redesigned around the 2026 chairmanship identity — new colours, cards and typography throughout.',
+      subtitleFr: "Chaque ecran a ete redessine autour de l'identite de la presidence 2026 — nouvelles couleurs, cartes et typographie.",
     ),
     _ChangelogItem(
-      icon: Icons.groups_rounded,
-      titleEn: 'Continental Dialogue Enhancements',
-      titleFr: 'Ameliorations du Dialogue Continental',
-      subtitleEn: 'Smoother registration experience with improved scheduling and document handling.',
-      subtitleFr: 'Inscription plus fluide avec une meilleure gestion des horaires et des documents.',
+      icon: Icons.home_rounded,
+      titleEn: 'A home screen that keeps up',
+      titleFr: 'Un accueil toujours a jour',
+      subtitleEn: 'New today brings live streams, the latest news and upcoming events together — every card opens the real thing.',
+      subtitleFr: "Nouveautes reunit les directs, les dernieres actualites et les evenements a venir — chaque carte ouvre le contenu.",
     ),
     _ChangelogItem(
-      icon: Icons.notifications_off_rounded,
-      titleEn: 'Smarter Notifications',
-      titleFr: 'Notifications plus intelligentes',
-      subtitleEn: 'Dismissed banners stay dismissed. No more repeated announcements cluttering your feed.',
-      subtitleFr: 'Les bannieres fermees restent fermees. Fini les annonces repetees qui encombrent votre fil.',
+      icon: Icons.explore_rounded,
+      titleEn: 'Discover Burundi & Africa',
+      titleFr: "Decouvrir le Burundi et l'Afrique",
+      subtitleEn: 'Both Discover sections now open rich photo pages with the story, key facts and initiatives behind them.',
+      subtitleFr: "Les deux sections Decouvrir ouvrent des pages illustrees avec le recit, les faits cles et les initiatives.",
+    ),
+    _ChangelogItem(
+      icon: Icons.translate_rounded,
+      titleEn: 'A clearer phrasebook',
+      titleFr: 'Un guide de conversation plus clair',
+      subtitleEn: 'Each phrase now shows your language and the Kirundi to say out loud — tap any phrase to copy it.',
+      subtitleFr: 'Chaque phrase affiche votre langue et le kirundi a prononcer — appuyez pour copier.',
     ),
     _ChangelogItem(
       icon: Icons.speed_rounded,
-      titleEn: 'Performance & Stability',
-      titleFr: 'Performance et stabilite',
-      subtitleEn: 'Faster app launch, improved splash screen timing, and overall smoother experience.',
-      subtitleFr: 'Lancement plus rapide, meilleur timing de l\'ecran de demarrage et experience plus fluide.',
-    ),
-    _ChangelogItem(
-      icon: Icons.bug_report_rounded,
-      titleEn: 'Bug Fixes',
-      titleFr: 'Corrections de bugs',
-      subtitleEn: 'Fixed scheduling issues, image loading, and various stability improvements.',
-      subtitleFr: 'Correction des problemes de planification, chargement d\'images et ameliorations de stabilite.',
+      titleEn: 'Faster and steadier',
+      titleFr: 'Plus rapide et plus stable',
+      subtitleEn: 'Lighter screens, fewer stalls, and fixes to sharing, deep links and image loading.',
+      subtitleFr: "Ecrans plus legers, moins de blocages, et corrections du partage, des liens et du chargement d'images.",
     ),
   ];
 
@@ -213,146 +214,110 @@ class _WhatsNewSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isFr = langCode == 'fr';
     final screenHeight = MediaQuery.of(context).size.height;
 
-    // Use backend-provided titles when available, otherwise the built-in
-    // bilingual default.
     final String headerTitle;
     if (isFr && (remoteTitleFr?.isNotEmpty ?? false)) {
       headerTitle = remoteTitleFr!;
     } else if (remoteTitleEn?.isNotEmpty ?? false) {
       headerTitle = remoteTitleEn!;
     } else {
-      headerTitle = isFr
-          ? 'Nouveautes dans v$currentVersion'
-          : "What's New in v$currentVersion";
+      headerTitle = isFr ? 'Nouveautes' : "What's new";
     }
 
     return Container(
-      constraints: BoxConstraints(maxHeight: screenHeight * 0.82),
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.86),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: Ds.bg(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // App icon
+          // Green header, same treatment as every screen in the app.
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.burundiGreen, AppColors.auGreen],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+            width: double.infinity,
+            color: Ds.green,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Ds.gold,
+                    borderRadius: BorderRadius.circular(Ds.rPill),
+                  ),
+                  child: Text(
+                    'VERSION $currentVersion',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                      color: Ds.goldInkDeep,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  headerTitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  isFr
+                      ? 'Decouvrez les dernieres ameliorations'
+                      : 'Here is what changed in this release',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.flag_rounded,
-              color: Colors.white,
-              size: 36,
-            ),
           ),
 
-          const SizedBox(height: 16),
-
-          // Title
-          Text(
-            headerTitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppColors.darkText : AppColors.lightText,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            isFr
-                ? 'Decouvrez les dernieres ameliorations'
-                : 'Discover the latest improvements',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          const Divider(height: 1),
-
-          // Changelog items
           Flexible(
             child: ListView.separated(
               shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 4),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return _ChangelogTile(
-                  item: item,
-                  langCode: langCode,
-                  isDark: isDark,
-                  index: index,
-                );
-              },
-            ),
-          ),
-
-          // "Got it" button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: FilledButton(
-                onPressed: onDismiss,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.burundiGreen,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: Text(
-                  isFr ? 'Compris!' : 'Got it!',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) => _ChangelogTile(
+                item: items[index],
+                langCode: langCode,
+                isDark: Theme.of(context).brightness == Brightness.dark,
+                index: index,
               ),
             ),
           ),
 
-          // Bottom safe area
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: DsPrimaryButton(
+              isFr ? 'Compris !' : 'Got it',
+              radius: 14,
+              onTap: onDismiss,
+            ),
+          ),
           SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
@@ -375,40 +340,16 @@ class _ChangelogTile extends StatelessWidget {
     required this.index,
   });
 
-  /// Rotate through a set of accent colors for visual variety.
-  static const List<Color> _accentColors = [
-    AppColors.burundiGreen,
-    AppColors.auGold,
-    AppColors.burundiRed,
-    AppColors.patternOrange,
-    AppColors.info,
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final color = _accentColors[index % _accentColors.length];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return DsCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon circle
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              item.icon,
-              color: color,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          // Text
+          DsIconSquare(item.icon,
+              tint: Ds.tint(context), color: Ds.green, size: 38),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,18 +358,15 @@ class _ChangelogTile extends StatelessWidget {
                   item.title(langCode),
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.darkText : AppColors.lightText,
+                    fontWeight: FontWeight.w700,
+                    color: Ds.ink(context),
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   item.subtitle(langCode),
                   style: TextStyle(
-                    fontSize: 13,
-                    height: 1.4,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                  ),
+                      fontSize: 13, height: 1.45, color: Ds.body(context)),
                 ),
               ],
             ),

@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:io';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
+import '../../config/app_ds.dart';
 
 class EventTicketScreen extends StatefulWidget {
   final int submissionId;
@@ -56,9 +57,6 @@ class _EventTicketScreenState extends State<EventTicketScreen> {
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text('Event Ticket'),
-        backgroundColor: AppColors.burundiGreen,
-        foregroundColor: Colors.white,
-        elevation: 0,
         actions: [
           if (_ticketData != null)
             IconButton(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../config/app_colors.dart';
+import '../../../config/app_ds.dart';
 
+/// Section heading: 16px/w700 title with an optional green "See all".
 class SectionTitle extends StatelessWidget {
   final String title;
   final bool showSeeAll;
@@ -16,42 +17,21 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 4,
-              height: 20,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.burundiGreen, AppColors.auGold],
-                ),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+        Expanded(child: Text(title, style: Ds.sectionTitle(context))),
         if (showSeeAll)
-          TextButton(
-            onPressed: onSeeAll,
-            child: const Row(
-              children: [
-                Text(
-                  'See All',
-                  style: TextStyle(color: AppColors.burundiGreen),
-                ),
-                Icon(Icons.chevron_right, color: AppColors.burundiGreen, size: 18),
-              ],
+          GestureDetector(
+            onTap: onSeeAll,
+            behavior: HitTestBehavior.opaque,
+            child: const Padding(
+              padding: EdgeInsets.only(left: 12),
+              child: Text(
+                'See all',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600, color: Ds.green),
+              ),
             ),
           ),
       ],

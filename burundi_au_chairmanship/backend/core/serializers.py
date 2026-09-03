@@ -15,7 +15,8 @@ from .models import (
     LoginHistory, ActiveSession, PasswordChangeHistory, Bookmark, Reaction,
     ReadingProgress, ContentSchedule, ArticleDraft, ContentVersion, ArticleSeries,
     TrendingContent, EventReminder, EventWaitlist, EventSpeaker, EventFeedback,
-    EventCheckIn, EventPhoto, Conversation, DirectMessage, Discussion, DiscussionReply,
+    EventCheckIn, EventPhoto, Conversation, DirectMessage, Discussion, DiscussionReply, DiscussionMedia, DiscussionLike, Follow,
+    DiscussionTopic, Poll, PollOption, PollVote,
     Poll, PollOption, PollVote, NotificationPreference, AnnouncementBanner,
     ContactDirectory, LiveQASession, LiveQAQuestion, UserPreference, OnboardingStep,
     EmailTemplate, Webhook, ScheduledMaintenance, PromotionalSplash, ABTest,
@@ -64,7 +65,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['phone_number', 'gender', 'nationality', 'date_of_birth', 'profile_picture', 'is_email_verified',
+        fields = ['phone_number', 'gender', 'nationality', 'date_of_birth', 'organization', 'role', 'bio',
+                  'profile_picture', 'is_email_verified',
                   'is_government_official', 'is_verified', 'badge_type', 'verification_requested_at',
                   'email_verified_at', 'government_verified_at', 'verified_at', 'receives_newsletter',
                   'admin_sections', 'is_usher']
@@ -82,6 +84,9 @@ class UserSerializer(serializers.ModelSerializer):
     gender = serializers.CharField(source='profile.gender', required=False, allow_blank=True)
     nationality = serializers.CharField(source='profile.nationality', required=False, allow_blank=True)
     date_of_birth = serializers.DateField(source='profile.date_of_birth', required=False, allow_null=True)
+    organization = serializers.CharField(source='profile.organization', required=False, allow_blank=True)
+    role = serializers.CharField(source='profile.role', required=False, allow_blank=True)
+    bio = serializers.CharField(source='profile.bio', required=False, allow_blank=True)
     profile_picture = serializers.ImageField(source='profile.profile_picture', required=False, allow_null=True)
     is_email_verified = serializers.BooleanField(source='profile.is_email_verified', read_only=True)
     is_government_official = serializers.BooleanField(source='profile.is_government_official', read_only=True)
@@ -91,8 +96,8 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'name', 'email', 'profile', 'phone_number', 'gender', 'nationality', 'date_of_birth',
-                  'profile_picture', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
-                  'is_staff']
+                  'organization', 'role', 'bio', 'profile_picture', 'is_email_verified', 'is_government_official',
+                  'is_verified', 'badge_type', 'is_staff']
         read_only_fields = ['id', 'email', 'is_email_verified', 'is_government_official', 'is_verified', 'badge_type',
                             'is_staff']
 
@@ -132,7 +137,8 @@ class UserSerializer(serializers.ModelSerializer):
         ret['verification_name'] = None
         approved = instance.verification_requests.filter(status='approved').order_by('-created_at').first()
         if approved:
-            ret['verification_title'] = approved.get_title_display()
+            # Strip the parenthetical gloss: "H.E. (His/Her Excellency)" -> "H.E."
+            ret['verification_title'] = approved.get_title_display().split('(')[0].strip()
             ret['verification_role'] = approved.position_role
             ret['verification_name'] = approved.full_name
         return ret
@@ -859,6 +865,10 @@ class AppSettingsSerializer(serializers.ModelSerializer):
                   'bookmarks_enabled', 'discussions_enabled',
                   'polls_enabled', 'newsletter_enabled',
                   'facts_enabled', 'live_feeds_enabled', 'qr_code_mode',
+                  'hero_rail_enabled', 'hero_rail_live_count',
+                  'hero_rail_news_count', 'hero_rail_event_count',
+                  'hero_rail_magazine_count', 'hero_rail_video_count',
+                  'hero_rail_feature_count',
                   'countdown_target_date', 'countdown_label',
                   'countdown_label_fr', 'countdown_enabled',
                   'section_title_news', 'section_title_news_fr',
@@ -1663,17 +1673,115 @@ class DirectMessageSerializer(serializers.ModelSerializer):
         return f'{obj.sender.first_name} {obj.sender.last_name}'.strip() or user_handle(obj.sender)
 
 
+class DiscussionMediaSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DiscussionMedia
+        fields = ['id', 'media_type', 'url', 'caption', 'order']
+
+    def get_url(self, obj):
+        f = obj.image if obj.media_type == 'image' else obj.video
+        if not f:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(f.url) if request else f.url
+
+
+class DiscussionTopicSerializer(serializers.ModelSerializer):
+    post_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = DiscussionTopic
+        fields = ['id', 'title', 'title_fr', 'description', 'description_fr',
+                  'category', 'order', 'post_count']
+
+
+class PostPollSerializer(serializers.ModelSerializer):
+    """A poll as the feed shows it: options, tallies and the viewer's vote."""
+    options = serializers.SerializerMethodField()
+    my_vote = serializers.SerializerMethodField()
+    has_ended = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Poll
+        fields = ['id', 'title', 'total_votes', 'multiple_choice', 'expires_at',
+                  'has_ended', 'options', 'my_vote']
+
+    def get_options(self, obj):
+        return [
+            {'id': o.id, 'text': o.text, 'vote_count': o.vote_count}
+            for o in obj.options.all()
+        ]
+
+    def get_my_vote(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        vote = PollVote.objects.filter(poll=obj, user=request.user).first()
+        return vote.option_id if vote else None
+
+    def get_has_ended(self, obj):
+        from django.utils import timezone
+        return bool(obj.expires_at and timezone.now() > obj.expires_at)
+
+
 class DiscussionSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
+    author_handle = serializers.SerializerMethodField()
+    author_avatar = serializers.SerializerMethodField()
     author_badge = serializers.SerializerMethodField()
+    media = DiscussionMediaSerializer(many=True, read_only=True)
+    is_liked = serializers.SerializerMethodField()
+    repost_count = serializers.SerializerMethodField()
+    reposted_post = serializers.SerializerMethodField()
+    poll = PostPollSerializer(read_only=True)
+    topic_title = serializers.CharField(source='topic.title', read_only=True, default=None)
 
     class Meta:
         model = Discussion
         fields = ['id', 'title', 'content', 'category', 'author', 'author_name',
-                  'author_badge', 'is_pinned', 'is_locked', 'view_count',
-                  'reply_count', 'last_reply_at', 'created_at']
-        read_only_fields = ['id', 'author', 'view_count', 'reply_count',
-                            'last_reply_at', 'created_at']
+                  'author_handle', 'author_avatar', 'author_badge', 'is_pinned',
+                  'is_locked', 'view_count', 'like_count', 'is_liked',
+                  'reply_count', 'repost_of', 'reposted_post', 'repost_count',
+                  'poll', 'topic', 'topic_title', 'last_reply_at', 'created_at', 'media']
+        read_only_fields = ['id', 'author', 'view_count', 'like_count',
+                            'reply_count', 'last_reply_at', 'created_at']
+
+    def get_author_handle(self, obj):
+        from .utils import user_handle
+        return user_handle(obj.author)
+
+    def get_author_avatar(self, obj):
+        profile = getattr(obj.author, 'profile', None)
+        if not profile or not profile.profile_picture:
+            return None
+        request = self.context.get('request')
+        url = profile.profile_picture.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_is_liked(self, obj):
+        # Set by the feed's annotation; the query is only for one-off lookups.
+        annotated = getattr(obj, 'liked_by_me', None)
+        if annotated is not None:
+            return annotated
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return DiscussionLike.objects.filter(discussion=obj, user=request.user).exists()
+
+    def get_repost_count(self, obj):
+        annotated = getattr(obj, 'repost_total', None)
+        return annotated if annotated is not None else obj.reposts.count()
+
+    def get_reposted_post(self, obj):
+        """The shared post, one level deep — a repost of a repost still shows
+        the original rather than recursing."""
+        if not obj.repost_of:
+            return None
+        inner = DiscussionSerializer(obj.repost_of, context=self.context).data
+        inner.pop('reposted_post', None)
+        return inner
 
     def get_author_name(self, obj):
         from .utils import user_handle

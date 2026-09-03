@@ -10,6 +10,13 @@ import '../../l10n/app_localizations.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../utils/input_sanitizer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../config/app_ds.dart';
+import '../../config/environment.dart';
+import '../../widgets/verified_badge.dart';
+import '../../widgets/image_gallery_viewer.dart';
+import '../feature_card/media_video_player_screen.dart';
+import '../../services/share_service.dart';
 
 class DiscussionDetailScreen extends StatefulWidget {
   final int discussionId;
@@ -102,6 +109,138 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  /// The question this post answers, if it was written from a topic.
+  Widget _buildTopicBanner(BuildContext context) {
+    final topicId = _discussion?['topic'] as int?;
+    final title = _discussion?['topic_title'] as String? ?? '';
+    if (topicId == null || title.isEmpty) return const SizedBox.shrink();
+
+    final fr = Localizations.localeOf(context).languageCode == 'fr';
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          color: Ds.tint(context),
+          borderRadius: BorderRadius.circular(Ds.rTile),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.forum_rounded, size: 17, color: Ds.greenDeep),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fr ? 'EN RÉPONSE À' : 'ANSWERING',
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: Ds.greenDeep),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    title,
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: Ds.ink(context)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Photos and videos attached to the post. Empty for text-only posts.
+  Widget _buildMediaStrip(bool isDark) {
+    final media = (_discussion?['media'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+    if (media.isEmpty) return const SizedBox.shrink();
+
+    final imageUrls = media
+        .where((m) => m['media_type'] != 'video' && m['url'] != null)
+        .map((m) => Environment.fixMediaUrl(m['url'] as String))
+        .toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: SizedBox(
+        height: 160,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: media.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final m = media[i];
+            final rawUrl = m['url'] as String?;
+            if (rawUrl == null) return const SizedBox.shrink();
+            final url = Environment.fixMediaUrl(rawUrl);
+            final caption = m['caption'] as String? ?? '';
+
+            if (m['media_type'] == 'video') {
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MediaVideoPlayerScreen(videoUrl: url, caption: caption),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 220,
+                    color: isDark ? Colors.grey[850] : Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.play_circle_fill_rounded, size: 48, color: Colors.white70),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // Photos open in the shared gallery viewer, indexed among photos only.
+            final photoIndex = imageUrls.indexOf(url);
+            return GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ImageGalleryViewer(
+                    images: imageUrls,
+                    initialIndex: photoIndex < 0 ? 0 : photoIndex,
+                    shareKind: 'discussions',
+                    shareId: _discussion?['id'],
+                    shareTitle: _discussion?['title'] as String?,
+                  ),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  width: 220,
+                  fit: BoxFit.cover,
+                  placeholder: (_, _) => Container(color: isDark ? Colors.grey[850] : Colors.grey[300]),
+                  errorWidget: (_, _, _) => Container(
+                    width: 220,
+                    color: isDark ? Colors.grey[850] : Colors.grey[300],
+                    child: const Icon(Icons.broken_image_rounded, color: Colors.white54),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _postReply() async {
     final text = InputSanitizer.sanitizeComment(_replyCtrl.text);
     if (text.isEmpty) return;
@@ -140,9 +279,26 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: const Text('Discussion'),
-        elevation: 0,
+        actions: [
+          if (_discussion != null)
+            Builder(
+              builder: (btnContext) => IconButton(
+                icon: const Icon(Icons.share_rounded),
+                tooltip: 'Share',
+                onPressed: () => ShareService.item(
+                  btnContext,
+                  kind: 'discussions',
+                  id: _discussion!['id'],
+                  title: (_discussion!['title'] as String?)?.trim().isNotEmpty == true
+                      ? _discussion!['title'] as String
+                      : (_discussion!['content'] as String? ?? ''),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -183,22 +339,34 @@ class _DiscussionDetailScreenState extends State<DiscussionDetailScreen> {
                                       Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(_discussion!['author_name'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          Row(
+                                            children: [
+                                              Text(_discussion!['author_name'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                              if (_discussion!['author_badge'] != null) ...[
+                                                const SizedBox(width: 4),
+                                                VerifiedBadge(badgeType: _discussion!['author_badge'] as String?, size: 15),
+                                              ],
+                                            ],
+                                          ),
                                           Text(_discussion!['created_at'] ?? '', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
                                         ],
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _discussion!['title'] ?? '',
-                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                                  ),
+                                  if ((_discussion!['title'] as String? ?? '').isNotEmpty) ...[
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _discussion!['title'] as String,
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
                                   const SizedBox(height: 8),
                                   Text(
                                     _discussion!['content'] ?? '',
                                     style: TextStyle(fontSize: 15, color: isDark ? Colors.grey[300] : Colors.grey[700], height: 1.5),
                                   ),
+                                  _buildTopicBanner(context),
+                                  _buildMediaStrip(isDark),
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [

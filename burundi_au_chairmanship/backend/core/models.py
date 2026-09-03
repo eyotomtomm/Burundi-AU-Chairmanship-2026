@@ -133,6 +133,12 @@ class UserProfile(models.Model):
         null=True,
         help_text='Type of verification badge (Gold for VIPs, Blue for officials, Green for verified users)'
     )
+    bio = models.CharField(
+        max_length=200, blank=True,
+        help_text='Short self-description shown on the Explore profile.')
+    explore_terms_accepted_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When the user accepted the Explore community terms. Null = not yet.')
     verification_requested_at = models.DateTimeField(null=True, blank=True, help_text='When user requested verification')
     email_verified_at = models.DateTimeField(null=True, blank=True)
     government_verified_at = models.DateTimeField(null=True, blank=True)
@@ -1632,6 +1638,16 @@ class AppSettings(models.Model):
     newsletter_enabled = models.BooleanField(default=True, help_text='Show Weekly Newsletter toggle in the app')
     facts_enabled = models.BooleanField(default=True, help_text='Show Facts & Quotes section in the app')
     live_feeds_enabled = models.BooleanField(default=True, help_text='Show Live Feeds feature in the app')
+
+    # Home "New today" rail — how many of each content type the rail shows.
+    # 0 hides that type. Order in the rail: live, news, events, magazine, video, discover.
+    hero_rail_enabled = models.BooleanField(default=True, help_text='Show the "New today" rail at the top of the home screen')
+    hero_rail_live_count = models.PositiveSmallIntegerField(default=2, help_text='Live feeds in the "New today" rail (0 = hide)')
+    hero_rail_news_count = models.PositiveSmallIntegerField(default=2, help_text='News/articles in the "New today" rail (0 = hide)')
+    hero_rail_event_count = models.PositiveSmallIntegerField(default=2, help_text='Upcoming events in the "New today" rail (0 = hide)')
+    hero_rail_magazine_count = models.PositiveSmallIntegerField(default=1, help_text='Magazines in the "New today" rail (0 = hide)')
+    hero_rail_video_count = models.PositiveSmallIntegerField(default=1, help_text='Videos in the "New today" rail (0 = hide)')
+    hero_rail_feature_count = models.PositiveSmallIntegerField(default=2, help_text='Feature cards in the "New today" rail (0 = hide)')
 
     # Editable section titles (home screen)
     section_title_news = models.CharField(max_length=100, blank=True, default='News', help_text='Home section title for News (English)')
@@ -3155,16 +3171,23 @@ class Discussion(models.Model):
     """Forum discussion/thread."""
     CATEGORY_CHOICES = [
         ('general', 'General'),
+        ('arise', 'A-RISE Youth Voices'),
         ('events', 'Events'),
         ('culture', 'Culture'),
         ('politics', 'Politics & Diplomacy'),
         ('business', 'Business & Trade'),
         ('announcements', 'Announcements'),
     ]
-    title = models.CharField(max_length=300)
+    title = models.CharField(max_length=300, blank=True)
     content = models.TextField()
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='general')
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussions')
+    repost_of = models.ForeignKey(
+        'self', on_delete=models.CASCADE, null=True, blank=True, related_name='reposts',
+        help_text='Set when this post shares another post.')
+    topic = models.ForeignKey(
+        'DiscussionTopic', on_delete=models.SET_NULL, null=True, blank=True, related_name='posts',
+        help_text='The admin-authored prompt this post answers, if any.')
     is_pinned = models.BooleanField(default=False)
     is_locked = models.BooleanField(default=False, help_text='Prevent new replies')
     view_count = models.PositiveIntegerField(default=0)
@@ -3206,6 +3229,159 @@ class DiscussionReply(models.Model):
         return f"Reply by {self.author.username} on {self.discussion.title[:30]}"
 
 
+class Follow(models.Model):
+    """One user following another. Drives the Following feed."""
+    follower = models.ForeignKey(User, on_delete=models.CASCADE, related_name='following_set')
+    following = models.ForeignKey(User, on_delete=models.CASCADE, related_name='follower_set')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('follower', 'following')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['follower', '-created_at']),
+            models.Index(fields=['following', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.follower.username} → {self.following.username}"
+
+
+class ContentReport(models.Model):
+    """A viewer flagging a post or another user for moderator review."""
+    REASON_CHOICES = [
+        ('spam', 'Spam or misleading'),
+        ('harassment', 'Harassment or hate'),
+        ('violence', 'Violence or threats'),
+        ('sexual', 'Sexual content'),
+        ('misinformation', 'False information'),
+        ('other', 'Something else'),
+    ]
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('reviewed', 'Reviewed'),
+        ('actioned', 'Actioned'),
+        ('dismissed', 'Dismissed'),
+    ]
+
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_made')
+    # Exactly one of these is set — a report is about a post or about a person.
+    discussion = models.ForeignKey(
+        Discussion, on_delete=models.CASCADE, null=True, blank=True, related_name='reports')
+    reported_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, blank=True, related_name='reports_against')
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, default='other')
+    detail = models.TextField(blank=True, max_length=2000)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='open', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Content Report'
+        verbose_name_plural = 'Content Reports'
+        indexes = [models.Index(fields=['status', '-created_at'])]
+        constraints = [
+            # One report per person per target, so a spam-tap can't flood the queue.
+            models.UniqueConstraint(
+                fields=['reporter', 'discussion'],
+                condition=models.Q(discussion__isnull=False),
+                name='unique_report_per_discussion'),
+            models.UniqueConstraint(
+                fields=['reporter', 'reported_user'],
+                condition=models.Q(reported_user__isnull=False),
+                name='unique_report_per_user'),
+        ]
+
+    def __str__(self):
+        target = f'post {self.discussion_id}' if self.discussion_id else f'user {self.reported_user_id}'
+        return f'{self.get_reason_display()} — {target}'
+
+
+class DiscussionTopic(models.Model):
+    """An admin-authored prompt the feed invites people to weigh in on."""
+    title = models.CharField(max_length=160)
+    title_fr = models.CharField(max_length=160, blank=True)
+    description = models.CharField(max_length=300, blank=True)
+    description_fr = models.CharField(max_length=300, blank=True)
+    category = models.CharField(
+        max_length=20, choices=Discussion.CATEGORY_CHOICES, default='general',
+        help_text='Category applied to posts started from this topic.')
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        verbose_name = 'Discussion Topic'
+        verbose_name_plural = 'Discussion Topics'
+
+    def __str__(self):
+        return self.title
+
+
+class ExploreNotification(models.Model):
+    """A social event addressed to one person: a follow, like or reply.
+
+    Separate from `Notification`, which is an admin broadcast with audience
+    targeting — this one always has an actor and a single recipient.
+    """
+    VERB_CHOICES = [
+        ('follow', 'Started following you'),
+        ('like', 'Liked your post'),
+        ('reply', 'Replied to your post'),
+        ('repost', 'Reposted your post'),
+    ]
+
+    recipient = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='explore_notifications')
+    actor = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='explore_actions')
+    verb = models.CharField(max_length=12, choices=VERB_CHOICES)
+    discussion = models.ForeignKey(
+        Discussion, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='notifications')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Explore Notification'
+        verbose_name_plural = 'Explore Notifications'
+        indexes = [
+            models.Index(fields=['recipient', '-created_at']),
+            models.Index(fields=['recipient', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f'{self.actor.username} {self.verb} -> {self.recipient.username}'
+
+
+class DiscussionMedia(models.Model):
+    """Photo or video attached to a discussion post by its author."""
+    MEDIA_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('video', 'Video'),
+    ]
+    MAX_PER_DISCUSSION = 4
+
+    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name='media')
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES, default='image')
+    image = models.ImageField(upload_to='discussion_media/', blank=True, validators=[validate_image_file])
+    video = models.FileField(upload_to='discussion_media/', blank=True, validators=[validate_video_file])
+    caption = models.CharField(max_length=300, blank=True)
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'Discussion Media'
+        verbose_name_plural = 'Discussion Media'
+
+    def __str__(self):
+        return f"{self.get_media_type_display()} on {self.discussion.title[:30]}"
+
+
 class Poll(models.Model):
     """Polls and surveys."""
     title = models.CharField(max_length=300)
@@ -3213,6 +3389,9 @@ class Poll(models.Model):
     description = models.TextField(blank=True)
     description_fr = models.TextField(blank=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_polls')
+    discussion = models.OneToOneField(
+        Discussion, on_delete=models.CASCADE, null=True, blank=True, related_name='poll',
+        help_text='Set when this poll was attached to a feed post.')
     is_active = models.BooleanField(default=True)
     is_anonymous = models.BooleanField(default=False, help_text='Hide voter identity')
     multiple_choice = models.BooleanField(default=False, help_text='Allow selecting multiple options')
@@ -5427,6 +5606,97 @@ class PhrasebookEntry(models.Model):
         super().save(*args, **kwargs)
 
 
+
+# ─────────────────────────────────────────────────────────────
+#  NEWS SCRAPER — fetch from external sources into a review
+#  queue, so nothing reaches the app until a human approves it.
+# ─────────────────────────────────────────────────────────────
+
+class NewsSource(models.Model):
+    """An external feed we pull candidate news from."""
+
+    KIND_CHOICES = [
+        ('x', 'X / Twitter account'),
+        ('rss', 'RSS / Atom feed'),
+    ]
+
+    name = models.CharField(max_length=100, help_text='Display name, e.g. "African Union"')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='rss')
+    target = models.CharField(
+        max_length=500,
+        help_text='X handle without the @ (e.g. BurundinAddis), or the full feed URL',
+    )
+    attribution = models.CharField(
+        max_length=100, blank=True,
+        help_text='Credit shown on reposts, e.g. "via African Union". Leave blank for our own posts.',
+    )
+    is_own_content = models.BooleanField(
+        default=False,
+        help_text='On = our own posts (no credit line). Off = a repost, credited to this source.',
+    )
+    default_category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='news_sources',
+        help_text='Category applied to articles approved from this source',
+    )
+    is_active = models.BooleanField(default=True)
+    last_fetched_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.name} ({self.get_kind_display()})'
+
+
+class ScrapedItem(models.Model):
+    """One candidate post pulled from a NewsSource, awaiting review."""
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    source = models.ForeignKey(NewsSource, on_delete=models.CASCADE, related_name='items')
+    external_id = models.CharField(
+        max_length=200, db_index=True,
+        help_text='Tweet id or feed entry guid — used to avoid re-importing the same post',
+    )
+    title = models.CharField(max_length=300)
+    content = models.TextField(blank=True)
+    image = models.ImageField(upload_to='scraped/', blank=True, validators=[validate_image_file])
+    image_url = models.URLField(max_length=1000, blank=True, help_text='Original image URL at the source')
+    source_url = models.URLField(max_length=1000, blank=True, help_text='Permalink back to the original post')
+    published_at = models.DateTimeField(db_index=True, help_text='When the source published it')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True)
+    article = models.ForeignKey(
+        'Article', on_delete=models.SET_NULL, null=True, blank=True, related_name='scraped_from',
+        help_text='The article created when this item was approved',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_scraped_items',
+    )
+    raw = models.JSONField(default=dict, blank=True, help_text='Original metadata from the source')
+    fetched_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-published_at']
+        # The same post must never enter the queue twice.
+        constraints = [
+            models.UniqueConstraint(fields=['source', 'external_id'], name='uniq_scraped_item_per_source'),
+        ]
+        indexes = [
+            models.Index(fields=['status', '-published_at']),
+        ]
+
+    def __str__(self):
+        return f'[{self.status}] {self.title[:60]}'
+
+
 # Connect to all core models with image fields
 from django.db.models.signals import pre_save  # noqa: E402
 for _model in [
@@ -5436,6 +5706,6 @@ for _model in [
     VerificationRequest, WeatherCity, Popup, UserProfile,
     # New models with image fields
     ArticleDraft, ArticleSeries, EventSpeaker, EventPhoto,
-    DirectMessage, ContactDirectory, OnboardingStep,
+    DirectMessage, ContactDirectory, OnboardingStep, ScrapedItem,
 ]:
     pre_save.connect(_auto_optimize_image, sender=_model)

@@ -10,6 +10,7 @@ import '../../widgets/african_pattern.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/translate_button.dart';
+import '../../config/app_ds.dart';
 
 class ResourcesScreen extends StatefulWidget {
   const ResourcesScreen({super.key});
@@ -62,6 +63,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
     final langCode = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(l10n.resources),
         actions: const [TranslateButton()],

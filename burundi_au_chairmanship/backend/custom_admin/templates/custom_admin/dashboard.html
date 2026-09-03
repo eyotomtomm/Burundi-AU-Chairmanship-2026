@@ -3,14 +3,14 @@
 {% block title %}Dashboard - Diplomatic Portal{% endblock %}
 
 {% block content %}
-<!-- Welcome + Customize Button -->
-<div class="mb-12 flex items-start justify-between">
+<!-- Welcome banner + Customize Button -->
+<div class="hero-banner px-8 py-7 mb-5 flex items-start justify-between gap-6">
   <div>
-    <span class="text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-2 block">Strategic Overview</span>
-    <h1 class="text-3xl font-bold text-on-surface font-headline leading-tight">Welcome, {{ user.get_full_name|default:user.username }}</h1>
-    <p class="text-on-surface-variant mt-2 max-w-2xl">Welcome to the command portal. Here is the current state of digital engagement for the Be 4 Africa.</p>
+    <div class="font-label text-[11px] tracking-[2px] uppercase text-gold">Strategic Overview &middot; {% now "D d M Y" %}</div>
+    <h1 class="text-[27px] font-extrabold font-headline leading-tight mt-1.5">Welcome back, {{ user.get_full_name|default:user.username }}</h1>
+    <p class="text-[13px] text-[#cfe0d5] mt-1">{% if pending_verif %}{{ pending_verif }} item{{ pending_verif|pluralize }} need{{ pending_verif|pluralize:"s," }} your attention today{% else %}Nothing is waiting on you today{% endif %}</p>
   </div>
-  <button onclick="toggleCustomizePanel()" class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm" title="Customize Dashboard">
+  <button onclick="toggleCustomizePanel()" class="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-white/10 border border-white/15 rounded-xl text-[13px] font-bold text-cream hover:bg-white/[0.18] transition-all" title="Customize Dashboard">
     <span class="material-symbols-outlined text-lg">settings</span>
     <span class="hidden sm:inline">Customize</span>
   </button>
@@ -111,55 +111,46 @@
     <span class="material-symbols-outlined text-slate-400 collapse-icon text-sm" id="collapse-icon-key-metrics">expand_less</span>
   </div>
   <div class="widget-body" id="body-key-metrics">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
-        <div class="flex justify-between items-start mb-4">
-          <div class="bg-primary-container/10 p-2 rounded-lg">
-            <span class="material-symbols-outlined text-primary-container">group</span>
-          </div>
-        </div>
-        <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">App Users</p>
-        <h3 class="text-2xl font-bold mt-1">{{ users|default:"0" }}</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="bg-surface-container-lowest border border-slate-200 rounded-2xl p-[18px]">
+        <p class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant">App Users</p>
+        <h3 class="text-[25px] font-extrabold mt-1.5 leading-none">{{ users|default:"0" }}</h3>
+        {% if growth_trend_pct %}
+        <p class="text-[11px] font-semibold mt-1 {% if growth_trend_direction == 'down' %}text-red-600{% else %}text-emerald-600{% endif %}">{% if growth_trend_direction == 'down' %}&#9660;{% else %}&#9650;{% endif %} {{ growth_trend_pct }}% <span class="text-on-surface-variant font-normal">last 30 days</span></p>
+        {% else %}
+        <p class="text-[11px] text-on-surface-variant mt-1">{{ growth_last_30|default:"0" }} joined in 30 days</p>
+        {% endif %}
       </div>
 
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
-        <div class="flex justify-between items-start mb-4">
-          <div class="bg-secondary-container/20 p-2 rounded-lg">
-            <span class="material-symbols-outlined text-secondary">bolt</span>
-          </div>
-          <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Active</span>
-        </div>
-        <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Active Today</p>
-        <h3 class="text-2xl font-bold mt-1">{{ active_today|default:"0" }}</h3>
+      <div class="bg-surface-container-lowest border border-slate-200 rounded-2xl p-[18px]">
+        <p class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant">Active Today</p>
+        <h3 class="text-[25px] font-extrabold mt-1.5 leading-none">{{ active_today|default:"0" }}</h3>
+        <p class="text-[11px] text-on-surface-variant mt-1">{{ live_users|default:"0" }} online now</p>
       </div>
 
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
-        <div class="flex justify-between items-start mb-4">
-          <div class="bg-primary-container/10 p-2 rounded-lg">
-            <span class="material-symbols-outlined text-primary-container">description</span>
-          </div>
-        </div>
-        <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Published Articles</p>
-        <h3 class="text-2xl font-bold mt-1">{{ articles|default:"0" }}</h3>
+      <div class="bg-surface-container-lowest border border-slate-200 rounded-2xl p-[18px]">
+        <p class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant">Articles</p>
+        <h3 class="text-[25px] font-extrabold mt-1.5 leading-none">{{ articles|default:"0" }}</h3>
+        <p class="text-[11px] text-on-surface-variant mt-1">
+          {% if live_feeds_active %}<span class="inline-flex items-center gap-1 font-semibold text-red-600"><span class="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse"></span>{{ live_feeds_active }} live now</span>{% else %}{{ total_content|default:"0" }} content items total{% endif %}
+        </p>
       </div>
 
-      <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm border-b-2 border-transparent hover:border-secondary transition-all duration-300">
-        <div class="flex justify-between items-start mb-4">
-          <div class="bg-primary-container/10 p-2 rounded-lg">
-            <span class="material-symbols-outlined text-primary-container">broadcast_on_personal</span>
-          </div>
-          {% if live_feeds_active %}
-          <div class="flex items-center gap-1">
-            <span class="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
-            <span class="text-[10px] font-bold text-red-600 uppercase">Live</span>
-          </div>
-          {% endif %}
-        </div>
-        <p class="text-on-surface-variant text-xs font-bold uppercase tracking-wider">Live Broadcasts</p>
-        <h3 class="text-2xl font-bold mt-1">{{ live_feeds_active|default:"0" }}</h3>
+      <div class="bg-primary-container rounded-2xl p-[18px] text-cream">
+        <p class="font-label text-[10px] tracking-[1.5px] uppercase text-gold">Pending Review</p>
+        <h3 class="text-[25px] font-extrabold mt-1.5 leading-none">{{ pending_verif|default:"0" }}</h3>
+        <p class="text-[11px] text-[#cfe0d5] mt-1">verification{{ pending_verif|pluralize }} waiting</p>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Comp: Overview / Content / Users / System tab row -->
+<div class="flex gap-2 mb-5" id="dashTabs">
+  <button type="button" class="tab on" data-dtab="overview">Overview</button>
+  <button type="button" class="tab" data-dtab="content">Content</button>
+  <button type="button" class="tab" data-dtab="users">Users</button>
+  <button type="button" class="tab" data-dtab="system">System</button>
 </div>
 
 <!-- Live Users Badge -->
@@ -244,7 +235,7 @@
 <!-- Account Alerts -->
 <div id="widget-account-alerts" class="dashboard-widget">
   {% if deletion_scheduled %}
-  <div class="mb-8 bg-white border-l-4 border-red-500 rounded-xl p-6 shadow-sm">
+  <div class="mb-8 bg-white border border-red-200 rounded-2xl p-6 shadow-sm">
     <div class="flex items-center gap-2 mb-4 cursor-pointer" onclick="collapseWidget('account-alerts')">
       <span class="material-symbols-outlined text-red-600">warning</span>
       <h4 class="text-lg font-bold text-red-700">Account Deletion Requests ({{ deletion_scheduled|length }})</h4>
@@ -280,7 +271,7 @@
   {% endif %}
 
   {% if deactivated_users %}
-  <div class="mb-8 bg-white border-l-4 border-amber-500 rounded-xl p-6 shadow-sm">
+  <div class="mb-8 bg-white border border-amber-200 rounded-2xl p-6 shadow-sm">
     <div class="flex items-center gap-2 mb-4">
       <span class="material-symbols-outlined text-amber-600">pause_circle</span>
       <h4 class="text-lg font-bold text-amber-700">Deactivated Accounts ({{ deactivated_users|length }})</h4>
@@ -487,7 +478,7 @@
           </div>
           <div class="p-4 rounded-lg bg-surface-container-low text-center">
             <div class="text-xs text-on-surface-variant uppercase tracking-wider">Opened</div>
-            <div class="text-2xl font-bold mt-1 text-indigo-600">{{ notif_opened_30d|default:"0" }}</div>
+            <div class="text-2xl font-bold mt-1 text-amber-600">{{ notif_opened_30d|default:"0" }}</div>
           </div>
         </div>
         <canvas id="notifEngagementChart" height="180"></canvas>
@@ -666,7 +657,7 @@
               <p class="text-sm font-medium text-slate-900">{{ event.name }}</p>
               <p class="text-xs text-slate-500 mt-1">{{ event.event_date|date:"M d, Y" }} &bull; {{ event.address|truncatewords:5 }}</p>
             </div>
-            <span class="text-xs font-bold {% if event.is_active %}text-emerald-600 bg-emerald-50{% else %}text-slate-400 bg-slate-50{% endif %} px-2 py-1 rounded">{% if event.is_active %}Active{% else %}Draft{% endif %}</span>
+            <span class="text-xs font-bold {% if event.is_active %}text-emerald-600 bg-emerald-50{% else %}text-slate-500 bg-slate-100{% endif %} px-2 py-1 rounded">{% if event.is_active %}Active{% else %}Draft{% endif %}</span>
           </div>
           {% empty %}
           <div class="p-6 text-sm text-on-surface-variant">No upcoming events.</div>
@@ -710,18 +701,50 @@ function saveCollapsePrefs(prefs) {
   try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(prefs)); } catch (e) {}
 }
 
+// Which dashboard tab each widget belongs to (unlisted -> overview).
+var DASH_TABS = {
+  overview: ['key-metrics','live-users','account-alerts','engagement-chart','quick-actions'],
+  content:  ['content-summary','content-engagement','content-category','recent-articles','recent-events','upcoming-events-widget'],
+  users:    ['user-growth','verification-donut','verification-queue','top-countries','language-distribution'],
+  system:   ['system-status','notif-engagement']
+};
+var currentDashTab = 'overview';
+
+function widgetTab(key) {
+  for (var t in DASH_TABS) { if (DASH_TABS[t].indexOf(key) !== -1) return t; }
+  return 'overview';
+}
+
+// Visibility is (in the active tab) AND (not hidden in Customize) — both
+// signals resolve here so the two features cannot fight over inline display.
+function applyDashVisibility() {
+  var prefs = getWidgetPrefs() || {};
+  document.querySelectorAll('.dashboard-widget').forEach(function (el) {
+    var key = el.id.replace('widget-', '');
+    var inTab = widgetTab(key) === currentDashTab;
+    var userOn = prefs[key] !== false;
+    el.style.display = (inTab && userOn) ? '' : 'none';
+  });
+}
+
+function switchDashTab(tab) {
+  currentDashTab = tab;
+  document.querySelectorAll('#dashTabs [data-dtab]').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.dtab === tab);
+  });
+  try { localStorage.setItem('dashboard_tab', tab); } catch (e) {}
+  applyDashVisibility();
+}
+
 function toggleWidget(checkbox) {
   var widgetId = checkbox.getAttribute('data-widget');
-  var el = document.getElementById('widget-' + widgetId);
-  if (el) {
-    el.style.display = checkbox.checked ? '' : 'none';
-  }
   // Save preferences
   var prefs = {};
   document.querySelectorAll('#customizePanel input[data-widget]').forEach(function(cb) {
     prefs[cb.getAttribute('data-widget')] = cb.checked;
   });
   saveWidgetPrefs(prefs);
+  applyDashVisibility();
 }
 
 function collapseWidget(widgetId) {
@@ -750,8 +773,8 @@ function resetWidgetPrefs() {
   localStorage.removeItem(PREFS_KEY);
   localStorage.removeItem(COLLAPSE_KEY);
   // Show all widgets and expand all
-  document.querySelectorAll('.dashboard-widget').forEach(function(w) { w.style.display = ''; });
   document.querySelectorAll('#customizePanel input[data-widget]').forEach(function(cb) { cb.checked = true; });
+  applyDashVisibility();
   document.querySelectorAll('.widget-body').forEach(function(b) { b.style.display = ''; });
   document.querySelectorAll('.collapse-icon').forEach(function(ic) { ic.textContent = 'expand_less'; });
 }
@@ -761,11 +784,20 @@ function resetWidgetPrefs() {
   var prefs = getWidgetPrefs();
   if (prefs) {
     Object.keys(prefs).forEach(function(widgetId) {
-      var el = document.getElementById('widget-' + widgetId);
       var cb = document.querySelector('#customizePanel input[data-widget="' + widgetId + '"]');
-      if (el) el.style.display = prefs[widgetId] ? '' : 'none';
       if (cb) cb.checked = prefs[widgetId];
     });
+  }
+
+  var rail = document.getElementById('dashTabs');
+  if (rail) {
+    rail.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-dtab]');
+      if (btn) switchDashTab(btn.dataset.dtab);
+    });
+    var savedTab = null;
+    try { savedTab = localStorage.getItem('dashboard_tab'); } catch (e) {}
+    switchDashTab(DASH_TABS[savedTab] ? savedTab : 'overview');
   }
 
   var collapsePrefs = getCollapsePrefs();

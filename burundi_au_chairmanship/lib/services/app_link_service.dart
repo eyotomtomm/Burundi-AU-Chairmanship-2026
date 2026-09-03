@@ -16,6 +16,12 @@ class AppLinkService {
   StreamSubscription<Uri>? _sub;
   bool _initialized = false;
 
+  /// The link the app was launched with, held until the app has finished
+  /// starting up. Routing it immediately would race SplashScreen's
+  /// `pushReplacementNamed('/home')` and the destination could be replaced
+  /// out from under the user.
+  Uri? _pendingInitialLink;
+
   /// Call once during app startup (fire-and-forget).
   Future<void> initialize() async {
     if (_initialized) return;
@@ -25,8 +31,8 @@ class AppLinkService {
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
-        if (kDebugMode) print('AppLinkService: cold-start link: $initialUri');
-        DeepLinkRouter().navigate(initialUri.toString());
+        if (kDebugMode) print('AppLinkService: cold-start link held: $initialUri');
+        _pendingInitialLink = initialUri;
       }
     } catch (e) {
       if (kDebugMode) print('AppLinkService: failed to get initial link: $e');
@@ -44,10 +50,21 @@ class AppLinkService {
     );
   }
 
+  /// Route the launch link, if any. Called once the app has reached its first
+  /// real screen so the deep link lands on top of it instead of the splash.
+  void flushPendingLink() {
+    final uri = _pendingInitialLink;
+    if (uri == null) return;
+    _pendingInitialLink = null;
+    if (kDebugMode) print('AppLinkService: routing held cold-start link: $uri');
+    DeepLinkRouter().navigate(uri.toString());
+  }
+
   /// Cancel the stream subscription (e.g. in tests).
   void dispose() {
     _sub?.cancel();
     _sub = null;
+    _pendingInitialLink = null;
     _initialized = false;
   }
 }

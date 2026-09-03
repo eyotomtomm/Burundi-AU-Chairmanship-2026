@@ -99,6 +99,13 @@ class Environment {
     }
   }
 
+  /// Public share link for one piece of content, e.g.
+  /// `shareUrl('articles', 12)` -> `https://burundi4africa.com/articles/12/share/`.
+  /// The page carries Open Graph tags and a rendered preview image so the item
+  /// previews in chat apps; `lang` picks which translation the card shows.
+  static String shareUrl(String kind, Object id, {String? lang}) =>
+      '$siteBaseUrl/$kind/$id/share/${lang == 'fr' ? '?lang=fr' : ''}';
+
   /// Check if we're in production
   static bool get isProduction => current == EnvironmentType.production;
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
+import '../../config/app_ds.dart';
 
 class EventFeedbackScreen extends StatefulWidget {
   final int eventId;
@@ -206,7 +207,6 @@ class _EventFeedbackScreenState extends State<EventFeedbackScreen>
           ),
         ),
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        elevation: 0,
         iconTheme: IconThemeData(
           color: isDark ? AppColors.darkText : AppColors.lightText,
         ),

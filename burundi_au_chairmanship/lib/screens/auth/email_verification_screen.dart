@@ -2,7 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
 
 /// Email verification gate:
@@ -110,162 +111,181 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   // ── Build ─────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final email = context.watch<AuthProvider>().userEmail ?? '';
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-
-              // Back button row
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () async {
-                    final authProvider = context.read<AuthProvider>();
-                    final navigator = Navigator.of(context);
-                    await authProvider.signOut();
-                    if (mounted) {
-                      navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
-                    }
-                  },
-                  icon: Icon(
-                    Icons.arrow_back_ios_rounded,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                  tooltip: 'Back to sign in',
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Icon
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.mark_email_read_outlined, size: 40, color: AppColors.burundiGreen),
-              ),
-              const SizedBox(height: 24),
-
-              Text('Verify Your Email', style: TextStyle(
-                fontSize: 24, fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : AppColors.lightText,
-              )),
-              const SizedBox(height: 12),
-              Text(_emailOtpSent ? 'A verification code has been sent to your email.' : 'We need to verify your email address to continue.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-              ),
-              const SizedBox(height: 8),
-              Text(email, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.burundiGreen)),
-              const SizedBox(height: 32),
-
-              if (_isSending && !_emailOtpSent) ...[
-                const SizedBox(height: 8),
-                const CircularProgressIndicator(color: AppColors.burundiGreen),
-                const SizedBox(height: 16),
-                Text('Sending verification code...', style: TextStyle(
-                  fontSize: 14, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                )),
-              ] else ...[
-                _buildOtpInput(_emailOtpController, isDark),
-                const SizedBox(height: 20),
-                _buildButton('Verify Email', _isVerifying, _verifyEmailOtp, AppColors.burundiGreen),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: _resendCountdown > 0 ? null : _sendEmailOtp,
-                  child: Text(
-                    _resendCountdown > 0 ? 'Resend code in ${_resendCountdown}s' : 'Resend Code',
-                    style: TextStyle(
-                      color: _resendCountdown > 0 ? (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary) : AppColors.burundiGreen,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () async {
-                    final authProvider = context.read<AuthProvider>();
-                    final navigator = Navigator.of(context);
-                    await authProvider.signOut();
-                    if (mounted) {
-                      navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
-                    }
-                  },
-                  child: Text(
-                    'Use a different email',
-                    style: TextStyle(
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-
-              _buildErrorBox(),
-              const Spacer(),
-              _buildInfoBox('Email verification is required to access the app. Check your inbox and spam folder.', isDark),
-              const SizedBox(height: 24),
-            ],
+        backgroundColor: Ds.bg(context),
+        appBar: AppBar(
+          title: const Text('Verify email'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Back to sign in',
+            onPressed: _backToSignIn,
           ),
         ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+          children: [
+            Center(
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                    color: Ds.tint(context), shape: BoxShape.circle),
+                child: const Icon(Icons.mark_email_unread_rounded,
+                    size: 34, color: Ds.green),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Check your inbox',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Ds.ink(context))),
+            const SizedBox(height: 8),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                      text: _emailOtpSent
+                          ? 'We sent a 6-digit code to\n'
+                          : 'We need to verify your email address\n'),
+                  TextSpan(
+                      text: email,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+              ),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, height: 1.5, color: Ds.body(context)),
+            ),
+            const SizedBox(height: 24),
+
+            if (_isSending && !_emailOtpSent) ...[
+              const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green)),
+              const SizedBox(height: 16),
+              Text('Sending verification code…',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Ds.body(context))),
+            ] else ...[
+              _buildOtpBoxes(),
+              const SizedBox(height: 24),
+              if (_isVerifying)
+                const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
+              else
+                DsPrimaryButton('Verify', radius: 14, onTap: _verifyEmailOtp),
+              const SizedBox(height: 18),
+              Center(
+                child: GestureDetector(
+                  onTap: _resendCountdown > 0 ? null : _sendEmailOtp,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        const TextSpan(text: "Didn't get it? "),
+                        TextSpan(
+                          text: _resendCountdown > 0
+                              ? 'Resend in 0:${_resendCountdown.toString().padLeft(2, '0')}'
+                              : 'Resend code',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: _resendCountdown > 0
+                                  ? Ds.muted(context)
+                                  : Ds.green),
+                        ),
+                      ],
+                    ),
+                    style: TextStyle(fontSize: 13, color: Ds.body(context)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: GestureDetector(
+                  onTap: _backToSignIn,
+                  child: Text('Use a different email',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Ds.muted(context))),
+                ),
+              ),
+            ],
+
+            _buildErrorBox(),
+            const SizedBox(height: 24),
+            DsFootnote(
+                'Email verification is required to access the app. Check your inbox and spam folder.',
+                center: true),
+          ],
+        ),
       ),
-    ),
     );
   }
 
-  // ── Shared widgets ────────────────────────────────────────
-  Widget _buildOtpInput(TextEditingController controller, bool isDark) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      maxLength: 6,
-      textAlign: TextAlign.center,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: TextStyle(
-        fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: 12,
-        color: isDark ? Colors.white : AppColors.lightText,
-      ),
-      decoration: InputDecoration(
-        hintText: '${String.fromCharCode(8226)} ${String.fromCharCode(8226)} ${String.fromCharCode(8226)} ${String.fromCharCode(8226)} ${String.fromCharCode(8226)} ${String.fromCharCode(8226)}',
-        hintStyle: TextStyle(
-          color: isDark ? AppColors.darkTextSecondary.withValues(alpha: 0.5) : Colors.grey[400],
-          fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: 12,
-        ),
-        counterText: '',
-        filled: true,
-        fillColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? AppColors.darkDivider : AppColors.lightDivider)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.burundiGreen, width: 1.5)),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      ),
-    );
+  Future<void> _backToSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+    final navigator = Navigator.of(context);
+    await authProvider.signOut();
+    if (mounted) {
+      navigator.pushNamedAndRemoveUntil('/auth', (route) => false);
+    }
   }
 
-  Widget _buildButton(String text, bool loading, VoidCallback onPressed, Color color) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: loading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color, foregroundColor: Colors.white, elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  /// Six boxed digit cells with an invisible field capturing the input.
+  Widget _buildOtpBoxes() {
+    final code = _emailOtpController.text;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(6, (i) {
+            final filled = i < code.length;
+            final isNext = i == code.length;
+            return Container(
+              width: 46,
+              height: 54,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Ds.surface(context),
+                borderRadius: BorderRadius.circular(Ds.rTile),
+                border: Border.all(
+                  color: isNext ? Ds.green : Ds.outline(context),
+                  width: 2,
+                ),
+              ),
+              child: Text(
+                filled ? code[i] : '',
+                style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Ds.ink(context)),
+              ),
+            );
+          }),
         ),
-        child: loading
-            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-      ),
+        // Transparent capture field sits on top of the boxes.
+        Opacity(
+          opacity: 0,
+          child: SizedBox(
+            height: 54,
+            child: TextField(
+              controller: _emailOtpController,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(counterText: ''),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -276,33 +296,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.burundiRed.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          color: Ds.redTintOf(context),
+          borderRadius: BorderRadius.circular(Ds.rIcon),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline, color: AppColors.burundiRed, size: 20),
+            const Icon(Icons.error_outline, color: Ds.red, size: 20),
             const SizedBox(width: 8),
-            Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppColors.burundiRed, fontSize: 13))),
+            Expanded(
+                child: Text(_errorMessage!,
+                    style: const TextStyle(color: Ds.red, fontSize: 13))),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildInfoBox(String text, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, size: 20, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-          const SizedBox(width: 12),
-          Expanded(child: Text(text, style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary))),
-        ],
       ),
     );
   }

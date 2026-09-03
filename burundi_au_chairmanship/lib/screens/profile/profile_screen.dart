@@ -7,8 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../config/app_constants.dart';
-import '../../config/app_spacing.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../l10n/app_localizations.dart';
@@ -72,66 +73,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           return CustomScrollView(
             slivers: [
-              // Header with gradient
-              SliverAppBar(
-                expandedHeight: 280,
-                pinned: true,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                actions: const [TranslateButton()],
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.burundiGreen, Color(0xFF0D7A25)],
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+              // Green profile header
+              SliverToBoxAdapter(
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                      20, MediaQuery.paddingOf(context).top + 20, 20, 24),
+                  decoration: const BoxDecoration(
+                    color: Ds.green,
+                    borderRadius:
+                        BorderRadius.vertical(bottom: Radius.circular(Ds.rHeader)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          const SizedBox(height: 16),
-                          // Avatar with camera button
                           GestureDetector(
-                            onTap: () => _showProfilePictureOptions(context, authProvider),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => Navigator.pop(context),
+                            child: const SizedBox(
+                              width: 30,
+                              height: 36,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Icon(Icons.arrow_back_rounded,
+                                    size: 22, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text('Profile',
+                                style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                    color: Colors.white)),
+                          ),
+                          const TranslateButton(),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          // Tap the avatar to change the profile picture.
+                          GestureDetector(
+                            onTap: () =>
+                                _showProfilePictureOptions(context, authProvider),
                             child: Stack(
                               children: [
                                 Container(
-                                  width: 88,
-                                  height: 88,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    border: Border.all(color: Colors.white, width: 3),
-                                  ),
+                                  width: 72,
+                                  height: 72,
+                                  decoration: const BoxDecoration(
+                                      shape: BoxShape.circle, color: Colors.white),
                                   child: ClipOval(
                                     child: authProvider.profilePictureUrl != null &&
                                             authProvider.profilePictureUrl!.isNotEmpty
                                         ? Semantics(
                                             label: 'Profile picture',
                                             child: CachedNetworkImage(
-                                            imageUrl: authProvider.profilePictureUrl!,
-                                            width: 88,
-                                            height: 88,
-                                            fit: BoxFit.cover,
-                                            placeholder: (context, url) =>
-                                                const CircularProgressIndicator(
-                                                    strokeWidth: 2, color: Colors.white),
-                                            errorWidget: (context, url, error) =>
-                                                _buildInitialsAvatar(authProvider),
-                                          ),
+                                              imageUrl: authProvider.profilePictureUrl!,
+                                              width: 72,
+                                              height: 72,
+                                              fit: BoxFit.cover,
+                                              placeholder: (context, url) =>
+                                                  _buildInitialsAvatar(authProvider),
+                                              errorWidget: (context, url, error) =>
+                                                  _buildInitialsAvatar(authProvider),
+                                            ),
                                           )
                                         : _buildInitialsAvatar(authProvider),
                                   ),
@@ -140,194 +158,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   bottom: 0,
                                   right: 0,
                                   child: Container(
-                                    padding: const EdgeInsets.all(6),
+                                    padding: const EdgeInsets.all(5),
                                     decoration: BoxDecoration(
-                                      color: AppColors.burundiGreen,
+                                      color: Ds.green,
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white, width: 2),
+                                      border:
+                                          Border.all(color: Colors.white, width: 2),
                                     ),
-                                    child: const Icon(
-                                      Icons.camera_alt,
-                                      size: 16,
-                                      color: Colors.white,
-                                      semanticLabel: 'Change profile picture',
-                                    ),
+                                    child: const Icon(Icons.camera_alt,
+                                        size: 14,
+                                        color: Colors.white,
+                                        semanticLabel: 'Change profile picture'),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          // Name with verified badge
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                authProvider.userName ?? 'User',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              if (authProvider.isVerified) ...[
-                                // Don't show badge if there's a pending/rejected request
-                                // (cached isVerified may be stale)
-                                Builder(builder: (ctx) {
-                                  final vStatus = Provider.of<VerificationProvider>(ctx, listen: false).requestStatus;
-                                  if (vStatus == 'pending' || vStatus == 'rejected') return const SizedBox.shrink();
-                                  return Row(children: [
-                                    const SizedBox(width: 6),
-                                    VerifiedBadge(badgeType: authProvider.badgeType, size: 24),
-                                  ]);
-                                }),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          // Email
-                          Text(
-                            authProvider.userEmail ?? '',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Verification Badges
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (authProvider.isEmailVerified)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.success.withValues(alpha: 0.9),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.verified, color: Colors.white, size: 16),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'VERIFIED',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              if (authProvider.isEmailVerified && authProvider.isGovernmentOfficial)
-                                const SizedBox(width: 8),
-                              if (authProvider.isGovernmentOfficial)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.auGold,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '🏛️',
-                                        style: TextStyle(fontSize: 14),
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'OFFICIAL',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Profile Completion Progress
-              if (_completionLoaded && _completionPercent < 100)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, 20, AppSpacing.pagePadding, 0),
-                    child: Container(
-                      padding: EdgeInsets.all(AppSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkSurface : Colors.white,
-                        borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
-                        border: Border.all(
-                          color: AppColors.burundiGreen.withValues(alpha: 0.3),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 56,
-                            height: 56,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                CircularProgressIndicator(
-                                  value: _completionPercent / 100.0,
-                                  strokeWidth: 5,
-                                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                                  valueColor: const AlwaysStoppedAnimation(AppColors.burundiGreen),
-                                ),
-                                Center(
-                                  child: Text(
-                                    '${_completionPercent.toInt()}%',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.burundiGreen,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: AppSpacing.lg),
+                          const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  l10n.translate('complete_your_profile'),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                if (_completionMessage.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _completionMessage,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        authProvider.userName ?? 'User',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white),
+                                      ),
                                     ),
+                                    if (authProvider.isVerified)
+                                      Builder(builder: (ctx) {
+                                        final vStatus =
+                                            Provider.of<VerificationProvider>(ctx,
+                                                    listen: false)
+                                                .requestStatus;
+                                        if (vStatus == 'pending' ||
+                                            vStatus == 'rejected') {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return Row(children: [
+                                          const SizedBox(width: 6),
+                                          VerifiedBadge(
+                                              badgeType: authProvider.badgeType,
+                                              size: 18),
+                                        ]);
+                                      }),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  authProvider.verificationRole?.isNotEmpty == true
+                                      ? authProvider.verificationRole!
+                                      : (authProvider.userEmail ?? ''),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white.withValues(alpha: 0.85)),
+                                ),
+                                if (authProvider.isEmailVerified ||
+                                    authProvider.isGovernmentOfficial) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    children: [
+                                      if (authProvider.isEmailVerified)
+                                        _headerPill('VERIFIED'),
+                                      if (authProvider.isGovernmentOfficial)
+                                        _headerPill('OFFICIAL'),
+                                    ],
                                   ),
                                 ],
                               ],
@@ -335,277 +240,201 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ),
-
-              // Personal Information Section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.xl, AppSpacing.pagePadding, AppSpacing.sm),
-                  child: Text(
-                    l10n.translate('personal_info'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: AppColors.burundiGreen,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                    ),
+                    ],
                   ),
                 ),
               ),
 
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
+              // ── Profile completion ───────────────────────────
+              if (_completionLoaded && _completionPercent < 100)
+                SliverToBoxAdapter(
+                  child: DsCard(
+                    featured: true,
+                    margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
                       children: [
-                        // Name row with edit
-                        ListTile(
-                          leading: const Icon(Icons.person_outline,
-                              color: AppColors.burundiGreen),
-                          title: Text(l10n.translate('full_name')),
-                          subtitle: Text(authProvider.userName ?? 'Not set'),
-                          trailing: IconButton(
-                            tooltip: 'Edit name',
-                            icon: const Icon(Icons.edit_outlined,
-                                color: AppColors.burundiGreen, size: 20),
-                            onPressed: () =>
-                                _showEditNameDialog(context, authProvider, l10n),
-                          ),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Email row (read-only)
-                        ListTile(
-                          leading: const Icon(Icons.email_outlined,
-                              color: AppColors.auGold),
-                          title: Text(l10n.translate('email')),
-                          subtitle: Text(authProvider.userEmail ?? 'Not set'),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Phone Number row (editable)
-                        ListTile(
-                          leading: const Icon(Icons.phone_outlined,
-                              color: AppColors.patternOrange),
-                          title: const Text('Phone Number'),
-                          subtitle: Text(_getPhoneLabel(authProvider.phoneNumber)),
-                          trailing: IconButton(
-                            tooltip: 'Edit phone number',
-                            icon: const Icon(Icons.edit_outlined,
-                                color: AppColors.patternOrange, size: 20),
-                            onPressed: () =>
-                                _showEditPhoneDialog(context, authProvider, l10n),
-                          ),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Gender row (editable)
-                        ListTile(
-                          leading: const Icon(Icons.person_outline,
-                              color: AppColors.success),
-                          title: const Text('Gender'),
-                          subtitle: Text(_getGenderLabel(authProvider.gender)),
-                          trailing: IconButton(
-                            tooltip: 'Edit gender',
-                            icon: const Icon(Icons.edit_outlined,
-                                color: AppColors.success, size: 20),
-                            onPressed: () =>
-                                _showEditGenderDialog(context, authProvider, l10n),
-                          ),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Nationality row (editable)
-                        ListTile(
-                          leading: const Icon(Icons.flag_outlined,
-                              color: AppColors.burundiGreen),
-                          title: const Text('Nationality'),
-                          subtitle: Text(_getNationalityLabel(authProvider.nationality)),
-                          trailing: IconButton(
-                            tooltip: 'Edit nationality',
-                            icon: const Icon(Icons.edit_outlined,
-                                color: AppColors.burundiGreen, size: 20),
-                            onPressed: () =>
-                                _showEditNationalityDialog(context, authProvider, l10n),
-                          ),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Date of Birth row (editable)
-                        ListTile(
-                          leading: const Icon(Icons.cake_outlined,
-                              color: AppColors.auGold),
-                          title: const Text('Date of Birth'),
-                          subtitle: Text(_formatDob(authProvider.dateOfBirth)),
-                          trailing: IconButton(
-                            tooltip: 'Edit date of birth',
-                            icon: const Icon(Icons.edit_outlined,
-                                color: AppColors.auGold, size: 20),
-                            onPressed: () =>
-                                _showEditDobDialog(context, authProvider, l10n),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Data & Privacy Section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.xl, AppSpacing.pagePadding, AppSpacing.sm),
-                  child: Text(
-                    l10n.translate('data_privacy'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: AppColors.burundiGreen,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Change Password (only for email/password users, not SSO)
-                        if (authProvider.hasPasswordProvider) ...[
-                          ListTile(
-                            leading: const Icon(Icons.lock_outline,
-                                color: AppColors.burundiGreen),
-                            title: Text(l10n.translate('change_password')),
-                            trailing: const Icon(Icons.chevron_right, size: 20),
-                            onTap: () => Navigator.push(
-                              context,
-                              CupertinoPageRoute(
-                                builder: (_) => const ChangePasswordScreen(),
+                        SizedBox(
+                          width: 52,
+                          height: 52,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              CircularProgressIndicator(
+                                value: _completionPercent / 100.0,
+                                strokeWidth: 5,
+                                strokeCap: StrokeCap.round,
+                                backgroundColor: Ds.subtle(context),
+                                valueColor:
+                                    const AlwaysStoppedAnimation(Ds.green),
                               ),
-                            ),
-                          ),
-                          const Divider(height: 1, indent: 16, endIndent: 16),
-                        ],
-                        // Linked Accounts
-                        ListTile(
-                          leading: const Icon(Icons.link_rounded,
-                              color: Color(0xFF26A69A)),
-                          title: const Text('Linked Accounts'),
-                          subtitle: const Text('Manage sign-in methods'),
-                          trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () => Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                              builder: (_) => const LinkedAccountsScreen(),
-                            ),
+                              Center(
+                                child: Text('${_completionPercent.toInt()}%',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        color: Ds.green)),
+                              ),
+                            ],
                           ),
                         ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Sign Out
-                        ListTile(
-                          leading: const Icon(Icons.logout,
-                              color: AppColors.warning),
-                          title: Text(l10n.translate('sign_out')),
-                          trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () =>
-                              _handleSignOut(context, authProvider),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(l10n.translate('complete_your_profile'),
+                                  style: Ds.sectionTitle(context)),
+                              if (_completionMessage.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(_completionMessage,
+                                    style: Ds.cardBody(context)),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
 
-              // Danger Zone Section
+              // ── Personal information ─────────────────────────
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(AppSpacing.pagePadding, AppSpacing.xl, AppSpacing.pagePadding, AppSpacing.sm),
-                  child: Text(
-                    l10n.translate('danger_zone'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
+                child: DsGroupLabel(l10n.translate('personal_info')),
+              ),
+              SliverToBoxAdapter(
+                child: DsTileGroup(
+                  children: [
+                    DsTile(
+                      icon: Icons.person_outline,
+                      iconTint: Ds.tint(context),
+                      iconColor: Ds.green,
+                      title: l10n.translate('full_name'),
+                      subtitle: authProvider.userName ?? 'Not set',
+                      onTap: () =>
+                          _showEditNameDialog(context, authProvider, l10n),
                     ),
-                  ),
+                    // Email is read-only: neutral square, no chevron.
+                    DsTile(
+                      icon: Icons.email_outlined,
+                      title: l10n.translate('email'),
+                      subtitle: authProvider.userEmail ?? 'Not set',
+                      chevron: false,
+                    ),
+                    DsTile(
+                      icon: Icons.phone_outlined,
+                      iconTint: Ds.tint(context),
+                      iconColor: Ds.green,
+                      title: 'Phone Number',
+                      subtitle: _getPhoneLabel(authProvider.phoneNumber),
+                      onTap: () =>
+                          _showEditPhoneDialog(context, authProvider, l10n),
+                    ),
+                    DsTile(
+                      icon: Icons.wc_outlined,
+                      iconTint: Ds.tint(context),
+                      iconColor: Ds.green,
+                      title: 'Gender',
+                      subtitle: _getGenderLabel(authProvider.gender),
+                      onTap: () =>
+                          _showEditGenderDialog(context, authProvider, l10n),
+                    ),
+                    DsTile(
+                      icon: Icons.flag_outlined,
+                      iconTint: Ds.tint(context),
+                      iconColor: Ds.green,
+                      title: 'Nationality',
+                      subtitle: _getNationalityLabel(authProvider.nationality),
+                      onTap: () => _showEditNationalityDialog(
+                          context, authProvider, l10n),
+                    ),
+                    DsTile(
+                      icon: Icons.cake_outlined,
+                      iconTint: Ds.tint(context),
+                      iconColor: Ds.green,
+                      title: 'Date of Birth',
+                      subtitle: _formatDob(authProvider.dateOfBirth),
+                      onTap: () =>
+                          _showEditDobDialog(context, authProvider, l10n),
+                    ),
+                  ],
                 ),
               ),
 
+              // ── Account & privacy ────────────────────────────
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.pagePadding),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : Colors.white,
-                      borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLg),
-                      border: Border.all(
-                        color: AppColors.error.withValues(alpha: 0.3),
+                child: DsGroupLabel(l10n.translate('data_privacy')),
+              ),
+              SliverToBoxAdapter(
+                child: DsTileGroup(
+                  children: [
+                    // Password rows only exist for email/password accounts.
+                    if (authProvider.hasPasswordProvider)
+                      DsTile(
+                        icon: Icons.lock_outline,
+                        iconTint: Ds.tint(context),
+                        iconColor: Ds.green,
+                        title: l10n.translate('change_password'),
+                        subtitle: 'Update your account password',
+                        onTap: () => Navigator.push(
+                          context,
+                          CupertinoPageRoute(
+                            builder: (_) => const ChangePasswordScreen(),
+                          ),
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                    DsTile(
+                      icon: Icons.link_rounded,
+                      iconTint: Ds.blueTint,
+                      iconColor: Ds.blue,
+                      title: 'Linked Accounts',
+                      subtitle: 'Manage sign-in methods',
+                      onTap: () => Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => const LinkedAccountsScreen(),
                         ),
-                      ],
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        // Take a Break
-                        ListTile(
-                          leading: const Icon(Icons.pause_circle_outline,
-                              color: AppColors.warning),
-                          title: const Text(
-                            'Take a Break',
-                            style: TextStyle(color: AppColors.warning),
-                          ),
-                          subtitle: const Text(
-                              'Deactivate your account temporarily. Log in anytime to come back.'),
-                          trailing: const Icon(Icons.chevron_right,
-                              size: 20, color: AppColors.warning),
-                          onTap: () =>
-                              _handleDeactivateAccount(context, authProvider, l10n),
-                        ),
-                        const Divider(height: 1, indent: 16, endIndent: 16),
-                        // Delete Account
-                        ListTile(
-                          leading: const Icon(Icons.delete_forever_outlined,
-                              color: AppColors.error),
-                          title: Text(
-                            l10n.translate('delete_account'),
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                          subtitle: const Text(
-                              'Schedule account for permanent deletion. You have 30 days to change your mind.'),
-                          trailing: const Icon(Icons.chevron_right,
-                              size: 20, color: AppColors.error),
-                          onTap: () =>
-                              _handleDeleteAccount(context, authProvider, l10n),
-                        ),
-                      ],
+                    DsTile(
+                      icon: Icons.logout_rounded,
+                      title: l10n.translate('sign_out'),
+                      subtitle: 'End this session on this device',
+                      onTap: () => _handleSignOut(context, authProvider),
                     ),
-                  ),
+                  ],
+                ),
+              ),
+
+              // ── Danger zone ──────────────────────────────────
+              SliverToBoxAdapter(
+                child: DsGroupLabel(l10n.translate('danger_zone')),
+              ),
+              SliverToBoxAdapter(
+                child: DsTileGroup(
+                  children: [
+                    DsTile(
+                      icon: Icons.pause_circle_outline,
+                      iconTint: Ds.goldTintOf(context),
+                      iconColor: Ds.goldInk,
+                      title: 'Take a Break',
+                      subtitle:
+                          'Deactivate your account temporarily. Log in anytime to come back.',
+                      onTap: () =>
+                          _handleDeactivateAccount(context, authProvider, l10n),
+                    ),
+                    DsTile(
+                      icon: Icons.delete_forever_outlined,
+                      iconTint: Ds.redTintOf(context),
+                      iconColor: Ds.red,
+                      title: l10n.translate('delete_account'),
+                      titleColor: Ds.red,
+                      subtitle:
+                          'Schedule permanent deletion. You have 30 days to change your mind.',
+                      onTap: () =>
+                          _handleDeleteAccount(context, authProvider, l10n),
+                    ),
+                  ],
                 ),
               ),
 
@@ -731,6 +560,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  /// Translucent status pill used inside the green header.
+  static Widget _headerPill(String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(Ds.rPill),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+      );
 
   static Widget _buildInitialsAvatar(AuthProvider authProvider) {
     return Center(

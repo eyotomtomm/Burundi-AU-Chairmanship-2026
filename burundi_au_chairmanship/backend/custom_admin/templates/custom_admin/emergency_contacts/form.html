@@ -1,0 +1,102 @@
+{% extends 'custom_admin/base.html' %}
+
+{% block title %}{{ action }} Emergency Contact - Be 4 Africa Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-4xl">
+
+  <div class="flex items-center gap-3">
+    <a href="{% url 'custom_admin:emergency_contacts_list' %}"
+       class="p-1.5 rounded-lg text-slate-500 hover:bg-surface-container transition-colors" title="Back">
+      <span class="material-symbols-rounded">arrow_back</span>
+    </a>
+    <div>
+      <h1>{{ action }} Emergency Contact</h1>
+      <p>Appears on the app&rsquo;s Emergency screen, ordered by the number below</p>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Name (English) *</label>
+          <input type="text" name="name_en" value="{{ item.name_en|default:'' }}" class="w-full py-2.5 px-3.5" required>
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Name (French)</label>
+          <input type="text" name="name_fr" value="{{ item.name_fr|default:'' }}" class="w-full py-2.5 px-3.5">
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Description (English)</label>
+          <input type="text" name="description_en" value="{{ item.description_en|default:'' }}" maxlength="200" class="w-full py-2.5 px-3.5">
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Description (French)</label>
+          <input type="text" name="description_fr" value="{{ item.description_fr|default:'' }}" maxlength="200" class="w-full py-2.5 px-3.5">
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-5 mt-4">
+      <h3>What happens when it&rsquo;s tapped</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Action type</label>
+          <select name="action_type" class="w-full py-2.5 px-3.5">
+            {% for value, label in action_type_choices %}
+            <option value="{{ value }}" {% if item.action_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Contact value *</label>
+          <input type="text" name="contact_value" value="{{ item.contact_value|default:'' }}" class="w-full py-2.5 px-3.5"
+                 placeholder="+257 79 000 000  /  https://…  /  /support-tickets" required>
+          <p class="text-[11px] text-on-surface-variant mt-1.5">Phone number, WhatsApp link, email, URL, or an in-app route.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-surface-container-lowest border border-slate-200 rounded-xl p-6 space-y-5 mt-4">
+      <h3>Appearance &amp; order</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Category</label>
+          <select name="category" class="w-full py-2.5 px-3.5">
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if item.category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Icon name</label>
+          <input type="text" name="icon_name" value="{{ item.icon_name|default:'phone' }}" class="w-full py-2.5 px-3.5" placeholder="local_police">
+          <p class="text-[11px] text-on-surface-variant mt-1.5">A Material icon name, e.g. <code>local_police</code>.</p>
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Accent colour</label>
+          <input type="text" name="color" value="{{ item.color|default:'#E53935' }}" class="w-full py-2.5 px-3.5" placeholder="#E53935">
+        </div>
+        <div>
+          <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Order</label>
+          <input type="number" name="order" value="{{ item.order|default:0 }}" class="w-full py-2.5 px-3.5">
+        </div>
+      </div>
+      <label class="inline-flex items-center gap-2 text-[13px]">
+        <input type="checkbox" name="is_active" {% if not item or item.is_active %}checked{% endif %}
+               class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+        Visible in the app
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <a href="{% url 'custom_admin:emergency_contacts_list' %}"
+         class="bg-surface-container-lowest border border-slate-200 text-on-surface rounded-xl px-5 py-2.5 text-[13px] font-bold">Cancel</a>
+      <button type="submit" class="bg-primary-container">{{ action }} contact</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../config/app_colors.dart';
+import 'package:flutter/services.dart';
+import '../../config/app_ds.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/api_service.dart';
+import '../../widgets/ds/ds_widgets.dart';
 
 class TranslateScreen extends StatefulWidget {
   const TranslateScreen({super.key});
@@ -68,166 +70,210 @@ class _TranslateScreenState extends State<TranslateScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          l10n.translate('phrasebook'),
-          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(title: Text(l10n.translate('phrasebook'))),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
           : _error != null
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.cloud_off_rounded, size: 48, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                      Icon(Icons.cloud_off_rounded, size: 48, color: Ds.muted(context)),
                       const SizedBox(height: 12),
-                      Text(_error!, style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
-                      const SizedBox(height: 12),
-                      TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); _fetchPhrases(); }, child: const Text('Retry')),
+                      Text(_error!, style: TextStyle(color: Ds.body(context))),
+                      const SizedBox(height: 16),
+                      DsOutlineButton('Retry', radius: Ds.rPill, onTap: () {
+                        setState(() { _loading = true; _error = null; });
+                        _fetchPhrases();
+                      }),
                     ],
                   ),
                 )
               : _categories.isEmpty
-                  ? Center(child: Text('No phrases available.', style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)))
-                  : _buildPhrasebook(isDark),
+                  ? Center(
+                      child: Text('No phrases available.',
+                          style: TextStyle(color: Ds.body(context))))
+                  : _buildPhrasebook(),
     );
   }
 
-  Widget _buildPhrasebook(bool isDark) {
-    final selectedCategory = _categories[_selectedIndex];
+  Widget _buildPhrasebook() {
+    final selected = _categories[_selectedIndex];
+    final fr = Localizations.localeOf(context).languageCode == 'fr';
+    // The phrasebook goes one way: from the language you read the app in,
+    // into Kirundi — the phrase you'd actually say out loud.
+    final yourLangLabel = fr ? 'FRANÇAIS' : 'ENGLISH';
+    final otherLangLabel = fr ? 'ENGLISH' : 'FRANÇAIS';
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Category chips
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: List.generate(_categories.length, (i) {
-                  final cat = _categories[i];
-                  final isSelected = _selectedIndex == i;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: FilterChip(
-                      selected: isSelected,
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            cat.icon,
-                            size: 16,
-                            color: isSelected ? Colors.white : (isDark ? AppColors.auGold : AppColors.burundiGreen),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(cat.label),
-                        ],
-                      ),
-                      labelStyle: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? Colors.white : (isDark ? AppColors.darkText : AppColors.lightText),
-                      ),
-                      selectedColor: AppColors.burundiGreen,
-                      backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-                      side: BorderSide(
-                        color: isSelected ? AppColors.burundiGreen : (isDark ? AppColors.darkDivider : AppColors.lightDivider),
-                      ),
-                      onSelected: (_) => setState(() => _selectedIndex = i),
-                    ),
-                  );
-                }),
+        // Direction explainer, so the card layout reads unambiguously.
+        DsCard(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  fr ? 'Français' : 'English',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Ds.ink(context)),
+                ),
               ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                    color: Ds.tint(context), shape: BoxShape.circle),
+                child: const Icon(Icons.arrow_forward_rounded,
+                    size: 20, color: Ds.green),
+              ),
+              const Expanded(
+                child: Text(
+                  'Kirundi',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700, color: Ds.green),
+                ),
+              ),
+            ],
+          ),
+        ),
+        DsFootnote(fr
+            ? 'Appuyez sur une phrase pour copier le kirundi.'
+            : 'Tap a phrase to copy the Kirundi.'),
+
+        // Category chips
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: List.generate(_categories.length, (i) {
+                final cat = _categories[i];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: DsFilterChip(
+                    cat.label,
+                    selected: _selectedIndex == i,
+                    onTap: () => setState(() => _selectedIndex = i),
+                  ),
+                );
+              }),
             ),
           ),
+        ),
 
-          // Header row
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            itemCount: selected.phrases.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final phrase = selected.phrases[index];
+              final yours = fr ? phrase.french : phrase.english;
+              final other = fr ? phrase.english : phrase.french;
+              return _phraseCard(
+                yourLangLabel: yourLangLabel,
+                yours: yours,
+                otherLangLabel: otherLangLabel,
+                other: other,
+                kirundi: phrase.kirundi,
+                copiedMessage: fr ? 'Copié' : 'Copied',
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// One phrase: what you mean on white, what you say on green.
+  Widget _phraseCard({
+    required String yourLangLabel,
+    required String yours,
+    required String otherLangLabel,
+    required String other,
+    required String kirundi,
+    required String copiedMessage,
+  }) {
+    return DsCard(
+      clip: true,
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: kirundi));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$copiedMessage: $kirundi'),
+            backgroundColor: Ds.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 2,
-                  child: Text('Kirundi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('English', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.burundiRed)),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text('Fran\u00e7ais', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.auGold)),
-                ),
+                Text(yourLangLabel, style: Ds.groupLabel(context)),
+                const SizedBox(height: 5),
+                Text(yours,
+                    style: TextStyle(
+                        fontSize: 16, height: 1.4, color: Ds.ink(context))),
+                if (other.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('$otherLangLabel · $other',
+                      style: TextStyle(fontSize: 12, color: Ds.muted(context))),
+                ],
               ],
             ),
           ),
-          const Divider(height: 1),
-
-          // Phrase list
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: selectedCategory.phrases.length,
-              separatorBuilder: (_, _) => Divider(
-                height: 1,
-                color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-              ),
-              itemBuilder: (context, index) {
-                final phrase = selectedCategory.phrases[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Row(
+          Container(
+            width: double.infinity,
+            color: Ds.green,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          phrase.kirundi,
+                      Text('KIRUNDI',
                           style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.darkText : AppColors.lightText,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          phrase.english,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          phrase.french,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                              color: Colors.white.withValues(alpha: 0.7))),
+                      const SizedBox(height: 5),
+                      Text(kirundi,
+                          style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              height: 1.4,
+                              color: Colors.white)),
                     ],
                   ),
-                );
-              },
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.content_copy_rounded,
+                    size: 18, color: Colors.white.withValues(alpha: 0.85)),
+              ],
             ),
           ),
         ],
-      );
+      ),
+    );
   }
 }
 

@@ -66,6 +66,8 @@ import 'screens/maintenance/maintenance_screen.dart';
 import 'screens/scanner/qr_scanner_screen.dart';
 import 'screens/scanner/yd_scan_history_screen.dart';
 import 'screens/emergency/emergency_screen.dart';
+import 'screens/discussions/discussions_screen.dart';
+import 'screens/polls/polls_screen.dart';
 
 // Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -260,7 +262,9 @@ void main() async {
     try {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: !isTransient);
     } catch (_) {}
-    if (Environment.sentryDsn.isNotEmpty) {
+    // Transient failures already ride along in Crashlytics as non-fatal; sending
+    // them to Sentry too just floods it when the device drops off the network.
+    if (!isTransient && Environment.sentryDsn.isNotEmpty) {
       Sentry.captureException(error, stackTrace: stack);
     }
     return true; // Handled — don't crash the app
@@ -402,6 +406,8 @@ class BurundiAUApp extends StatelessWidget {
                 '/qr-scanner': (context) => const QrScannerScreen(),
                 '/yd-scan-history': (context) => const YdScanHistoryScreen(),
                 '/emergency': (context) => const EmergencyScreen(),
+                '/discussions': (context) => const DiscussionsScreen(),
+                '/polls': (context) => const PollsScreen(),
               };
 
               // Handle maintenance route with arguments

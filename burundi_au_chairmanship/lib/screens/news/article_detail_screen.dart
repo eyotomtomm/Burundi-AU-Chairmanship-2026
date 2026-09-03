@@ -6,8 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../config/environment.dart';
 import '../../widgets/image_gallery_viewer.dart';
 import '../../services/haptic_service.dart';
@@ -17,11 +18,11 @@ import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/translate_button.dart';
-import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 import '../../utils/input_sanitizer.dart';
+import '../../services/share_service.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -390,11 +391,12 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final auth = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      backgroundColor: Ds.bg(context),
       // Continue Reading floating indicator
       floatingActionButton: (_showContinueReading && !_restoredPosition)
           ? FloatingActionButton.extended(
               onPressed: _scrollToSavedPosition,
-              backgroundColor: AppColors.burundiGreen,
+              backgroundColor: Ds.green,
               icon: const Icon(Icons.bookmark_rounded, color: Colors.white),
               label: Text(
                 langCode == 'fr'
@@ -404,134 +406,86 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               ),
             )
           : null,
+      // Comp's pinned action bar: reactions on the left, comment CTA on the right.
+      bottomNavigationBar: DsBottomBar(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleLike,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                    _article.isLiked
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 26,
+                    color: _article.isLiked ? Ds.red : Ds.body(context)),
+                const SizedBox(width: 7),
+                Text('${_article.likeCount}',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _article.isLiked ? Ds.red : Ds.body(context))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Icon(Icons.mode_comment_outlined, size: 24, color: Ds.body(context)),
+          const SizedBox(width: 7),
+          Text('${_article.commentCount}',
+              style: TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w600, color: Ds.body(context))),
+          const Spacer(),
+          DsPrimaryButton(
+            langCode == 'fr' ? 'Commenter' : 'Comment',
+            icon: Icons.mode_comment_rounded,
+            expand: false,
+            radius: Ds.rPill,
+            onTap: _scheduleScrollToComments,
+          ),
+        ],
+      ),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // Hero image SliverAppBar
-          SliverAppBar(
-            expandedHeight: 260,
-            pinned: true,
-            actions: [
-              // Listen button - copies article text for device TTS
-              IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.headphones_rounded, color: Colors.white, size: 20),
-                ),
-                tooltip: langCode == 'fr' ? 'Ecouter' : 'Listen',
-                onPressed: () {
-                  final articleText = _article.getContent(langCode);
-                  Clipboard.setData(ClipboardData(text: articleText));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              langCode == 'fr'
-                                  ? 'Texte copie - utilisez la fonctionnalite de synthese vocale de votre appareil'
-                                  : 'Text copied - use your device\'s text-to-speech feature to listen',
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
+          // Green header from the comp (replaces the default AppBar).
+          SliverToBoxAdapter(
+            child: DsHeader(
+              title: l10n.translate('news'),
+              actions: [
+                DsHeaderAction(
+                  Icons.headphones_rounded,
+                  onTap: () {
+                    Clipboard.setData(
+                        ClipboardData(text: _article.getContent(langCode)));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          langCode == 'fr'
+                              ? 'Texte copié — utilisez la synthèse vocale de votre appareil'
+                              : "Text copied — use your device's text-to-speech feature to listen",
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        duration: const Duration(seconds: 4),
+                        backgroundColor: Ds.green,
                       ),
-                      duration: const Duration(seconds: 4),
-                      backgroundColor: AppColors.burundiGreen,
-                    ),
-                  );
-                },
-              ),
-              Builder(
-                builder: (btnContext) => IconButton(
-                  icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
-                  ),
-                  onPressed: () {
-                    HapticService.light();
-                    final shareUrl = '${Environment.siteBaseUrl}/articles/${_article.id}/share/';
-                    final box = btnContext.findRenderObject() as RenderBox?;
-                    final origin = box != null
-                        ? box.localToGlobal(Offset.zero) & box.size
-                        : Rect.fromLTWH(0, 0, MediaQuery.of(context).size.width, 1);
-                    Share.share(
-                      '${_article.getTitle(Provider.of<LanguageProvider>(context, listen: false).languageCode)}\n\n$shareUrl',
-                      sharePositionOrigin: origin,
                     );
                   },
                 ),
-              ),
-              const TranslateButton(),
-            ],
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: GestureDetector(
-                onTap: () {
-                  HapticService.light();
-                  // Collect all images: hero image + media images
-                  final allImages = <String>[Environment.fixMediaUrl(_article.imageUrl)];
-                  final allCaptions = <String>[_article.getTitle(langCode)];
-                  for (final m in _article.media) {
-                    if (m.isImage && m.imageUrl.isNotEmpty) {
-                      allImages.add(Environment.fixMediaUrl(m.imageUrl));
-                      allCaptions.add(m.getCaption(langCode));
-                    }
-                  }
-                  ImageGalleryViewer.show(
-                    context,
-                    images: allImages,
-                    initialIndex: 0,
-                    captions: allCaptions,
-                  );
-                },
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: Environment.fixMediaUrl(_article.imageUrl),
-                      fit: BoxFit.cover,
-                      placeholder: (_, _) => Container(color: AppColors.auGold.withValues(alpha: 0.2)),
-                      errorWidget: (_, _, _) => Container(
-                        color: AppColors.auGold.withValues(alpha: 0.2),
-                        child: const Icon(Icons.article_rounded, size: 48, color: Colors.white54),
-                      ),
+                const SizedBox(width: 8),
+                Builder(
+                  builder: (btnContext) => DsHeaderAction(
+                    Icons.share_rounded,
+                    onTap: () => ShareService.item(
+                      btnContext,
+                      kind: 'articles',
+                      id: _article.id,
+                      title: _article.getTitle(langCode),
                     ),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.7),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
 
@@ -539,17 +493,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           SliverToBoxAdapter(
             child: Container(
               height: 3,
-              color: isDark ? AppColors.darkSurface : Colors.grey.shade200,
+              color: Ds.outline(context),
               alignment: Alignment.centerLeft,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 height: 3,
                 width: MediaQuery.of(context).size.width * _readingProgress,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.burundiGreen, AppColors.auGold],
-                  ),
-                ),
+                color: Ds.green,
               ),
             ),
           ),
@@ -557,115 +507,134 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           // Content
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Category + timestamp
+                  Row(
+                    children: [
+                      if (_article.category != null) ...[
+                        DsPill(_article.category!
+                            .getDisplayName(langCode)
+                            .toUpperCase()),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: Text(
+                          DateFormat('MMMM d, yyyy · HH:mm').format(_article.publishDate),
+                          style: Ds.meta(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
                   // Title
                   Text(
                     _article.getTitle(langCode),
                     style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.darkText : AppColors.lightText,
-                      height: 1.2,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      height: 1.25,
+                      color: Ds.ink(context),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  // Author + date
+                  // Byline
                   Row(
                     children: [
-                      const Icon(Icons.person_rounded, size: 16, color: AppColors.auGold),
-                      const SizedBox(width: 6),
-                      Flexible(
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                            color: Ds.tint(context), shape: BoxShape.circle),
+                        alignment: Alignment.center,
                         child: Text(
-                          _article.author,
-                          style: TextStyle(fontSize: 14, color: AppColors.auGold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          _article.author.isEmpty
+                              ? '?'
+                              : _article.author
+                                  .trim()
+                                  .split(RegExp(r'\s+'))
+                                  .take(2)
+                                  .map((w) => w.isEmpty ? '' : w[0].toUpperCase())
+                                  .join(),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Ds.green),
                         ),
                       ),
-                      const SizedBox(width: 20),
-                      const Icon(Icons.schedule_rounded, size: 16, color: AppColors.auGold),
-                      const SizedBox(width: 6),
-                      Text(
-                        DateFormat('MMMM d, yyyy').format(_article.publishDate),
-                        style: TextStyle(fontSize: 14, color: AppColors.auGold),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_article.author,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Ds.ink(context))),
+                            Text(
+                                langCode == 'fr'
+                                    ? 'Officiel'
+                                    : 'Official',
+                                style: Ds.meta(context)),
+                          ],
+                        ),
                       ),
+                      const TranslateButton(),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
 
-                  // Engagement stats bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildEngagementStat(
-                          Icons.visibility_rounded,
-                          '${_article.viewCount}',
-                          l10n.translate('views'),
-                          isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                        ),
-                        Container(
-                          width: 1,
-                          height: 30,
-                          color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                        ),
-                        _buildEngagementStat(
-                          Icons.chat_bubble_outline_rounded,
-                          '${_article.commentCount}',
-                          l10n.translate('comments'),
-                          isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                        ),
-                        Container(
-                          width: 1,
-                          height: 30,
-                          color: isDark ? AppColors.darkDivider : AppColors.lightDivider,
-                        ),
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _toggleLike,
-                          child: _buildEngagementStat(
-                            _article.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                            '${_article.likeCount}',
-                            l10n.translate('like'),
-                            _article.isLiked ? AppColors.burundiRed : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Liked-by avatars
-                  if (_article.recentLikers.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12, left: 4),
-                      child: Row(
-                        children: [
-                          LikedByAvatars(
-                            likers: _article.recentLikers,
-                            totalLikes: _article.likeCount,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _article.likeCount == 1 ? '1 like' : '${_article.likeCount} likes',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+          // Article photo
+          SliverToBoxAdapter(
+            child: GestureDetector(
+              onTap: () {
+                HapticService.light();
+                final allImages = <String>[Environment.fixMediaUrl(_article.imageUrl)];
+                final allCaptions = <String>[_article.getTitle(langCode)];
+                for (final m in _article.media) {
+                  if (m.isImage && m.imageUrl.isNotEmpty) {
+                    allImages.add(Environment.fixMediaUrl(m.imageUrl));
+                    allCaptions.add(m.getCaption(langCode));
+                  }
+                }
+                ImageGalleryViewer.show(context,
+                    images: allImages, initialIndex: 0, captions: allCaptions);
+              },
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                height: 200,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(Ds.rCard)),
+                child: CachedNetworkImage(
+                  imageUrl: Environment.fixMediaUrl(_article.imageUrl),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
+                  errorWidget: (_, _, _) => const DsImagePlaceholder(
+                      radius: 0, icon: Icons.article_rounded),
+                ),
+              ),
+            ),
+          ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   const SizedBox(height: 24),
 
                   // Article content
@@ -1160,16 +1129,5 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     );
   }
 
-  Widget _buildEngagementStat(IconData icon, String count, String label, Color color) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 22, color: color),
-        const SizedBox(height: 4),
-        Text(count, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: color)),
-        Text(label, style: TextStyle(fontSize: 11, color: color)),
-      ],
-    );
-  }
 
 }

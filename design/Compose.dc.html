@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: -apple-system, "SF Pro Text", system-ui, "Segoe UI", sans-serif; }
+    a { color: #2E7231; } a:hover { color: #409843; }
+  </style>
+</helmet>
+
+<div style="width: 402px; height: 874px; background: #F5F5F5; position: relative; overflow: hidden;">
+
+  <!-- Dimmed feed behind the sheet -->
+  <div style="position: absolute; inset: 0; background: #F5F5F5;">
+    <div style="background: #409843; border-radius: 0 0 28px 28px; height: 118px;"></div>
+    <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="background: #FFFFFF; border-radius: 16px; height: 150px;"></div>
+      <div style="background: #FFFFFF; border-radius: 16px; height: 150px;"></div>
+    </div>
+  </div>
+  <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.42);"></div>
+
+  <!-- Compose sheet -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-radius: 20px 20px 0 0; padding: 10px 20px 26px;">
+
+    <div style="width: 40px; height: 4px; border-radius: 999px; background: #E0E0E0; margin: 0 auto 14px;"></div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+      <div style="font-size: 15px; font-weight: 600; color: #666666;">Cancel</div>
+      <div style="font-size: 16px; font-weight: 700; letter-spacing: -0.2px; color: #1A1A1A;">New post</div>
+      <div style="height: 36px; padding: 0 18px; border-radius: 999px; background: #409843; color: #FFFFFF; font-size: 14px; font-weight: 700; display: flex; align-items: center;">Post</div>
+    </div>
+
+    <div style="margin-top: 18px; display: flex; gap: 12px;">
+      <div style="width: 40px; height: 40px; border-radius: 999px; background: #EAF4EA; color: #2E7231; font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">A</div>
+      <div style="flex: 1; min-width: 0; padding-top: 9px; font-size: 16px; line-height: 1.5; color: #999999;">What should the summit hear?</div>
+    </div>
+
+    <!-- Attachments -->
+    <div style="margin-top: 16px; display: flex; gap: 10px;">
+      <div style="width: 76px; height: 76px; border-radius: 12px; overflow: hidden; position: relative;">
+        <svg width="76" height="76" viewBox="0 0 76 76" preserveAspectRatio="xMidYMid slice">
+          <rect width="76" height="76" fill="#DDE7DA"></rect>
+          <circle cx="58" cy="20" r="12" fill="#FCD116" opacity="0.8"></circle>
+          <path d="M0 54c18-12 30-2 46-10s22-8 30-2v34H0z" fill="#409843"></path>
+        </svg>
+        <div style="position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 999px; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </div>
+      </div>
+      <div style="width: 76px; height: 76px; border-radius: 12px; overflow: hidden; position: relative; background: #2A5C2D;">
+        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2.5"></rect><path d="M15 10.5l6-3.5v10l-6-3.5z"></path></svg>
+        </div>
+        <div style="position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; border-radius: 999px; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </div>
+        <div style="position: absolute; left: 5px; bottom: 5px; background: rgba(0,0,0,0.6); color: #FFFFFF; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px;">0:48</div>
+      </div>
+    </div>
+
+    <!-- Category -->
+    <div style="margin-top: 18px; display: flex; gap: 8px;">
+      <div style="height: 34px; padding: 0 14px; border-radius: 999px; background: #409843; color: #FFFFFF; font-size: 13px; font-weight: 700; display: flex; align-items: center;">A-RISE</div>
+      <div style="height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid #E0E0E0; color: #666666; font-size: 13px; font-weight: 600; display: flex; align-items: center;">General</div>
+      <div style="height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid #E0E0E0; color: #666666; font-size: 13px; font-weight: 600; display: flex; align-items: center;">Culture</div>
+    </div>
+
+    <div style="height: 1px; background: #F0F0F0; margin: 18px 0 14px;"></div>
+
+    <!-- Attach controls -->
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="height: 44px; padding: 0 16px 0 12px; border-radius: 999px; background: #F5F5F5; display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#409843" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><circle cx="9" cy="10" r="1.8"></circle><path d="M4 17l5-4 4 3 3-2 4 3"></path></svg>
+        <span style="font-size: 14px; font-weight: 600; color: #1A1A1A;">Photo</span>
+      </div>
+      <div style="height: 44px; padding: 0 16px 0 12px; border-radius: 999px; background: #F5F5F5; display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#409843" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="6" width="12" height="12" rx="2.5"></rect><path d="M15 10.5l6-3.5v10l-6-3.5z"></path></svg>
+        <span style="font-size: 14px; font-weight: 600; color: #1A1A1A;">Video</span>
+      </div>
+      <div style="flex: 1;"></div>
+      <div style="font-size: 13px; font-weight: 600; color: #999999;">2/4</div>
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/api_service.dart';
 import '../../models/api_models.dart';
-import '../../config/environment.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -228,626 +227,227 @@ class _WeatherScreenState extends State<WeatherScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = _cities.isNotEmpty ? _cities.first : null;
 
     return Scaffold(
-      floatingActionButton: _isLoading
-          ? null
-          : FloatingActionButton(
-              backgroundColor: AppColors.burundiGreen,
+      backgroundColor: Ds.bg(context),
+      appBar: AppBar(
+        title: Text(l10n.translate('weather')),
+        actions: [
+          if (!_isLoading)
+            IconButton(
+              icon: const Icon(Icons.add_rounded),
+              tooltip: 'Add city',
               onPressed: _showAddCityDialog,
-              child: const Icon(Icons.add, color: Colors.white),
             ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: _isLoading
-          ? CustomScrollView(
-              slivers: [
-                // Always render the AppBar so users can go back during loading
-                SliverAppBar(
-                  expandedHeight: 280,
-                  pinned: true,
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  backgroundColor: const Color(0xFF2D6E31),
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: Text(
-                      l10n.translate('weather'),
-                      style: const TextStyle(
-                        fontFamily: 'HeatherGreen',
-                        fontSize: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                    background: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SliverFillRemaining(
-                  child: Center(
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green))
+          : _hasError
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(color: AppColors.burundiGreen),
-                        SizedBox(height: 16),
-                        Text(
-                          'Loading weather data…',
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                        Icon(Icons.cloud_off_rounded, size: 56, color: Ds.muted(context)),
+                        const SizedBox(height: 16),
+                        Text('Could not load weather data',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Ds.ink(context))),
+                        const SizedBox(height: 8),
+                        Text('Please check your connection and try again.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, color: Ds.body(context))),
+                        const SizedBox(height: 20),
+                        DsOutlineButton('Retry',
+                            radius: Ds.rPill, onTap: _loadCitiesAndFetch),
                       ],
                     ),
                   ),
-                ),
-              ],
-            )
-          : _hasError
-              ? CustomScrollView(
-                  slivers: [
-                    SliverAppBar(
-                      expandedHeight: 280,
-                      pinned: true,
-                      leading: IconButton(
-                        icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      backgroundColor: const Color(0xFF2D6E31),
-                      flexibleSpace: FlexibleSpaceBar(
-                        title: Text(
-                          l10n.translate('weather'),
-                          style: const TextStyle(
-                            fontFamily: 'HeatherGreen',
-                            fontSize: 20,
-                            color: Colors.white,
-                          ),
-                        ),
-                        background: Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SliverFillRemaining(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.cloud_off_rounded,
-                              size: 56,
-                              color: isDark ? Colors.white38 : Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Could not load weather data',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white70 : Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Please check your connection and try again.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDark ? Colors.white38 : Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: _loadCitiesAndFetch,
-                              icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: const Text('Retry'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.burundiGreen,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 )
-          : RefreshIndicator(
-              onRefresh: () async {
-                HapticFeedback.mediumImpact();
-                await _fetchWeather();
-              },
-              color: AppColors.burundiGreen,
-              child: CustomScrollView(
-                slivers: [
-                  // --- Gradient hero header with Bujumbura ---
-                  SliverAppBar(
-                    expandedHeight: 280,
-                    pinned: true,
-                    leading: IconButton(
-                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    backgroundColor: const Color(0xFF2D6E31),
-                    flexibleSpace: FlexibleSpaceBar(
-                      title: Text(
-                        l10n.translate('weather'),
-                        style: const TextStyle(
-                          fontFamily: 'HeatherGreen',
-                          fontSize: 20,
-                          color: Colors.white,
-                        ),
-                      ),
-
-                      background: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Background image (blurred) from backend
-                          if (primary?.backgroundImageUrl != null && primary!.backgroundImageUrl!.isNotEmpty)
-                            CachedNetworkImage(
-                              imageUrl: Environment.fixMediaUrl(primary.backgroundImageUrl!),
-                              fit: BoxFit.cover,
-                              errorWidget: (_, _, _) => Container(
-                                decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
-                                  ),
-                                ),
+              : RefreshIndicator(
+                  color: Ds.green,
+                  onRefresh: () async {
+                    HapticFeedback.mediumImpact();
+                    await _fetchWeather();
+                  },
+                  child: ListView(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    children: [
+                      for (var i = 0; i < _cities.length; i++)
+                        _isDefaultCity(i)
+                            ? _buildCityCard(_cities[i])
+                            : GestureDetector(
+                                onLongPress: () => _showRemoveCityDialog(i),
+                                child: _buildCityCard(_cities[i]),
                               ),
-                            )
-                          else
-                            Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [AppColors.burundiGreen, Color(0xFF2D6E31)],
-                                ),
-                              ),
-                            ),
-
-                          // Blur effect
-                          BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                            child: Container(
-                              color: Colors.black.withValues(alpha: 0.1),
-                            ),
-                          ),
-
-                          // Gradient overlay for better text contrast
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  AppColors.burundiGreen.withValues(alpha: 0.7),
-                                  const Color(0xFF2D6E31).withValues(alpha: 0.8),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // Content
-                          SafeArea(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-                            child: primary != null
-                                ? Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      // Location label
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.location_on_rounded, color: AppColors.auGold, size: 14),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            primary.name,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.white.withValues(alpha: 0.9),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      // Weather icon in tinted circle
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Colors.white.withValues(alpha: 0.15),
-                                        ),
-                                        child: Icon(
-                                          _getWeatherIcon(primary.weatherCode),
-                                          size: 36,
-                                          color: AppColors.auGold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      // Large temperature
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            primary.currentTemp.toStringAsFixed(0),
-                                            style: const TextStyle(
-                                              fontSize: 56,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
-                                              height: 1,
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.only(top: 6),
-                                            child: Text(
-                                              '°C',
-                                              style: TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w400,
-                                                color: Colors.white.withValues(alpha: 0.7),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      // Description
-                                      Text(
-                                        _getWeatherDescription(primary.weatherCode, primary.conditionText),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.white.withValues(alpha: 0.85),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ),
-                        ],
-                      ),
-                    ),
+                      if (_lastUpdated != null)
+                        DsFootnote('Updated ${_formatTime(_lastUpdated!)}', center: true),
+                    ],
                   ),
-
-                  // --- Last updated timestamp ---
-                  if (_lastUpdated != null)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        child: Text(
-                          'Updated ${_formatTime(_lastUpdated!)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-
-                  // --- City weather cards ---
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final isDefault = _isDefaultCity(index);
-                          final card = _buildCityCard(_cities[index], isDark);
-                          if (isDefault) return card;
-                          return GestureDetector(
-                            onLongPress: () => _showRemoveCityDialog(index),
-                            child: card,
-                          );
-                        },
-                        childCount: _cities.length,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 
-  Widget _buildCityCard(_CityWeather city, bool isDark) {
-    final cardColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-    final borderColor = isDark ? AppColors.darkDivider : AppColors.lightDivider;
+  Widget _buildCityCard(_CityWeather city) {
+    final advisory = _getRainAdvisory(city, false);
+    final hi = city.forecast.isNotEmpty ? city.forecast.first.maxTemp : city.currentTemp;
+    final lo = city.forecast.isNotEmpty ? city.forecast.first.minTemp : city.currentTemp;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor, width: 0.5),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- City name row ---
-            Row(
-              children: [
-                Icon(Icons.location_on_rounded, size: 18, color: AppColors.auGold),
-                const SizedBox(width: 6),
-                Text(
-                  city.name,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.darkText : AppColors.lightText,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // --- Icon + temp + description ---
-            Row(
-              children: [
-                // Weather icon in tinted circle
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.burundiGreen.withValues(alpha: 0.1),
-                  ),
-                  child: Icon(
-                    _getWeatherIcon(city.weatherCode),
-                    size: 36,
-                    color: AppColors.auGold,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Temperature + description
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Green hero: the comp's signature weather card.
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+          decoration: BoxDecoration(
+            color: Ds.green,
+            borderRadius: BorderRadius.circular(Ds.rSheet),
+            boxShadow: [
+              BoxShadow(
+                color: Ds.green.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(city.name,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
+                        const SizedBox(height: 2),
                         Text(
-                          city.currentTemp.toStringAsFixed(0),
+                          _lastUpdated == null ? '' : _formatTime(_lastUpdated!),
                           style: TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.burundiGreen,
-                            height: 1,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '°C',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w400,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
+                              fontSize: 12,
+                              color: Colors.white.withValues(alpha: 0.75)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _getWeatherDescription(city.weatherCode, city.conditionText),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // --- Stats row: humidity, wind, feels-like, UV ---
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildStatChip(Icons.water_drop_rounded, '${city.humidity}%', 'Humidity', isDark),
-                  const SizedBox(width: 8),
-                  _buildStatChip(Icons.air_rounded, '${city.windSpeed.toStringAsFixed(1)} km/h', 'Wind', isDark),
-                  const SizedBox(width: 8),
-                  _buildStatChip(Icons.thermostat_rounded, '${city.feelsLike.toStringAsFixed(0)}°', 'Feels like', isDark),
-                  const SizedBox(width: 8),
-                  _buildStatChip(Icons.wb_sunny_outlined, city.uvIndex.toStringAsFixed(1), 'UV Index', isDark),
+                  ),
+                  Icon(_getWeatherIcon(city.weatherCode), size: 44, color: Ds.gold),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // --- Sunrise / Sunset row ---
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSunChip(Icons.wb_twilight_rounded, _formatSunTime(city.sunrise), 'Sunrise', isDark),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _buildSunChip(Icons.nights_stay_rounded, _formatSunTime(city.sunset), 'Sunset', isDark),
-                ),
-              ],
-            ),
-
-            // --- Rain advisory ---
-            const SizedBox(height: 14),
-            _buildRainAdvisory(city, isDark),
-
-            if (city.forecast.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Divider(color: isDark ? AppColors.darkDivider : AppColors.lightDivider),
-              const SizedBox(height: 14),
-
-              // --- 3-Day Forecast ---
-              Text(
-                '3-Day Forecast',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.darkText : AppColors.lightText,
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Row(
-                children: city.forecast.map((day) {
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.burundiGreen.withValues(alpha: isDark ? 0.08 : 0.05),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            _formatDayAbbrev(day.date),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Icon(_getWeatherIcon(day.weatherCode), size: 26, color: AppColors.auGold),
-                          const SizedBox(height: 8),
-                          Text(
-                            '${day.maxTemp.toStringAsFixed(0)}°',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? AppColors.darkText : AppColors.lightText,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${day.minTemp.toStringAsFixed(0)}°',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${city.currentTemp.toStringAsFixed(0)}°',
+                    style: const TextStyle(
+                        fontSize: 52,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -2,
+                        height: 1.1,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '${_getWeatherDescription(city.weatherCode, city.conditionText)}\nH ${hi.toStringAsFixed(0)}° · L ${lo.toStringAsFixed(0)}°',
+                        style: TextStyle(
+                            fontSize: 14,
+                            height: 1.35,
+                            color: Colors.white.withValues(alpha: 0.85)),
                       ),
                     ),
-                  );
-                }).toList(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _heroChip(Icons.water_drop_rounded, '${city.humidity}%'),
+                  const SizedBox(width: 10),
+                  _heroChip(Icons.air_rounded, '${city.windSpeed.toStringAsFixed(0)} km/h'),
+                  const SizedBox(width: 10),
+                  _heroChip(Icons.wb_twilight_rounded, _formatSunTime(city.sunset)),
+                ],
               ),
             ],
-          ],
+          ),
         ),
-      ),
+
+        if (city.forecast.isNotEmpty)
+          DsTileGroup(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            children: [
+              for (final day in city.forecast)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(_formatDayAbbrev(day.date),
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Ds.ink(context))),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 14),
+                        child: Icon(_getWeatherIcon(day.weatherCode),
+                            size: 20, color: Ds.green),
+                      ),
+                      Text(
+                        '${day.maxTemp.toStringAsFixed(0)}° / ${day.minTemp.toStringAsFixed(0)}°',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Ds.ink(context)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+        DsFootnote(advisory.text),
+      ],
     );
   }
 
-  Widget _buildStatChip(IconData icon, String value, String label, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.burundiGreen.withValues(alpha: isDark ? 0.1 : 0.07),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppColors.burundiGreen),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  /// Translucent stat pill inside the green hero card.
+  Widget _heroChip(IconData icon, String value) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(Ds.rTile),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.darkText : AppColors.lightText,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                ),
+              Icon(icon, size: 15, color: Colors.white),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Colors.white)),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSunChip(IconData icon, String time, String label, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.auGold.withValues(alpha: isDark ? 0.1 : 0.07),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.auGold),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                ),
-              ),
-              Text(
-                time,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.darkText : AppColors.lightText,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
 
   /// WeatherAPI.com rain condition codes:
   /// 1063-1201: rain/drizzle/freezing rain variants
@@ -890,33 +490,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
       color: AppColors.burundiGreen,
       bgColor: AppColors.burundiGreen.withValues(alpha: isDark ? 0.1 : 0.06),
       text: 'No rain expected — clear skies ahead.',
-    );
-  }
-
-  Widget _buildRainAdvisory(_CityWeather city, bool isDark) {
-    final advisory = _getRainAdvisory(city, isDark);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: advisory.bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(advisory.icon, size: 20, color: advisory.color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              advisory.text,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.darkText : AppColors.lightText,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

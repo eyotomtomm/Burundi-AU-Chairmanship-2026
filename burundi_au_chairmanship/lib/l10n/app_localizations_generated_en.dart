@@ -367,6 +367,9 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   String get complete_your_profile => 'Complete your profile';
 
   @override
+  String get agenda => 'Explore';
+
+  @override
   String get news => 'News';
 
   @override

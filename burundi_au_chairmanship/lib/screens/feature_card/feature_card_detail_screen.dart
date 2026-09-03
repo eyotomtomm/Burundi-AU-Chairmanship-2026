@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
+import '../../config/app_ds.dart';
+import '../../widgets/ds/ds_widgets.dart';
+import 'media_video_player_screen.dart';
+import '../../services/share_service.dart';
 
 class FeatureCardDetailScreen extends StatefulWidget {
   final Map<String, dynamic> cardData;
@@ -55,75 +57,177 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
     return val is List ? val : [];
   }
 
-  Color _hexToColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.isEmpty) return const Color(0xFF409843);
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.tryParse(hex, radix: 16) ?? 0xFF409843);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final gradStart = _hexToColor(
-        cardData['gradient_start'] as String? ?? '#409843');
-    final gradEnd = _hexToColor(
-        cardData['gradient_end'] as String? ?? '#4CAF50');
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mediaItems = cardData['media'] as List<dynamic>? ?? [];
+    final en = _isEnglish(context);
+    final subtitle = _t(context, 'description');
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          _buildHeroSliver(context, gradStart, gradEnd),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Overview
-                  if (_t(context, 'overview').isNotEmpty) ...[
-                    _buildSectionTitle(context, _isEnglish(context) ? 'Overview' : 'Apercu', gradStart),
-                    const SizedBox(height: 12),
-                    _buildContentText(context, _t(context, 'overview'), isDark),
-                    const SizedBox(height: 24),
-                  ],
+      backgroundColor: Ds.bg(context),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 40),
+        children: [
+          _buildHeroPhoto(context),
 
-                  // Key Points
-                  if (_tList(context, 'key_points').isNotEmpty) ...[
-                    _buildSectionTitle(context, _isEnglish(context) ? 'Key Points' : 'Points Cles', gradStart),
-                    const SizedBox(height: 12),
-                    ..._tList(context, 'key_points').map((point) =>
-                        _buildBulletPoint(context, point.toString(), gradStart, isDark)),
-                    const SizedBox(height: 24),
-                  ],
+          // Title card lifted over the photo's lower edge.
+          Transform.translate(
+            offset: const Offset(0, -28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DsCard(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DsPill(en ? 'DISCOVER BURUNDI' : 'DÉCOUVRIR LE BURUNDI'),
+                      const SizedBox(height: 10),
+                      Text(
+                        _t(context, 'title'),
+                        style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            height: 1.25,
+                            color: Ds.ink(context)),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Text(subtitle,
+                            style: TextStyle(
+                                fontSize: 13, height: 1.4, color: Ds.body(context))),
+                      ],
+                    ],
+                  ),
+                ),
 
-                  // Impact Areas
-                  if (_tList(context, 'impact_areas').isNotEmpty) ...[
-                    _buildSectionTitle(context, _isEnglish(context) ? 'Impact Areas' : "Domaines d'Impact", gradStart),
-                    const SizedBox(height: 12),
-                    ..._buildImpactCards(context, isDark),
-                    const SizedBox(height: 24),
-                  ],
+                if (_t(context, 'overview').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
+                    child: Text(
+                      _t(context, 'overview'),
+                      style: TextStyle(
+                          fontSize: 14, height: 1.65, color: Ds.body(context)),
+                    ),
+                  ),
 
-                  // Media Gallery
-                  if (mediaItems.isNotEmpty) ...[
-                    _buildSectionTitle(context, _isEnglish(context) ? 'Gallery' : 'Galerie', gradStart),
-                    const SizedBox(height: 12),
-                    _buildMediaGallery(context, mediaItems, isDark),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Extra Content
-                  if (_t(context, 'extra_content').isNotEmpty) ...[
-                    _buildSectionTitle(context, _isEnglish(context) ? 'More Information' : "Plus d'Informations", gradStart),
-                    const SizedBox(height: 12),
-                    _buildContentText(context, _t(context, 'extra_content'), isDark),
-                    const SizedBox(height: 24),
-                  ],
-
-                  const SizedBox(height: 32),
+                if (_tList(context, 'key_points').isNotEmpty) ...[
+                  _heading(context, en ? 'Key points' : 'Points clés'),
+                  ..._tList(context, 'key_points').indexed.map((e) =>
+                      _buildBulletPoint(context, e.$2.toString(), e.$1)),
                 ],
+
+                if (_tList(context, 'impact_areas').isNotEmpty) ...[
+                  _heading(context,
+                      en ? 'Impact areas' : "Domaines d'impact"),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(children: _buildImpactCards(context, isDark)),
+                  ),
+                ],
+
+                if (mediaItems.isNotEmpty) ...[
+                  _heading(context, en ? 'Gallery' : 'Galerie'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildMediaGallery(context, mediaItems, isDark),
+                  ),
+                ],
+
+                if (_t(context, 'extra_content').isNotEmpty) ...[
+                  _heading(context, en ? 'More information' : "Plus d'informations"),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
+                    child: Text(
+                      _t(context, 'extra_content'),
+                      style: TextStyle(
+                          fontSize: 14, height: 1.65, color: Ds.body(context)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heading(BuildContext context, String title) => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 10),
+        child: Text(title,
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w800, color: Ds.ink(context))),
+      );
+
+  /// Cinematic hero: photo, brand scrim, and the title sitting on the image.
+  Widget _buildHeroPhoto(BuildContext context) {
+    final imageUrl = Environment.fixMediaUrl(
+        (cardData['imageUrl'] ?? cardData['image_url'] ?? cardData['image'] ?? '')
+            .toString());
+    final gradient = (cardData['gradient'] as List<Color>?) ??
+        const [Ds.green, Ds.greenDeep];
+
+    final fallback = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradient,
+        ),
+      ),
+    );
+
+    return SizedBox(
+      height: 320,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (imageUrl.isEmpty)
+            fallback
+          else
+            CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => fallback,
+              errorWidget: (_, _, _) => fallback,
+            ),
+          // Top shade for the back button, bottom shade for the title card.
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x73000000),
+                  Color(0x00000000),
+                  Color(0x59000000),
+                ],
+                stops: [0.0, 0.4, 1.0],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: _circleButton(
+                Icons.arrow_back_rounded, () => Navigator.pop(context)),
+          ),
+          Positioned(
+            right: 16,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: Builder(
+              builder: (btnContext) => _circleButton(
+                Icons.share_rounded,
+                () => ShareService.item(
+                  btnContext,
+                  kind: 'features',
+                  id: cardData['id'],
+                  title: _t(btnContext, 'title'),
+                ),
               ),
             ),
           ),
@@ -132,249 +236,114 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
     );
   }
 
+  Widget _circleButton(IconData icon, VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: Colors.white),
+        ),
+      );
+
   bool _isEnglish(BuildContext context) {
     return Localizations.localeOf(context).languageCode != 'fr';
   }
 
-  Widget _buildHeroSliver(BuildContext context, Color gradStart, Color gradEnd) {
-    final icon = cardData['icon'] as IconData? ?? Icons.stars;
-    final imageUrl = cardData['image_url'] as String? ?? '';
-
-    return SliverAppBar(
-      expandedHeight: 280,
-      pinned: true,
-      backgroundColor: gradStart,
-      foregroundColor: Colors.white,
-      flexibleSpace: FlexibleSpaceBar(
-        centerTitle: true,
-        titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        title: Text(
-          _t(context, 'title'),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            shadows: [Shadow(blurRadius: 8, color: Colors.black54)],
-          ),
-        ),
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background image if available, otherwise gradient
-            if (imageUrl.isNotEmpty)
-              CachedNetworkImage(
-                imageUrl: Environment.fixMediaUrl(imageUrl),
-                fit: BoxFit.cover,
-                placeholder: (_, _) => Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [gradStart, gradEnd],
-                    ),
-                  ),
-                ),
-                errorWidget: (_, _, _) => Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [gradStart, gradEnd],
-                    ),
-                  ),
-                ),
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [gradStart, gradEnd],
-                  ),
-                ),
-              ),
-            // Gradient overlay for text readability
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    gradStart.withValues(alpha: 0.3),
-                    gradEnd.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-            ),
-            // Icon — uploaded image or Material icon fallback
-            Center(
-              child: _buildHeroIcon(icon, 80),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  static const Map<String, IconData> _impactIcons = {
+    'health_and_safety': Icons.health_and_safety_rounded,
+    'school': Icons.school_rounded,
+    'agriculture': Icons.agriculture_rounded,
+    'trending_up': Icons.trending_up_rounded,
+    'business': Icons.business_rounded,
+    'computer': Icons.computer_rounded,
+    'factory': Icons.factory_rounded,
+    'local_shipping': Icons.local_shipping_rounded,
+    'public': Icons.public_rounded,
+    'security': Icons.security_rounded,
+    'groups': Icons.groups_rounded,
+    'landscape': Icons.landscape_rounded,
+    'music_note': Icons.music_note_rounded,
+    'restaurant': Icons.restaurant_rounded,
+    'diversity_3': Icons.diversity_3_rounded,
+    'shield': Icons.shield_rounded,
+    'handshake': Icons.handshake_rounded,
+    'military_tech': Icons.military_tech_rounded,
+    'gavel': Icons.gavel_rounded,
+  };
 
   List<Widget> _buildImpactCards(BuildContext context, bool isDark) {
-    final areas = _tList(context, 'impact_areas');
-    const cardColors = [
-      AppColors.success,
-      AppColors.auGold,
-      AppColors.info,
-      AppColors.burundiGreen,
-    ];
+    const accents = [Ds.blue, Ds.green, Ds.goldDeep, Ds.red];
+    return _tList(context, 'impact_areas').indexed.map<Widget>((entry) {
+      final area = entry.$2;
+      final accent = accents[entry.$1 % accents.length];
+      final iconName = area is Map ? (area['icon'] ?? '').toString() : '';
+      final title = (area is Map ? (area['title'] ?? '') : area).toString();
+      final desc = area is Map ? (area['description'] ?? '').toString() : '';
 
-    final iconMap = {
-      'health_and_safety': Icons.health_and_safety,
-      'school': Icons.school,
-      'agriculture': Icons.agriculture,
-      'trending_up': Icons.trending_up,
-      'business': Icons.business,
-      'computer': Icons.computer,
-      'factory': Icons.factory,
-      'local_shipping': Icons.local_shipping,
-      'public': Icons.public,
-      'security': Icons.security,
-      'groups': Icons.groups,
-      'landscape': Icons.landscape,
-      'music_note': Icons.music_note,
-      'restaurant': Icons.restaurant,
-      'diversity_3': Icons.diversity_3,
-      'shield': Icons.shield,
-      'handshake': Icons.handshake,
-      'military_tech': Icons.military_tech,
-      'gavel': Icons.gavel,
-    };
-
-    return areas.asMap().entries.map((entry) {
-      final i = entry.key;
-      final area = entry.value;
-      final color = cardColors[i % cardColors.length];
-      final iconName = area is Map ? (area['icon'] ?? '') : '';
-      final icon = iconMap[iconName] ?? Icons.star;
-      final title = area is Map ? (area['title'] ?? '') : area.toString();
-      final desc = area is Map ? (area['description'] ?? '') : '';
-
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark
-                ? color.withValues(alpha: 0.15)
-                : color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.toString(),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    if (desc.toString().isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        desc.toString(),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark
-                              ? Colors.white70
-                              : Colors.black.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
+      return DsCard(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            DsIconSquare(
+              _impactIcons[iconName] ?? Icons.star_rounded,
+              tint: accent.withValues(alpha: isDark ? 0.18 : 0.12),
+              color: accent,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Ds.cardTitle(context)),
+                  if (desc.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(desc, style: Ds.cardBody(context)),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }).toList();
   }
 
-  Widget _buildHeroIcon(IconData fallbackIcon, double size) {
-    final iconImageUrl = cardData['iconImageUrl'] as String? ?? '';
-    if (iconImageUrl.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: Environment.fixMediaUrl(iconImageUrl),
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        color: Colors.white38,
-        colorBlendMode: BlendMode.modulate,
-        placeholder: (_, _) => Icon(fallbackIcon, size: size, color: Colors.white38),
-        errorWidget: (_, _, _) => Icon(fallbackIcon, size: size, color: Colors.white38),
-      );
-    }
-    return Icon(fallbackIcon, size: size, color: Colors.white38);
-  }
+  Widget _buildBulletPoint(BuildContext context, String text, int index) {
+    // Cycle the flag palette so a long list keeps some rhythm.
+    const accents = [Ds.green, Ds.goldDeep, Ds.blue, Ds.red];
+    final accent = accents[index % accents.length];
 
-  Widget _buildSectionTitle(BuildContext context, String title, Color accentColor) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-        color: accentColor,
-      ),
-    );
-  }
-
-  Widget _buildContentText(BuildContext context, String text, bool isDark) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 16,
-        height: 1.6,
-        color: isDark ? Colors.white70 : Colors.black87,
-      ),
-    );
-  }
-
-  Widget _buildBulletPoint(BuildContext context, String text, Color accentColor, bool isDark) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+    return DsCard(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Icon(Icons.check_circle, size: 20, color: accentColor),
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(Ds.rIcon),
+            ),
+            alignment: Alignment.center,
+            child: Text('${index + 1}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: accent)),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
-                fontSize: 16,
-                height: 1.6,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
+                  fontSize: 14, height: 1.5, color: Ds.ink(context)),
             ),
           ),
         ],
@@ -467,9 +436,30 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
     );
   }
 
+  Widget _videoPlaceholder(bool isDark) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[850] : Colors.grey[300],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: Icon(Icons.videocam, size: 48, color: Colors.white54),
+        ),
+      );
+
   Widget _buildVideoThumbnail(BuildContext context, String videoUrl, String caption, bool isDark) {
+    final poster = MediaVideoPlayerScreen.posterFor(videoUrl);
     return GestureDetector(
-      onTap: videoUrl.isNotEmpty ? () => _launchVideoUrl(videoUrl) : null,
+      onTap: videoUrl.isNotEmpty
+          ? () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MediaVideoPlayerScreen(
+                    videoUrl: videoUrl,
+                    caption: caption,
+                  ),
+                ),
+              )
+          : null,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
@@ -477,15 +467,17 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Icon(Icons.videocam, size: 48, color: Colors.white54),
-                ),
-              ),
+              // YouTube gives us a poster frame for free; uploaded files
+              // have no thumbnail, so they keep the placeholder.
+              if (poster != null)
+                CachedNetworkImage(
+                  imageUrl: poster,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, _, _) => _videoPlaceholder(isDark),
+                  placeholder: (_, _) => _videoPlaceholder(isDark),
+                )
+              else
+                _videoPlaceholder(isDark),
               // Play button overlay
               Center(
                 child: Container(
@@ -561,10 +553,4 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
     );
   }
 
-  Future<void> _launchVideoUrl(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
 }

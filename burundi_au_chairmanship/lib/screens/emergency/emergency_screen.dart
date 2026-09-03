@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/language_provider.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
@@ -23,6 +25,14 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
   String _sosTitle = 'Emergency / SOS';
   String _sosTitleFr = 'Urgence / SOS';
   bool _liveAgentOnline = false;
+
+  Timer? _sosHoldTimer;
+
+  @override
+  void dispose() {
+    _sosHoldTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -106,7 +116,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not open $value')),
+            SnackBar(content: Text(AppLocalizations.of(context).translate('could_not_open_link'))),
           );
         }
       }
@@ -133,7 +143,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start live chat: $e'),
+            content: Text(AppLocalizations.of(context).translate('live_chat_start_failed')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -240,7 +250,17 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       children: [
         const SizedBox(height: 6),
         GestureDetector(
-          onLongPress: primary == null ? null : () => _handleAction(primary),
+          // Real 3-second hold: the timer only fires if the finger stays down.
+          onLongPressStart: primary == null
+              ? null
+              : (_) {
+                  _sosHoldTimer?.cancel();
+                  _sosHoldTimer = Timer(const Duration(seconds: 3), () {
+                    if (mounted) _handleAction(primary);
+                  });
+                },
+          onLongPressEnd: (_) => _sosHoldTimer?.cancel(),
+          onLongPressCancel: () => _sosHoldTimer?.cancel(),
           child: Container(
             width: 130,
             height: 130,
@@ -279,8 +299,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         const SizedBox(height: 18),
         Text(
           fr
-              ? "Appelle le service d'urgence principal · Envoie votre position"
-              : 'Calls the primary emergency line · Sends your location',
+              ? "Appelle le service d'urgence principal"
+              : 'Calls the primary emergency line',
           textAlign: TextAlign.center,
           style: TextStyle(
               fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),

@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>{% block title %}Diplomatic Portal | Be 4 Africa 2026–2027{% endblock %}</title>
+<meta name="csrf-token" content="{{ csrf_token }}">
 <!-- Dark mode detection: runs before any rendering to prevent flash of wrong theme -->
 <script>
 (function() {
@@ -13,7 +14,7 @@
   }
 })();
 </script>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms,container-queries"></script>
 {% include 'custom_admin/_design_tokens.html' %}
 <style>
 /* === Sidebar navigation (design: .nav-i) === */
@@ -640,7 +641,14 @@ h1, h2, h3, h4 { font-family: 'Sora', sans-serif; letter-spacing: -0.01em; }
       <a class="nav-i {% if 'resource' in url_name %}on{% endif %}" href="{% url 'custom_admin:resources_list' %}"><span class="ic material-symbols-rounded">folder_zip</span><span>Resources</span></a>
       {% endif %}
       {% if 'reorder' in allowed_sections %}
-      <a class="nav-i {% if 'reorder' in url_name %}on{% endif %}" href="{% url 'custom_admin:reorder' %}"><span class="ic material-symbols-rounded">swap_vert</span><span>Reorder Items</span></a>
+      <details {% if 'reorder' in url_name %}open{% endif %}>
+        <summary class="nav-i {% if 'reorder' in url_name %}on{% endif %}" style="list-style:none"><span class="ic material-symbols-rounded">swap_vert</span><span>Reorder Items</span></summary>
+        <a class="nav-i pl-10" href="{% url 'custom_admin:reorder' %}?model=hero_slides"><span>Hero Slides</span></a>
+        <a class="nav-i pl-10" href="{% url 'custom_admin:reorder' %}?model=feature_cards"><span>Feature Cards</span></a>
+        <a class="nav-i pl-10" href="{% url 'custom_admin:reorder' %}?model=onboarding_steps"><span>Onboarding Steps</span></a>
+        <a class="nav-i pl-10" href="{% url 'custom_admin:reorder' %}?model=gallery_albums"><span>Gallery Albums</span></a>
+        <a class="nav-i pl-10" href="{% url 'custom_admin:reorder' %}?model=quick_access"><span>Quick Access Menu</span></a>
+      </details>
       {% endif %}
       {% if 'quick_access_list' in allowed_sections %}
       <a class="nav-i {% if 'quick_access' in url_name %}on{% endif %}" href="{% url 'custom_admin:quick_access_list' %}"><span class="ic material-symbols-rounded">bolt</span><span>Quick Access</span></a>
@@ -947,12 +955,18 @@ h1, h2, h3, h4 { font-family: 'Sora', sans-serif; letter-spacing: -0.01em; }
     {% if messages %}
     <div class="mb-8 space-y-3">
       {% for message in messages %}
-      <div class="flex items-center gap-3 p-4 rounded-xl {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+      <div class="flash-msg flex items-center gap-3 p-4 rounded-xl {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif message.tags == 'error' %}bg-red-50 text-red-800 border border-red-200{% elif message.tags == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}" data-tags="{{ message.tags }}" role="status">
         <span class="material-symbols-outlined text-sm">{% if message.tags == 'success' %}check_circle{% elif message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}</span>
-        <span class="text-sm font-medium">{{ message }}</span>
+        <span class="text-sm font-medium flex-1">{{ message }}</span>
+        <button type="button" class="p-1 rounded-md opacity-60 hover:opacity-100" aria-label="Dismiss" onclick="this.parentNode.remove()"><span class="material-symbols-outlined text-sm">close</span></button>
       </div>
       {% endfor %}
     </div>
+    <script>
+      setTimeout(function() {
+        document.querySelectorAll('.flash-msg[data-tags~="success"]').forEach(function(el) { el.remove(); });
+      }, 6000);
+    </script>
     {% endif %}
 
     {% block content %}{% endblock %}
@@ -1142,7 +1156,7 @@ function toggleDarkMode() {
 
   window.extendSession = function() {
     // Ping the server to reset session cookie
-    fetch('{% url "custom_admin:dashboard" %}', { method: 'HEAD', credentials: 'same-origin' })
+    fetch('{% url "custom_admin:ping" %}', { credentials: 'same-origin' })
       .catch(function() {});
     resetTimer();
   };
@@ -1591,6 +1605,8 @@ function toggleDarkMode() {
   }
 
   function getCsrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) return meta.content;
     var cookie = document.cookie.split(';').find(function(c) { return c.trim().startsWith('csrftoken='); });
     return cookie ? cookie.split('=')[1] : '';
   }

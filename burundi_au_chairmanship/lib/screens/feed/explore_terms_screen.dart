@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../config/app_ds.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// One-time gate before someone can take part in Explore.
 ///
@@ -22,35 +23,20 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
   bool _agreed = false;
   bool _busy = false;
 
+  // (icon, title key, body key) — resolved through l10n at build time.
   static const _points = [
-    (
-      Icons.badge_rounded,
-      'Post as yourself',
-      'Your name, photo and country appear on everything you post. No anonymous accounts.',
-    ),
-    (
-      Icons.forum_rounded,
-      'Argue the point, not the person',
-      'Disagree as sharply as you like. Harassment, hate and threats are removed.',
-    ),
-    (
-      Icons.fact_check_rounded,
-      'Be honest about sources',
-      'Do not present rumour as fact. Misinformation about the agenda gets taken down.',
-    ),
-    (
-      Icons.flag_rounded,
-      'Reporting is on you too',
-      'If you see something that breaks these terms, report it. Moderators review every report.',
-    ),
+    (Icons.badge_rounded, 'xt_point1_title', 'xt_point1_body'),
+    (Icons.forum_rounded, 'xt_point2_title', 'xt_point2_body'),
+    (Icons.fact_check_rounded, 'xt_point3_title', 'xt_point3_body'),
+    (Icons.flag_rounded, 'xt_point4_title', 'xt_point4_body'),
   ];
 
-  static String _label(String field) => switch (field) {
-        'profile_picture' => 'a profile photo',
-        'date_of_birth' => 'your date of birth',
-        'name' => 'your name',
-        'nationality' => 'your country',
-        'phone' => 'your phone number',
+  static String _label(AppLocalizations l10n, String field) => switch (field) {
+        'profile_picture' => l10n.translate('xt_field_photo'),
+        'date_of_birth' => l10n.translate('xt_field_dob'),
+        'name' => l10n.translate('xt_field_name'),
+        'nationality' => l10n.translate('xt_field_country'),
+        'phone' => l10n.translate('xt_field_phone'),
         _ => field.replaceAll('_', ' '),
       };
 
@@ -72,6 +58,7 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final missing = widget.missingFields;
     final ready = _agreed && missing.isEmpty;
 
@@ -91,25 +78,30 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context, false),
-                  child: const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: Icon(Icons.arrow_back_rounded,
-                        color: Colors.white, size: 22),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => Navigator.pop(context, false),
+                    child: const SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Icon(Icons.arrow_back_rounded,
+                          color: Colors.white, size: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text('Welcome to Explore',
-                    style: TextStyle(
+                Text(l10n.translate('explore_terms_title'),
+                    style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.3,
                         color: Colors.white)),
                 const SizedBox(height: 6),
                 Text(
-                  'A public space for youth policy debate. Read this once before you take part.',
+                  l10n.translate('explore_terms_subtitle'),
                   style: TextStyle(
                       fontSize: 14,
                       height: 1.45,
@@ -122,6 +114,13 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
+                // No French legal copy exists yet; the English text is binding.
+                if (Localizations.localeOf(context).languageCode == 'fr')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(l10n.translate('explore_terms_english_prevails'),
+                        style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Ds.muted(context))),
+                  ),
                 for (final (icon, title, body) in _points)
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -148,13 +147,13 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(title,
+                              Text(l10n.translate(title),
                                   style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                       color: Ds.ink(context))),
                               const SizedBox(height: 3),
-                              Text(body,
+                              Text(l10n.translate(body),
                                   style: TextStyle(
                                       fontSize: 13,
                                       height: 1.4,
@@ -180,7 +179,7 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                             const Icon(Icons.person_search_rounded,
                                 size: 20, color: Ds.goldInk),
                             const SizedBox(width: 8),
-                            Text('Before you can post',
+                            Text(l10n.translate('explore_terms_before_posting'),
                                 style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
@@ -189,8 +188,8 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'We still need ${missing.map(_label).join(', ')}. '
-                          'This is what keeps Explore accountable — every post has a real person behind it.',
+                          '${l10n.translate('xt_we_still_need')} ${missing.map((m) => _label(l10n, m)).join(', ')}. '
+                          '${l10n.translate('xt_accountable')}',
                           style: TextStyle(
                               fontSize: 13, height: 1.45, color: Ds.body(context)),
                         ),
@@ -205,7 +204,7 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                               color: Ds.surface(context),
                               borderRadius: BorderRadius.circular(Ds.rPill),
                             ),
-                            child: Text('Complete my profile',
+                            child: Text(l10n.translate('explore_terms_complete_profile'),
                                 style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
@@ -223,7 +222,7 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   title: Text(
-                    'I have read and agree to the Explore community terms.',
+                    l10n.translate('explore_terms_agree'),
                     style: TextStyle(
                         fontSize: 14, height: 1.4, color: Ds.ink(context)),
                   ),
@@ -251,8 +250,8 @@ class _ExploreTermsScreenState extends State<ExploreTermsScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white))
-                      : const Text('Agree and continue',
-                          style: TextStyle(
+                      : Text(l10n.translate('explore_terms_continue'),
+                          style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                               color: Colors.white)),

@@ -7,6 +7,7 @@ import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../utils/input_sanitizer.dart';
+import '../../l10n/app_localizations.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -63,10 +64,11 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
       if (mounted) {
         HapticFeedback.mediumImpact();
+        final l10n = AppLocalizations.of(context);
         Navigator.pop(context, true); // Return true to signal ticket created
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Support ticket submitted! We\'ll respond via email.'),
+          SnackBar(
+            content: Text(l10n.translate('sup_submitted')),
             backgroundColor: AppColors.success,
           ),
         );
@@ -76,7 +78,9 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to submit: $e'),
+            content: Text(e is ApiException
+                ? e.message
+                : AppLocalizations.of(context).translate('sup_failed_to_submit')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -88,9 +92,10 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Ds.bg(context),
-      appBar: AppBar(title: const Text('Contact support')),
+      appBar: AppBar(title: Text(l10n.translate('contact_support'))),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -110,13 +115,13 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('How can we help?',
+                        Text(l10n.translate('sup_how_can_we_help'),
                             style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 color: Ds.ink(context))),
                         const SizedBox(height: 3),
-                        Text('We typically respond within 24 hours',
+                        Text(l10n.translate('sup_respond_24h'),
                             style: Ds.cardBody(context)),
                       ],
                     ),
@@ -128,7 +133,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
             _field(
               controller: _emailController,
-              label: 'EMAIL',
+              label: l10n.translate('email').toUpperCase(),
               hint: 'your.email@example.com',
               icon: Icons.mail_rounded,
               keyboardType: TextInputType.emailAddress,
@@ -137,16 +142,16 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             const SizedBox(height: 10),
             _field(
               controller: _subjectController,
-              label: 'SUBJECT',
-              hint: 'Brief description of your issue',
+              label: l10n.translate('sup_subject').toUpperCase(),
+              hint: l10n.translate('sup_subject_hint'),
               icon: Icons.subject_rounded,
               maxLength: InputSanitizer.maxSubjectLength,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Please enter a subject';
+                  return l10n.translate('sup_enter_subject');
                 }
                 if (value.trim().length < 3) {
-                  return 'Subject must be at least 3 characters';
+                  return l10n.translate('sup_subject_min');
                 }
                 return null;
               },
@@ -154,17 +159,17 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
             const SizedBox(height: 10),
             _field(
               controller: _messageController,
-              label: 'MESSAGE',
-              hint: 'Describe your issue or question in detail…',
+              label: l10n.translate('sup_message').toUpperCase(),
+              hint: l10n.translate('sup_message_hint'),
               icon: Icons.chat_rounded,
               maxLines: 6,
               maxLength: InputSanitizer.maxMessageLength,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your message';
+                  return l10n.translate('sup_enter_message');
                 }
                 if (value.trim().length < 10) {
-                  return 'Please provide more details (at least 10 characters)';
+                  return l10n.translate('sup_message_min');
                 }
                 return null;
               },
@@ -178,7 +183,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       width: 22,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green)))
             else
-              DsPrimaryButton('Submit request',
+              DsPrimaryButton(l10n.translate('sup_submit_request'),
                   radius: 14, onTap: _submitSupport),
           ],
         ),

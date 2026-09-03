@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../config/app_colors.dart';
 import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations_generated.dart';
+import '../../widgets/app_network_image.dart';
 
 class OnboardingScreen extends StatefulWidget {
   /// When true, shows "Close" instead of "Get Started" and skips the
@@ -47,57 +49,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Hardcoded bilingual fallback steps — used when the API returns nothing.
   static List<Map<String, dynamic>> _fallbackSteps(String lang) {
-    final isFr = lang == 'fr';
+    final g = lookupAppLocalizationsGenerated(Locale(lang));
     return [
-      {
-        'icon': Icons.celebration_rounded,
-        'title': isFr ? 'Bienvenue sur B4Africa' : 'Welcome to B4Africa',
-        'description': isFr
-            ? 'Votre compagnon pour la Présidence de l\'Union Africaine 2026. Faisons le tour !'
-            : 'Your companion for the African Union Chairmanship 2026. Let\'s show you around!',
-      },
-      {
-        'icon': Icons.article_rounded,
-        'title': isFr ? 'Actualités' : 'News',
-        'description': isFr
-            ? 'Restez informé des derniers articles et annonces'
-            : 'Stay updated with the latest articles and announcements',
-      },
-      {
-        'icon': Icons.event_rounded,
-        'title': isFr ? 'Événements' : 'Events',
-        'description': isFr
-            ? 'Parcourez les événements à venir, inscrivez-vous et obtenez des billets'
-            : 'Browse upcoming events, register, and get tickets',
-      },
-      {
-        'icon': Icons.auto_stories_rounded,
-        'title': isFr ? 'Magazine Numérique' : 'Digital Magazine',
-        'description': isFr
-            ? 'Lisez le magazine numérique et les articles en vedette'
-            : 'Read the digital magazine and featured articles',
-      },
-      {
-        'icon': Icons.live_tv_rounded,
-        'title': isFr ? 'Diffusions en Direct' : 'Live Feeds',
-        'description': isFr
-            ? 'Regardez les diffusions en direct et le contenu vidéo'
-            : 'Watch live streams and video content',
-      },
-      {
-        'icon': Icons.translate_rounded,
-        'title': isFr ? 'Traduction' : 'Translate',
-        'description': isFr
-            ? 'Traduisez le contenu entre les langues instantanément'
-            : 'Translate content between languages instantly',
-      },
-      {
-        'icon': Icons.photo_library_rounded,
-        'title': isFr ? 'Galerie' : 'Gallery',
-        'description': isFr
-            ? 'Explorez les albums photos des événements et sommets'
-            : 'Explore photo albums from events and summits',
-      },
+      {'icon': Icons.celebration_rounded, 'title': g.onboarding_welcome, 'description': g.onboarding_welcome_desc},
+      {'icon': Icons.article_rounded, 'title': g.onboarding_news, 'description': g.onboarding_news_desc},
+      {'icon': Icons.event_rounded, 'title': g.onboarding_events, 'description': g.onboarding_events_desc},
+      {'icon': Icons.auto_stories_rounded, 'title': g.onboarding_magazine, 'description': g.onboarding_magazine_desc},
+      {'icon': Icons.live_tv_rounded, 'title': g.onboarding_live, 'description': g.onboarding_live_desc},
+      {'icon': Icons.translate_rounded, 'title': g.onboarding_translate, 'description': g.onboarding_translate_desc},
+      {'icon': Icons.photo_library_rounded, 'title': g.onboarding_gallery, 'description': g.onboarding_gallery_desc},
     ];
   }
 
@@ -209,19 +169,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemBuilder: (context, index) {
                   final step = _steps[index];
                   final imageUrl = _resolveImage(step, isDark);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (imageUrl != null)
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child: Image.network(
-                              imageUrl,
+                            child: AppNetworkImage(
+                              imageUrl: imageUrl,
                               height: 260,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => _buildIconPlaceholder(step),
+                              hero: true,
+                              errorWidget: (_, _, _) => _buildIconPlaceholder(step),
                             ),
                           )
                         else

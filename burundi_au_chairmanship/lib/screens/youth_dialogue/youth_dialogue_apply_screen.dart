@@ -1,14 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
 import '../../config/app_colors.dart';
 import '../../models/event_registration_model.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
-import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
 
 class YouthDialogueApplyScreen extends StatefulWidget {
   final List<RegistrationFormField> formFields;
@@ -22,6 +19,7 @@ class YouthDialogueApplyScreen extends StatefulWidget {
 }
 
 class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _submitted = false;
@@ -30,7 +28,6 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   // Dynamic form state
   final Map<String, TextEditingController> _formControllers = {};
   final Map<String, dynamic> _formValues = {};
-  final Map<String, File> _pickedFiles = {};
 
   // Side events selection
   final Set<int> _selectedSideEventIds = {};
@@ -378,8 +375,8 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     setState(() => _hasTriedSubmit = true);
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fix the errors highlighted in red below.'),
+        SnackBar(
+          content: Text(_l10n.translate('yda_fix_errors')),
           backgroundColor: AppColors.burundiRed,
           behavior: SnackBarBehavior.floating,
         ),
@@ -391,8 +388,8 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     if (!authProvider.isEmailVerified) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please verify your email address before applying.'),
+        SnackBar(
+          content: Text(_l10n.translate('yda_verify_email_first')),
           backgroundColor: AppColors.burundiRed,
         ),
       );
@@ -441,7 +438,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       _showErrorDialog(e.message);
     } catch (e) {
       if (!mounted) return;
-      _showErrorDialog('Something went wrong. Please try again.');
+      _showErrorDialog(_l10n.translate('generic_error'));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -461,7 +458,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           children: [
             const Icon(Icons.error_outline, color: AppColors.burundiRed, size: 24),
             const SizedBox(width: 10),
-            Text('Submission Error',
+            Text(_l10n.translate('yda_submission_error'),
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
                 color: isDark ? Colors.white : Colors.black87)),
           ],
@@ -470,7 +467,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Please fix the following issues:',
+            Text(_l10n.translate('yda_fix_issues'),
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black54)),
             const SizedBox(height: 12),
             ...errors.map((e) => Padding(
@@ -490,7 +487,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
+            child: Text(_l10n.translate('ok'), style: const TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -503,11 +500,11 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     final langCode = Localizations.localeOf(context).languageCode;
 
     if (_submitted) {
-      final isFr = langCode == 'fr';
+      final l10n = _l10n;
       return Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
-          title: Text(isFr ? 'Candidature envoyée' : 'Application Submitted'),
+          title: Text(l10n.translate('yda_application_submitted')),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -524,14 +521,12 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                 child: const Icon(Icons.check_circle_rounded, size: 54, color: AppColors.burundiGreen),
               ),
               const SizedBox(height: 24),
-              Text(isFr ? 'Candidature envoyée !' : 'Application Submitted!',
+              Text(l10n.translate('yda_application_submitted_excl'),
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87)),
               const SizedBox(height: 12),
               Text(
-                isFr
-                    ? 'Votre candidature a été reçue avec succès et est en cours de traitement. Nous vous informerons dès qu\'une décision sera prise.'
-                    : 'Your application has been successfully received and is being processed. We will notify you as soon as a decision has been made.',
+                l10n.translate('yda_submitted_desc'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 15, height: 1.6, color: isDark ? Colors.white60 : Colors.black54)),
               const SizedBox(height: 28),
@@ -551,14 +546,14 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                       children: [
                         Icon(Icons.info_outline_rounded, size: 18, color: AppColors.burundiGreen),
                         const SizedBox(width: 8),
-                        Text(isFr ? 'Prochaines étapes' : 'What happens next',
+                        Text(l10n.translate('yda_what_happens_next'),
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.burundiGreen)),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _buildStepRow('1', isFr ? 'Notre équipe examinera votre candidature' : 'Our team will review your application', isDark),
-                    _buildStepRow('2', isFr ? 'Vous recevrez une notification de la décision' : 'You will receive a notification with the decision', isDark),
-                    _buildStepRow('3', isFr ? 'Si accepté(e), téléchargez les documents requis' : 'If accepted, upload the required documents', isDark),
+                    _buildStepRow('1', l10n.translate('yda_step_review'), isDark),
+                    _buildStepRow('2', l10n.translate('yda_step_notify'), isDark),
+                    _buildStepRow('3', l10n.translate('yda_step_docs'), isDark),
                   ],
                 ),
               ),
@@ -577,9 +572,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        isFr
-                            ? 'Un email de confirmation a été envoyé à votre adresse email.'
-                            : 'A confirmation email has been sent to your email address.',
+                        l10n.translate('yda_email_sent'),
                         style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
                       ),
                     ),
@@ -597,7 +590,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: Text(isFr ? 'Retour au ${widget.programmeTitle}' : 'Back to ${widget.programmeTitle}',
+                  child: Text('${l10n.translate('yda_back_to')} ${widget.programmeTitle}',
                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
@@ -620,23 +613,23 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
 
     // Desired field ordering — fields listed here render in this sequence;
     // any backend field whose fieldName is NOT in this list renders afterwards.
-    const _fieldOrder = [
+    const fieldOrder = [
       'title', 'first_name', 'last_name', 'name', 'email', 'phone_number',
       'date_of_birth', 'gender', 'nationality', 'country_code',
       'organization', 'position',
     ];
 
-    int _orderOf(String fieldName) {
-      final idx = _fieldOrder.indexOf(fieldName);
-      return idx >= 0 ? idx : _fieldOrder.length;
+    int orderOf(String fieldName) {
+      final idx = fieldOrder.indexOf(fieldName);
+      return idx >= 0 ? idx : fieldOrder.length;
     }
 
     // Sort backend fields to match desired order (stable sort preserves
-    // relative order of fields not in _fieldOrder).
+    // relative order of fields not in fieldOrder).
     final sortedFields = List<RegistrationFormField>.from(activeFields)
       ..sort((a, b) {
-        final oa = _orderOf(a.fieldName);
-        final ob = _orderOf(b.fieldName);
+        final oa = orderOf(a.fieldName);
+        final ob = orderOf(b.fieldName);
         if (oa != ob) return oa.compareTo(ob);
         return a.order.compareTo(b.order);
       });
@@ -646,7 +639,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
 
     // If title is not a backend field, inject it first
     if (!hasBackendTitle) {
-      formWidgets.add(_buildFixedDropdown('title', 'Title', 'Select title', _titleOptions, isDark, isRequired: true));
+      formWidgets.add(_buildFixedDropdown('title', _l10n.translate('yda_title'), _l10n.translate('yda_select_title'), _titleOptions, isDark, isRequired: true));
     }
 
     bool positionInserted = hasBackendPosition; // already handled if backend field
@@ -658,7 +651,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         // Don't insert yet if organization comes later
         final hasOrg = sortedFields.any((f) => f.fieldName == 'organization');
         if (!hasOrg || field.fieldName == 'organization') {
-          formWidgets.add(_buildFixedDropdown('position', 'Position / Role', 'Select position', _positionOptions, isDark, isRequired: true));
+          formWidgets.add(_buildFixedDropdown('position', _l10n.translate('yda_position_role'), _l10n.translate('yda_select_position'), _positionOptions, isDark, isRequired: true));
           positionInserted = true;
         }
       }
@@ -666,7 +659,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
 
     // If position still hasn't been inserted (no organization/nationality field), add at end
     if (!positionInserted) {
-      formWidgets.add(_buildFixedDropdown('position', 'Position / Role', 'Select position', _positionOptions, isDark, isRequired: true));
+      formWidgets.add(_buildFixedDropdown('position', _l10n.translate('yda_position_role'), _l10n.translate('yda_select_position'), _positionOptions, isDark, isRequired: true));
     }
 
     // Side events at the end
@@ -677,7 +670,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: Text('Apply for ${widget.programmeTitle}'),
+        title: Text('${_l10n.translate('yda_apply_for')} ${widget.programmeTitle}'),
       ),
       body: Form(
         key: _formKey,
@@ -706,7 +699,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                 ),
                 child: _isLoading
                     ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Submit Application', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                    : Text(_l10n.translate('yda_submit_application'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ),
             const SizedBox(height: 40),
@@ -717,7 +710,6 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
   }
 
   Widget _buildSideEventsSection(String langCode, bool isDark) {
-    final isFr = langCode == 'fr';
     final textColor = isDark ? Colors.white70 : Colors.black87;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -725,13 +717,13 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isFr ? 'Événements parallèles' : 'Side Events',
+            _l10n.translate('yda_side_events'),
             style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              isFr ? 'Choisissez un événement auquel vous souhaitez participer' : 'Choose one event you would like to attend',
+              _l10n.translate('yda_side_events_hint'),
               style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
             ),
           ),
@@ -825,16 +817,16 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         padding: const EdgeInsets.only(bottom: 14),
         child: DropdownButtonFormField<String>(
           key: ValueKey('title_${field.fieldName}'),
-          value: _formValues[field.fieldName] as String?,
+          initialValue: _formValues[field.fieldName] as String?,
           decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
-          hint: Text(placeholder.isNotEmpty ? placeholder : 'Select title'),
+          hint: Text(placeholder.isNotEmpty ? placeholder : _l10n.translate('yda_select_title')),
           isExpanded: true,
           menuMaxHeight: 300,
           items: _titleOptions
               .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
               .toList(),
           onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
-          validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+          validator: field.isRequired ? (v) => v == null ? _l10n.translate('field_required') : null : null,
         ),
       );
     }
@@ -845,16 +837,16 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
         padding: const EdgeInsets.only(bottom: 14),
         child: DropdownButtonFormField<String>(
           key: ValueKey('position_${field.fieldName}'),
-          value: _formValues[field.fieldName] as String?,
+          initialValue: _formValues[field.fieldName] as String?,
           decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
-          hint: Text(placeholder.isNotEmpty ? placeholder : 'Select position'),
+          hint: Text(placeholder.isNotEmpty ? placeholder : _l10n.translate('yda_select_position')),
           isExpanded: true,
           menuMaxHeight: 300,
           items: _positionOptions
               .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
               .toList(),
           onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
-          validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+          validator: field.isRequired ? (v) => v == null ? _l10n.translate('field_required') : null : null,
         ),
       );
     }
@@ -871,7 +863,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             textCapitalization: TextCapitalization.sentences,
             decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired),
             validator: (v) {
-              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return _l10n.translate('field_required');
               if (field.minLength != null && v != null && v.isNotEmpty && v.length < field.minLength!) {
                 return 'Minimum ${field.minLength} characters required';
               }
@@ -887,7 +879,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
             key: ValueKey('select_${field.fieldName}'),
-            value: _formValues[field.fieldName] as String?,
+            initialValue: _formValues[field.fieldName] as String?,
             decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
             hint: placeholder.isNotEmpty ? Text(placeholder) : null,
             isExpanded: true,
@@ -896,7 +888,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                 .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
                 .toList(),
             onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
-            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+            validator: field.isRequired ? (v) => v == null ? _l10n.translate('field_required') : null : null,
           ),
         );
 
@@ -905,7 +897,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
             key: ValueKey('country_${field.fieldName}'),
-            value: _formValues[field.fieldName] as String?,
+            initialValue: _formValues[field.fieldName] as String?,
             decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
             isExpanded: true,
             menuMaxHeight: 300,
@@ -913,7 +905,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                 .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
                 .toList(),
             onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
-            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+            validator: field.isRequired ? (v) => v == null ? _l10n.translate('field_required') : null : null,
           ),
         );
 
@@ -922,7 +914,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: DropdownButtonFormField<String>(
             key: ValueKey('nationality_${field.fieldName}'),
-            value: _formValues[field.fieldName] as String?,
+            initialValue: _formValues[field.fieldName] as String?,
             decoration: _inputDecoration(label, null, helpText, isDark, field.isRequired),
             isExpanded: true,
             menuMaxHeight: 300,
@@ -944,7 +936,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                 })
                 .toList(),
             onChanged: (val) => setState(() => _formValues[field.fieldName] = val),
-            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
+            validator: field.isRequired ? (v) => v == null ? _l10n.translate('field_required') : null : null,
           ),
         );
 
@@ -954,7 +946,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: FormField<String>(
             initialValue: _formValues[field.fieldName] as String?,
-            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? _l10n.translate('field_required') : null : null,
             builder: (state) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1011,7 +1003,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: FormField<List<String>>(
             initialValue: selected,
-            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Select at least one' : null : null,
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? _l10n.translate('yda_select_at_least_one') : null : null,
             builder: (state) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1100,7 +1092,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                     '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
               }
             },
-            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? _l10n.translate('field_required') : null : null,
           ),
         );
 
@@ -1123,102 +1115,34 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                     '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
               }
             },
-            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? 'Required' : null : null,
+            validator: field.isRequired ? (v) => (v == null || v.isEmpty) ? _l10n.translate('field_required') : null : null,
           ),
         );
 
       case 'file':
       case 'image':
-        final pickedFile = _pickedFiles[field.fieldName];
-        final isImage = field.fieldType == 'image';
+        // The apply endpoint is JSON-only; documents are collected via the
+        // documents screen once the application is accepted.
         return Padding(
           padding: const EdgeInsets.only(bottom: 14),
-          child: FormField<File>(
-            validator: field.isRequired ? (v) => v == null ? 'Required' : null : null,
-            initialValue: pickedFile,
-            builder: (state) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    field.isRequired ? '$label *' : label,
-                    style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.burundiGreen.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: AppColors.burundiGreen, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$label: ${AppLocalizations.of(context).translate('yd_documents_after_acceptance')}',
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
                   ),
-                  if (helpText.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(helpText, style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38)),
-                    ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () async {
-                      File? file;
-                      if (isImage) {
-                        final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-                        if (picked != null) file = File(picked.path);
-                      } else {
-                        final result = await FilePicker.platform.pickFiles();
-                        if (result != null && result.files.single.path != null) {
-                          file = File(result.files.single.path!);
-                        }
-                      }
-                      if (file != null) {
-                        setState(() => _pickedFiles[field.fieldName] = file!);
-                        state.didChange(file);
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: state.hasError
-                              ? AppColors.burundiRed
-                              : (isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0)),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isImage ? Icons.image_outlined : Icons.attach_file,
-                            color: pickedFile != null ? AppColors.burundiGreen : (isDark ? Colors.white38 : Colors.black38),
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              pickedFile != null
-                                  ? pickedFile.path.split('/').last
-                                  : (isImage ? 'Tap to select image' : 'Tap to select file'),
-                              style: TextStyle(
-                                color: pickedFile != null ? textColor : (isDark ? Colors.white38 : Colors.black38),
-                                fontSize: 14,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (pickedFile != null)
-                            GestureDetector(
-                              onTap: () {
-                                setState(() => _pickedFiles.remove(field.fieldName));
-                                state.didChange(null);
-                              },
-                              child: Icon(Icons.close, size: 18, color: isDark ? Colors.white38 : Colors.black38),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (state.hasError)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 4),
-                      child: Text(state.errorText!, style: const TextStyle(color: AppColors.burundiRed, fontSize: 12)),
-                    ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         );
 
@@ -1228,7 +1152,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           child: TextFormField(
             controller: _formControllers[field.fieldName],
             keyboardType: TextInputType.phone,
-            decoration: _inputDecoration(label, placeholder.isNotEmpty ? placeholder : 'Phone number', helpText, isDark, field.isRequired).copyWith(
+            decoration: _inputDecoration(label, placeholder.isNotEmpty ? placeholder : _l10n.translate('yda_phone_number'), helpText, isDark, field.isRequired).copyWith(
               prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
               prefixIcon: GestureDetector(
                 onTap: () => _showPhoneCodePicker(isDark),
@@ -1248,7 +1172,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
               ),
             ),
             validator: (v) {
-              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return _l10n.translate('field_required');
               return null;
             },
           ),
@@ -1283,10 +1207,10 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                       : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
                 ),
                 validator: (v) {
-                  if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+                  if (field.isRequired && (v == null || v.trim().isEmpty)) return _l10n.translate('field_required');
                   if (v != null && v.isNotEmpty) {
                     final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                    if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
+                    if (!emailRegex.hasMatch(v.trim())) return _l10n.translate('yda_invalid_email');
                   }
                   return null;
                 },
@@ -1295,7 +1219,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                 Padding(
                   padding: const EdgeInsets.only(left: 4, top: 4),
                   child: Text(
-                    'Email verified',
+                    _l10n.translate('yda_email_verified'),
                     style: TextStyle(fontSize: 12, color: AppColors.burundiGreen, fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -1313,11 +1237,11 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             textCapitalization: field.fieldType == 'text' ? TextCapitalization.words : TextCapitalization.none,
             decoration: _inputDecoration(label, placeholder, helpText, isDark, field.isRequired),
             validator: (v) {
-              if (field.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+              if (field.isRequired && (v == null || v.trim().isEmpty)) return _l10n.translate('field_required');
               if (field.validationRegex.isNotEmpty && v != null && v.isNotEmpty) {
                 try {
                   final regex = RegExp(field.validationRegex);
-                  if (!regex.hasMatch(v)) return 'Invalid format';
+                  if (!regex.hasMatch(v)) return _l10n.translate('yda_invalid_format');
                 } catch (_) {
                   // Skip broken regex
                 }
@@ -1377,17 +1301,17 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Email Not Verified',
+                Text(_l10n.translate('yda_email_not_verified'),
                   style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
                 const SizedBox(height: 4),
-                Text('Please verify your email address before applying.',
+                Text(_l10n.translate('yda_verify_email_first'),
                   style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54)),
               ],
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pushNamed(context, '/email-verification'),
-            child: const Text('Verify', style: TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
+            child: Text(_l10n.translate('yda_verify'), style: const TextStyle(color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -1429,7 +1353,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
                       child: TextField(
                         controller: searchController,
                         decoration: InputDecoration(
-                          hintText: 'Search country...',
+                          hintText: _l10n.translate('yda_search_country'),
                           prefixIcon: const Icon(Icons.search, size: 20),
                           filled: true,
                           fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5),
@@ -1487,7 +1411,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
           },
         );
       },
-    );
+    ).then((_) => searchController.dispose());
   }
 
   Widget _buildFixedDropdown(String fieldName, String label, String hint, List<String> options, bool isDark, {bool isRequired = false}) {
@@ -1495,7 +1419,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
       padding: const EdgeInsets.only(bottom: 14),
       child: DropdownButtonFormField<String>(
         key: ValueKey('fixed_$fieldName'),
-        value: _formValues[fieldName] as String?,
+        initialValue: _formValues[fieldName] as String?,
         decoration: _inputDecoration(label, null, null, isDark, isRequired),
         hint: Text(hint),
         isExpanded: true,
@@ -1504,7 +1428,7 @@ class _YouthDialogueApplyScreenState extends State<YouthDialogueApplyScreen> {
             .map((o) => DropdownMenuItem(value: o, child: Text(o, overflow: TextOverflow.ellipsis)))
             .toList(),
         onChanged: (val) => setState(() => _formValues[fieldName] = val),
-        validator: isRequired ? (v) => v == null ? 'Required' : null : null,
+        validator: isRequired ? (v) => v == null ? _l10n.translate('field_required') : null : null,
       ),
     );
   }

@@ -27,7 +27,8 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VideoPlayerController _videoController;
+  // Nullable: _initPlayer can throw before assignment, and Retry re-creates them.
+  VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _hasError = false;
   String _errorMessage = '';
@@ -146,14 +147,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Future<void> _initPlayer() async {
     try {
       final fixedUrl = Environment.fixMediaUrl(widget.feed.streamUrl);
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(fixedUrl));
+      final videoController = VideoPlayerController.networkUrl(Uri.parse(fixedUrl));
+      _videoController = videoController;
 
-      await _videoController.initialize();
+      await videoController.initialize();
 
       if (!mounted) return;
 
       _chewieController = ChewieController(
-        videoPlayerController: _videoController,
+        videoPlayerController: videoController,
         autoPlay: true,
         looping: widget.feed.isLive,
         allowFullScreen: true,
@@ -243,8 +245,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ElevatedButton.icon(
             onPressed: () {
               setState(() { _hasError = false; _errorMessage = ''; });
-              _chewieController?.dispose();
-              _videoController.dispose();
+              _disposePlayer();
               _initPlayer();
             },
             icon: const Icon(Icons.refresh),
@@ -256,11 +257,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
+  void _disposePlayer() {
+    _chewieController?.dispose();
+    _chewieController = null;
+    _videoController?.dispose();
+    _videoController = null;
+  }
+
   @override
   void dispose() {
     _removeLikeListener?.call();
-    _chewieController?.dispose();
-    _videoController.dispose();
+    _disposePlayer();
     _commentController.dispose();
     _commentFocusNode.dispose();
     SystemChrome.setPreferredOrientations([

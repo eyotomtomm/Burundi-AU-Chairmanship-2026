@@ -1,8 +1,11 @@
+import re
 import io
 import logging
 
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import User
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.core.files.base import ContentFile
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -286,7 +289,7 @@ class MagazineEdition(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-publish_date']
+        ordering = ['-publish_date', '-id']
         indexes = [
             models.Index(fields=['-publish_date']),
             models.Index(fields=['is_featured', '-publish_date']),
@@ -454,14 +457,20 @@ class Article(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-archive article after this date. Expired articles are hidden from public API but remain in the database.')
     is_draft = models.BooleanField(default=False, help_text='Legacy: Draft articles are hidden from the public API until published.')
 
+    # Must match the SearchVector built in views.search_articles exactly,
+    # otherwise Postgres will not use the GIN index.
+    SEARCH_FIELDS = ('title', 'title_fr', 'content', 'content_fr')
+
     class Meta:
-        ordering = ['-publish_date']
+        ordering = ['-publish_date', '-id']
         indexes = [
             models.Index(fields=['-publish_date']),
             models.Index(fields=['is_featured', '-publish_date']),
             models.Index(fields=['is_draft', '-publish_date']),
             models.Index(fields=['status', '-publish_date']),
             models.Index(fields=['content_type', '-publish_date']),
+            GinIndex(SearchVector('title', 'title_fr', 'content', 'content_fr', config='simple'),
+                     name='article_search_gin'),
         ]
 
     def __str__(self):
@@ -1214,6 +1223,15 @@ class EventSubmission(models.Model):
             models.Index(fields=['status', '-submitted_at']),
             models.Index(fields=['is_proxy', '-submitted_at']),
         ]
+        constraints = [
+            # One self-registration per user per event; proxies share the user
+            # (is_proxy=True) and are deduplicated by proxy_email in the view.
+            models.UniqueConstraint(
+                fields=['user', 'event_registration'],
+                condition=models.Q(is_proxy=False),
+                name='uniq_self_registration_per_event',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.event_registration.event_title}"
@@ -1802,7 +1820,7 @@ class Fact(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['order', '-created_at']
+        ordering = ['order', '-created_at', '-id']
 
     def __str__(self):
         return f"[{self.get_fact_type_display()}] {self.title}"
@@ -2008,7 +2026,7 @@ class Video(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-is_featured', '-publish_date']
+        ordering = ['-is_featured', '-publish_date', '-id']
         verbose_name = 'Video'
         verbose_name_plural = 'Videos'
         indexes = [
@@ -2352,6 +2370,7 @@ class VerificationRequest(models.Model):
     def __str__(self):
         return f"{self.full_name} ({self.status}) - {self.badge_type or 'No badge'}"
 
+    @transaction.atomic
     def approve(self, admin_user, badge_type='BLUE'):
         """Approve verification request and grant badge to user.
         Government officials automatically receive GOLD badge."""
@@ -2398,8 +2417,9 @@ class VerificationRequest(models.Model):
             profile.nationality = self.country_code
         profile.save()
 
+    @transaction.atomic
     def reject(self, admin_user, reason):
-        """Reject verification request with reason"""
+        """Reject verification request with reason and revoke any badge."""
         from django.utils import timezone
 
         self.status = 'rejected'
@@ -2407,6 +2427,7 @@ class VerificationRequest(models.Model):
         self.reviewed_by = admin_user
         self.reviewed_at = timezone.now()
         self.save()
+        UserProfile.objects.filter(user=self.user).update(is_verified=False, badge_type=None)
 
     def submit_appeal(self, message):
         """User submits appeal for rejected request"""
@@ -2648,6 +2669,7 @@ class UserSession(models.Model):
         indexes = [
             models.Index(fields=['country_code', 'created_at']),
             models.Index(fields=['user_nationality', 'created_at']),
+            models.Index(fields=['ip_address', 'created_at']),
         ]
 
     def __str__(self):
@@ -2696,6 +2718,8 @@ class ActiveSession(models.Model):
     """Tracks active user sessions for multi-device management."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='active_sessions')
     session_key = models.CharField(max_length=255, unique=True, db_index=True)
+    refresh_jti = models.CharField(max_length=255, blank=True, null=True, db_index=True,
+                                   help_text='jti of the refresh token issued for this session')
     device_name = models.CharField(max_length=200, blank=True, help_text='e.g. iPhone 15 Pro')
     device_type = models.CharField(max_length=50, blank=True, help_text='e.g. ios, android, web')
     ip_address = models.GenericIPAddressField(blank=True, null=True)
@@ -3150,7 +3174,7 @@ class DirectMessage(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
     content = models.TextField()
-    attachment = models.ImageField(upload_to='messages/attachments/', blank=True, null=True, validators=[validate_image_file])
+    attachment = models.ImageField(upload_to='messages/attachments/', storage=_private_storage, blank=True, null=True, validators=[validate_image_file])
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -3190,12 +3214,24 @@ class Discussion(models.Model):
         help_text='The admin-authored prompt this post answers, if any.')
     is_pinned = models.BooleanField(default=False)
     is_locked = models.BooleanField(default=False, help_text='Prevent new replies')
+    is_hidden = models.BooleanField(
+        default=False, db_index=True,
+        help_text='Hidden from the feed pending moderator review.')
+    edited_at = models.DateTimeField(
+        null=True, blank=True, help_text='Set the first time the author edits the text.')
     view_count = models.PositiveIntegerField(default=0)
     like_count = models.PositiveIntegerField(default=0)
     reply_count = models.PositiveIntegerField(default=0)
     last_reply_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # A post is a paragraph, not a document — replies already cap at 5000.
+    MAX_CONTENT_LENGTH = 5000
+    # How long after posting the author may still change the words.
+    EDIT_WINDOW_SECONDS = 15 * 60
+    # Open reports that take a post out of the feed until a moderator looks.
+    AUTO_HIDE_REPORTS = 3
 
     class Meta:
         ordering = ['-is_pinned', '-last_reply_at', '-created_at']
@@ -3204,10 +3240,31 @@ class Discussion(models.Model):
         indexes = [
             models.Index(fields=['category', '-is_pinned', '-last_reply_at']),
             models.Index(fields=['-is_pinned', '-last_reply_at', '-created_at']),
+            models.Index(fields=['-is_pinned', '-created_at']),
         ]
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.sync_tags()
+
+    def sync_tags(self):
+        """Keep DiscussionTag in step with the hashtags in the body.
+
+        Tags live in their own indexed table because the alternative — a
+        regex over every post body — cannot use an index at all.
+        """
+        found = {t.lower()[:64] for t in DiscussionTag.PATTERN.findall(self.content or '')}
+        existing = set(self.tags.values_list('tag', flat=True))
+        gone = existing - found
+        if gone:
+            self.tags.filter(tag__in=gone).delete()
+        DiscussionTag.objects.bulk_create(
+            [DiscussionTag(discussion=self, tag=t) for t in found - existing],
+            ignore_conflicts=True,
+        )
 
 
 class DiscussionReply(models.Model):
@@ -3245,6 +3302,61 @@ class Follow(models.Model):
 
     def __str__(self):
         return f"{self.follower.username} → {self.following.username}"
+
+
+class Block(models.Model):
+    """One user blocking another.
+
+    App Store guideline 1.2 and Play's UGC policy both require a block, not
+    just a report: a blocked account's posts, replies and notifications stop
+    reaching the blocker, in both directions.
+    """
+    blocker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocks_made')
+    blocked = models.ForeignKey(User, on_delete=models.CASCADE, related_name='blocks_against')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('blocker', 'blocked')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['blocker', '-created_at']),
+            models.Index(fields=['blocked']),
+        ]
+
+    def __str__(self):
+        return f"{self.blocker.username} blocked {self.blocked.username}"
+
+    @staticmethod
+    def hidden_user_ids(user):
+        """Everyone `user` should not see: accounts they blocked, and accounts
+        that blocked them. Blocking hides in both directions."""
+        if not user or not user.is_authenticated:
+            return []
+        pairs = Block.objects.filter(
+            models.Q(blocker=user) | models.Q(blocked=user)
+        ).values_list('blocker_id', 'blocked_id')
+        return [b if b != user.id else a for a, b in pairs]
+
+
+class DiscussionTag(models.Model):
+    """One hashtag used by one post, extracted on save.
+
+    Exists so `?tag=water` and the trending list are index lookups rather than
+    a regex scan over every post body.
+    """
+    PATTERN = re.compile(r'#([\w\u00C0-\u024F]+)')
+
+    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name='tags')
+    tag = models.CharField(max_length=64)
+
+    class Meta:
+        unique_together = ('discussion', 'tag')
+        indexes = [
+            models.Index(fields=['tag', '-discussion']),
+        ]
+
+    def __str__(self):
+        return f'#{self.tag}'
 
 
 class ContentReport(models.Model):
@@ -4880,6 +4992,7 @@ class NewsletterEdition(models.Model):
     body_html = models.TextField()
     sent_at = models.DateTimeField(null=True, blank=True)
     recipient_count = models.IntegerField(default=0)
+    sent_chunks = models.JSONField(default=list, blank=True, help_text='Chunk indexes already delivered (retry guard)')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -5327,8 +5440,8 @@ class YouthDialogueApplication(models.Model):
         generating_ref = not self.reference_id and not self.pk
         super().save(*args, **kwargs)
         if generating_ref:
-            import datetime
-            self.reference_id = f'YD-{datetime.date.today().year}-{self.pk:05d}'
+            from django.utils import timezone as tz
+            self.reference_id = f'YD-{tz.localdate().year}-{self.pk:05d}'
             super().save(update_fields=['reference_id'])
 
     def __str__(self):
@@ -5346,21 +5459,33 @@ class YouthDialogueApplication(models.Model):
         """Generate sequential participant code scoped to event: YD-YYYY-NNNN"""
         from django.utils import timezone as tz
         from django.db.models import Max
-        year = tz.now().year
+        year = tz.localdate().year
         prefix = f'YD-{year}-'
-        qs = YouthDialogueApplication.objects.filter(participant_code__startswith=prefix)
-        if self.event_id:
-            qs = qs.filter(event=self.event)
-        # Find the highest existing number to avoid collisions from deleted records
-        last_code = qs.aggregate(max_code=Max('participant_code'))['max_code']
-        if last_code:
-            try:
-                last_num = int(last_code.replace(prefix, ''))
-            except ValueError:
-                last_num = qs.count()
-        else:
-            last_num = 0
-        self.participant_code = f'{prefix}{last_num + 1:04d}'
+        # Serialise concurrent issuers on the event row, and persist the code
+        # while the lock is held so two reviewers cannot both get MAX()+1.
+        # ponytail: no event -> lock the matching application rows instead
+        # (not gap-safe); the unique constraint on participant_code still
+        # rejects the loser.
+        with transaction.atomic():
+            if self.event_id:
+                YouthDialogueEvent.objects.select_for_update().filter(pk=self.event_id).exists()
+            qs = YouthDialogueApplication.objects.filter(participant_code__startswith=prefix)
+            if self.event_id:
+                qs = qs.filter(event_id=self.event_id)
+            else:
+                qs = qs.select_for_update()
+            # Find the highest existing number to avoid collisions from deleted records
+            last_code = qs.aggregate(max_code=Max('participant_code'))['max_code']
+            if last_code:
+                try:
+                    last_num = int(last_code.replace(prefix, ''))
+                except ValueError:
+                    last_num = qs.count()
+            else:
+                last_num = 0
+            self.participant_code = f'{prefix}{last_num + 1:04d}'
+            if self.pk:
+                YouthDialogueApplication.objects.filter(pk=self.pk).update(participant_code=self.participant_code)
         return self.participant_code
 
     def generate_qr_hash(self):

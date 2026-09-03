@@ -49,27 +49,28 @@ class DsHeader extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: color,
-        borderRadius:
-            const BorderRadius.vertical(bottom: Radius.circular(Ds.rHeader)),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(Ds.rHeader),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              if (showBack) ...[
-                _HeaderBack(),
-                const SizedBox(width: 12),
-              ],
+              if (showBack) _HeaderBack(),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (overline != null)
-                      Text(overline!,
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.75))),
+                      Text(
+                        overline!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.75),
+                        ),
+                      ),
                     Text(title, style: titleStyle),
                   ],
                 ),
@@ -87,15 +88,23 @@ class DsHeader extends StatelessWidget {
 class _HeaderBack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.maybePop(context),
-      child: const SizedBox(
-        width: 30,
-        height: 40,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Icon(Icons.arrow_back_rounded, size: 22, color: Colors.white),
+    return Semantics(
+      button: true,
+      label: MaterialLocalizations.of(context).backButtonTooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.maybePop(context),
+        child: const SizedBox(
+          width: 44,
+          height: 44,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Icon(
+              Icons.arrow_back_rounded,
+              size: 22,
+              color: Colors.white,
+            ),
+          ),
         ),
       ),
     );
@@ -107,45 +116,71 @@ class DsHeaderAction extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
+  /// Accessibility label (read by screen readers).
+  final String label;
+
   /// Small unread count rendered as a red dot badge.
   final int badge;
-  const DsHeaderAction(this.icon, {super.key, this.onTap, this.badge = 0});
+  const DsHeaderAction(
+    this.icon, {
+    super.key,
+    required this.label,
+    this.onTap,
+    this.badge = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 20, color: Colors.white),
-          ),
-          if (badge > 0)
-            Positioned(
-              right: -2,
-              top: -2,
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              // 44x44 tap target; the visible circle is drawn inside it.
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: Ds.red,
-                  borderRadius: BorderRadius.circular(Ds.rPill),
-                  border: Border.all(color: Ds.green, width: 1.5),
+                  color: Colors.white.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
                 ),
-                child: Text(badge > 99 ? '99+' : '$badge',
-                    style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
+                child: Icon(icon, size: 20, color: Colors.white),
               ),
             ),
-        ],
+            if (badge > 0)
+              Positioned(
+                right: 1,
+                top: 1,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Ds.red,
+                    borderRadius: BorderRadius.circular(Ds.rPill),
+                    border: Border.all(color: Ds.green, width: 1.5),
+                  ),
+                  child: Text(
+                    badge > 99 ? '99+' : '$badge',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -225,9 +260,14 @@ class DsSectionTitle extends StatelessWidget {
           if (onAction != null)
             GestureDetector(
               onTap: onAction,
-              child: Text(actionLabel ?? 'See all',
-                  style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: Ds.green)),
+              child: Text(
+                actionLabel ?? 'See all',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Ds.green,
+                ),
+              ),
             ),
         ],
       ),
@@ -239,14 +279,17 @@ class DsSectionTitle extends StatelessWidget {
 class DsGroupLabel extends StatelessWidget {
   final String text;
   final EdgeInsetsGeometry padding;
-  const DsGroupLabel(this.text,
-      {super.key, this.padding = const EdgeInsets.fromLTRB(22, 16, 22, 8)});
+  const DsGroupLabel(
+    this.text, {
+    super.key,
+    this.padding = const EdgeInsets.fromLTRB(22, 16, 22, 8),
+  });
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: padding,
-        child: Text(text.toUpperCase(), style: Ds.groupLabel(context)),
-      );
+    padding: padding,
+    child: Text(text.toUpperCase(), style: Ds.groupLabel(context)),
+  );
 }
 
 enum DsTone { green, red, gold, neutral, white }
@@ -258,8 +301,13 @@ class DsPill extends StatelessWidget {
   final IconData? icon;
   final bool dense;
 
-  const DsPill(this.label,
-      {super.key, this.tone = DsTone.green, this.icon, this.dense = false});
+  const DsPill(
+    this.label, {
+    super.key,
+    this.tone = DsTone.green,
+    this.icon,
+    this.dense = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -282,19 +330,30 @@ class DsPill extends StatelessWidget {
         fg = Ds.green;
     }
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: dense ? 9 : 10, vertical: dense ? 3 : 4),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(Ds.rPill)),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 9 : 10,
+        vertical: dense ? 3 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(Ds.rPill),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, size: 12, color: fg), const SizedBox(width: 4)],
-          Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: tone == DsTone.red ? 0.8 : 0,
-                  color: fg)),
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: fg),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: tone == DsTone.red ? 0.8 : 0,
+              color: fg,
+            ),
+          ),
         ],
       ),
     );
@@ -309,8 +368,13 @@ class DsFilterChip extends StatelessWidget {
   final VoidCallback? onTap;
   final bool onGreen;
 
-  const DsFilterChip(this.label,
-      {super.key, required this.selected, this.onTap, this.onGreen = false});
+  const DsFilterChip(
+    this.label, {
+    super.key,
+    required this.selected,
+    this.onTap,
+    this.onGreen = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -330,17 +394,23 @@ class DsFilterChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: onGreen ? 16 : 14, vertical: onGreen ? 8 : 7),
+        padding: EdgeInsets.symmetric(
+          horizontal: onGreen ? 16 : 14,
+          vertical: onGreen ? 8 : 7,
+        ),
         decoration: BoxDecoration(
           color: bg,
           border: border,
           borderRadius: BorderRadius.circular(Ds.rPill),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: onGreen ? 13 : 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: fg)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: onGreen ? 13 : 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            color: fg,
+          ),
+        ),
       ),
     );
   }
@@ -354,19 +424,25 @@ class DsIconSquare extends StatelessWidget {
   final double size;
   final double radius;
 
-  const DsIconSquare(this.icon,
-      {super.key, this.tint, this.color, this.size = 36, this.radius = Ds.rIcon});
+  const DsIconSquare(
+    this.icon, {
+    super.key,
+    this.tint,
+    this.color,
+    this.size = 36,
+    this.radius = Ds.rIcon,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: tint ?? Ds.subtle(context),
-          borderRadius: BorderRadius.circular(radius),
-        ),
-        child: Icon(icon, size: size * 0.53, color: color ?? Ds.body(context)),
-      );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      color: tint ?? Ds.subtle(context),
+      borderRadius: BorderRadius.circular(radius),
+    ),
+    child: Icon(icon, size: size * 0.53, color: color ?? Ds.body(context)),
+  );
 }
 
 /// One row of a [DsTileGroup].
@@ -414,9 +490,12 @@ class DsTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: Ds.tileTitle(context)
-                          .copyWith(color: titleColor ?? Ds.ink(context))),
+                  Text(
+                    title,
+                    style: Ds.tileTitle(
+                      context,
+                    ).copyWith(color: titleColor ?? Ds.ink(context)),
+                  ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(subtitle!, style: Ds.meta(context)),
@@ -427,12 +506,18 @@ class DsTile extends StatelessWidget {
             if (value != null)
               Padding(
                 padding: const EdgeInsets.only(left: 8, right: 6),
-                child: Text(value!,
-                    style: TextStyle(fontSize: 13, color: Ds.muted(context))),
+                child: Text(
+                  value!,
+                  style: TextStyle(fontSize: 13, color: Ds.muted(context)),
+                ),
               ),
             ?trailing,
             if (trailing == null && chevron)
-              const Icon(Icons.chevron_right_rounded, size: 20, color: Ds.chevron),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: Ds.chevron,
+              ),
           ],
         ),
       ),
@@ -502,8 +587,10 @@ class DsSwitch extends StatelessWidget {
           child: Container(
             width: 22,
             height: 22,
-            decoration:
-                const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       ),
@@ -520,42 +607,50 @@ class DsStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DsCard(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Column(
-          children: [
-            Text(value,
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: valueColor ?? Ds.green)),
-            const SizedBox(height: 2),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 10, color: Ds.body(context))),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    child: Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: valueColor ?? Ds.green,
+          ),
         ),
-      );
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 10, color: Ds.body(context)),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Row of equal-width [DsStat]s.
 class DsStatRow extends StatelessWidget {
   final List<Widget> stats;
   final EdgeInsetsGeometry margin;
-  const DsStatRow(this.stats,
-      {super.key, this.margin = const EdgeInsets.all(16)});
+  const DsStatRow(
+    this.stats, {
+    super.key,
+    this.margin = const EdgeInsets.all(16),
+  });
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: margin,
-        child: Row(
-          children: [
-            for (var i = 0; i < stats.length; i++) ...[
-              if (i > 0) const SizedBox(width: 12),
-              Expanded(child: stats[i]),
-            ],
-          ],
-        ),
-      );
+    padding: margin,
+    child: Row(
+      children: [
+        for (var i = 0; i < stats.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          Expanded(child: stats[i]),
+        ],
+      ],
+    ),
+  );
 }
 
 /// Full-width green action button (`13px 0`, 12px radius).
@@ -565,8 +660,14 @@ class DsPrimaryButton extends StatelessWidget {
   final IconData? icon;
   final bool expand;
   final double radius;
-  const DsPrimaryButton(this.label,
-      {super.key, this.onTap, this.icon, this.expand = true, this.radius = Ds.rTile});
+  const DsPrimaryButton(
+    this.label, {
+    super.key,
+    this.onTap,
+    this.icon,
+    this.expand = true,
+    this.radius = Ds.rTile,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -585,16 +686,23 @@ class DsPrimaryButton extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           Flexible(
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
     );
     final tappable = GestureDetector(onTap: onTap, child: child);
-    return expand ? SizedBox(width: double.infinity, child: tappable) : tappable;
+    return expand
+        ? SizedBox(width: double.infinity, child: tappable)
+        : tappable;
   }
 }
 
@@ -605,8 +713,14 @@ class DsOutlineButton extends StatelessWidget {
   final IconData? icon;
   final bool expand;
   final double radius;
-  const DsOutlineButton(this.label,
-      {super.key, this.onTap, this.icon, this.expand = false, this.radius = Ds.rTile});
+  const DsOutlineButton(
+    this.label, {
+    super.key,
+    this.onTap,
+    this.icon,
+    this.expand = false,
+    this.radius = Ds.rTile,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -625,16 +739,23 @@ class DsOutlineButton extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           Flexible(
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700, color: Ds.green)),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Ds.green,
+              ),
+            ),
           ),
         ],
       ),
     );
     final tappable = GestureDetector(onTap: onTap, child: child);
-    return expand ? SizedBox(width: double.infinity, child: tappable) : tappable;
+    return expand
+        ? SizedBox(width: double.infinity, child: tappable)
+        : tappable;
   }
 }
 
@@ -676,19 +797,28 @@ class DsNoteBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Ds.ink(context))),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Ds.ink(context),
+                      ),
+                    ),
                     if (subtitle != null)
-                      Text(subtitle!,
-                          style: const TextStyle(fontSize: 12, color: Ds.goldInk)),
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(fontSize: 12, color: Ds.goldInk),
+                      ),
                   ],
                 ),
               ),
               if (onTap != null)
-                const Icon(Icons.chevron_right_rounded, size: 20, color: Ds.goldDeep),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: Ds.goldDeep,
+                ),
             ],
           ),
         ),
@@ -705,11 +835,13 @@ class DsFootnote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
-        child: Text(text,
-            textAlign: center ? TextAlign.center : TextAlign.start,
-            style: TextStyle(fontSize: 12, color: Ds.muted(context), height: 1.5)),
-      );
+    padding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
+    child: Text(
+      text,
+      textAlign: center ? TextAlign.center : TextAlign.start,
+      style: TextStyle(fontSize: 12, color: Ds.muted(context), height: 1.5),
+    ),
+  );
 }
 
 /// Placeholder that stands in for a photo slot while an image loads or when
@@ -739,8 +871,11 @@ class DsImagePlaceholder extends StatelessWidget {
         color: dark ? const Color(0xFF2E3B2C) : Ds.greenTintDeep,
         borderRadius: BorderRadius.circular(radius),
       ),
-      child: Icon(icon ?? Icons.image_rounded,
-          size: 22, color: dark ? Colors.white24 : const Color(0xFF7C8878)),
+      child: Icon(
+        icon ?? Icons.image_rounded,
+        size: 22,
+        color: dark ? Colors.white24 : const Color(0xFF7C8878),
+      ),
     );
   }
 }
@@ -764,8 +899,9 @@ class DsBottomBar extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: Ds.surface(context),
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(Ds.rSheet)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(Ds.rSheet),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -776,7 +912,10 @@ class DsBottomBar extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: children),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: children,
+        ),
       ),
     );
   }

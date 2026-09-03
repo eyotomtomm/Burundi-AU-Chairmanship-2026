@@ -5,6 +5,7 @@ import '../config/app_colors.dart';
 import '../config/app_ds.dart';
 import '../services/api_service.dart' show ApiException;
 import 'comment_ban_dialog.dart';
+import '../l10n/app_localizations.dart';
 
 /// Shared comment tile widget used across all content types.
 ///
@@ -422,7 +423,7 @@ class _CommentTileState extends State<CommentTile> {
                         color: isDark ? Colors.white : AppColors.lightText,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Reply to ${widget.userName}...',
+                        hintText: '${AppLocalizations.of(context).translate('w_reply_to')} ${widget.userName}...',
                         hintStyle: TextStyle(
                           fontSize: 13,
                           color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -452,12 +453,14 @@ class _CommentTileState extends State<CommentTile> {
                               )
                             else
                               IconButton(
+                                tooltip: AppLocalizations.of(context).translate('send'),
                                 icon: const Icon(Icons.send_rounded, size: 20, color: AppColors.burundiGreen),
                                 onPressed: _submitReply,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                               ),
                             IconButton(
+                              tooltip: AppLocalizations.of(context).translate('cancel'),
                               icon: Icon(Icons.close, size: 18, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
                               onPressed: _cancelReplying,
                               padding: EdgeInsets.zero,

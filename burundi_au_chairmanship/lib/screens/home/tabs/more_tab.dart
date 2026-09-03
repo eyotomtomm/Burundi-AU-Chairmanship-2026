@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/name_format.dart';
 import 'package:in_app_review/in_app_review.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import '../../../config/app_colors.dart';
@@ -124,7 +124,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     final title = auth.verificationTitle;
     // Prefer real name from verification over signup name
     final realName = auth.verificationName;
-    final name = (realName != null && realName.isNotEmpty) ? realName : (auth.userName ?? 'User');
+    final name = (realName != null && realName.isNotEmpty) ? realName : (auth.userName ?? AppLocalizations.of(context).translate('more_user'));
 
     if (title != null && title.isNotEmpty) {
       // Title + family name — the protocol form, and short enough for the row.
@@ -160,7 +160,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             ),
 
             // ── Community ───────────────────────────────────
-            const SliverToBoxAdapter(child: DsGroupLabel('Community')),
+            SliverToBoxAdapter(child: DsGroupLabel(l10n.translate('more_community'))),
             SliverToBoxAdapter(
               child: DsTileGroup(
                 children: [
@@ -177,7 +177,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             ),
 
             // ── Preferences ─────────────────────────────────
-            const SliverToBoxAdapter(child: DsGroupLabel('Preferences')),
+            SliverToBoxAdapter(child: DsGroupLabel(l10n.translate('more_preferences'))),
             SliverToBoxAdapter(
               child: DsTileGroup(
                 children: [
@@ -243,7 +243,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   children: [
                     // ── Verification ────────────────────────────
                     if (showVerificationItem) ...[
-                      const DsGroupLabel('Verification'),
+                      DsGroupLabel(l10n.translate('more_verification')),
                       DsTileGroup(children: [
                         _buildVerificationMenuItem(
                           context: context,
@@ -255,15 +255,22 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
 
                     // ── Account ─────────────────────────────────
                     if (isLoggedIn) ...[
-                      const DsGroupLabel('Account'),
+                      DsGroupLabel(l10n.translate('more_account')),
                       DsTileGroup(
                         children: [
+                          DsTile(
+                            icon: Icons.bookmark_rounded,
+                            iconTint: Ds.tint(context),
+                            iconColor: Ds.gold,
+                            title: l10n.translate('bookmarks'),
+                            onTap: () => Navigator.pushNamed(context, '/bookmarks'),
+                          ),
                           DsTile(
                             icon: Icons.manage_accounts_rounded,
                             iconTint: Ds.redTintOf(context),
                             iconColor: Ds.red,
-                            title: 'Manage Account',
-                            subtitle: 'Deactivate or delete your account',
+                            title: l10n.translate('more_manage_account'),
+                            subtitle: l10n.translate('more_manage_account_sub'),
                             onTap: () => _showAccountManageSheet(
                                 context, isDark, authProvider),
                           ),
@@ -307,7 +314,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     ],
 
                     // ── Support ─────────────────────────────────
-                    const DsGroupLabel('Support'),
+                    DsGroupLabel(l10n.translate('more_support')),
                     DsTileGroup(
                       children: [
                         DsTile(
@@ -315,26 +322,18 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           iconTint: Ds.tint(context),
                           iconColor: Ds.green,
                           title: l10n.translate('contact_support'),
-                          subtitle: 'Get help and support',
+                          subtitle: l10n.translate('more_support_sub'),
                           onTap: () {
                             if (!authProvider.isAuthenticated) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    Localizations.localeOf(context)
-                                                .languageCode ==
-                                            'fr'
-                                        ? 'Veuillez vous connecter pour contacter le support'
-                                        : 'Please sign in to contact support',
+                                    l10n.translate('more_sign_in_to_contact'),
                                   ),
                                   backgroundColor: AppColors.burundiGreen,
                                   behavior: SnackBarBehavior.floating,
                                   action: SnackBarAction(
-                                    label: Localizations.localeOf(context)
-                                                .languageCode ==
-                                            'fr'
-                                        ? 'Connexion'
-                                        : 'Sign In',
+                                    label: l10n.translate('sign_in'),
                                     textColor: Colors.white,
                                     onPressed: () =>
                                         Navigator.pushNamed(context, '/auth'),
@@ -369,7 +368,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     ),
 
                     // ── Share the app ───────────────────────────
-                    const DsGroupLabel('Spread the word'),
+                    DsGroupLabel(l10n.translate('more_spread_word')),
                     DsTileGroup(
                       children: [
                         DsTile(
@@ -392,7 +391,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     ),
 
                     // ── Legal ───────────────────────────────────
-                    const DsGroupLabel('Legal'),
+                    DsGroupLabel(l10n.translate('more_legal')),
                     DsTileGroup(
                       children: [
                         DsTile(
@@ -425,7 +424,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             icon: Icons.logout_rounded,
                             iconTint: Ds.redTintOf(context),
                             iconColor: Ds.red,
-                            title: 'Sign Out',
+                            title: l10n.translate('sign_out'),
                             titleColor: Ds.red,
                             onTap: () =>
                                 _showSignOutConfirmation(context, authProvider),
@@ -515,6 +514,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _showAccountManageSheet(BuildContext context, bool isDark, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -536,7 +536,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 20),
               Text(
-                'Manage Your Account',
+                l10n.translate('more_manage_your_account'),
                 style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87,
@@ -554,8 +554,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   ),
                   child: const Icon(Icons.pause_circle_outline, color: Colors.orange, size: 28),
                 ),
-                title: const Text('Take a Break', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                subtitle: const Text('Deactivate temporarily. Log back in anytime to reactivate.'),
+                title: Text(l10n.translate('more_take_break'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                subtitle: Text(l10n.translate('more_take_break_sub')),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -574,8 +574,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   ),
                   child: const Icon(Icons.delete_forever_rounded, color: Colors.red, size: 28),
                 ),
-                title: const Text('Delete Forever', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
-                subtitle: const Text('Permanently delete your account and all data after 30 days.'),
+                title: Text(l10n.translate('more_delete_forever'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
+                subtitle: Text(l10n.translate('more_delete_forever_sub')),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -591,18 +591,16 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _confirmDeactivate(BuildContext context, bool isDark, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Text('Take a Break?'),
-        content: const Text(
-          'Your account will be deactivated and hidden from others.\n\n'
-          'You can reactivate it anytime by simply logging back in.',
-        ),
+        title: Text(l10n.translate('more_take_break_q')),
+        content: Text(l10n.translate('more_take_break_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           TextButton(
             onPressed: () async {
@@ -617,8 +615,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 Navigator.pop(context);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Account deactivated. Log in anytime to come back!'),
+                    SnackBar(
+                      content: Text(l10n.translate('more_deactivated_toast')),
                       backgroundColor: Colors.orange,
                     ),
                   );
@@ -626,7 +624,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(authProvider.errorMessage ?? 'Failed to deactivate'),
+                      content: Text(authProvider.errorMessage ?? l10n.translate('more_deactivate_failed')),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -634,7 +632,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.orange),
-            child: const Text('Deactivate'),
+            child: Text(l10n.translate('more_deactivate')),
           ),
         ],
       ),
@@ -642,25 +640,22 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _confirmDelete(BuildContext context, bool isDark, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_rounded, color: Colors.red, size: 24),
-            SizedBox(width: 8),
-            Text('Delete Account?'),
+            const Icon(Icons.warning_rounded, color: Colors.red, size: 24),
+            const SizedBox(width: 8),
+            Text(l10n.translate('more_delete_account_q')),
           ],
         ),
-        content: const Text(
-          'Your account will be scheduled for permanent deletion.\n\n'
-          'You have 30 days to change your mind by logging back in.\n'
-          'After 30 days, all your data will be permanently removed.',
-        ),
+        content: Text(l10n.translate('more_delete_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           TextButton(
             onPressed: () async {
@@ -675,8 +670,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 Navigator.pop(context);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Account scheduled for deletion. You have 30 days to cancel by logging in.'),
+                    SnackBar(
+                      content: Text(l10n.translate('more_delete_scheduled_toast')),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -684,7 +679,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(authProvider.errorMessage ?? 'Failed to delete account'),
+                      content: Text(authProvider.errorMessage ?? l10n.translate('more_delete_failed')),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -692,7 +687,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete Forever'),
+            child: Text(l10n.translate('more_delete_forever')),
           ),
         ],
       ),
@@ -715,16 +710,14 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
         icon: Icons.hourglass_top_rounded,
         iconTint: Ds.goldTintOf(context),
         iconColor: Ds.goldInk,
-        title: pending ? 'Verification Pending' : 'Verification In Review',
-        subtitle:
-            pending ? 'Your request is being processed' : 'Still being processed',
+        title: l10n.translate(pending ? 'more_verif_pending' : 'more_verif_in_review'),
+        subtitle: l10n.translate(pending ? 'more_verif_pending_sub' : 'more_verif_review_sub'),
         chevron: false,
         onTap: () {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(pending
-                  ? 'Your verification request is being processed. Please wait.'
-                  : 'Your verification request is still being processed. Please wait.'),
+              content: Text(l10n.translate(
+                  pending ? 'more_verif_pending_msg' : 'more_verif_review_msg')),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -743,16 +736,17 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _showSignOutConfirmation(BuildContext context, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out?'),
+        title: Text(l10n.translate('sign_out')),
+        content: Text(l10n.translate('more_sign_out_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -766,7 +760,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
               }
             },
-            child: const Text('Sign Out'),
+            child: Text(l10n.translate('sign_out')),
           ),
         ],
       ),
@@ -781,6 +775,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _showSupportOptions(BuildContext context, bool isDark) async {
+    final l10n = AppLocalizations.of(context);
     // Fetch live agent status from backend
     bool liveAgentOnline = false;
     try {
@@ -814,7 +809,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 20),
               Text(
-                'How would you like to reach us?',
+                l10n.translate('more_reach_us'),
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -833,8 +828,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   ),
                   child: Icon(Icons.email_rounded, color: AppColors.burundiGreen, size: 28),
                 ),
-                title: const Text('Support Ticket', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                subtitle: const Text('Create a ticket, we respond within 24 hours'),
+                title: Text(l10n.translate('more_support_ticket'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                subtitle: Text(l10n.translate('more_support_ticket_sub')),
                 trailing: const Icon(Icons.chevron_right),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onTap: () {
@@ -863,7 +858,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 title: Row(
                   children: [
                     Text(
-                      'Live Agent',
+                      l10n.translate('more_live_agent'),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
@@ -880,14 +875,14 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        liveAgentOnline ? 'ONLINE' : 'OFFLINE',
+                        l10n.translate(liveAgentOnline ? 'more_online' : 'more_offline'),
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
                   ],
                 ),
                 subtitle: Text(
-                  liveAgentOnline ? 'Quick response via support chat' : 'No agents available right now',
+                  l10n.translate(liveAgentOnline ? 'more_live_agent_online_sub' : 'more_live_agent_offline_sub'),
                   style: TextStyle(color: liveAgentOnline ? null : Colors.grey),
                 ),
                 trailing: liveAgentOnline ? const Icon(Icons.chevron_right) : null,
@@ -900,8 +895,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         try {
                           final api = ApiService();
                           final result = await api.createTicket(
-                            'Live Chat Support',
-                            'Started a live chat session.',
+                            l10n.translate('more_live_chat_subject'),
+                            l10n.translate('more_live_chat_body'),
                           );
                           if (context.mounted) {
                             Navigator.pushNamed(
@@ -913,7 +908,11 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to start live chat: $e'), backgroundColor: AppColors.error),
+                              SnackBar(
+                                  content: Text(e is ApiException
+                                      ? e.message
+                                      : l10n.translate('more_live_chat_failed')),
+                                  backgroundColor: AppColors.error),
                             );
                           }
                         }
@@ -933,15 +932,14 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     required bool isDark,
     required AuthProvider authProvider,
   }) {
+    final l10n = AppLocalizations.of(context);
     final isSubscribed = authProvider.receivesNewsletter;
     return DsTile(
       icon: Icons.newspaper_rounded,
       iconTint: Ds.tint(context),
       iconColor: Ds.green,
-      title: 'Monthly Newsletter',
-      subtitle: isSubscribed
-          ? 'Subscribed'
-          : 'Subscribe to receive our monthly digest',
+      title: l10n.translate('more_newsletter'),
+      subtitle: l10n.translate(isSubscribed ? 'more_subscribed' : 'more_subscribe_sub'),
       trailing: isSubscribed
           ? const Icon(Icons.check_circle_rounded, color: Ds.green, size: 22)
           : null,
@@ -953,16 +951,17 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _showUnsubscribeDialog(BuildContext context, bool isDark, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Unsubscribe from newsletter?'),
-        content: const Text('You will no longer receive our monthly newsletter.'),
+        title: Text(l10n.translate('more_unsubscribe_q')),
+        content: Text(l10n.translate('more_unsubscribe_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.translate('cancel')),
           ),
           TextButton(
             onPressed: () async {
@@ -973,7 +972,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Unsubscribed from newsletter'),
+                      content: Text(l10n.translate('more_unsubscribed')),
                       backgroundColor: AppColors.burundiGreen,
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -983,7 +982,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to unsubscribe: $e'),
+                      content: Text(e is ApiException ? e.message : l10n.translate('more_unsubscribe_failed')),
                       backgroundColor: AppColors.burundiRed,
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -992,7 +991,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Unsubscribe'),
+            child: Text(l10n.translate('more_unsubscribe')),
           ),
         ],
       ),
@@ -1000,6 +999,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   void _showNewsletterSubscriptionDialog(BuildContext context, bool isDark, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController(text: authProvider.userName ?? '');
     final emailController = TextEditingController(text: authProvider.userEmail ?? '');
     final phoneController = TextEditingController(text: authProvider.phoneNumber ?? '');
@@ -1026,7 +1026,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Monthly Newsletter',
+                  l10n.translate('more_newsletter'),
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1043,7 +1043,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Subscribe to receive our monthly newsletter with the latest updates and news.',
+                    l10n.translate('more_newsletter_desc'),
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.7),
@@ -1053,24 +1053,24 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   TextFormField(
                     controller: nameController,
                     decoration: InputDecoration(
-                      labelText: 'Full Name',
+                      labelText: l10n.translate('full_name'),
                       prefixIcon: const Icon(Icons.person_outline_rounded),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? l10n.translate('more_name_required') : null,
                   ),
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      labelText: 'Email Address',
+                      labelText: l10n.translate('more_email_address'),
                       prefixIcon: const Icon(Icons.email_outlined),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email is required';
-                      if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email';
+                      if (v == null || v.trim().isEmpty) return l10n.translate('more_email_required');
+                      if (!v.contains('@') || !v.contains('.')) return l10n.translate('more_valid_email');
                       return null;
                     },
                   ),
@@ -1079,7 +1079,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     controller: phoneController,
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
-                      labelText: 'Phone Number (optional)',
+                      labelText: l10n.translate('more_phone_optional'),
                       prefixIcon: const Icon(Icons.phone_outlined),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -1092,7 +1092,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             TextButton(
               onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
               child: Text(
-                'Cancel',
+                l10n.translate('cancel'),
                 style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
               ),
             ),
@@ -1112,7 +1112,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: const Text('Subscribed to Monthly Newsletter!'),
+                        content: Text(l10n.translate('more_subscribed_toast')),
                         backgroundColor: AppColors.burundiGreen,
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -1123,7 +1123,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Failed to subscribe: $e'),
+                        content: Text(e is ApiException ? e.message : l10n.translate('more_subscribe_failed')),
                         backgroundColor: AppColors.burundiRed,
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -1139,7 +1139,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               ),
               child: isSubmitting
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Subscribe', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : Text(l10n.translate('more_subscribe'), style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -1152,7 +1152,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   Widget _buildProfileHeader(
       BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
     final isLoggedIn = authProvider.isAuthenticated;
-    final name = isLoggedIn ? _buildDisplayName(authProvider) : 'Guest User';
+    final name = isLoggedIn ? _buildDisplayName(authProvider) : l10n.translate('more_guest_user');
     final photo = authProvider.profilePictureUrl;
     final role = authProvider.verificationRole;
 
@@ -1173,7 +1173,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 width: 58,
                 height: 58,
                 child: isLoggedIn && photo != null && photo.isNotEmpty
-                    ? CachedNetworkImage(
+                    ? AppNetworkImage(
                         imageUrl: Environment.fixMediaUrl(photo),
                         fit: BoxFit.cover,
                         placeholder: (_, _) => _avatarInitials(name, isLoggedIn),
@@ -1246,6 +1246,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       );
 
   Future<void> _handleRateApp(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     void toast(String msg) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1258,13 +1259,12 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       );
     }
 
-    const unavailable =
-        'Rating will be available once the app is on the App Store';
+    final unavailable = l10n.translate('more_rating_unavailable');
     try {
       final inAppReview = InAppReview.instance;
       if (await inAppReview.isAvailable()) {
         await inAppReview.requestReview();
-        toast('Thank you for your support!');
+        toast(l10n.translate('more_thanks_support'));
         return;
       }
     } catch (_) {

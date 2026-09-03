@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
+import 'package:intl/intl.dart';
 
 class YdScanHistoryScreen extends StatefulWidget {
   const YdScanHistoryScreen({super.key});
@@ -33,7 +35,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Failed to load scan history.';
+        _error = AppLocalizations.of(context).translate('scan_history_load_failed');
         _isLoading = false;
       });
     }
@@ -42,11 +44,12 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Scan History'),
+        title: Text(l10n.translate('scan_history_title')),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
@@ -60,7 +63,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
                       child: ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: _scans.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (_, index) => _buildScanCard(_scans[index], isDark),
                       ),
                     ),
@@ -85,7 +88,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
               _loadHistory();
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.burundiGreen),
-            child: const Text('Retry', style: TextStyle(color: Colors.white)),
+            child: Text(AppLocalizations.of(context).translate('retry'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -93,6 +96,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
   }
 
   Widget _buildEmpty(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -100,7 +104,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
           Icon(Icons.history_rounded, size: 64, color: isDark ? Colors.white24 : Colors.black12),
           const SizedBox(height: 16),
           Text(
-            'No scans yet',
+            l10n.translate('scan_no_scans'),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -109,7 +113,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Scanned credentials will appear here.',
+            l10n.translate('scan_no_scans_sub'),
             style: TextStyle(
               fontSize: 14,
               color: isDark ? Colors.white24 : Colors.black26,
@@ -121,7 +125,8 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
   }
 
   Widget _buildScanCard(Map<String, dynamic> scan, bool isDark) {
-    final personName = scan['person_name'] as String? ?? 'Unknown';
+    final l10n = AppLocalizations.of(context);
+    final personName = scan['person_name'] as String? ?? l10n.translate('unknown');
     final participantCode = scan['participant_code'] as String? ?? '';
     final role = scan['role'] as String? ?? '';
     final scannedBy = scan['scanned_by'] as String? ?? '';
@@ -130,7 +135,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
     final scanCount = scan['scan_count'] as int? ?? 1;
 
     final cardColor = isDuplicate
-        ? (scanCount >= 3 ? Colors.red.shade50 : Colors.orange.shade50)
+        ? (scanCount >= 3 ? Ds.redTintOf(context) : Colors.orange.withValues(alpha: 0.12))
         : (isDark ? const Color(0xFF1E1E1E) : Colors.white);
     final borderColor = isDuplicate
         ? (scanCount >= 3 ? Colors.red.shade200 : Colors.orange.shade200)
@@ -139,7 +144,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark && !isDuplicate ? const Color(0xFF1E1E1E) : cardColor,
+        color: isDark ? const Color(0xFF1E1E1E) : cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor),
         boxShadow: isDuplicate
@@ -164,7 +169,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: isDark && !isDuplicate ? Colors.white : Colors.black87,
+                    color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
               ),
@@ -176,7 +181,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    scanCount >= 3 ? 'DUPLICATE x$scanCount' : 'DUPLICATE',
+                    scanCount >= 3 ? '${l10n.translate('scan_duplicate')} x$scanCount' : l10n.translate('scan_duplicate'),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -192,9 +197,9 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
                     color: AppColors.burundiGreen.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    'FIRST SCAN',
-                    style: TextStyle(
+                  child: Text(
+                    l10n.translate('scan_first_scan'),
+                    style: const TextStyle(
                       color: AppColors.burundiGreen,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -211,7 +216,7 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
             children: [
               if (participantCode.isNotEmpty) ...[
                 Icon(Icons.confirmation_number_rounded, size: 14,
-                    color: isDark && !isDuplicate ? Colors.white38 : Colors.black38),
+                    color: isDark ? Colors.white38 : Colors.black38),
                 const SizedBox(width: 4),
                 Text(
                   participantCode,
@@ -219,20 +224,20 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
                     fontSize: 13,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w600,
-                    color: isDark && !isDuplicate ? Colors.white60 : Colors.black54,
+                    color: isDark ? Colors.white60 : Colors.black54,
                   ),
                 ),
                 const SizedBox(width: 16),
               ],
               if (role.isNotEmpty) ...[
                 Icon(Icons.badge_rounded, size: 14,
-                    color: isDark && !isDuplicate ? Colors.white38 : Colors.black38),
+                    color: isDark ? Colors.white38 : Colors.black38),
                 const SizedBox(width: 4),
                 Text(
                   role,
                   style: TextStyle(
                     fontSize: 13,
-                    color: isDark && !isDuplicate ? Colors.white60 : Colors.black54,
+                    color: isDark ? Colors.white60 : Colors.black54,
                   ),
                 ),
               ],
@@ -245,26 +250,26 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
             children: [
               if (scannedBy.isNotEmpty) ...[
                 Icon(Icons.person_outline_rounded, size: 14,
-                    color: isDark && !isDuplicate ? Colors.white30 : Colors.black26),
+                    color: isDark ? Colors.white30 : Colors.black26),
                 const SizedBox(width: 4),
                 Text(
                   scannedBy,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark && !isDuplicate ? Colors.white38 : Colors.black38,
+                    color: isDark ? Colors.white38 : Colors.black38,
                   ),
                 ),
                 const Spacer(),
               ],
               if (scannedAt != null) ...[
                 Icon(Icons.access_time_rounded, size: 14,
-                    color: isDark && !isDuplicate ? Colors.white30 : Colors.black26),
+                    color: isDark ? Colors.white30 : Colors.black26),
                 const SizedBox(width: 4),
                 Text(
                   _formatDateTime(scannedAt),
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark && !isDuplicate ? Colors.white38 : Colors.black38,
+                    color: isDark ? Colors.white38 : Colors.black38,
                   ),
                 ),
               ],
@@ -278,7 +283,6 @@ class _YdScanHistoryScreenState extends State<YdScanHistoryScreen> {
   String _formatDateTime(String iso) {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return DateFormat.yMMMd(Localizations.localeOf(context).languageCode).add_Hm().format(dt.toLocal());
   }
 }

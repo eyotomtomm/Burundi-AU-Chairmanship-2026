@@ -5,12 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_colors.dart';
+import '../../config/app_constants.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../services/api_service.dart' show ApiService, ApiException;
+import '../../utils/input_sanitizer.dart';
 import '../../widgets/confetti_overlay.dart';
+import '../../l10n/app_localizations.dart';
 
 class VerificationRequestScreen extends StatefulWidget {
   const VerificationRequestScreen({super.key});
@@ -50,186 +53,21 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   final Map<String, bool> _socialMediaActive = {};
   final Map<String, TextEditingController> _socialMediaControllers = {};
 
-  final List<Map<String, String>> _titles = [
-    {'value': 'mr', 'label': 'Mr.'},
-    {'value': 'mrs', 'label': 'Mrs.'},
-    {'value': 'ms', 'label': 'Ms.'},
-    {'value': 'dr', 'label': 'Dr.'},
-    {'value': 'prof', 'label': 'Prof.'},
-    {'value': 'he', 'label': 'H.E. (His/Her Excellency)'},
-    {'value': 'amb', 'label': 'Ambassador'},
-    {'value': 'hon', 'label': 'Honorable'},
-    {'value': 'other', 'label': 'Other'},
+  // 'label' is an l10n key.
+  static const List<Map<String, String>> _titles = [
+    {'value': 'mr', 'label': 'vr_title_mr'},
+    {'value': 'mrs', 'label': 'vr_title_mrs'},
+    {'value': 'ms', 'label': 'vr_title_ms'},
+    {'value': 'dr', 'label': 'vr_title_dr'},
+    {'value': 'prof', 'label': 'vr_title_prof'},
+    {'value': 'he', 'label': 'vr_title_he'},
+    {'value': 'amb', 'label': 'vr_title_amb'},
+    {'value': 'hon', 'label': 'vr_title_hon'},
+    {'value': 'other', 'label': 'vr_other'},
   ];
 
-  final List<Map<String, String>> _nationalities = [
-    {'code': 'BI', 'name': 'Burundi'},
-    {'code': 'DZ', 'name': 'Algeria'},
-    {'code': 'AO', 'name': 'Angola'},
-    {'code': 'BJ', 'name': 'Benin'},
-    {'code': 'BW', 'name': 'Botswana'},
-    {'code': 'BF', 'name': 'Burkina Faso'},
-    {'code': 'CV', 'name': 'Cabo Verde'},
-    {'code': 'CM', 'name': 'Cameroon'},
-    {'code': 'CF', 'name': 'Central African Republic'},
-    {'code': 'TD', 'name': 'Chad'},
-    {'code': 'KM', 'name': 'Comoros'},
-    {'code': 'CG', 'name': 'Congo (Brazzaville)'},
-    {'code': 'CD', 'name': 'Congo (DRC)'},
-    {'code': 'CI', 'name': "Côte d'Ivoire"},
-    {'code': 'DJ', 'name': 'Djibouti'},
-    {'code': 'EG', 'name': 'Egypt'},
-    {'code': 'GQ', 'name': 'Equatorial Guinea'},
-    {'code': 'ER', 'name': 'Eritrea'},
-    {'code': 'SZ', 'name': 'Eswatini'},
-    {'code': 'ET', 'name': 'Ethiopia'},
-    {'code': 'GA', 'name': 'Gabon'},
-    {'code': 'GM', 'name': 'Gambia'},
-    {'code': 'GH', 'name': 'Ghana'},
-    {'code': 'GN', 'name': 'Guinea'},
-    {'code': 'GW', 'name': 'Guinea-Bissau'},
-    {'code': 'KE', 'name': 'Kenya'},
-    {'code': 'LS', 'name': 'Lesotho'},
-    {'code': 'LR', 'name': 'Liberia'},
-    {'code': 'LY', 'name': 'Libya'},
-    {'code': 'MG', 'name': 'Madagascar'},
-    {'code': 'MW', 'name': 'Malawi'},
-    {'code': 'ML', 'name': 'Mali'},
-    {'code': 'MR', 'name': 'Mauritania'},
-    {'code': 'MU', 'name': 'Mauritius'},
-    {'code': 'MA', 'name': 'Morocco'},
-    {'code': 'MZ', 'name': 'Mozambique'},
-    {'code': 'NA', 'name': 'Namibia'},
-    {'code': 'NE', 'name': 'Niger'},
-    {'code': 'NG', 'name': 'Nigeria'},
-    {'code': 'RW', 'name': 'Rwanda'},
-    {'code': 'ST', 'name': 'São Tomé and Príncipe'},
-    {'code': 'SN', 'name': 'Senegal'},
-    {'code': 'SC', 'name': 'Seychelles'},
-    {'code': 'SL', 'name': 'Sierra Leone'},
-    {'code': 'SO', 'name': 'Somalia'},
-    {'code': 'ZA', 'name': 'South Africa'},
-    {'code': 'SS', 'name': 'South Sudan'},
-    {'code': 'SD', 'name': 'Sudan'},
-    {'code': 'TZ', 'name': 'Tanzania'},
-    {'code': 'TG', 'name': 'Togo'},
-    {'code': 'TN', 'name': 'Tunisia'},
-    {'code': 'UG', 'name': 'Uganda'},
-    {'code': 'ZM', 'name': 'Zambia'},
-    {'code': 'ZW', 'name': 'Zimbabwe'},
-    // International
-    {'code': 'US', 'name': 'United States'},
-    {'code': 'GB', 'name': 'United Kingdom'},
-    {'code': 'FR', 'name': 'France'},
-    {'code': 'DE', 'name': 'Germany'},
-    {'code': 'CN', 'name': 'China'},
-    {'code': 'IN', 'name': 'India'},
-    {'code': 'BR', 'name': 'Brazil'},
-    {'code': 'CA', 'name': 'Canada'},
-    {'code': 'AU', 'name': 'Australia'},
-    {'code': 'JP', 'name': 'Japan'},
-    {'code': 'BE', 'name': 'Belgium'},
-    {'code': 'IT', 'name': 'Italy'},
-    {'code': 'ES', 'name': 'Spain'},
-    {'code': 'NL', 'name': 'Netherlands'},
-    {'code': 'SE', 'name': 'Sweden'},
-    {'code': 'CH', 'name': 'Switzerland'},
-    {'code': 'AE', 'name': 'UAE'},
-    {'code': 'SA', 'name': 'Saudi Arabia'},
-    {'code': 'TR', 'name': 'Turkey'},
-    {'code': 'RU', 'name': 'Russia'},
-    {'code': 'KR', 'name': 'South Korea'},
-    {'code': 'OTHER', 'name': 'Other'},
-  ];
-
-  // Phone country codes with dial codes
-  static const List<Map<String, String>> _phoneCountryCodes = [
-    {'code': 'BI', 'dial': '+257'},
-    {'code': 'DZ', 'dial': '+213'},
-    {'code': 'AO', 'dial': '+244'},
-    {'code': 'BJ', 'dial': '+229'},
-    {'code': 'BW', 'dial': '+267'},
-    {'code': 'BF', 'dial': '+226'},
-    {'code': 'CV', 'dial': '+238'},
-    {'code': 'CM', 'dial': '+237'},
-    {'code': 'CF', 'dial': '+236'},
-    {'code': 'TD', 'dial': '+235'},
-    {'code': 'KM', 'dial': '+269'},
-    {'code': 'CG', 'dial': '+242'},
-    {'code': 'CD', 'dial': '+243'},
-    {'code': 'CI', 'dial': '+225'},
-    {'code': 'DJ', 'dial': '+253'},
-    {'code': 'EG', 'dial': '+20'},
-    {'code': 'GQ', 'dial': '+240'},
-    {'code': 'ER', 'dial': '+291'},
-    {'code': 'SZ', 'dial': '+268'},
-    {'code': 'ET', 'dial': '+251'},
-    {'code': 'GA', 'dial': '+241'},
-    {'code': 'GM', 'dial': '+220'},
-    {'code': 'GH', 'dial': '+233'},
-    {'code': 'GN', 'dial': '+224'},
-    {'code': 'GW', 'dial': '+245'},
-    {'code': 'KE', 'dial': '+254'},
-    {'code': 'LS', 'dial': '+266'},
-    {'code': 'LR', 'dial': '+231'},
-    {'code': 'LY', 'dial': '+218'},
-    {'code': 'MG', 'dial': '+261'},
-    {'code': 'MW', 'dial': '+265'},
-    {'code': 'ML', 'dial': '+223'},
-    {'code': 'MR', 'dial': '+222'},
-    {'code': 'MU', 'dial': '+230'},
-    {'code': 'MA', 'dial': '+212'},
-    {'code': 'MZ', 'dial': '+258'},
-    {'code': 'NA', 'dial': '+264'},
-    {'code': 'NE', 'dial': '+227'},
-    {'code': 'NG', 'dial': '+234'},
-    {'code': 'RW', 'dial': '+250'},
-    {'code': 'ST', 'dial': '+239'},
-    {'code': 'SN', 'dial': '+221'},
-    {'code': 'SC', 'dial': '+248'},
-    {'code': 'SL', 'dial': '+232'},
-    {'code': 'SO', 'dial': '+252'},
-    {'code': 'ZA', 'dial': '+27'},
-    {'code': 'SS', 'dial': '+211'},
-    {'code': 'SD', 'dial': '+249'},
-    {'code': 'TZ', 'dial': '+255'},
-    {'code': 'TG', 'dial': '+228'},
-    {'code': 'TN', 'dial': '+216'},
-    {'code': 'UG', 'dial': '+256'},
-    {'code': 'ZM', 'dial': '+260'},
-    {'code': 'ZW', 'dial': '+263'},
-    {'code': 'US', 'dial': '+1'},
-    {'code': 'GB', 'dial': '+44'},
-    {'code': 'FR', 'dial': '+33'},
-    {'code': 'DE', 'dial': '+49'},
-    {'code': 'CN', 'dial': '+86'},
-    {'code': 'IN', 'dial': '+91'},
-    {'code': 'BR', 'dial': '+55'},
-    {'code': 'CA', 'dial': '+1'},
-    {'code': 'AU', 'dial': '+61'},
-    {'code': 'JP', 'dial': '+81'},
-    {'code': 'BE', 'dial': '+32'},
-    {'code': 'IT', 'dial': '+39'},
-    {'code': 'ES', 'dial': '+34'},
-    {'code': 'NL', 'dial': '+31'},
-    {'code': 'SE', 'dial': '+46'},
-    {'code': 'CH', 'dial': '+41'},
-    {'code': 'AE', 'dial': '+971'},
-    {'code': 'SA', 'dial': '+966'},
-    {'code': 'TR', 'dial': '+90'},
-    {'code': 'RU', 'dial': '+7'},
-    {'code': 'KR', 'dial': '+82'},
-  ];
-
-  /// Convert a 2-letter country code to its flag emoji.
-  static String _countryCodeToEmoji(String code) {
-    if (code == 'OTHER' || code.length != 2) return '';
-    final int first = code.codeUnitAt(0) - 0x41 + 0x1F1E6;
-    final int second = code.codeUnitAt(1) - 0x41 + 0x1F1E6;
-    return String.fromCharCode(first) + String.fromCharCode(second);
-  }
-
-  // Social media platforms with icons
+  // Social media platforms with icons. Labels/hints that are l10n keys get
+  // translated; brand names and URL patterns pass through translate() unchanged.
   static const List<Map<String, dynamic>> _socialPlatforms = [
     {'key': 'twitter', 'label': 'X', 'icon': Icons.close, 'hint': '@username or https://x.com/...'},
     {'key': 'facebook', 'label': 'Facebook', 'icon': Icons.facebook, 'hint': 'https://facebook.com/...'},
@@ -238,9 +76,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     {'key': 'tiktok', 'label': 'TikTok', 'icon': Icons.music_note_outlined, 'hint': '@username or https://tiktok.com/@...'},
     {'key': 'youtube', 'label': 'YouTube', 'icon': Icons.play_circle_outline, 'hint': 'https://youtube.com/@...'},
     {'key': 'telegram', 'label': 'Telegram', 'icon': Icons.send, 'hint': '@username or https://t.me/...'},
-    {'key': 'whatsapp', 'label': 'WhatsApp', 'icon': Icons.phone, 'hint': 'Phone number or link'},
+    {'key': 'whatsapp', 'label': 'WhatsApp', 'icon': Icons.phone, 'hint': 'vr_hint_phone_or_link'},
     {'key': 'threads', 'label': 'Threads', 'icon': Icons.alternate_email, 'hint': '@username'},
-    {'key': 'other', 'label': 'Other', 'icon': Icons.link, 'hint': 'URL or username'},
+    {'key': 'other', 'label': 'vr_other', 'icon': Icons.link, 'hint': 'vr_hint_url_or_username'},
   ];
 
   @override
@@ -266,7 +104,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     if (auth.nationality != null && auth.nationality!.isNotEmpty) {
       // Match against the nationality codes in the list
       final code = auth.nationality!;
-      if (_nationalities.any((n) => n['code'] == code)) {
+      if (AppConstants.nationalityChoices.containsKey(code)) {
         _selectedNationality = code;
       }
     }
@@ -303,13 +141,14 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
   Future<void> _sendEmailOtp() async {
     final email = _emailController.text.trim();
+    final l10n = AppLocalizations.of(context);
     if (email.isEmpty) {
-      _showError('Please enter your email address');
+      _showError(l10n.translate('auth_enter_email'));
       return;
     }
-    final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,}$');
-    if (!emailRegex.hasMatch(email)) {
-      _showError('Please enter a valid email address');
+    final emailError = InputSanitizer.validateEmail(email);
+    if (emailError != null) {
+      _showError(emailError);
       return;
     }
 
@@ -323,7 +162,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           _sendingEmailOtp = false;
         });
         _startEmailCountdown();
-        _showSuccess('Verification code sent to $email');
+        _showSuccess('${l10n.translate('vr_code_sent_to')} $email');
       }
     } catch (e) {
       if (mounted) {
@@ -332,7 +171,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         if (e is ApiException) {
           errorMsg = e.message;
         } else {
-          errorMsg = 'Failed to send verification code. Please check your connection and try again.';
+          errorMsg = l10n.translate('vr_send_code_failed');
         }
         _showError(errorMsg);
       }
@@ -341,8 +180,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
   Future<void> _verifyEmailOtp() async {
     final code = _emailOtpController.text.trim();
+    final l10n = AppLocalizations.of(context);
     if (code.isEmpty || code.length < 6) {
-      _showError('Please enter the 6-digit code');
+      _showError(l10n.translate('auth_enter_6_digit_code'));
       return;
     }
 
@@ -358,7 +198,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           _emailVerified = true;
           _verifyingEmailOtp = false;
         });
-        _showSuccess('Email verified!');
+        _showSuccess(l10n.translate('vr_email_verified_snack'));
       }
     } catch (e) {
       if (mounted) {
@@ -367,7 +207,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         if (e is ApiException) {
           errorMsg = e.message;
         } else {
-          errorMsg = 'Invalid code. Please try again.';
+          errorMsg = l10n.translate('auth_invalid_code');
         }
         _showError(errorMsg);
       }
@@ -436,9 +276,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildPendingStatusScreen(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Ds.bg(context),
-      appBar: AppBar(title: const Text('Verification')),
+      appBar: AppBar(title: Text(l10n.translate('vr_verification'))),
       body: ListView(
         padding: const EdgeInsets.only(top: 16, bottom: 40),
         children: [
@@ -457,7 +298,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                       size: 32, color: Ds.goldDeep),
                 ),
                 const SizedBox(height: 12),
-                Text('In review',
+                Text(l10n.translate('vr_in_review'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontSize: 17,
@@ -465,13 +306,13 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                         color: Ds.ink(context))),
                 const SizedBox(height: 6),
                 Text(
-                  'Your verification request has been submitted. Reviews usually take up to 5 working days.',
+                  l10n.translate('vr_pending_body'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: 13, height: 1.5, color: Ds.body(context)),
                 ),
                 const SizedBox(height: 12),
-                const DsPill('PENDING', tone: DsTone.gold),
+                DsPill(l10n.translate('vr_pending'), tone: DsTone.gold),
               ],
             ),
           ),
@@ -484,7 +325,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Progress',
+                Text(l10n.translate('vr_progress'),
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -492,17 +333,17 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 const SizedBox(height: 14),
                 _timelineStep(
                   done: true,
-                  title: 'Documents submitted',
-                  subtitle: 'Government ID + selfie',
+                  title: l10n.translate('vr_step_docs'),
+                  subtitle: l10n.translate('vr_step_docs_sub'),
                 ),
                 _timelineStep(
                   active: true,
-                  title: 'Under review',
-                  subtitle: 'Our team is checking your documents',
+                  title: l10n.translate('vr_step_review'),
+                  subtitle: l10n.translate('vr_step_review_sub'),
                 ),
                 _timelineStep(
-                  title: 'Badge issued',
-                  subtitle: 'Verified badge appears on your profile',
+                  title: l10n.translate('vr_step_badge'),
+                  subtitle: l10n.translate('vr_step_badge_sub'),
                   isLast: true,
                 ),
               ],
@@ -512,7 +353,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DsOutlineButton('Go back',
+            child: DsOutlineButton(l10n.translate('vr_go_back'),
                 expand: true, onTap: () => Navigator.pop(context)),
           ),
         ],
@@ -617,11 +458,13 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       return _buildPendingStatusScreen(isDark);
     }
 
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
-        title: const Text('Verification'),
+        title: Text(l10n.translate('vr_verification')),
         leading: IconButton(
+          tooltip: l10n.translate('close'),
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
         ),
@@ -691,6 +534,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildHeader(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -704,7 +548,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         ),
         const SizedBox(height: 20),
         Text(
-          'Get Verified',
+          l10n.translate('get_verified'),
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -713,7 +557,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Apply for a verified badge to stand out as an official representative or notable figure.',
+          l10n.translate('vr_intro'),
           style: TextStyle(fontSize: 15, height: 1.5, color: isDark ? Colors.white60 : Colors.black54),
         ),
       ],
@@ -721,23 +565,24 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildBadgeTypeInfo(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     final badgeTypes = [
       {
         'value': 'GOLD',
-        'label': 'Gold Badge',
-        'description': 'VIPs, Government Officials, Ambassadors',
+        'label': l10n.translate('vr_gold_badge'),
+        'description': l10n.translate('vr_gold_desc'),
         'color': const Color(0xFFFFD700),
       },
       {
         'value': 'BLUE',
-        'label': 'Blue Badge',
-        'description': 'Verified professionals and notable individuals',
+        'label': l10n.translate('vr_blue_badge'),
+        'description': l10n.translate('vr_blue_desc'),
         'color': const Color(0xFF1DA1F2),
       },
       {
         'value': 'GREEN',
-        'label': 'Green Badge',
-        'description': 'Verified community members and contributors',
+        'label': l10n.translate('vr_green_badge'),
+        'description': l10n.translate('vr_green_desc'),
         'color': const Color(0xFF409843),
       },
     ];
@@ -745,10 +590,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Select Badge Type *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_select_badge_type'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 4),
         Text(
-          'Choose the badge type that best represents your role',
+          l10n.translate('vr_select_badge_hint'),
           style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
         ),
         const SizedBox(height: 12),
@@ -826,7 +671,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           );
         }),
         Text(
-          'Our team will review your application and may assign a different badge based on your profile.',
+          l10n.translate('vr_badge_notice'),
           style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black45, fontStyle: FontStyle.italic),
         ),
       ],
@@ -834,34 +679,36 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildTitleField(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Title *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_title_label'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedTitle,
-          decoration: _inputDecoration(isDark: isDark, hint: 'Select your title', prefixIcon: const Icon(Icons.person_outline)),
-          items: _titles.map((t) => DropdownMenuItem(value: t['value'], child: Text(t['label']!))).toList(),
+          initialValue: _selectedTitle,
+          decoration: _inputDecoration(isDark: isDark, hint: l10n.translate('vr_select_title'), prefixIcon: const Icon(Icons.person_outline)),
+          items: _titles.map((t) => DropdownMenuItem(value: t['value'], child: Text(l10n.translate(t['label']!)))).toList(),
           onChanged: (v) => setState(() => _selectedTitle = v),
-          validator: (v) => (v == null || v.isEmpty) ? 'Please select your title' : null,
+          validator: (v) => (v == null || v.isEmpty) ? l10n.translate('vr_title_required') : null,
         ),
       ],
     );
   }
 
   Widget _buildFullNameField(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Full Legal Name *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_full_legal_name'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _fullNameController,
-          decoration: _inputDecoration(isDark: isDark, hint: 'Enter your full legal name', prefixIcon: const Icon(Icons.badge_outlined)),
+          decoration: _inputDecoration(isDark: isDark, hint: l10n.translate('vr_enter_full_legal_name'), prefixIcon: const Icon(Icons.badge_outlined)),
           validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Please enter your full name';
-            if (v.trim().length < 3) return 'Name must be at least 3 characters';
+            if (v == null || v.trim().isEmpty) return l10n.translate('vr_full_name_required');
+            if (v.trim().length < 3) return l10n.translate('vr_name_min');
             return null;
           },
         ),
@@ -870,69 +717,70 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildNationalityField(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Nationality *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_nationality_label'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedNationality,
-          decoration: _inputDecoration(isDark: isDark, hint: 'Select your nationality', prefixIcon: const Icon(Icons.public)),
+          initialValue: _selectedNationality,
+          decoration: _inputDecoration(isDark: isDark, hint: l10n.translate('pc_select_nationality'), prefixIcon: const Icon(Icons.public)),
           isExpanded: true,
-          items: _nationalities.map((n) {
-            final flag = _countryCodeToEmoji(n['code']!);
+          items: AppConstants.nationalityChoices.entries.map((n) {
+            final flag = AppConstants.countryFlag(n.key);
             return DropdownMenuItem(
-              value: n['code'],
-              child: Text('$flag  ${n['name']}', style: const TextStyle(fontSize: 15)),
+              value: n.key,
+              child: Text('$flag  ${n.value}', style: const TextStyle(fontSize: 15)),
             );
           }).toList(),
           onChanged: (v) {
             setState(() {
               _selectedNationality = v;
               // Auto-sync phone country code when nationality changes
-              if (v != null && v != 'OTHER') {
-                final match = _phoneCountryCodes.where((c) => c['code'] == v);
-                if (match.isNotEmpty) {
-                  _selectedPhoneCountry = match.first['code']!;
-                  _selectedPhoneCode = match.first['dial']!;
-                }
+              final dial = v == null ? null : AppConstants.countryDialCodes[v];
+              if (dial != null) {
+                _selectedPhoneCountry = v!;
+                _selectedPhoneCode = dial;
               }
             });
           },
-          validator: (v) => (v == null || v.isEmpty) ? 'Please select your nationality' : null,
+          validator: (v) => (v == null || v.isEmpty) ? l10n.translate('pc_nationality_required') : null,
         ),
       ],
     );
   }
 
   Widget _buildGenderField(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Gender *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_gender_label'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _selectedGender,
-          decoration: _inputDecoration(isDark: isDark, hint: 'Select your gender', prefixIcon: const Icon(Icons.person_outline)),
-          items: const [
-            DropdownMenuItem(value: 'male', child: Text('Male')),
-            DropdownMenuItem(value: 'female', child: Text('Female')),
+          initialValue: _selectedGender,
+          decoration: _inputDecoration(isDark: isDark, hint: l10n.translate('vr_select_gender'), prefixIcon: const Icon(Icons.person_outline)),
+          items: [
+            DropdownMenuItem(value: 'male', child: Text(l10n.translate('pc_male'))),
+            DropdownMenuItem(value: 'female', child: Text(l10n.translate('pc_female'))),
           ],
           onChanged: (v) => setState(() => _selectedGender = v),
-          validator: (v) => (v == null || v.isEmpty) ? 'Please select your gender' : null,
+          validator: (v) => (v == null || v.isEmpty) ? l10n.translate('pc_gender_required') : null,
         ),
       ],
     );
   }
 
   Widget _buildDocumentUpload(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Supporting Document (Optional)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_supporting_doc'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 4),
         Text(
-          'Upload a photo of your ID, business card, or other supporting document',
+          l10n.translate('vr_supporting_doc_hint'),
           style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
         ),
         const SizedBox(height: 12),
@@ -951,15 +799,19 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
               Positioned(
                 top: 8,
                 right: 8,
-                child: GestureDetector(
-                  onTap: () => setState(() => _supportingDocument = null),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
+                child: Semantics(
+                  button: true,
+                  label: l10n.translate('remove'),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _supportingDocument = null),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, color: Colors.white, size: 16),
                     ),
-                    child: const Icon(Icons.close, color: Colors.white, size: 16),
                   ),
                 ),
               ),
@@ -986,7 +838,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                   Icon(Icons.cloud_upload_outlined, size: 32, color: isDark ? Colors.white38 : Colors.grey[500]),
                   const SizedBox(height: 8),
                   Text(
-                    'Tap to upload image',
+                    l10n.translate('vr_tap_upload'),
                     style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
                   ),
                 ],
@@ -1013,13 +865,14 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   // ── Email with inline OTP ──────────────────────────────────
 
   Widget _buildEmailSection(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Work/Professional Email *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_work_email'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 4),
         Text(
-          'Use your professional or organizational email (not personal Gmail/Yahoo)',
+          l10n.translate('vr_work_email_hint'),
           style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black45),
         ),
         const SizedBox(height: 8),
@@ -1041,12 +894,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                       ? const Icon(Icons.check_circle, color: AppColors.success)
                       : null,
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Please enter your email';
-                  final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
-                  if (!emailRegex.hasMatch(v)) return 'Please enter a valid email';
-                  return null;
-                },
+                validator: InputSanitizer.validateEmail,
               ),
             ),
             if (!_emailVerified) ...[
@@ -1067,7 +915,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                       child: _sendingEmailOtp
                           ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : Text(
-                              countdown > 0 ? '${countdown}s' : 'Get Code',
+                              countdown > 0 ? '${countdown}s' : l10n.translate('vr_get_code'),
                               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                             ),
                     ),
@@ -1091,7 +939,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   decoration: _inputDecoration(
                     isDark: isDark,
-                    hint: 'Enter 6-digit code',
+                    hint: l10n.translate('vr_enter_code'),
                     prefixIcon: const Icon(Icons.pin, size: 20),
                   ).copyWith(counterText: ''),
                 ),
@@ -1109,7 +957,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                   ),
                   child: _verifyingEmailOtp
                       ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Verify', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      : Text(l10n.translate('auth_verify'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 ),
               ),
             ],
@@ -1124,7 +972,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
               children: [
                 Icon(Icons.check_circle, color: AppColors.success, size: 16),
                 const SizedBox(width: 6),
-                Text('Email verified', style: TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(l10n.translate('vr_email_verified'), style: TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -1133,10 +981,11 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildPhoneSection(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Phone Number', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('pc_phone_number'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1155,22 +1004,21 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   borderRadius: BorderRadius.circular(12),
                   icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                  items: _phoneCountryCodes.map((c) {
-                    final flag = _countryCodeToEmoji(c['code']!);
+                  items: AppConstants.countryDialCodes.entries.map((c) {
+                    final flag = AppConstants.countryFlag(c.key);
                     return DropdownMenuItem(
-                      value: c['code'],
+                      value: c.key,
                       child: Text(
-                        '$flag ${c['dial']}',
+                        '$flag ${c.value}',
                         style: const TextStyle(fontSize: 14),
                       ),
                     );
                   }).toList(),
                   onChanged: (v) {
                     if (v != null) {
-                      final match = _phoneCountryCodes.firstWhere((c) => c['code'] == v);
                       setState(() {
                         _selectedPhoneCountry = v;
-                        _selectedPhoneCode = match['dial']!;
+                        _selectedPhoneCode = AppConstants.countryDialCodes[v]!;
                       });
                     }
                   },
@@ -1186,7 +1034,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: _inputDecoration(
                   isDark: isDark,
-                  hint: 'Phone number (optional)',
+                  hint: l10n.translate('pc_phone_optional'),
                   prefixIcon: const Icon(Icons.phone_outlined, size: 20),
                 ),
               ),
@@ -1200,15 +1048,16 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
 
 
   Widget _buildPositionField(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Current Position/Role *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_position'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
         TextFormField(
           controller: _positionController,
-          decoration: _inputDecoration(isDark: isDark, hint: 'e.g., Ambassador, Director, Minister', prefixIcon: const Icon(Icons.work_outline)),
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your current position' : null,
+          decoration: _inputDecoration(isDark: isDark, hint: l10n.translate('vr_position_hint'), prefixIcon: const Icon(Icons.work_outline)),
+          validator: (v) => (v == null || v.trim().isEmpty) ? l10n.translate('vr_position_required') : null,
         ),
       ],
     );
@@ -1217,12 +1066,13 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   // ── Social Media Section ──────────────────────────────────
 
   Widget _buildSocialMediaSection(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Social Media (Optional)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
+        Text(l10n.translate('vr_social_media'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDark ? Colors.white : Colors.black87)),
         const SizedBox(height: 8),
-        Text('Tap a platform to add your profile', style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45)),
+        Text(l10n.translate('vr_social_hint'), style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45)),
         const SizedBox(height: 16),
 
         // Platform toggle buttons
@@ -1265,7 +1115,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      platform['label'] as String,
+                      l10n.translate(platform['label'] as String),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
@@ -1288,10 +1138,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
               controller: _socialMediaControllers[key],
               decoration: _inputDecoration(
                 isDark: isDark,
-                hint: platform['hint'] as String,
+                hint: l10n.translate(platform['hint'] as String),
                 prefixIcon: Icon(platform['icon'] as IconData, size: 20),
               ).copyWith(
-                labelText: platform['label'] as String,
+                labelText: l10n.translate(platform['label'] as String),
               ),
             ),
           );
@@ -1315,7 +1165,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Review typically takes up to 24 hours. You\'ll be notified once your request is reviewed.',
+              AppLocalizations.of(context).translate('vr_review_notice'),
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87, height: 1.4),
             ),
           ),
@@ -1325,6 +1175,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   }
 
   Widget _buildSubmitButton(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     final canSubmit = _emailVerified && _selectedBadgeType != null;
 
     return Column(
@@ -1338,7 +1189,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Please verify your email to submit',
+                    l10n.translate('vr_verify_email_to_submit'),
                     style: TextStyle(fontSize: 13, color: AppColors.auGold, fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -1354,7 +1205,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Please select a badge type',
+                    l10n.translate('vr_select_badge_required'),
                     style: TextStyle(fontSize: 13, color: AppColors.auGold, fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -1375,12 +1226,12 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
             ),
             child: _isLoading
                 ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-                : const Row(
+                : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Submit Request', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                      SizedBox(width: 8),
-                      Icon(Icons.send_rounded, size: 20),
+                      Text(l10n.translate('vr_submit_request'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.send_rounded, size: 20),
                     ],
                   ),
           ),
@@ -1392,8 +1243,9 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_emailVerified) return;
+    final l10n = AppLocalizations.of(context);
     if (_selectedBadgeType == null) {
-      _showError('Please select a badge type');
+      _showError(l10n.translate('vr_select_badge_required'));
       return;
     }
     HapticFeedback.lightImpact();
@@ -1427,23 +1279,33 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       final rawPhone = _phoneController.text.trim();
       final fullPhone = rawPhone.isNotEmpty ? '$_selectedPhoneCode$rawPhone' : '';
 
-      await api.submitVerificationRequest(
-        title: _selectedTitle!,
-        fullName: _fullNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phoneNumber: fullPhone,
-        positionRole: _positionController.text.trim(),
-        countryCode: _selectedNationality,
-        gender: _selectedGender,
-        badgeType: _selectedBadgeType,
-        twitterUrl: twitterUrl,
-        linkedinUrl: linkedinUrl,
-        facebookUrl: facebookUrl,
-        instagramUrl: instagramUrl,
-        tiktokUrl: tiktokUrl,
-        youtubeUrl: youtubeUrl,
-        otherSocialUrl: otherSocialUrl,
-      );
+      final fields = <String, String>{
+        'title': _selectedTitle!,
+        'full_name': _fullNameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phone_number': fullPhone,
+        'position_role': _positionController.text.trim(),
+      };
+      void put(String key, String? value) {
+        if (value != null && value.isNotEmpty) fields[key] = value;
+      }
+      put('country_code', _selectedNationality);
+      put('gender', _selectedGender);
+      put('badge_type', _selectedBadgeType);
+      put('twitter_url', twitterUrl);
+      put('linkedin_url', linkedinUrl);
+      put('facebook_url', facebookUrl);
+      put('instagram_url', instagramUrl);
+      put('tiktok_url', tiktokUrl);
+      put('youtube_url', youtubeUrl);
+      put('other_social_url', otherSocialUrl);
+
+      final doc = _supportingDocument;
+      if (doc != null) {
+        await api.submitVerificationRequestWithDocument(fields, doc);
+      } else {
+        await api.post('verification/request/', fields, auth: true);
+      }
 
       if (mounted) {
         HapticFeedback.mediumImpact();
@@ -1466,13 +1328,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                   child: Icon(Icons.check_circle_outline, color: AppColors.burundiGreen, size: 28),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(child: Text('Request Submitted!')),
+                Expanded(child: Text(l10n.translate('vr_request_submitted'))),
               ],
             ),
-            content: const Text(
-              'Your verification request has been submitted successfully! '
-              'Our team will review it within 24 hours and you\'ll be notified of the decision.',
-            ),
+            content: Text(l10n.translate('vr_request_submitted_body')),
             actions: [
               ElevatedButton(
                 onPressed: () {
@@ -1483,7 +1342,7 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
                   backgroundColor: AppColors.burundiGreen,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('OK'),
+                child: Text(l10n.translate('ok')),
               ),
             ],
           ),
@@ -1493,7 +1352,10 @@ class _VerificationRequestScreenState extends State<VerificationRequestScreen> {
       if (mounted) {
         HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.burundiRed),
+          SnackBar(
+            content: Text(e is ApiException ? e.message : l10n.translate('generic_error')),
+            backgroundColor: AppColors.burundiRed,
+          ),
         );
       }
     } finally {

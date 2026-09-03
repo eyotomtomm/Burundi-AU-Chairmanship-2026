@@ -1312,6 +1312,708 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'Reduce image quality and polling frequency to save data'**
   String get data_saver_desc;
+
+  /// No description provided for @generic_error.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get generic_error;
+
+  /// No description provided for @yd_documents_after_acceptance.
+  ///
+  /// In en, this message translates to:
+  /// **'supporting documents are requested after your application is accepted.'**
+  String get yd_documents_after_acceptance;
+
+  /// No description provided for @camera_permission_denied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is required to scan codes. Enable it for this app in your device Settings.'**
+  String get camera_permission_denied;
+
+  /// No description provided for @explore_terms_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Explore'**
+  String get explore_terms_title;
+
+  /// No description provided for @explore_terms_subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A public space for youth policy debate. Read this once before you take part.'**
+  String get explore_terms_subtitle;
+
+  /// No description provided for @explore_terms_before_posting.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you can post'**
+  String get explore_terms_before_posting;
+
+  /// No description provided for @explore_terms_complete_profile.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete my profile'**
+  String get explore_terms_complete_profile;
+
+  /// No description provided for @explore_terms_agree.
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and agree to the Explore community terms.'**
+  String get explore_terms_agree;
+
+  /// No description provided for @explore_terms_continue.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree and continue'**
+  String get explore_terms_continue;
+
+  /// No description provided for @explore_terms_english_prevails.
+  ///
+  /// In en, this message translates to:
+  /// **'The English version of these terms is the reference text.'**
+  String get explore_terms_english_prevails;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// No description provided for @yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get no;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @send.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get send;
+
+  /// No description provided for @submit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get submit;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
+
+  /// No description provided for @share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get share;
+
+  /// No description provided for @copy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copy;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get copied;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// No description provided for @open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get open;
+
+  /// No description provided for @bookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark'**
+  String get bookmark;
+
+  /// No description provided for @unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknown;
+
+  /// No description provided for @not_available.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get not_available;
+
+  /// No description provided for @try_again.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get try_again;
+
+  /// No description provided for @failed_to_load.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load'**
+  String get failed_to_load;
+
+  /// No description provided for @connection_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed. Check your network.'**
+  String get connection_failed;
+
+  /// No description provided for @server_error_retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Server error. Please try again later.'**
+  String get server_error_retry;
+
+  /// No description provided for @request_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Request failed'**
+  String get request_failed;
+
+  /// No description provided for @offline_no_internet.
+  ///
+  /// In en, this message translates to:
+  /// **'No internet connection'**
+  String get offline_no_internet;
+
+  /// No description provided for @offline_back_online.
+  ///
+  /// In en, this message translates to:
+  /// **'Back online'**
+  String get offline_back_online;
+
+  /// No description provided for @offline_reconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting...'**
+  String get offline_reconnecting;
+
+  /// No description provided for @update_required.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Required'**
+  String get update_required;
+
+  /// No description provided for @update_available.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Available'**
+  String get update_available;
+
+  /// No description provided for @update_now.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Now'**
+  String get update_now;
+
+  /// No description provided for @maybe_later.
+  ///
+  /// In en, this message translates to:
+  /// **'Maybe Later'**
+  String get maybe_later;
+
+  /// No description provided for @whats_new.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new'**
+  String get whats_new;
+
+  /// No description provided for @got_it.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get got_it;
+
+  /// No description provided for @no_magazines_found.
+  ///
+  /// In en, this message translates to:
+  /// **'No magazines found'**
+  String get no_magazines_found;
+
+  /// No description provided for @live_chat_start_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start live chat. Please try again.'**
+  String get live_chat_start_failed;
+
+  /// No description provided for @blocked_external_nav.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked navigation to an external site'**
+  String get blocked_external_nav;
+
+  /// No description provided for @could_not_open_platform.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this platform'**
+  String get could_not_open_platform;
+
+  /// No description provided for @open_externally.
+  ///
+  /// In en, this message translates to:
+  /// **'Open externally'**
+  String get open_externally;
+
+  /// No description provided for @no_stream_url.
+  ///
+  /// In en, this message translates to:
+  /// **'No stream link is available for this feed'**
+  String get no_stream_url;
+
+  /// No description provided for @no_scheduled_time.
+  ///
+  /// In en, this message translates to:
+  /// **'No scheduled time is available for this event'**
+  String get no_scheduled_time;
+
+  /// No description provided for @reminder_add_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not add the reminder. Please try again.'**
+  String get reminder_add_failed;
+
+  /// No description provided for @no_phrases_available.
+  ///
+  /// In en, this message translates to:
+  /// **'No phrases available.'**
+  String get no_phrases_available;
+
+  /// No description provided for @could_not_open_link.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the link'**
+  String get could_not_open_link;
+
+  /// No description provided for @no_active_polls.
+  ///
+  /// In en, this message translates to:
+  /// **'No active polls'**
+  String get no_active_polls;
+
+  /// No description provided for @recording_unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This session recording is not available'**
+  String get recording_unavailable;
+
+  /// No description provided for @pdf_not_available.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF not available yet.'**
+  String get pdf_not_available;
+
+  /// No description provided for @rs_discussion.
+  ///
+  /// In en, this message translates to:
+  /// **'Discussion'**
+  String get rs_discussion;
+
+  /// No description provided for @rs_discussion_not_found.
+  ///
+  /// In en, this message translates to:
+  /// **'Discussion not found'**
+  String get rs_discussion_not_found;
+
+  /// No description provided for @rs_no_discussions_yet.
+  ///
+  /// In en, this message translates to:
+  /// **'No discussions yet'**
+  String get rs_no_discussions_yet;
+
+  /// No description provided for @rs_no_replies_yet.
+  ///
+  /// In en, this message translates to:
+  /// **'No replies yet'**
+  String get rs_no_replies_yet;
+
+  /// No description provided for @rs_replies.
+  ///
+  /// In en, this message translates to:
+  /// **'Replies'**
+  String get rs_replies;
+
+  /// No description provided for @rs_write_reply_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a reply…'**
+  String get rs_write_reply_hint;
+
+  /// No description provided for @rs_comment_post_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your reply could not be posted.'**
+  String get rs_comment_post_failed;
+
+  /// No description provided for @rs_load_more_replies.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more replies'**
+  String get rs_load_more_replies;
+
+  /// No description provided for @w_new_post.
+  ///
+  /// In en, this message translates to:
+  /// **'New post'**
+  String get w_new_post;
+
+  /// No description provided for @w_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get w_title;
+
+  /// No description provided for @w_category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get w_category;
+
+  /// No description provided for @w_post.
+  ///
+  /// In en, this message translates to:
+  /// **'Post'**
+  String get w_post;
+
+  /// No description provided for @w_photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get w_photo;
+
+  /// No description provided for @w_video.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get w_video;
+
+  /// No description provided for @w_poll.
+  ///
+  /// In en, this message translates to:
+  /// **'Poll'**
+  String get w_poll;
+
+  /// No description provided for @w_ask_question.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a question'**
+  String get w_ask_question;
+
+  /// No description provided for @w_option.
+  ///
+  /// In en, this message translates to:
+  /// **'Option'**
+  String get w_option;
+
+  /// No description provided for @w_add_option.
+  ///
+  /// In en, this message translates to:
+  /// **'Add option'**
+  String get w_add_option;
+
+  /// No description provided for @w_answering.
+  ///
+  /// In en, this message translates to:
+  /// **'Answering'**
+  String get w_answering;
+
+  /// No description provided for @w_poll_skipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Poll skipped'**
+  String get w_poll_skipped;
+
+  /// No description provided for @w_attachment_skipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Some attachments did not upload'**
+  String get w_attachment_skipped;
+
+  /// No description provided for @w_file_too_large.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is too large'**
+  String get w_file_too_large;
+
+  /// No description provided for @w_complete_profile_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete your profile'**
+  String get w_complete_profile_title;
+
+  /// No description provided for @w_complete_profile_body.
+  ///
+  /// In en, this message translates to:
+  /// **'Add the rest of your details before posting.'**
+  String get w_complete_profile_body;
+
+  /// No description provided for @w_not_now.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get w_not_now;
+
+  /// No description provided for @w_repost.
+  ///
+  /// In en, this message translates to:
+  /// **'Repost'**
+  String get w_repost;
+
+  /// No description provided for @w_repost_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'Share this with your followers'**
+  String get w_repost_sub;
+
+  /// No description provided for @w_repost_removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Repost removed'**
+  String get w_repost_removed;
+
+  /// No description provided for @w_quote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get w_quote;
+
+  /// No description provided for @w_quote_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your own take'**
+  String get w_quote_sub;
+
+  /// No description provided for @w_add_take_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your take…'**
+  String get w_add_take_hint;
+
+  /// No description provided for @w_report.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get w_report;
+
+  /// No description provided for @w_report_post.
+  ///
+  /// In en, this message translates to:
+  /// **'Report post'**
+  String get w_report_post;
+
+  /// No description provided for @w_report_account.
+  ///
+  /// In en, this message translates to:
+  /// **'Report account'**
+  String get w_report_account;
+
+  /// No description provided for @w_report_this_post.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this post'**
+  String get w_report_this_post;
+
+  /// No description provided for @w_this_account.
+  ///
+  /// In en, this message translates to:
+  /// **'this account'**
+  String get w_this_account;
+
+  /// No description provided for @w_what_is_wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'What is wrong with it?'**
+  String get w_what_is_wrong;
+
+  /// No description provided for @w_delete_post.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete post'**
+  String get w_delete_post;
+
+  /// No description provided for @w_delete_post_body.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes it for everyone. It cannot be undone.'**
+  String get w_delete_post_body;
+
+  /// No description provided for @w_block.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get w_block;
+
+  /// No description provided for @w_block_account.
+  ///
+  /// In en, this message translates to:
+  /// **'Block account'**
+  String get w_block_account;
+
+  /// No description provided for @w_block_body.
+  ///
+  /// In en, this message translates to:
+  /// **'You will not see their posts or replies, and they will not see yours.'**
+  String get w_block_body;
+
+  /// No description provided for @w_blocked_done.
+  ///
+  /// In en, this message translates to:
+  /// **'Account blocked'**
+  String get w_blocked_done;
+
+  /// No description provided for @w_unblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get w_unblock;
+
+  /// No description provided for @w_blocked_accounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked accounts'**
+  String get w_blocked_accounts;
+
+  /// No description provided for @w_edited.
+  ///
+  /// In en, this message translates to:
+  /// **'edited'**
+  String get w_edited;
+
+  /// No description provided for @w_leaving_app.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving the app'**
+  String get w_leaving_app;
+
+  /// No description provided for @w_link_opens_browser.
+  ///
+  /// In en, this message translates to:
+  /// **'This link opens in your browser.'**
+  String get w_link_opens_browser;
+
+  /// No description provided for @w_image_load_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Image could not be loaded'**
+  String get w_image_load_failed;
+
+  /// No description provided for @w_clear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get w_clear;
+
+  /// No description provided for @w_congratulations.
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations'**
+  String get w_congratulations;
+
+  /// No description provided for @xt_accountable.
+  ///
+  /// In en, this message translates to:
+  /// **'Posts here carry your real name and photo. You are accountable for what you write.'**
+  String get xt_accountable;
+
+  /// No description provided for @xt_we_still_need.
+  ///
+  /// In en, this message translates to:
+  /// **'We still need'**
+  String get xt_we_still_need;
+
+  /// No description provided for @xt_field_name.
+  ///
+  /// In en, this message translates to:
+  /// **'your full name'**
+  String get xt_field_name;
+
+  /// No description provided for @xt_field_photo.
+  ///
+  /// In en, this message translates to:
+  /// **'a profile photo'**
+  String get xt_field_photo;
+
+  /// No description provided for @xt_field_country.
+  ///
+  /// In en, this message translates to:
+  /// **'your country'**
+  String get xt_field_country;
+
+  /// No description provided for @xt_field_dob.
+  ///
+  /// In en, this message translates to:
+  /// **'your date of birth'**
+  String get xt_field_dob;
+
+  /// No description provided for @xt_field_phone.
+  ///
+  /// In en, this message translates to:
+  /// **'your phone number'**
+  String get xt_field_phone;
+
+  /// No description provided for @w_appeal_explain.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us why you think this was a mistake.'**
+  String get w_appeal_explain;
+
+  /// No description provided for @w_appeal_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your explanation…'**
+  String get w_appeal_hint;
+
+  /// No description provided for @w_appeal_more_details.
+  ///
+  /// In en, this message translates to:
+  /// **'Please add a little more detail.'**
+  String get w_appeal_more_details;
+
+  /// No description provided for @w_appeal_reason_required.
+  ///
+  /// In en, this message translates to:
+  /// **'A reason is required.'**
+  String get w_appeal_reason_required;
 }
 
 class _AppLocalizationsGeneratedDelegate

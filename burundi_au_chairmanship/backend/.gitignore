@@ -72,8 +72,7 @@ firebase-adminsdk*.json
 credentials/
 *.p8
 
-#markdown
-*.md/
+# Markdown docs are tracked (ENV_VARS.md, LOCAL_SETUP.md, ...).
 
 # GeoIP database files
 geoip/*.mmdb

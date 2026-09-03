@@ -34,7 +34,8 @@ class _EventsScreenState extends State<EventsScreen> with SingleTickerProviderSt
     _tabController = TabController(length: 3, vsync: this);
     // Keeps the pill filters in sync with swipes between tabs.
     _tabController.addListener(() {
-      if (mounted) setState(() {});
+      // Only rebuild once the swipe settles on a new tab, not every frame.
+      if (mounted && !_tabController.indexIsChanging) setState(() {});
     });
     _loadData();
   }

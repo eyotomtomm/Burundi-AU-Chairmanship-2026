@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../../config/app_ds.dart';
 import '../../../widgets/ds/ds_widgets.dart';
@@ -280,7 +280,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
               children: [
                 Icon(Icons.search_off_rounded, size: 48, color: Ds.muted(context)),
                 const SizedBox(height: 12),
-                Text('No magazines found',
+                Text(AppLocalizations.of(context).translate('no_magazines_found'),
                     style: TextStyle(color: Ds.body(context), fontSize: 14)),
               ],
             ),
@@ -309,7 +309,7 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     );
   }
 
-  Widget _cover(MagazineEdition magazine) => CachedNetworkImage(
+  Widget _cover(MagazineEdition magazine) => AppNetworkImage(
         imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
         fit: BoxFit.cover,
         placeholder: (_, _) =>

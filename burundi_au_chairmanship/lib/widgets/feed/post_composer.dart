@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_ds.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// A file queued in the composer, not yet uploaded.
 class ComposerAttachment {
@@ -59,8 +60,13 @@ class PostComposer {
     final initial = <ComposerAttachment>[];
     if (pickOnOpen != null) {
       final picked = await _pick(isVideo: pickOnOpen == 'video');
-      if (picked != null) initial.add(picked);
       if (!context.mounted) return false;
+      if (picked != null && _rejectReason(context, picked) == null) {
+        initial.add(picked);
+      } else if (picked != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_rejectReason(context, picked)!)));
+      }
     }
 
     final posted = await Navigator.push<bool>(
@@ -78,12 +84,30 @@ class PostComposer {
     return posted == true;
   }
 
+  /// Server ceilings, checked here so a long upload over mobile data cannot
+  /// end in a rejection after every byte has already been sent.
+  static const int maxImageBytes = 10 * 1024 * 1024;
+  static const int maxVideoBytes = 200 * 1024 * 1024;
+  static const Duration maxVideoDuration = Duration(minutes: 5);
+
   static Future<ComposerAttachment?> _pick({required bool isVideo}) async {
     final picker = ImagePicker();
     final picked = isVideo
-        ? await picker.pickVideo(source: ImageSource.gallery)
-        : await picker.pickImage(source: ImageSource.gallery, maxWidth: 2048);
+        ? await picker.pickVideo(
+            source: ImageSource.gallery, maxDuration: maxVideoDuration)
+        // Re-encoding at 85 turns a 4 MB phone photo into a few hundred KB
+        // with no visible difference at the size the feed shows it.
+        : await picker.pickImage(
+            source: ImageSource.gallery, maxWidth: 2048, imageQuality: 85);
     return picked == null ? null : ComposerAttachment(File(picked.path), isVideo);
+  }
+
+  /// Null when the file is fine, otherwise why it was refused.
+  static String? _rejectReason(BuildContext context, ComposerAttachment a) {
+    final limit = a.isVideo ? maxVideoBytes : maxImageBytes;
+    if (a.file.lengthSync() <= limit) return null;
+    final mb = (limit / (1024 * 1024)).round();
+    return '${AppLocalizations.of(context).translate('w_file_too_large')} ($mb MB)';
   }
 
   static Future<bool> _ensureCanPost(BuildContext context) async {
@@ -102,18 +126,19 @@ class PostComposer {
       final go = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Complete your profile'),
+          title: Text(AppLocalizations.of(ctx).translate('w_complete_profile_title')),
           content: Text(
-            'Add the rest of your profile details before posting.\n\nStill missing: '
+            '${AppLocalizations.of(ctx).translate('w_complete_profile_body')}'
             '${missing.map(_fieldLabel).join(', ')}.',
           ),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Not now')),
+                child: Text(AppLocalizations.of(ctx).translate('w_not_now'))),
             TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Complete profile')),
+                child: Text(AppLocalizations.of(ctx)
+                    .translate('explore_terms_complete_profile'))),
           ],
         ),
       );
@@ -149,8 +174,16 @@ class PostComposer {
     final progress = ValueNotifier<_UploadState>(
         const _UploadState(index: 0, total: 0, fraction: 0));
 
+    var dialogOpen = false;
+    void closeDialog() {
+      if (!dialogOpen) return;
+      dialogOpen = false;
+      if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+
     void showProgress() {
       if (attachments.isEmpty || !context.mounted) return;
+      dialogOpen = true;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -169,13 +202,14 @@ class PostComposer {
         } on ApiException catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text('Poll skipped: ${e.message}')));
+                .showSnackBar(SnackBar(content: Text('${AppLocalizations.of(context).translate('w_poll_skipped')}: ${e.message}')));
           }
         }
       }
 
       if (id != null && attachments.isNotEmpty) {
         showProgress();
+        final failed = <ComposerAttachment>[];
         for (var i = 0; i < attachments.length; i++) {
           final a = attachments[i];
           progress.value =
@@ -188,15 +222,17 @@ class PostComposer {
               onProgress: (f) => progress.value = _UploadState(
                   index: i + 1, total: attachments.length, fraction: f),
             );
-          } on ApiException catch (e) {
-            // The post is already live; a rejected attachment shouldn't lose it.
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Attachment skipped: ${e.message}')));
-            }
+          } catch (_) {
+            // The post is already live; a dropped attachment shouldn't lose
+            // it — and a timeout is at least as likely here as a rejection,
+            // so this catches everything rather than ApiException alone.
+            failed.add(a);
           }
         }
-        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+        closeDialog();
+        if (failed.isNotEmpty && context.mounted) {
+          _offerRetry(context, id, failed);
+        }
       }
       return true;
     } on ApiException catch (e) {
@@ -206,11 +242,44 @@ class PostComposer {
       }
       return false;
     } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppLocalizations.of(context).translate('generic_error'))));
+      }
       return false;
     } finally {
+      // The dialog blocks its barrier, so leaving it up on an error path is an
+      // unrecoverable hang — close it before the notifier it listens to goes.
+      closeDialog();
       progress.dispose();
     }
   }
+}
+
+/// Attachments that did not make it: say so, and let one tap try again.
+void _offerRetry(BuildContext context, int postId, List<ComposerAttachment> failed) {
+  final l10n = AppLocalizations.of(context);
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    duration: const Duration(seconds: 8),
+    content: Text('${l10n.translate('w_attachment_skipped')} (${failed.length})'),
+    action: SnackBarAction(
+      label: l10n.translate('retry'),
+      onPressed: () async {
+        final api = ApiService();
+        final stillFailed = <ComposerAttachment>[];
+        for (final a in failed) {
+          try {
+            await api.uploadDiscussionMedia(postId, a.file, isVideo: a.isVideo);
+          } catch (_) {
+            stillFailed.add(a);
+          }
+        }
+        if (context.mounted && stillFailed.isNotEmpty) {
+          _offerRetry(context, postId, stillFailed);
+        }
+      },
+    ),
+  ));
 }
 
 class _UploadState {
@@ -319,7 +388,15 @@ class _ComposerPageState extends State<_ComposerPage> {
   Future<void> _add({required bool isVideo}) async {
     if (_attachments.length >= PostComposer.maxAttachments) return;
     final picked = await PostComposer._pick(isVideo: isVideo);
-    if (picked != null) setState(() => _attachments.add(picked));
+    if (picked == null || !mounted) return;
+    // Refuse it here rather than after the whole file has gone up the wire.
+    final reason = PostComposer._rejectReason(context, picked);
+    if (reason != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(reason)));
+      return;
+    }
+    setState(() => _attachments.add(picked));
   }
 
   Future<void> _post() async {
@@ -362,7 +439,7 @@ class _ComposerPageState extends State<_ComposerPage> {
                     controller: _titleCtrl,
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
-                      hintText: fr ? 'Titre' : 'Title',
+                      hintText: AppLocalizations.of(context).translate('w_title'),
                       filled: true,
                       fillColor: Ds.surface(context),
                       border: OutlineInputBorder(
@@ -424,7 +501,7 @@ class _ComposerPageState extends State<_ComposerPage> {
                 ],
                 const SizedBox(height: 18),
                 Text(
-                  fr ? 'Catégorie' : 'Category',
+                  AppLocalizations.of(context).translate('w_category'),
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -494,7 +571,7 @@ class _ComposerPageState extends State<_ComposerPage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(fr ? 'Nouvelle publication' : 'New post',
+              child: Text(AppLocalizations.of(context).translate('w_new_post'),
                   style: const TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
@@ -521,7 +598,7 @@ class _ComposerPageState extends State<_ComposerPage> {
                         height: 16,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                    : Text(fr ? 'Publier' : 'Post',
+                    : Text(AppLocalizations.of(context).translate('w_post'),
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -550,7 +627,7 @@ class _ComposerPageState extends State<_ComposerPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(fr ? 'EN RÉPONSE À' : 'ANSWERING',
+                  Text(AppLocalizations.of(context).translate('w_answering'),
                       style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
@@ -587,7 +664,7 @@ class _ComposerPageState extends State<_ComposerPage> {
                   child: TextField(
                     controller: _pollQuestion,
                     decoration: InputDecoration(
-                      hintText: fr ? 'Poser une question' : 'Ask a question',
+                      hintText: AppLocalizations.of(context).translate('w_ask_question'),
                       isDense: true,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -613,7 +690,7 @@ class _ComposerPageState extends State<_ComposerPage> {
                 child: TextField(
                   controller: _pollOptions[i],
                   decoration: InputDecoration(
-                    hintText: '${fr ? 'Option' : 'Option'} ${i + 1}',
+                    hintText: '${AppLocalizations.of(context).translate('w_option')} ${i + 1}',
                     isDense: true,
                     filled: true,
                     fillColor: Ds.subtle(context),
@@ -632,7 +709,7 @@ class _ComposerPageState extends State<_ComposerPage> {
                   children: [
                     const Icon(Icons.add_rounded, size: 18, color: Ds.green),
                     const SizedBox(width: 6),
-                    Text(fr ? 'Ajouter une option' : 'Add option',
+                    Text(AppLocalizations.of(context).translate('w_add_option'),
                         style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -691,11 +768,11 @@ class _ComposerPageState extends State<_ComposerPage> {
       child: Row(
         children: [
           _attachAction(context, Icons.photo_library_rounded,
-              fr ? 'Photo' : 'Photo', !full, () => _add(isVideo: false)),
+              AppLocalizations.of(context).translate('w_photo'), !full, () => _add(isVideo: false)),
           _attachAction(context, Icons.videocam_rounded,
-              fr ? 'Vidéo' : 'Video', !full, () => _add(isVideo: true)),
+              AppLocalizations.of(context).translate('w_video'), !full, () => _add(isVideo: true)),
           _attachAction(context, Icons.bar_chart_rounded,
-              fr ? 'Sondage' : 'Poll', !_pollOn,
+              AppLocalizations.of(context).translate('w_poll'), !_pollOn,
               () => setState(() => _pollOn = true)),
           const Spacer(),
           Text('${_attachments.length}/${PostComposer.maxAttachments}',

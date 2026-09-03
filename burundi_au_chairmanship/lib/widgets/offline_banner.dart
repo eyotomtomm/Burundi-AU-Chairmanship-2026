@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../config/app_colors.dart';
 import '../services/api_service.dart';
 import '../services/data_saver_service.dart';
+import '../l10n/app_localizations.dart';
 
 /// A persistent banner that monitors connectivity and shows online/offline status.
 /// Also listens to [ApiService.authDegraded] to show a "Reconnecting..." banner
@@ -28,12 +29,15 @@ class _OfflineBannerState extends State<OfflineBanner> {
   void initState() {
     super.initState();
     _checkConnectivity();
-    _pollTimer = Timer.periodic(
-      Duration(seconds: 10 * DataSaverService().pollingMultiplier),
-      (_) => _checkConnectivity(),
-    );
     ApiService().authDegraded.addListener(_onAuthDegradedChanged);
     _authDegraded = ApiService().authDegraded.value;
+  }
+
+  /// Poll fast (10s) only while offline; online, a cheap check every 60s.
+  void _schedulePoll() {
+    final seconds = (_isOffline ? 10 : 60) * DataSaverService().pollingMultiplier;
+    _pollTimer?.cancel();
+    _pollTimer = Timer(Duration(seconds: seconds), _checkConnectivity);
   }
 
   @override
@@ -77,6 +81,7 @@ class _OfflineBannerState extends State<OfflineBanner> {
         });
       }
     }
+    if (mounted) _schedulePoll();
   }
 
   @override
@@ -86,7 +91,7 @@ class _OfflineBannerState extends State<OfflineBanner> {
       return _buildBanner(
         color: AppColors.burundiRed,
         icon: Icons.wifi_off,
-        text: 'No internet connection',
+        text: AppLocalizations.of(context).translate('offline_no_internet'),
       );
     }
 
@@ -94,7 +99,7 @@ class _OfflineBannerState extends State<OfflineBanner> {
       return _buildBanner(
         color: AppColors.burundiGreen,
         icon: Icons.wifi,
-        text: 'Back online',
+        text: AppLocalizations.of(context).translate('offline_back_online'),
       );
     }
 
@@ -103,7 +108,7 @@ class _OfflineBannerState extends State<OfflineBanner> {
       return _buildBanner(
         color: const Color(0xFFD4A017), // gold
         icon: null, // use spinner instead
-        text: 'Reconnecting...',
+        text: AppLocalizations.of(context).translate('offline_reconnecting'),
         showSpinner: true,
       );
     }

@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../config/app_colors.dart';
 import '../../models/api_models.dart';
 import '../../widgets/fullscreen_back_button.dart';
+import '../../l10n/app_localizations.dart';
 
 class InAppWebViewScreen extends StatefulWidget {
   final ApiLiveFeed feed;
@@ -75,7 +76,7 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('Blocked navigation to external site'),
+                    content: Text(AppLocalizations.of(context).translate('blocked_external_nav')),
                     action: SnackBarAction(
                       label: 'Open',
                       onPressed: () async {
@@ -100,6 +101,8 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
             if (mounted) setState(() => _loadingProgress = 100);
           },
           onWebResourceError: (error) {
+            // Sub-resource failures (trackers, ads, fonts) must not kill the page.
+            if (error.isForMainFrame != true) return;
             if (mounted) {
               setState(() {
                 _hasError = true;
@@ -153,7 +156,7 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not open ${widget.feed.platformName}'),
+          content: Text(AppLocalizations.of(context).translate('could_not_open_platform')),
           backgroundColor: AppColors.error,
         ),
       );
@@ -233,7 +236,7 @@ class _InAppWebViewScreenState extends State<InAppWebViewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.open_in_new),
-            tooltip: 'Open externally',
+            tooltip: AppLocalizations.of(context).translate('open_externally'),
             onPressed: _openExternally,
           ),
         ],

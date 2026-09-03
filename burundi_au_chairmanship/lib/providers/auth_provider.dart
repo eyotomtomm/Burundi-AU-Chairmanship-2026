@@ -107,6 +107,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   AuthProvider() {
+    ApiService.onSessionExpired = signOut;
     _checkAuthStatus();
     _listenToAuthChanges();
   }

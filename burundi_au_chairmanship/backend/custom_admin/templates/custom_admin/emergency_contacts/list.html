@@ -17,6 +17,7 @@
 
   {% if items %}
   <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
     <table class="w-full">
       <thead>
         <tr>
@@ -71,6 +72,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   {% else %}
   <div class="bg-surface-container-lowest border border-slate-200 rounded-xl text-center py-16">

@@ -27,6 +27,7 @@
 
   {% if reports %}
   <div class="bg-surface-container-lowest border border-slate-200 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
     <table class="w-full">
       <thead>
         <tr>
@@ -72,26 +73,49 @@
           <td class="text-right">
             <div class="flex justify-end gap-1">
               {% if r.discussion %}
-              <a href="{% url 'custom_admin:content_report_delete_post' r.pk %}"
-                 class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove post"
-                 onclick="return confirm('Remove this post permanently and close the report?')">
-                <span class="material-symbols-outlined text-xl">delete</span>
-              </a>
+              {% if r.discussion.is_hidden %}
+              <form method="post" action="{% url 'custom_admin:content_report_restore_post' r.pk %}" class="inline"
+                    onsubmit="return confirm('Put this post back in the feed and dismiss the report?')">
+                {% csrf_token %}
+                <button type="submit" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Restore to feed">
+                  <span class="material-symbols-outlined text-xl">restore_from_trash</span>
+                </button>
+              </form>
               {% endif %}
-              <a href="{% url 'custom_admin:content_report_set_status' r.pk 'reviewed' %}?from={{ current_status }}"
-                 class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Mark reviewed">
-                <span class="material-symbols-outlined text-xl">visibility</span>
-              </a>
-              <a href="{% url 'custom_admin:content_report_set_status' r.pk 'dismissed' %}?from={{ current_status }}"
-                 class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Dismiss">
-                <span class="material-symbols-outlined text-xl">close</span>
-              </a>
+              <form method="post" action="{% url 'custom_admin:content_report_delete_post' r.pk %}" class="inline"
+                    onsubmit="return confirm('Remove this post permanently and close the report?')">
+                {% csrf_token %}
+                <button type="submit" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove post">
+                  <span class="material-symbols-outlined text-xl">delete</span>
+                </button>
+              </form>
+              {% endif %}
+              <form method="post" action="{% url 'custom_admin:content_report_ban_author' r.pk %}" class="inline"
+                    onsubmit="return confirm('Ban this account from posting and hide everything it has written?')">
+                {% csrf_token %}
+                <button type="submit" class="p-2 text-red-700 hover:bg-red-50 rounded-lg transition-colors" title="Ban account">
+                  <span class="material-symbols-outlined text-xl">block</span>
+                </button>
+              </form>
+              <form method="post" action="{% url 'custom_admin:content_report_set_status' r.pk 'reviewed' %}?from={{ current_status }}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Mark reviewed">
+                  <span class="material-symbols-outlined text-xl">visibility</span>
+                </button>
+              </form>
+              <form method="post" action="{% url 'custom_admin:content_report_set_status' r.pk 'dismissed' %}?from={{ current_status }}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Dismiss">
+                  <span class="material-symbols-outlined text-xl">close</span>
+                </button>
+              </form>
             </div>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 
   {% if reports.has_other_pages %}

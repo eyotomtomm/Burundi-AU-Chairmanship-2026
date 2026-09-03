@@ -17,6 +17,8 @@ Last updated: 2026-07-02 — check the URL above periodically for changes.
 import ipaddress
 import logging
 
+from django.conf import settings
+
 logger = logging.getLogger(__name__)
 
 # Published Cloudflare edge IP ranges.
@@ -63,17 +65,44 @@ def _is_cloudflare_ip(ip_str):
     return any(addr in net for net in CLOUDFLARE_NETWORKS)
 
 
+def get_client_ip(request):
+    """The real client IP as resolved by CloudflareProxyMiddleware.
+
+    Single source of truth — every IP-based feature (throttling, login
+    history, geo lookups, QR scan logs) should call this rather than read
+    REMOTE_ADDR / X-Forwarded-For itself.
+    """
+    return request.META.get('REMOTE_ADDR', '')
+
+
+def _xff_hops(request):
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    return [h.strip() for h in xff.split(',') if h.strip()]
+
+
 class CloudflareProxyMiddleware:
     """
-    Sets REMOTE_ADDR to the real client IP provided by Cloudflare.
+    Sets REMOTE_ADDR to the real client IP.
 
-    The CF-Connecting-IP header is only trusted when the immediate upstream
-    (REMOTE_ADDR set by the WSGI server / DO App Platform router) is a
-    Cloudflare IP.  Requests that bypass Cloudflare and hit the origin
-    directly will retain the original REMOTE_ADDR.
+    Two trusted topologies:
+      1. Cloudflare -> origin: REMOTE_ADDR is a Cloudflare edge IP, so
+         CF-Connecting-IP is trusted.
+      2. Cloudflare -> platform router (DigitalOcean App Platform) -> app:
+         REMOTE_ADDR is the router, and the router appends its peer (the
+         Cloudflare edge) as the LAST X-Forwarded-For hop. When
+         settings.TRUST_PLATFORM_PROXY is on and that last hop is a
+         Cloudflare IP, CF-Connecting-IP is trusted. If the last hop is not
+         Cloudflare, the request bypassed Cloudflare and that hop *is* the
+         client (the router appended it, so the client cannot forge it).
 
-    Must be placed BEFORE any middleware that reads REMOTE_ADDR
-    (SecurityMiddleware, throttling, etc.).
+    Anything else keeps the original REMOTE_ADDR, so an attacker hitting the
+    origin directly cannot spoof CF-Connecting-IP or X-Forwarded-For to dodge
+    throttling / django-axes lockouts.
+
+    The resolved IP is also written back to X-Forwarded-For so libraries that
+    read that header (DRF throttling with NUM_PROXIES, axes) agree with us.
+
+    Must be placed BEFORE any middleware that reads REMOTE_ADDR.
     """
 
     def __init__(self, get_response):
@@ -81,16 +110,23 @@ class CloudflareProxyMiddleware:
 
     def __call__(self, request):
         cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
-        if cf_ip:
-            upstream_ip = request.META.get('REMOTE_ADDR', '')
-            if _is_cloudflare_ip(upstream_ip):
-                request.META['REMOTE_ADDR'] = cf_ip
-            else:
-                # Someone is sending CF-Connecting-IP without coming through
-                # Cloudflare.  Log it and ignore the header.
-                logger.warning(
-                    'Ignoring CF-Connecting-IP=%s from non-Cloudflare source %s',
-                    cf_ip, upstream_ip,
-                )
+        remote = request.META.get('REMOTE_ADDR', '')
+        hops = _xff_hops(request) if getattr(settings, 'TRUST_PLATFORM_PROXY', False) else []
+        resolved = None
+
+        if cf_ip and _is_cloudflare_ip(remote):
+            resolved = cf_ip
+        elif hops:
+            resolved = cf_ip if (cf_ip and _is_cloudflare_ip(hops[-1])) else hops[-1]
+        elif cf_ip:
+            # CF-Connecting-IP from a peer that is neither Cloudflare nor the
+            # platform router: ignore it. Debug level — this is expected noise
+            # from scanners hitting the origin directly.
+            logger.debug('Ignoring CF-Connecting-IP=%s from non-Cloudflare source %s', cf_ip, remote)
+
+        if resolved:
+            request.META['REMOTE_ADDR'] = resolved
+            if 'HTTP_X_FORWARDED_FOR' in request.META:
+                request.META['HTTP_X_FORWARDED_FOR'] = resolved
 
         return self.get_response(request)

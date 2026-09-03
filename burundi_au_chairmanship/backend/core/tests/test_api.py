@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import (
+from core.models import (
     AppSettings, Article, Category, DeviceToken, Event,
     EventRegistration, EventSubmission, FeatureCard, HeroSlide,
     UserProfile,
@@ -232,13 +232,13 @@ class FCMTokenRegistrationTests(TestCase):
 
     def test_register_anonymous_token(self):
         resp = self.client.post('/api/register-fcm-token/', {
-            'fcm_token': 'fake-fcm-token-abc123',
+            'fcm_token': 'fake-fcm-token-abc123' + 'x' * 130,
             'device_type': 'iPhone 15',
             'device_os': 'iOS 18',
             'preferred_language': 'fr',
         }, content_type='application/json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        token = DeviceToken.objects.get(token='fake-fcm-token-abc123')
+        token = DeviceToken.objects.get(token='fake-fcm-token-abc123' + 'x' * 130)
         self.assertIsNone(token.user)
         self.assertTrue(token.is_active)
         self.assertEqual(token.preferred_language, 'fr')
@@ -250,12 +250,12 @@ class FCMTokenRegistrationTests(TestCase):
 
     def test_register_token_invalid_language_defaults_to_en(self):
         resp = self.client.post('/api/register-fcm-token/', {
-            'fcm_token': 'token-lang-test',
+            'fcm_token': 'token-lang-test' + 'x' * 130,
             'preferred_language': 'xx',
         }, content_type='application/json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(
-            DeviceToken.objects.get(token='token-lang-test').preferred_language,
+            DeviceToken.objects.get(token='token-lang-test' + 'x' * 130).preferred_language,
             'en',
         )
 

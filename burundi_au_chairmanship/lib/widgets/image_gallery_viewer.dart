@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/share_service.dart';
+import '../l10n/app_localizations.dart';
+import '../services/data_saver_service.dart';
 
 /// A full-screen swipeable image gallery viewer with zoom/pan support.
 ///
@@ -120,7 +122,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
     _doubleTapAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
-    );
+    )..addListener(_onDoubleTapTick);
 
     // Immersive mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -136,6 +138,13 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
     // Restore system UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  void _onDoubleTapTick() {
+    final page = _animatingPage;
+    final anim = _doubleTapAnimation;
+    if (page == null || anim == null) return;
+    _getTransformController(page).value = anim.value;
   }
 
   TransformationController _getTransformController(int index) {
@@ -169,11 +178,6 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
           curve: Curves.easeInOut,
         ),
       );
-      _doubleTapAnimation!.addListener(() {
-        if (_animatingPage == index) {
-          controller.value = _doubleTapAnimation!.value;
-        }
-      });
       _doubleTapAnimController!.forward(from: 0.0).then((_) {
         _animatingPage = null;
       });
@@ -200,11 +204,6 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
           curve: Curves.easeInOut,
         ),
       );
-      _doubleTapAnimation!.addListener(() {
-        if (_animatingPage == index) {
-          controller.value = _doubleTapAnimation!.value;
-        }
-      });
       _doubleTapAnimController!.forward(from: 0.0).then((_) {
         _animatingPage = null;
       });
@@ -488,6 +487,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
           child: CachedNetworkImage(
             imageUrl: url,
             fit: BoxFit.contain,
+            memCacheWidth: DataSaverService().fullImageCacheWidth,
             placeholder: (_, _) => const Center(
               child: SizedBox(
                 width: 40,
@@ -506,7 +506,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer>
                       color: Colors.white38, size: 64),
                   const SizedBox(height: 12),
                   Text(
-                    'Failed to load image',
+                    AppLocalizations.of(context).translate('w_image_load_failed'),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 14,

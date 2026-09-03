@@ -18,6 +18,7 @@ import '../../services/popup_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/api_service.dart';
 import '../../services/app_link_service.dart';
+import '../../services/remote_config_service.dart';
 import '../../main.dart' show messagingService;
 import '../../config/app_constants.dart';
 import '../../widgets/promotional_splash_overlay.dart';
@@ -58,11 +59,7 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Any link the app was launched with is routed here, once home exists.
       AppLinkService().flushPendingLink();
-      _checkVerificationStatus();
-      _checkAndShowPopups();
-      _checkPromotionalSplash();
-      _checkForAppUpdate();
-      _showWhatsNew();
+      _runStartupFlows();
     });
     // Check maintenance every 60 seconds
     _maintenanceTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -78,6 +75,26 @@ class _HomeScreenState extends State<HomeScreen>
       _checkVerificationStatus();
       // Re-register FCM token so the backend always has a fresh, valid token
       messagingService?.refreshToken();
+    }
+  }
+
+  /// Modal flows run one after another, highest priority first, so dialogs
+  /// never stack. Each step swallows its own errors.
+  Future<void> _runStartupFlows() async {
+    for (final step in [
+      _checkForAppUpdate,
+      _checkMaintenance,
+      _checkVerificationStatus,
+      _checkAndShowPopups,
+      _checkPromotionalSplash,
+      _showWhatsNew,
+    ]) {
+      if (!mounted) return;
+      try {
+        await step();
+      } catch (e) {
+        if (kDebugMode) print('Startup flow failed: $e');
+      }
     }
   }
 
@@ -254,6 +271,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   /// Check for app updates on home screen load
   Future<void> _checkForAppUpdate() async {
+    // Don't compare against Remote Config defaults before the first fetch lands.
+    await RemoteConfigService()
+        .ensureFetched()
+        .timeout(const Duration(seconds: 3), onTimeout: () {});
+    if (!mounted) return;
     final langCode = Localizations.localeOf(context).languageCode;
     await AppUpdateDialog.check(
       context: context,
@@ -264,8 +286,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   /// Show What's New dialog if there's a new version
   Future<void> _showWhatsNew() async {
-    // Delay slightly so it doesn't compete with other popups
-    await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     final langCode = Localizations.localeOf(context).languageCode;
     await WhatsNewDialog.showIfNeeded(
@@ -319,7 +339,13 @@ class _HomeScreenState extends State<HomeScreen>
                     MagazineTab(onBackToHome: () => _goToTab(2)),
                     NewsScreen(isTab: true, onBackToHome: () => _goToTab(2)),
                     HomeTab(onSwitchTab: _goToTab),
-                    ExploreTab(onBackToHome: () => _goToTab(2)),
+                    // The stack keeps every tab mounted, so a tab that
+                    // animates would keep animating off-screen. TickerMode
+                    // stops it, and the tab watches this to park its timers.
+                    TickerMode(
+                      enabled: _currentIndex == 3,
+                      child: ExploreTab(onBackToHome: () => _goToTab(2)),
+                    ),
                     MoreTab(),
                   ],
                 ),

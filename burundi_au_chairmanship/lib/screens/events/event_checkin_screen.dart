@@ -5,7 +5,7 @@ import '../../config/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
 
 class EventCheckInScreen extends StatefulWidget {
   final int eventId;
@@ -119,14 +119,13 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final langCode = context.watch<LanguageProvider>().languageCode;
-    final isFrench = langCode == 'fr';
+    context.watch<LanguageProvider>(); // rebuild on language change
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: Text(
-          isFrench ? 'Enregistrement' : 'Event Check-In',
+          AppLocalizations.of(context).translate('rs_checkin_title'),
           style: TextStyle(
             color: isDark ? AppColors.darkText : AppColors.lightText,
             fontWeight: FontWeight.bold,
@@ -186,7 +185,7 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
             const SizedBox(height: 28),
 
             // Status indicator
-            _buildStatusBadge(isDark, isFrench),
+            _buildStatusBadge(isDark),
 
             const SizedBox(height: 28),
 
@@ -200,8 +199,8 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
                 );
               },
               child: Container(
-                width: 260,
-                height: 260,
+                width: MediaQuery.textScalerOf(context).scale(260),
+                height: MediaQuery.textScalerOf(context).scale(260),
                 decoration: BoxDecoration(
                   color: isDark ? AppColors.darkSurface : Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -267,9 +266,8 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
                     ],
                     const SizedBox(height: 16),
                     Text(
-                      _isCheckedIn
-                          ? (isFrench ? 'Enregistre' : 'Checked In')
-                          : (isFrench ? 'Pret pour l\'enregistrement' : 'Ready to Check In'),
+                      AppLocalizations.of(context).translate(
+                          _isCheckedIn ? 'rs_checkin_done' : 'rs_checkin_ready'),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -299,7 +297,7 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
               child: Column(
                 children: [
                   Text(
-                    isFrench ? 'Code d\'enregistrement' : 'Check-In Code',
+                    AppLocalizations.of(context).translate('rs_checkin_code'),
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -332,7 +330,7 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    isFrench ? 'Appuyez pour copier' : 'Tap to copy',
+                    AppLocalizations.of(context).translate('rs_tap_to_copy'),
                     style: TextStyle(
                       fontSize: 11,
                       color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
@@ -361,9 +359,8 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
                       )
                     : Icon(_isCheckedIn ? Icons.check : Icons.login),
                 label: Text(
-                  _isCheckedIn
-                      ? (isFrench ? 'Deja enregistre' : 'Already Checked In')
-                      : (isFrench ? 'S\'enregistrer' : 'Check In'),
+                  AppLocalizations.of(context).translate(
+                      _isCheckedIn ? 'rs_checkin_already' : 'rs_checkin_action'),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -390,7 +387,7 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
     );
   }
 
-  Widget _buildStatusBadge(bool isDark, bool isFrench) {
+  Widget _buildStatusBadge(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
@@ -414,9 +411,8 @@ class _EventCheckInScreenState extends State<EventCheckInScreen>
           ),
           const SizedBox(width: 8),
           Text(
-            _isCheckedIn
-                ? (isFrench ? 'Enregistre avec succes' : 'Successfully Checked In')
-                : (isFrench ? 'En attente d\'enregistrement' : 'Pending Check-In'),
+            AppLocalizations.of(context).translate(
+                _isCheckedIn ? 'rs_checkin_success' : 'rs_checkin_pending'),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,

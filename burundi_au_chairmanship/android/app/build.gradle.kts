@@ -68,17 +68,5 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
-    // Import the Firebase BoM (Bill of Materials)
-    // When using the BoM, you don't specify versions in Firebase library dependencies
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-
-    // Firebase products
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-messaging")
-    implementation("com.google.firebase:firebase-crashlytics")
-    implementation("com.google.firebase:firebase-config")
-
-    // Note: Flutter Firebase plugins will also add their own dependencies
-    // The BoM ensures all Firebase libraries use compatible versions
+    // Firebase Android SDKs are pulled in (and version-aligned) by the FlutterFire plugins.
 }

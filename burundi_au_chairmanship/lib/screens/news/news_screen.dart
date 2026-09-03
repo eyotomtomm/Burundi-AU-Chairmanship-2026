@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -285,10 +285,11 @@ class _NewsScreenState extends State<NewsScreen> {
     );
   }
 
-  Widget _articleImage(Article article, {BoxFit fit = BoxFit.cover}) {
-    return CachedNetworkImage(
+  Widget _articleImage(Article article, {BoxFit fit = BoxFit.cover, bool hero = false}) {
+    return AppNetworkImage(
       imageUrl: Environment.fixMediaUrl(article.imageUrl),
       fit: fit,
+      hero: hero,
       placeholder: (_, _) => const DsImagePlaceholder(radius: 0),
       errorWidget: (_, _, _) =>
           const DsImagePlaceholder(radius: 0, icon: Icons.article_rounded),
@@ -369,7 +370,7 @@ class _NewsScreenState extends State<NewsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 190, width: double.infinity, child: _articleImage(article)),
+          SizedBox(height: 190, width: double.infinity, child: _articleImage(article, hero: true)),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -379,7 +380,7 @@ class _NewsScreenState extends State<NewsScreen> {
                   children: [
                     DsPill(l10n.translate('featured').toUpperCase()),
                     const SizedBox(width: 8),
-                    Text(DateFormat('MMM d · HH:mm').format(article.publishDate),
+                    Text(DateFormat.MMMd(langCode).add_Hm().format(article.publishDate),
                         style: Ds.meta(context)),
                   ],
                 ),
@@ -427,7 +428,7 @@ class _NewsScreenState extends State<NewsScreen> {
 
   Widget _buildArticleRow(Article article, String langCode) {
     final catLabel = article.category?.getDisplayName(langCode) ?? '';
-    final when = DateFormat('MMM d').format(article.publishDate);
+    final when = DateFormat.MMMd(langCode).format(article.publishDate);
 
     return DsCard(
       margin: const EdgeInsets.only(bottom: 10),

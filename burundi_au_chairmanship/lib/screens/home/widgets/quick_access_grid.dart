@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import '../../../config/app_colors.dart';
 import '../../../config/app_ds.dart';
 
@@ -65,7 +65,7 @@ class QuickAccessGrid extends StatelessWidget {
         if (iconImageUrl.isNotEmpty) {
           iconContent = ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: CachedNetworkImage(
+            child: AppNetworkImage(
               imageUrl: iconImageUrl,
               width: 48,
               height: 48,

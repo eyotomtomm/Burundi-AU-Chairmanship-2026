@@ -1,0 +1,424 @@
+<title>B4Africa Readiness Audit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F7F2; --bg2:#EDF1E9; --ink:#1B2A20; --ink2:#4A5A50; --ink3:#7A887E; --line:#D6DDD3;
+  --accent:#1E6B45; --accent-ink:#FFFFFF; --gold:#B8860B;
+  --crit:#B3261E; --crit-bg:#FBE9E7; --high:#C2410C; --high-bg:#FDEBDD; --med:#9A6A00; --med-bg:#FBF1D6; --low:#4E6070; --low-bg:#E7ECF0;
+  --ok:#1E6B45; --ok-bg:#E3F1E8; --warn:#9A6A00; --warn-bg:#FBF1D6; --bad:#B3261E; --bad-bg:#FBE9E7;
+  --code-bg:#E9EEE6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111813; --bg2:#182019; --ink:#E4EAE4; --ink2:#AEBBB1; --ink3:#7E8C82; --line:#2A352D;
+    --accent:#5FBF8A; --accent-ink:#0E1A13; --gold:#D9A93B;
+    --crit:#FF7B72; --crit-bg:#3A1A18; --high:#F79A5B; --high-bg:#3A2415; --med:#E4B84A; --med-bg:#332A12; --low:#A9B8C4; --low-bg:#1F2A32;
+    --ok:#5FBF8A; --ok-bg:#16301F; --warn:#E4B84A; --warn-bg:#332A12; --bad:#FF7B72; --bad-bg:#3A1A18;
+    --code-bg:#1E2922;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111813; --bg2:#182019; --ink:#E4EAE4; --ink2:#AEBBB1; --ink3:#7E8C82; --line:#2A352D;
+  --accent:#5FBF8A; --accent-ink:#0E1A13; --gold:#D9A93B;
+  --crit:#FF7B72; --crit-bg:#3A1A18; --high:#F79A5B; --high-bg:#3A2415; --med:#E4B84A; --med-bg:#332A12; --low:#A9B8C4; --low-bg:#1F2A32;
+  --ok:#5FBF8A; --ok-bg:#16301F; --warn:#E4B84A; --warn-bg:#332A12; --bad:#FF7B72; --bad-bg:#3A1A18;
+  --code-bg:#1E2922;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;font-weight:700;letter-spacing:-.01em;text-wrap:balance;margin:0}
+h1{font-size:clamp(30px,4.5vw,44px);line-height:1.05}
+h2{font-size:24px;line-height:1.15;margin:0 0 6px}
+h3{font-size:17px;font-weight:600;margin:22px 0 8px}
+p{margin:0 0 10px;max-width:68ch}
+a{color:var(--accent)}
+code{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em;background:var(--code-bg);padding:1px 5px;border-radius:4px;word-break:break-word}
+.wrap{max-width:1080px;margin:0 auto;padding:36px 22px 80px}
+.eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);font-weight:600;margin-bottom:10px}
+header{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:26px}
+header .meta{color:var(--ink2);margin-top:12px;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px}
+.verdict{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin:0 0 30px}
+@media (max-width:760px){.verdict{grid-template-columns:1fr}}
+.verdict-card{background:var(--bg2);border-left:4px solid var(--crit);padding:18px 20px;border-radius:0 8px 8px 0}
+.verdict-card strong{font-family:"Bricolage Grotesque",sans-serif;font-size:22px;display:block;margin-bottom:6px;color:var(--crit)}
+.counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.count{background:var(--bg2);padding:12px 12px 10px;border-radius:8px}
+.count b{display:block;font-family:"Bricolage Grotesque",sans-serif;font-size:30px;line-height:1;font-variant-numeric:tabular-nums}
+.count span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+.count.c b{color:var(--crit)} .count.h b{color:var(--high)} .count.m b{color:var(--med)} .count.l b{color:var(--low)}
+.areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 34px}
+.area{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.area .name{font-weight:600;font-size:14px}
+.area .state{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-top:4px}
+.area .why{font-size:13px;color:var(--ink2);margin-top:4px}
+.state.bad{color:var(--bad)} .state.warn{color:var(--warn)} .state.ok{color:var(--ok)}
+nav.toc{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 0;margin:0 0 30px;z-index:2;display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px}
+nav.toc a{text-decoration:none;color:var(--ink2);font-weight:500}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--accent)}
+section{margin:0 0 46px;scroll-margin-top:60px}
+section>p.lede{color:var(--ink2);margin-bottom:16px}
+ol.blockers{counter-reset:b;list-style:none;padding:0;margin:0;display:grid;gap:8px}
+ol.blockers li{counter-increment:b;display:grid;grid-template-columns:34px 1fr;gap:12px;padding:12px 14px;background:var(--bg2);border-radius:8px}
+ol.blockers li::before{content:counter(b);font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:20px;color:var(--accent);line-height:1.2}
+ol.blockers b{font-weight:600}
+ol.blockers .where{color:var(--ink3);font-size:13px;margin-top:2px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--bg2);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.sev{white-space:nowrap;width:1%}
+td.where{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink2);min-width:180px;max-width:280px}
+td.fix{color:var(--ink2);min-width:200px}
+.chip{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+.chip.c{background:var(--crit-bg);color:var(--crit)} .chip.h{background:var(--high-bg);color:var(--high)} .chip.m{background:var(--med-bg);color:var(--med)} .chip.l{background:var(--low-bg);color:var(--low)}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
+details{border:1px solid var(--line);border-radius:8px;margin:14px 0}
+summary{cursor:pointer;padding:12px 14px;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::after{content:"+";font-family:"Bricolage Grotesque",sans-serif;font-size:20px;color:var(--ink3)}
+details[open] summary::after{content:"–"}
+details .tbl{border:0;border-top:1px solid var(--line);border-radius:0}
+summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+ul.plain{margin:0;padding-left:18px}
+ul.plain li{margin:0 0 6px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+.good{border-left:3px solid var(--accent);padding-left:14px}
+.note{font-size:13px;color:var(--ink3)}
+@media (prefers-reduced-motion:no-preference){details summary::after{transition:transform .15s}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Production readiness audit · 3 September 2026</div>
+  <h1>B4Africa Readiness Audit</h1>
+  <div class="meta">
+    <span>Flutter app 2.0.0+57 · 170 Dart files · 60 screens</span>
+    <span>Django 4.2 backend · custom admin portal · DigitalOcean App Platform</span>
+    <span>Branch <code>home-rail-and-media-perf</code></span>
+  </div>
+</header>
+
+<div class="verdict">
+  <div class="verdict-card">
+    <strong>Not ready to ship</strong>
+    <p>The foundations are better than average: fail-secure settings, signed private media, a deny-by-default admin permission model, and a Flutter client that starts fast and caches well. But the release path itself is broken (the backend cannot build on its pinned Python, CI never runs), the admin portal has no working second factor, one scheduled task deletes paused users' accounts, and six live app-to-API calls point at endpoints that do not match. Twelve blockers are listed below in the order to fix them.</p>
+  </div>
+  <div class="counts">
+    <div class="count c"><b>14</b><span>Critical</span></div>
+    <div class="count h"><b>33</b><span>High</span></div>
+    <div class="count m"><b>52</b><span>Medium</span></div>
+    <div class="count l"><b>40+</b><span>Low</span></div>
+  </div>
+</div>
+
+<div class="areas">
+  <div class="area"><div class="name">Backend deploy</div><div class="state bad">Blocked</div><div class="why">Python 3.9 pin cannot install Pillow 12; Django past EOL</div></div>
+  <div class="area"><div class="name">CI</div><div class="state bad">Blocked</div><div class="why">Workflow folder is one level too deep; never runs</div></div>
+  <div class="area"><div class="name">Admin portal</div><div class="state bad">Broken auth</div><div class="why">No 2FA enforced; forced password change bypassable</div></div>
+  <div class="area"><div class="name">Backend API</div><div class="state warn">Needs work</div><div class="why">Data-loss task, races, dead schedulers, N+1s</div></div>
+  <div class="area"><div class="name">Flutter app</div><div class="state warn">Needs work</div><div class="why">9 screens broken, 40 need work, 11 ready</div></div>
+  <div class="area"><div class="name">Android</div><div class="state warn">Needs work</div><div class="why">App Links fail on Play builds; unused permissions</div></div>
+  <div class="area"><div class="name">iOS</div><div class="state warn">Needs work</div><div class="why">Extension version mismatch will fail upload</div></div>
+  <div class="area"><div class="name">Web / desktop</div><div class="state bad">Dead</div><div class="why">Scaffolding only; cannot compile. Delete</div></div>
+</div>
+
+<nav class="toc">
+  <a href="#blockers">Blockers</a>
+  <a href="#checks">Checks run</a>
+  <a href="#security">Security</a>
+  <a href="#backend">Backend</a>
+  <a href="#admin">Admin portal</a>
+  <a href="#app">Flutter app</a>
+  <a href="#platform">Platform &amp; deploy</a>
+  <a href="#good">Done well</a>
+</nav>
+
+<section id="blockers">
+  <div class="eyebrow">Fix in this order</div>
+  <h2>Twelve ship blockers</h2>
+  <p class="lede">Each of these was verified against the source, not just reported. Numbers are priority order.</p>
+  <ol class="blockers">
+    <li><div><b>Rotate every credential in the recovery doc, then delete it.</b> A plaintext file on disk holds the live Django secret key, the managed Postgres password, the Gmail app password, the Twilio auth token and the full Firebase service-account key. It is gitignored and was never committed, but it sits in a synced Downloads folder.<div class="where">burundi_au_chairmanship/DIGITALOCEAN_RECOVERY.md:15,25,46,56,83</div></div></li>
+    <li><div><b>Stop the daily task that hard-deletes "Take a Break" accounts.</b> Deactivation sets <code>is_deactivated</code>; the beat task deletes every such user after 30 days while the email promises "your data is safe". Filter on <code>is_scheduled_for_deletion</code> instead.<div class="where">core/tasks.py:104-116 · core/views.py:586-603 · config/settings.py:635</div></div></li>
+    <li><div><b>Make admin login actually require TOTP, and fix the forced password change.</b> Templates for 2FA exist, django-otp is installed, but no view checks it. The forced-change flag is only checked at login (any later URL works) and the change page itself 403s for non-superusers, so invited admins cannot change their temp password.<div class="where">custom_admin/views.py:221-263 · custom_admin/permissions.py:137-142</div></div></li>
+    <li><div><b>Put the auth decorators on the notification-create view.</b> They were applied to its validation helper instead. Anonymous GET renders the admin push form; the POST is blocked only by accident.<div class="where">custom_admin/views.py:1097-1101</div></div></li>
+    <li><div><b>Make <code>admin_sections</code> read-only in the profile serializer.</b> Any authenticated user can PATCH their own profile and grant themselves every admin section.<div class="where">core/serializers.py:66-76, 157-181 · core/views.py:566-573</div></div></li>
+    <li><div><b>Unblock the backend build.</b> <code>runtime.txt</code> pins Python 3.9.18 but Pillow 12.1.0 requires Python 3.10+, so a fresh DigitalOcean build fails at pip install. Django 4.2 left extended support in April 2026. Move to Python 3.12 and Django 5.2 LTS, and align the Dockerfile and CI, which currently use 3.11.<div class="where">backend/runtime.txt · backend/requirements.txt:4,9</div></div></li>
+    <li><div><b>Make CI run.</b> The workflow lives at <code>burundi_au_chairmanship/.github/workflows/</code>; GitHub only reads the repo root. Once moved it still fails: Flutter is pinned to 3.32 but the pubspec needs 3.38, and the Firebase config files plus <code>key.properties</code> are gitignored and never restored from secrets.<div class="where">burundi_au_chairmanship/.github/workflows/ci.yml:15,124-134 · .gitignore:39-46</div></div></li>
+    <li><div><b>Fix six live app-to-API mismatches.</b> Event file upload builds <code>/apievent-submissions/upload-file/</code> (missing slash). Session revoke POSTs to a DELETE-only route. Notification preferences POSTs to a GET/PUT route. Live Q&amp;A upvote uses a path that does not exist. The verification request drops the picked ID document. The Continental Dialogue apply form drops its file fields.<div class="where">lib/services/api_service.dart:1051,1620,1656,1715,1190 · youth_dialogue_apply_screen.dart:405-434</div></div></li>
+    <li><div><b>Ship or remove four dead app features.</b> Resources View/Download only show snackbars. Support ticket cards have no tap handler, so the list cannot open a ticket. Bookmarks has a screen and API but nothing routes to it and nothing calls add. Social Media shows fabricated follower counts when the API fails.<div class="where">resources_screen.dart:341-371 · support_tickets_screen.dart:313-364 · bookmarks_screen.dart · social_media_screen.dart:24-79</div></div></li>
+    <li><div><b>Store readiness.</b> Android App Links list only the upload key fingerprint, so Play-signed builds fail verification and share links open in the browser. Five permissions (fine/coarse location, contacts, read/write calendar) have no code behind them. Release builds are not obfuscated. iOS notification extension is hardcoded to version 1.0, which App Store Connect rejects.<div class="where">backend/config/urls.py:45-49 · AndroidManifest.xml:14-22 · ios/Runner.xcodeproj/project.pbxproj:632-668</div></div></li>
+    <li><div><b>Wire the schedulers and close the registration race.</b> Nothing flips scheduled content to published and nothing promotes the event waitlist; both commands exist but are not in the beat schedule. Scheduling a one-time notification from admin 500s on a naive datetime. Event capacity is checked with exists/count/save and no lock, and rejected submissions count against capacity forever.<div class="where">core/management/commands/publish_scheduled.py · custom_admin/views.py:1119,1165 · core/views.py:3810-3827</div></div></li>
+    <li><div><b>Fix client-IP handling and login lockout.</b> The Cloudflare middleware only trusts <code>CF-Connecting-IP</code> when the peer is a Cloudflare range, but on App Platform the peer is DigitalOcean's router, so every request shares one IP. Auth throttles then lock out everyone behind a point of presence together. The JWT login also bypasses django-axes by calling <code>check_password</code> directly.<div class="where">core/middleware/cloudflare.py:83-95 · core/views.py:436-450 · gunicorn.conf.py</div></div></li>
+  </ol>
+</section>
+
+<section id="checks">
+  <div class="eyebrow">Mechanical</div>
+  <h2>Checks run on this machine</h2>
+  <div class="tbl"><table>
+    <tr><th>Check</th><th>Result</th><th>Notes</th></tr>
+    <tr><td>Django <code>check --deploy</code></td><td><span class="chip warn">Local only</span></td><td>Local run has DEBUG on so HSTS/secure-cookie warnings are expected. Settings gate them on env correctly. 300+ drf-spectacular warnings are noise from function views without serializers.</td></tr>
+    <tr><td>Django test suite</td><td><span class="chip bad">1 module fails to import</span></td><td>20 tests found, 19 pass. <code>core/tests/test_api.py</code> does <code>from .models import</code> and has never run. Parallel mode crashes with an unpicklable traceback. Sentry sends events during tests. <code>custom_admin/tests.py</code> is empty.</td></tr>
+    <tr><td><code>makemigrations --check</code></td><td><span class="chip ok">Clean</span></td><td>No pending model changes. Migration 0136 is a Postgres-only repair that redeclares state 0135 already creates. Harmless but redundant.</td></tr>
+    <tr><td><code>flutter analyze</code></td><td><span class="chip ok">0 errors</span></td><td>20 warnings (unused imports, unused locals, one catchError that returns nothing), 66 infos.</td></tr>
+    <tr><td><code>flutter test</code></td><td><span class="chip bad">1 of 6 fails</span></td><td>The default smoke test pumps the real app, which throws because Firebase is not initialised in tests. Only one real test file exists.</td></tr>
+    <tr><td>Load tests</td><td><span class="chip warn">Never run</span></td><td>k6 scripts ramp to 40k anonymous users. No recorded results anywhere. Against one uvicorn worker with the DB cache, not realistic.</td></tr>
+  </table></div>
+</section>
+
+<section id="security">
+  <div class="eyebrow">Backend and admin</div>
+  <h2>Security</h2>
+  <p class="lede">Object-level permission checks are correct across tickets, bookmarks, conversations, submissions and comments. The problems are concentrated in staff authentication, a few writable fields, and IP handling.</p>
+  <div class="tbl"><table>
+    <tr><th>Sev</th><th>Finding</th><th>Where</th><th>Fix</th></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Live secrets in plaintext on disk (see blocker 1).</td><td class="where">DIGITALOCEAN_RECOVERY.md</td><td class="fix">Rotate all five credentials; delete the file.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Admin portal has no working 2FA. Password-only login for superusers who can push to every device and download full DB dumps.</td><td class="where">custom_admin/views.py:221-263</td><td class="fix">Gate on <code>request.user.is_verified()</code> after login; require enrollment on first login.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Forced password change bypassable, and the change page 403s for scoped staff.</td><td class="where">custom_admin/views.py:257 · permissions.py:137-142, 343-350</td><td class="fix">Add to <code>UNRESTRICTED_URLS</code>; enforce the flag in the permission middleware.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Notification-create view undecorated; anonymous GET renders the push form.</td><td class="where">custom_admin/views.py:1097-1101</td><td class="fix">Move decorators from the helper to the view.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Users can grant themselves admin sections via profile PATCH.</td><td class="where">core/serializers.py:66-76</td><td class="fix">Add <code>admin_sections</code>, <code>receives_newsletter</code> to read-only fields.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Registration uploads (passport/ID scans) go to the public bucket under a guessable prefix, never linked to a submission, extension-only checks.</td><td class="where">core/views.py:4158-4197 · settings.py:274-279</td><td class="fix">Use the private storage backend, return signed URLs, bind to the submission.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Client IP is the DO router for everyone; throttles keyed on the Cloudflare edge IP; every request logs a warning.</td><td class="where">core/middleware/cloudflare.py:83-95 · settings.py:391</td><td class="fix">Set <code>FORWARDED_ALLOW_IPS</code> for the DO hop and trust <code>CF-Connecting-IP</code> behind it.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>JWT login bypasses django-axes; <code>User.objects.get(email=)</code> 500s on duplicate emails, which OTP signup can create.</td><td class="where">core/views.py:436-450, 4360-4366</td><td class="fix">Route through <code>authenticate()</code>; enforce email uniqueness.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Youth Dialogue OTP endpoints unthrottled: <code>@throttle_classes</code> is placed under <code>@action</code> where DRF ignores it. Sends mail to any address supplied.</td><td class="where">core/views.py:8194-8210</td><td class="fix"><code>@action(..., throttle_classes=[OTPRateThrottle])</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Reflected XSS: a query-string value rendered with <code>|safe</code> inside an href; admin CSP allows inline scripts.</td><td class="where">youth_dialogue/review.html:23,577 · custom_admin/views.py:2233,3098</td><td class="fix">Drop <code>|safe</code>; rebuild the query string with <code>urlencode</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Attendees can check themselves in: <code>check_in</code> has no staff check and the owner receives their own QR hash.</td><td class="where">core/views.py:3934-4027</td><td class="fix">Require staff or usher permission on <code>check_in</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Three admin deletes reachable by GET via plain links, no CSRF, and unlogged because the activity logger records POST only.</td><td class="where">custom_admin/views.py:3233-3293</td><td class="fix"><code>@require_POST</code> plus forms with CSRF tokens.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Staff with the users section can create staff accounts; no password validation on create/edit.</td><td class="where">custom_admin/views.py:1762</td><td class="fix">Gate <code>is_staff</code> on superuser; run <code>validate_password</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Full <code>dumpdata</code> backups (password hashes, tokens) written to ephemeral local disk and downloadable by any staff with the section.</td><td class="where">custom_admin/views.py:7596-7700</td><td class="fix">Superuser-only, push to the private bucket, or drop in favour of managed backups.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Admin JS CSRF helper reads a cookie that is HttpOnly, so bell mark-read and similar AJAX posts always 403.</td><td class="where">base.html:1594-1597 · settings.py:437</td><td class="fix">Render a <code>&lt;meta name="csrf-token"&gt;</code> and read it, as <code>bulk_actions_js.html</code> already does.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Users can set <code>is_pinned</code>, <code>is_locked</code>, <code>repost_of</code>, <code>poll</code>, <code>topic</code> on their own posts; feed sorts pinned first.</td><td class="where">core/serializers.py:1743-1749</td><td class="fix">Mark read-only.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>User-controlled names interpolated unescaped into HTML emails; proxy registration mails third parties.</td><td class="where">core/views.py:3818-3900, 4029-4140</td><td class="fix"><code>escape()</code> every value or use a template.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>"Revoke session" deletes the row but leaves the refresh token valid.</td><td class="where">core/views.py:741-750</td><td class="fix">Store the refresh JTI and blacklist it.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Login returns tokens plus full profile to admin-disabled users.</td><td class="where">core/views.py:452-485</td><td class="fix">Reject <code>not is_active</code> first.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Support ticket throttle (5/hour) applied to reads; listing tickets 429s after five GETs.</td><td class="where">core/views.py:4542-4543</td><td class="fix">Scope to create and reply.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Newsletter subscribe is anonymous, unverified, and overwrites existing subscribers' name and phone.</td><td class="where">core/views.py:6696-6740</td><td class="fix">Double opt-in; never update from anonymous callers.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Video uploads extension-only, 200 MB per attachment to the public CDN; no image dimension cap so share-card generation can allocate hundreds of MB from one upload.</td><td class="where">core/validators.py:49-57, 219-234 · share_cards.py:70</td><td class="fix">Magic-byte sniffing, <code>MAX_IMAGE_PIXELS</code>, throttle share-card image.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Public "handle" is the email local part; DM attachments use public storage; FCM token registration is anonymous and rebinds existing tokens.</td><td class="where">core/utils.py:20-42 · models.py:3153 · views.py:1108-1160</td><td class="fix">User-chosen username; private storage; validate and authenticate token binding.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>WebSockets use session auth only; the app sends Bearer tokens, so live sockets are dead in production.</td><td class="where">config/asgi.py:35-38 · core/consumers.py:38,187</td><td class="fix">JWT middleware on the socket handshake.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Admin session: 24 h absolute, no server-side idle timeout; the 30 min auto-logout is JavaScript only. Tailwind Play CDN in production requires <code>unsafe-eval</code>; chart.js pinned to major only; no SRI.</td><td class="where">settings.py:424-427 · base.html:16 · security_headers.py:43-55</td><td class="fix">Enforce idle timeout in middleware; build Tailwind once and self-host; pin and SRI.</td></tr>
+    <tr><td class="sev"><span class="chip l">Low</span></td><td>reCAPTCHA fails open and the secret is not set in production; OTP compares with <code>!=</code> not <code>compare_digest</code>; Gemini key in a query string; logout blacklists any refresh token without owner check; GDPR export omits comments, tickets, registrations; admin content sent to unkeyed public translation APIs; temp admin passwords emailed in plaintext.</td><td class="where">core/views.py:381-385, 1269, 5760, 1435 · otp_utils.py:218 · custom_admin/views.py:2082, 9270</td><td class="fix">Individually small; batch into one hardening pass.</td></tr>
+  </table></div>
+</section>
+
+<section id="backend">
+  <div class="eyebrow">Correctness, performance, operations</div>
+  <h2>Backend</h2>
+  <p class="lede">Counters use <code>F()</code>, likes are annotated with <code>Exists</code>, image work is off the request path. The gaps are dead schedulers, un-locked multi-step writes, and per-row queries in serializers that sit on hot lists.</p>
+  <div class="tbl"><table>
+    <tr><th>Sev</th><th>Finding</th><th>Where</th><th>Fix</th></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Paused accounts hard-deleted after 30 days (blocker 2).</td><td class="where">core/tasks.py:104-116</td><td class="fix">Filter on the deletion flag; reuse <code>purge_deleted_accounts</code>.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Scheduled content never publishes; waitlist never promotes. Both commands exist, neither is scheduled.</td><td class="where">settings.py:629-654 · .do/app.yaml</td><td class="fix">Beat entries calling both commands every minute.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Admin one-time notification schedule 500s: naive datetime compared to aware, after the row is already created.</td><td class="where">custom_admin/views.py:1119, 1152, 1165</td><td class="fix"><code>timezone.make_aware</code> after parsing.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Event registration race: exists, count, save with no lock or unique constraint. Rejected submissions consume capacity forever.</td><td class="where">core/views.py:3810-3827 · models.py:1169-1219</td><td class="fix"><code>atomic()</code> + <code>select_for_update</code>; unique constraint on (user, registration); exclude rejected.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Event file upload path is <code>/apievent-submissions/upload-file/</code> in production.</td><td class="where">lib/services/api_service.dart:1051</td><td class="fix">Add the slash.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Method and path mismatches: session revoke (POST vs DELETE), notification preferences (POST vs GET/PUT), live Q&amp;A upvote path.</td><td class="where">api_service.dart:1620,1656,1715 · core/views.py:4741,5489,5561</td><td class="fix">Accept the shipped methods server-side, then correct the app.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>DB cache with default <code>MAX_ENTRIES=300</code>. Producers include per-IP dedup keys, per-user home feeds and 50-150 KB share-card JPEGs. Past 300 rows every set does a COUNT and culls a third.</td><td class="where">settings.py:192-198 · views.py:256, 3213, 6944-6958</td><td class="fix">Raise <code>MAX_ENTRIES</code> or confirm <code>REDIS_URL</code> is set live; store share cards in Spaces.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Recent-likers N+1 in every content list serializer; home feed pays ~40 on a cache miss. Support ticket, conversation, bookmark serializers also query per row.</td><td class="where">serializers.py:197-217, 1372-1383, 1464-1490, 1649-1660</td><td class="fix"><code>Prefetch</code> with <code>to_attr</code>; annotate counts.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Search is <code>icontains</code> over four TextFields and returns drafts.</td><td class="where">core/views.py:3416-3419, 3461-3464</td><td class="fix"><code>SearchVectorField</code> + GIN index; add published filters.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Recurring notifications compare UTC time to Bujumbura wall-clock: fire two hours off. Live feeds skip <code>live</code> and go straight to <code>recorded</code>.</td><td class="where">core/tasks.py:181-219, 374-377</td><td class="fix"><code>timezone.localtime()</code>; add the live transition.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Poll vote non-atomic and unique only on (user, option): two racing votes for different options both count.</td><td class="where">core/views.py:5470-5483 · models.py:3437</td><td class="fix"><code>atomic()</code> + unique (user, poll) for single choice.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Admin verification review reimplements approve/reject: loses Gold auto-upgrade, no status guard, reject never clears the badge.</td><td class="where">custom_admin/views.py:2129-2207 · models.py:2355-2399</td><td class="fix">Call the model's <code>approve()/reject()</code>; make them atomic.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Fire-and-forget threads for email, push and GeoIP. Worker recycling at 500 requests kills them mid-flight; each opens a DB connection on a 22-connection instance. No <code>EMAIL_TIMEOUT</code>; SMTP inline in OTP and registration paths.</td><td class="where">core/views.py:459-546, 7244-7951 · otp_utils.py:19-51 · gunicorn.conf.py:35</td><td class="fix"><code>transaction.on_commit</code> → Celery; <code>EMAIL_TIMEOUT=10</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Admin bulk sends (push, SMS, email campaigns) run inside the web request when Celery is eager; a 2,000-recipient campaign outlives the 120 s worker timeout and delivers partially with no resume.</td><td class="where">custom_admin/views.py:1568-1610 · email_views.py:448-530 · settings.py:625-627</td><td class="fix">Require a broker in prod; chunk sends; never <code>.get()</code> in a request.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Explore feed paginates a GROUP BY queryset with a count on every page and no matching index. Deactivated users still receive pushes and their comments stay visible.</td><td class="where">core/views.py:5112-5157 · push_service.py:39-42</td><td class="fix">Cursor pagination + index; filter <code>user__is_active</code>.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>No cache invalidation for admin-edited data (categories, app settings, quick access, emergency contacts, YD settings, home feed). Only one <code>cache.delete</code> in the codebase.</td><td class="where">core/views.py:1675, 3019, 3539, 3565, 7977</td><td class="fix">Signal receivers deleting the matching keys.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Unpaginated N+1 endpoints: discussion replies, event comments, attendees, login history, sessions. Live-feed list writes on every GET. Article list groups by every column including body text.</td><td class="where">core/views.py:5296, 6513, 6674, 4728, 2139, 1697</td><td class="fix">Copy the article-comments pattern; denormalise comment_count.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Unstable pagination ordering (publish_date only) duplicates or skips rows in infinite scroll. Seven comment-like toggles bypass the atomic helper; delete_reply never decrements.</td><td class="where">models.py:289, 458, 1805 · views.py:1655-6662, 5379</td><td class="fix">Append <code>-id</code>; reuse <code>_atomic_toggle_like</code>.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Registration deadline and enabled flag not enforced server-side. Weekly newsletter opens one SMTP connection per recipient and is killed by the 300 s task limit, then resends on retry.</td><td class="where">core/views.py:3806-3827 · tasks.py:333-358</td><td class="fix">Validate in <code>perform_create</code>; one connection, chunked sub-tasks, progress row.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Celery worker env lacks EMAIL_BACKEND, EMAIL_HOST_USER, SITE_URL, CDN_DOMAIN, so worker-sent mail fails silently. Session-tracking middleware does an unindexed <code>exists()</code> on every API request, table grows unbounded.</td><td class="where">.do/app.yaml:129-169 · middleware/session_tracking.py:51-58</td><td class="fix">Mirror web envs; index and purge.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Non-atomic multi-write flows: pending-signup user creation, participant code <code>Max()+1</code> on a unique column, OTP attempt caps read-then-check.</td><td class="where">core/views.py:4361-4373 · models.py:5347-5364 · otp_utils.py:209-221</td><td class="fix"><code>atomic()</code> + <code>select_for_update</code>; increment first.</td></tr>
+    <tr><td class="sev"><span class="chip l">Low</span></td><td>Health check never touches the DB; <code>/api/v1/</code> is an alias with no versioning; response shapes drift between <code>detail</code>, <code>error</code>, <code>message</code>; <code>deploy.sh</code> says WSGI while everything runs ASGI; WhiteNoise without manifest hashing; bilingual fallback inconsistent across 122 <code>_fr</code> fields; ~12 silent <code>except: pass</code> blocks around registration emails.</td><td class="where">views.py:3033 · config/urls.py:93 · deploy.sh:44 · settings.py:254</td><td class="fix">One hygiene pass.</td></tr>
+  </table></div>
+  <h3>Test coverage</h3>
+  <p>Covered: health, JWT register/login/logout, profile, FCM token, event submission with waitlist and duplicate block, public list 200s, Firebase auto-promotion, share cards, private-media signing, discussion media caps. Untested: OTP send/verify and attempt caps, verification approve/reject/appeal, support tickets, poll voting, like integrity, notification targeting and scheduling, deactivate/delete/reactivate/purge (blocker 2 would have been caught), home feed cache, search, Youth Dialogue flow, every admin view, every Celery task. Tests run on SQLite so Postgres-specific behaviour is never exercised.</p>
+</section>
+
+<section id="admin">
+  <div class="eyebrow">Server-rendered portal</div>
+  <h2>Admin portal</h2>
+  <p class="lede">All 55 pages rendered with the test client returned 200 against a copy of the local database. Every POST form carries a CSRF token. The permission model is deny-by-default. The failures are in authentication (above), the middleware's URL-name mapping, and synchronous bulk operations.</p>
+  <div class="tbl"><table>
+    <tr><th>Sev</th><th>Finding</th><th>Where</th><th>Fix</th></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Eight legitimate URLs 403 for scoped staff because the whitelist uses wrong names or the substring chain misfires: notifications page (the bell's "View all" is dead), push diagnostics, content report status/delete, device unban, news sources, scraper review, YD ban toggle.</td><td class="where">custom_admin/permissions.py:138, 262-291</td><td class="fix">Explicit URL-name to section dict generated from <code>urls.py</code>, plus a test asserting every URL resolves.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Anonymous global search renders the admin shell (no data leaks, incidentally).</td><td class="where">custom_admin/views.py:6077</td><td class="fix">Add decorators.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Comments list loads every comment of seven types into Python then paginates in memory. Exports are fully in-memory.</td><td class="where">custom_admin/views.py:8999-9060, 6347-6390</td><td class="fix">UNION or per-type pagination; streaming responses before ~50k rows.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Audit trail: explicit logging in 43 of 256 views; the path-based middleware records empty diffs; two parallel log models and two near-identical log pages.</td><td class="where">middleware/activity_logger.py:152 · views.py:5593, 6888</td><td class="fix">One helper that records diffs on save; delete one log page.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Sidebar "Reorder" link always bounces to the dashboard with "Unknown model".</td><td class="where">base.html:643</td><td class="fix">Pass <code>?model=</code> or make it a submenu.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>No Django forms anywhere: errors arrive as one flash string and most views re-render an empty form, discarding the admin's input. Article content saved raw with no sanitizer.</td><td class="where">custom_admin/views.py:744-747, 1735-1745</td><td class="fix">Adopt forms for the top ten editors; sanitize on save if HTML is intended.</td></tr>
+    <tr><td class="sev"><span class="chip l">Low</span></td><td>Native <code>confirm()</code> in 55 templates; 14 tables without horizontal scroll wrappers; no search on events, notifications, verification, discussions, magazines, videos; flash messages never dismiss; support attachments always rendered as images; reviewer portal on its own unpinned Tailwind CDN; Bujumbura times shown without a timezone label.</td><td class="where">templates/custom_admin/**</td><td class="fix">Usability pass after the auth fixes land.</td></tr>
+  </table></div>
+  <details><summary>Admin section readiness (20 sections)</summary><div class="tbl"><table>
+    <tr><th>Section</th><th>Status</th><th>Reason</th></tr>
+    <tr><td>Login / 2FA / forced password</td><td><span class="chip bad">Broken</span></td><td>No TOTP; bypass and 403 on forced change</td></tr>
+    <tr><td>Permissions middleware</td><td><span class="chip warn">Needs work</span></td><td>Fail-secure, but 8 mapped URLs 403</td></tr>
+    <tr><td>Notifications</td><td><span class="chip bad">Broken</span></td><td>Undecorated create; sync send; bell 403 + CSRF</td></tr>
+    <tr><td>Discussions / topics / reports</td><td><span class="chip warn">Needs work</span></td><td>GET deletes, unlogged; staff 403s</td></tr>
+    <tr><td>Users</td><td><span class="chip warn">Needs work</span></td><td>Staff escalation; no password validation</td></tr>
+    <tr><td>Email campaigns</td><td><span class="chip warn">Needs work</span></td><td>Synchronous SMTP loop</td></tr>
+    <tr><td>Database backups</td><td><span class="chip warn">Needs work</span></td><td>Ephemeral disk; staff-downloadable full dump</td></tr>
+    <tr><td>Comments</td><td><span class="chip warn">Needs work</span></td><td>In-memory aggregation</td></tr>
+    <tr><td>Audit / activity log</td><td><span class="chip warn">Needs work</span></td><td>Duplicate pages, shallow diffs</td></tr>
+    <tr><td>Reorder</td><td><span class="chip bad">Broken</span></td><td>Link always bounces</td></tr>
+    <tr><td>Search</td><td><span class="chip warn">Needs work</span></td><td>Anonymous render</td></tr>
+    <tr><td>Dashboard</td><td><span class="chip ok">Ready</span></td><td>40 queries, ~70 ms</td></tr>
+    <tr><td>Analytics / charts / rate limiting</td><td><span class="chip ok">Ready</span></td><td>Aggregated in SQL; fine under 100k rows</td></tr>
+    <tr><td>Admin management</td><td><span class="chip ok">Ready</span></td><td>Superuser-gated, POST-only, logged</td></tr>
+    <tr><td>Verification</td><td><span class="chip ok">Ready</span></td><td>Reviewer recorded, diffs logged (see model-bypass finding)</td></tr>
+    <tr><td>Events / registrations / submissions</td><td><span class="chip ok">Ready</span></td><td>Paginated, POST toggles</td></tr>
+    <tr><td>Content editors</td><td><span class="chip ok">Ready-ish</span></td><td>Render fine; raw HTML save; no search</td></tr>
+    <tr><td>Support tickets</td><td><span class="chip ok">Ready</span></td><td>Escaped rendering</td></tr>
+    <tr><td>Translation queue / manager</td><td><span class="chip ok">Ready</span></td><td>Paginated, searchable</td></tr>
+    <tr><td>App settings</td><td><span class="chip ok">Ready</span></td><td>No secrets in form; logged</td></tr>
+  </table></div></details>
+  <p class="note">The built-in Django admin is not installed; <code>/admin/</code> routes to the custom portal. No second attack surface.</p>
+</section>
+
+<section id="app">
+  <div class="eyebrow">Usability, correctness, performance</div>
+  <h2>Flutter app</h2>
+  <p class="lede">Startup is genuinely non-blocking and the home, magazine and events tabs have the full loading, empty, error and offline story. Most other screens do not: 11 screens turn network errors into empty states with no retry, 28 call sites show raw exception text, and the localisation is bimodal (ARB files are at exact parity, but only 34 of ~100 screen files use them).</p>
+  <div class="tbl"><table>
+    <tr><th>Sev</th><th>Finding</th><th>Where</th><th>Fix</th></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Verification request never uploads the supporting document. Users pick and preview an ID that is silently dropped.</td><td class="where">verification_request_screen.dart:1000-1011 · api_service.dart:1190</td><td class="fix">Multipart upload, reusing <code>uploadRegistrationFile</code>.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Continental Dialogue apply form drops file and image fields; they pass "Required" validation then are never serialised.</td><td class="where">youth_dialogue_apply_screen.dart:33, 405-434, 1166</td><td class="fix">Upload alongside <code>formData</code>.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Resources View and Download are stubs showing "Opening…" snackbars.</td><td class="where">resources_screen.dart:341-371</td><td class="fix"><code>launchUrl</code>; reuse the PDF download path.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Support ticket list cannot open a ticket (no tap handler). Conversation screen spins forever on bad args and reports "failed to load" when only mark-read fails.</td><td class="where">support_tickets_screen.dart:313-364 · ticket_conversation_screen.dart:27-76</td><td class="fix">Tap → conversation; separate the mark-read call.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Videos: network failure is a dead end with no retry, and recorded live feeds are opened with a LiveFeed id against video endpoints (wrong likes, comments, views).</td><td class="where">videos_screen.dart:85, 106-114</td><td class="fix"><code>AsyncContentView</code>; route recorded feeds to the live-feed player.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Social Media screen shows fabricated follower counts ("125K") when the API fails.</td><td class="where">social_media_screen.dart:24-79, 106-111</td><td class="fix">Error state, never mock data.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>In-app WebView replaces the page with an error on any sub-resource failure (a blocked tracker kills every Zoom/Teams/Webex link).</td><td class="where">in_app_webview_screen.dart:102-109</td><td class="fix">Return unless <code>error.isForMainFrame</code>.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Bookmarks is dead end-to-end: no route reaches the screen, nothing calls add, cards have no tap, and a swallowed remove leaves a dismissed widget in the tree (Flutter assertion).</td><td class="where">bookmarks_screen.dart:40-46, 111-137</td><td class="fix">Ship it or delete it.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Maintenance screen hammers the API once per second after <code>ends_at</code>, and treats any exception on manual retry as "maintenance over".</td><td class="where">maintenance_screen.dart:66-90, 171-201</td><td class="fix">Retry once when the countdown crosses zero; show "still unreachable" on exception.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Home fires five modal flows concurrently on first frame (verification, announcements, promo splash, update, What's New). Profile picture error handler pops the profile screen itself.</td><td class="where">home_screen.dart:57-64 · profile_screen.dart:1250-1321</td><td class="fix">Await in priority order; pop only when the loading dialog is open.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>No 401 → refresh → retry path; <code>refreshToken()</code> has zero callers. Every request can stall 10 s when the Firebase token fetch fails (two 5 s attempts, per request, per retry).</td><td class="where">api_service.dart:78-131, 475</td><td class="fix">Refresh once on 401 then sign out; cache the last good token.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Raw exception text shown to users in 28 places; <code>ApiException</code> itself embeds <code>'Connection failed: $e'</code>, and POST/PATCH decode the body before checking status so Cloudflare HTML 502 pages surface as FormatException text.</td><td class="where">api_service.dart:270, 302, 335, 379, 400 and 28 screens</td><td class="fix">Strip <code>$e</code>; one localised "Something went wrong" helper.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Event detail: success reported as failure when the post-submit refresh throws (invites duplicate submits); a 1 s timer rebuilds a 3,217-line State; <code>setState</code> before <code>mounted</code>.</td><td class="where">event_detail_screen.dart:228-240, 2335-2416</td><td class="fix">Separate the refresh try; move the timer into the countdown widget.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Youth Dialogue main shows "Apply Now" to existing applicants when the status fetch fails. Notifications marks all read in the same frame as load, so unread UI never renders; unguarded <code>launchUrl</code> to arbitrary backend routes.</td><td class="where">youth_dialogue_main_screen.dart:51 · notifications_screen.dart:82-151</td><td class="fix">Distinguish unknown from none; mark read on dispose; whitelist via <code>DeepLinkRouter</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Errors rendered as empty states with no retry in 11 screens (calendar, discussions, discussion detail, polls, facts, sessions, login history, bookmarks, tag feed, user profile, agenda). <code>AsyncContentView</code> exists and is used by 6.</td><td class="where">calendar_screen.dart:65 · discussions_screen.dart:95 · polls_screen.dart:60 and 8 more</td><td class="fix">Adopt <code>AsyncContentView</code> with <code>onRetry</code>.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Live feeds: sticky error never cleared on success; thumbnails bypass <code>fixMediaUrl</code>. QR scanner: camera runs while backgrounded, instant duplicate re-scan, no "Open Settings" on denial.</td><td class="where">live_feeds_screen.dart:97-107, 383 · qr_scanner_screen.dart:45-220</td><td class="fix">Clear error; wrap URLs; lifecycle observer and cooldown.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td><code>int.parse</code> on admin-supplied hex colours inside <code>build</code>: one malformed colour in the CMS blanks the credential, scan-result and social screens.</td><td class="where">youth_dialogue_credential_screen.dart:376 · qr_scan_result_screen.dart:15 · social_media_screen.dart:182</td><td class="fix">Use the existing <code>hexToColor</code> helper.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Emergency screen promises "Hold 3 sec" and "Sends your location"; neither exists. Discussion reply, poll vote and rating have no double-submit guard. Force-update check runs before Remote Config has fetched on first launch, so a blocking update never triggers on a fresh install. Feature flags have zero consumers.</td><td class="where">emergency_screen.dart:243-283 · discussion_detail_screen.dart:244 · main.dart:139 · home_screen.dart:283</td><td class="fix">Fix copy; in-flight flags; await fetch before the check.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Performance: zero <code>memCacheWidth</code>/<code>cacheWidth</code> across 46 files with network images, so the Data Saver toggle only slows polling; all JSON parsed on the UI thread including the whole home feed; whole-screen <code>setState</code> on scroll in article detail and on pinch in the PDF viewer; PDF download has no cancel token; five background pollers while idle on Home.</td><td class="where">data_saver_service.dart:27-35 · home_tab.dart:589-680 · article_detail_screen.dart:137 · pdf_viewer_screen.dart:107-296</td><td class="fix">Pass cache widths in shared cards; <code>compute</code> for home feed; <code>ValueNotifier</code> for progress; cancel in dispose.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Localisation: 223 hardcoded English literals plus 250 inline <code>isFr ?</code> ternaries; 18 screens entirely English (email verification, support, scanner, credential, weather, live feeds, more tab dialogs); accent-less French in check-in, feedback, update dialog; dates ignore locale in 12 places.</td><td class="where">lib/screens/** · lib/l10n/</td><td class="fix">Move into ARBs; the <code>translate(key)</code> bridge means no call-site churn. <code>DateFormat.yMMMd(langCode)</code>.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Accessibility and theming: 52 icon buttons vs 25 tooltips; header actions are bare <code>GestureDetector</code>s; OTP field hidden in <code>Opacity(0)</code> is invisible to screen readers; fixed heights overflow at large text in six screens; 714 hardcoded white/black colours with confirmed dark-mode breaks in PDF viewer, scan result, lookup, credential, facts, maintenance; theme defaults to light instead of system.</td><td class="where">ds_widgets.dart:116 · email_verification_screen.dart:273 · theme_provider.dart:16</td><td class="fix"><code>Semantics</code> in <code>DsHeaderAction</code>; <code>textScalerOf</code> as home_tab does; route colours through <code>Ds.*</code>; default <code>ThemeMode.system</code>.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Sentry release hardcoded to 1.0.0+1 while the app is 2.0.0; <code>ErrorWidget.builder</code> nests a second <code>MaterialApp</code>; offline banner polls google.com every 10 s forever with English-only strings.</td><td class="where">main.dart:243-281 · offline_banner.dart:31-105</td><td class="fix">Build release from <code>AppConstants.appVersion</code>; plain Material; poll only while offline.</td></tr>
+    <tr><td class="sev"><span class="chip l">Low</span></td><td>Dead code (fullscreen image viewer, news vs articles duplicate screens, two agenda detail screens, unused nationality list); 85 swallowed catches of which four hide failures users must see; undisposed dialog controllers in seven places; "2025" hardcoded in ticket and credential copy; client-generated check-in codes.</td><td class="where">lib/screens/**</td><td class="fix">Cleanup pass.</td></tr>
+  </table></div>
+  <details><summary>Per-screen readiness (60 screens)</summary><div class="tbl"><table>
+    <tr><th>Screen</th><th>Status</th><th>Reason</th></tr>
+    <tr><td>videos</td><td><span class="chip bad">Broken</span></td><td>Network failure dead end; LiveFeed ids on video endpoints</td></tr>
+    <tr><td>in_app_webview</td><td><span class="chip bad">Broken</span></td><td>Any sub-resource error kills the page</td></tr>
+    <tr><td>resources</td><td><span class="chip bad">Broken</span></td><td>View/Download do nothing</td></tr>
+    <tr><td>social_media</td><td><span class="chip bad">Broken</span></td><td>Fake follower counts on failure</td></tr>
+    <tr><td>youth_dialogue_apply</td><td><span class="chip bad">Broken</span></td><td>File fields never sent</td></tr>
+    <tr><td>verification_request</td><td><span class="chip bad">Broken</span></td><td>Document dropped; email regex mismatch blocks submit</td></tr>
+    <tr><td>support_tickets</td><td><span class="chip bad">Broken</span></td><td>Cannot open a ticket</td></tr>
+    <tr><td>ticket_conversation</td><td><span class="chip bad">Broken</span></td><td>Infinite spinner on bad args</td></tr>
+    <tr><td>bookmarks</td><td><span class="chip bad">Broken</span></td><td>Unreachable; Dismissible crash</td></tr>
+    <tr><td>onboarding</td><td><span class="chip warn">Needs work</span></td><td>Overflow at large text; full-res images</td></tr>
+    <tr><td>auth</td><td><span class="chip warn">Needs work</span></td><td>~25 English strings; string-matching on error text</td></tr>
+    <tr><td>email_verification</td><td><span class="chip warn">Needs work</span></td><td>No l10n; OTP field invisible to screen readers</td></tr>
+    <tr><td>home (shell)</td><td><span class="chip warn">Needs work</span></td><td>Five concurrent modals on first frame</td></tr>
+    <tr><td>news tab / news_screen</td><td><span class="chip warn">Needs work</span></td><td>Stale carousel timer; unlocalised dates</td></tr>
+    <tr><td>explore_tab</td><td><span class="chip warn">Needs work</span></td><td>Errors become empty lists</td></tr>
+    <tr><td>more_tab</td><td><span class="chip warn">Needs work</span></td><td>22 English literals; raw errors ×3</td></tr>
+    <tr><td>articles</td><td><span class="chip warn">Needs work</span></td><td>Duplicate of news with divergent behaviour</td></tr>
+    <tr><td>article_detail</td><td><span class="chip warn">Needs work</span></td><td>Raw errors; scroll setState storm</td></tr>
+    <tr><td>magazine_detail</td><td><span class="chip warn">Needs work</span></td><td>Raw errors; double view count</td></tr>
+    <tr><td>pdf_viewer</td><td><span class="chip warn">Needs work</span></td><td>Unguarded setState; no download cancel; dark-mode overlays</td></tr>
+    <tr><td>video_detail</td><td><span class="chip warn">Needs work</span></td><td>Dead subtitles toggle; double dispose</td></tr>
+    <tr><td>gallery / album_detail</td><td><span class="chip warn">Needs work</span></td><td>French title ignored; sheet does not refresh</td></tr>
+    <tr><td>live_feeds</td><td><span class="chip warn">Needs work</span></td><td>Sticky error; raw thumbnails; ~30 English strings</td></tr>
+    <tr><td>video_player / youtube_player</td><td><span class="chip warn">Needs work</span></td><td><code>late</code> crash path; swallowed comment errors</td></tr>
+    <tr><td>feature_card_detail</td><td><span class="chip warn">Needs work</span></td><td>Unsafe colour cast</td></tr>
+    <tr><td>media_video_player</td><td><span class="chip warn">Needs work</span></td><td>YouTube fullscreen unhandled; no retry</td></tr>
+    <tr><td>facts_list / fact_detail</td><td><span class="chip warn">Needs work</span></td><td>Errors as empty; raw image URLs</td></tr>
+    <tr><td>trending</td><td><span class="chip warn">Needs work</span></td><td>Downloads every article to open one; inert rows with chevrons</td></tr>
+    <tr><td>weather</td><td><span class="chip warn">Needs work</span></td><td>Serial fetch; silent 0°</td></tr>
+    <tr><td>translate</td><td><span class="chip warn">Needs work</span></td><td>Unguarded setState; English status strings</td></tr>
+    <tr><td>calendar</td><td><span class="chip warn">Needs work</span></td><td>Error shown as "being prepared"</td></tr>
+    <tr><td>event_detail</td><td><span class="chip warn">Needs work</span></td><td>1 s full rebuild; false failure after success</td></tr>
+    <tr><td>event_checkin / event_feedback</td><td><span class="chip warn">Needs work</span></td><td>Accent-less French; setState before mounted</td></tr>
+    <tr><td>event_ticket</td><td><span class="chip warn">Needs work</span></td><td>Context after await; 100% English</td></tr>
+    <tr><td>youth_dialogue_main</td><td><span class="chip warn">Needs work</span></td><td>Status failure shows Apply Now</td></tr>
+    <tr><td>youth_dialogue_documents</td><td><span class="chip warn">Needs work</span></td><td>Swallowed reload; unguarded pickers</td></tr>
+    <tr><td>youth_dialogue_credential</td><td><span class="chip warn">Needs work</span></td><td><code>int.parse</code> crash; raw errors; English</td></tr>
+    <tr><td>qr_scanner</td><td><span class="chip warn">Needs work</span></td><td>Lifecycle; permission path; duplicate re-scan</td></tr>
+    <tr><td>qr_scan_result / manual_lookup</td><td><span class="chip warn">Needs work</span></td><td><code>int.parse</code> crash; dark-mode boxes; English</td></tr>
+    <tr><td>discussions / discussion_detail</td><td><span class="chip warn">Needs work</span></td><td>Error→empty; reply double-submit; raw ISO date</td></tr>
+    <tr><td>polls</td><td><span class="chip warn">Needs work</span></td><td>Raw errors; double vote</td></tr>
+    <tr><td>emergency</td><td><span class="chip warn">Needs work</span></td><td>Copy promises features that do not exist</td></tr>
+    <tr><td>feed/edit_profile</td><td><span class="chip warn">Needs work</span></td><td>Swallowed load can blank-overwrite profile</td></tr>
+    <tr><td>feed/explore_terms</td><td><span class="chip warn">Needs work</span></td><td>Zero French</td></tr>
+    <tr><td>profile</td><td><span class="chip warn">Needs work</span></td><td>Picker error pops screen; "+257" saves alone; completion API spam</td></tr>
+    <tr><td>profile_completion</td><td><span class="chip warn">Needs work</span></td><td>l10n passed and unused; raw errors</td></tr>
+    <tr><td>change_password</td><td><span class="chip warn">Needs work</span></td><td>Raw error text only; otherwise close</td></tr>
+    <tr><td>active_sessions / login_history</td><td><span class="chip warn">Needs work</span></td><td>Errors as empty; raw timestamps</td></tr>
+    <tr><td>linked_accounts</td><td><span class="chip warn">Needs work</span></td><td>Raw errors ×4; silent Firebase-link skip</td></tr>
+    <tr><td>notification_preferences</td><td><span class="chip warn">Needs work</span></td><td>Failure renders all toggles on; backend method mismatch</td></tr>
+    <tr><td>contact_support</td><td><span class="chip warn">Needs work</span></td><td>Email field validated but never sent</td></tr>
+    <tr><td>notifications</td><td><span class="chip warn">Needs work</span></td><td>Unread UI dead; unguarded launchUrl</td></tr>
+    <tr><td>maintenance</td><td><span class="chip warn">Needs work</span></td><td>1 request/s loop; network error = "over"</td></tr>
+    <tr><td>splash</td><td><span class="chip ok">Ready</span></td><td>Bounded timeouts; fallback navigator</td></tr>
+    <tr><td>home_tab</td><td><span class="chip ok">Ready</span></td><td>Preload, cache, error, retry all present</td></tr>
+    <tr><td>magazine_tab / magazine_screen</td><td><span class="chip ok">Ready</span></td><td>Cache fallback + AsyncContentView</td></tr>
+    <tr><td>events</td><td><span class="chip ok">Ready</span></td><td>Full states</td></tr>
+    <tr><td>yd_scan_history</td><td><span class="chip ok">Ready</span></td><td>Full states</td></tr>
+    <tr><td>feed/tag_feed, user_profile, explore_notifications</td><td><span class="chip ok">Ready</span></td><td>Minor only</td></tr>
+    <tr><td>agenda/* + priority_agenda_detail</td><td><span class="chip ok">Ready</span></td><td>Silent load failure only</td></tr>
+  </table></div></details>
+</section>
+
+<section id="platform">
+  <div class="eyebrow">Android, iOS, CI, hosting</div>
+  <h2>Platform and deployment</h2>
+  <div class="tbl"><table>
+    <tr><th>Sev</th><th>Finding</th><th>Where</th><th>Fix</th></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>Backend cannot build: Python 3.9 pin vs Pillow 12 needing 3.10+. Four different Pythons across runtime.txt (3.9), Dockerfile (3.11), CI (3.11), local venv (3.13).</td><td class="where">backend/runtime.txt · Dockerfile:1 · ci.yml:16</td><td class="fix">3.12 everywhere; Django 5.2 LTS; migrate <code>STATICFILES_STORAGE</code>/<code>DEFAULT_FILE_STORAGE</code> to <code>STORAGES</code>.</td></tr>
+    <tr><td class="sev"><span class="chip c">Critical</span></td><td>CI never runs (wrong directory) and would fail on every job if moved: Flutter 3.32 vs pubspec 3.38, gitignored Firebase config files, keystore decoded but <code>key.properties</code> never written, 8 GB Gradle heap on a 7 GB runner.</td><td class="where">burundi_au_chairmanship/.github/workflows/ci.yml · gradle.properties:1</td><td class="fix">Move to root; bump Flutter; add secrets; track the client config files (they are not secrets).</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>App Links verify only for the upload key; Play App Signing re-signs with Google's key. <code>www.</code> missing from <code>ALLOWED_HOSTS</code> while manifest, entitlements and CSRF origins all claim it, so assetlinks and AASA on www return 400.</td><td class="where">backend/config/urls.py:45-49 · .do/app.yaml:41</td><td class="fix">Add the Play signing SHA-256 and the www host.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>Unused dangerous permissions (location ×2, contacts, calendar ×2) on Android; matching usage strings and a CoarseLocation declaration in the iOS privacy manifest. Data Safety and privacy label mismatch; review risk.</td><td class="where">AndroidManifest.xml:14-22 · Info.plist:66-73 · PrivacyInfo.xcprivacy</td><td class="fix">Delete them; keep CAMERA, POST_NOTIFICATIONS, INTERNET, VIBRATE.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td>No <code>--obfuscate --split-debug-info</code> anywhere; Sentry cannot symbolicate. iOS notification extension hardcoded to 1.0/1 while Runner is 2.0.0/57.</td><td class="where">build_release.sh:46-61 · project.pbxproj:632-668</td><td class="fix">Add the flags and upload symbols; use <code>$(FLUTTER_BUILD_NAME)</code> in the extension.</td></tr>
+    <tr><td class="sev"><span class="chip h">High</span></td><td><code>*.md</code> is gitignored at the root: zero docs in the repo. 57 env vars read by settings, 30 documented, the worker missing several. Three overlapping migrate paths plus a stale <code>deploy.sh</code> that starts WSGI. Two divergent privacy policies.</td><td class="where">.gitignore:9 · .env.production.example · deploy.sh:44 · docs/privacy-policy.html</td><td class="fix">Un-ignore docs; one ENV_VARS.md; delete deploy.sh, Procfile and docs/.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>No adaptive launcher icon; full-colour icon used as the FCM small icon (white blob). Three Apple Sign-In guides carry the wrong team ID and bundle ID. Two dead dependencies (<code>animated_notch_bottom_bar</code>, <code>carousel_slider</code>). Syncfusion PDF viewer without license registration. Explicit Firebase BoM from Dec 2024 alongside FlutterFire. Gmail SMTP as production relay. Sentry release hardcoded on both client and server.</td><td class="where">pubspec.yaml:20,23,74,117 · build.gradle.kts:71-80 · app.yaml:46-59</td><td class="fix">Individually small; one platform hygiene pass.</td></tr>
+    <tr><td class="sev"><span class="chip m">Medium</span></td><td>Repo hygiene: tracked Gradle build report, simulator screenshot, brand PNGs at root, 2.4 MB design HTML, screenshots folder; 52 MB of loose objects. Last commit is a 50-file grab-bag that includes a rewritten already-numbered migration. <code>deploy_on_push</code> is false everywhere so there is no automated path from merge to production.</td><td class="where">android/build/reports/ · commit 40cb870 · .do/app.yaml:18,123</td><td class="fix">Ignore <code>**/build/</code>; confirm 0136 has not run on prod before merging; document manual deploys.</td></tr>
+    <tr><td class="sev"><span class="chip l">Low</span></td><td>Web, Linux, macOS, Windows folders are untouched templates and Firebase throws on those platforms. <code>CFBundleName</code> still the package name. Redis provisioned at $15/month while the code was changed to run without it.</td><td class="where">web/ linux/ macos/ windows/ · Info.plist:19 · app.yaml:217</td><td class="fix">Delete the four folders; set the bundle name; decide on Redis.</td></tr>
+  </table></div>
+</section>
+
+<section id="good">
+  <div class="eyebrow">Keep these</div>
+  <h2>Done well</h2>
+  <div class="two">
+    <div class="good">
+      <h3>Backend</h3>
+      <ul class="plain">
+        <li>Settings fail loudly on missing secret key or allowed hosts; HSTS with preload, secure cookies, proxy SSL header, PII off in Sentry.</li>
+        <li>SimpleJWT with 15 min access, 7 day refresh, rotation and blacklist; password change revokes all tokens.</li>
+        <li>OTP codes hashed at rest, five-attempt lockout, pending signups live only in cache until verified.</li>
+        <li>Private media (support, verification, YD documents) on a separate private-ACL storage with signed v4 URLs and no CDN domain, covered by a test.</li>
+        <li>Object-level scoping correct for tickets, bookmarks, conversations, reminders, submissions, sessions, comments.</li>
+        <li>Counters via <code>F()</code>, like state via <code>Exists</code>, WebP conversion and thumbnails off the read path, push in 500-token batches with stale-token cleanup.</li>
+        <li>Migrations run once in a PRE_DEPLOY job; Celery beat runs on one instance; gunicorn sized honestly for the plan.</li>
+      </ul>
+    </div>
+    <div class="good">
+      <h3>App and admin</h3>
+      <ul class="plain">
+        <li>Startup is non-blocking: Firebase gated at 5 s, splash capped at 6 s with partial data, messaging and remote config deferred.</li>
+        <li>In-flight GET deduplication, bounded retries honouring Retry-After, maintenance detection via header and body.</li>
+        <li>Optimistic like store with debounce and honest revert; heartbeat and socket services pause in background.</li>
+        <li>Hive cache tiers with cache-first home, magazine and events tabs; tabs keep scroll state.</li>
+        <li>ARB files at exact parity (202 keys each) with a bridge that lets remaining strings migrate without call-site churn.</li>
+        <li>Deep links centralised with ID validation; cold-start links held until Home exists.</li>
+        <li>Admin: every POST form has a CSRF token, user content autoescaped, CSV formula-injection sanitised, Axes lockout, superuser-only admin management with self-lockout guards.</li>
+        <li>Signing hygiene: keystore, key.properties, .p8, .env, service-account JSON all untracked and never committed.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<p class="note">Method: five parallel read-only code audits (backend security, backend correctness and performance, Flutter app, admin portal, platform and deployment) plus Django deploy check, Django and Flutter test suites, flutter analyze, and a test-client render of all 55 admin pages against a database copy. Every critical finding was re-verified against source before inclusion. No files were modified.</p>
+</div>

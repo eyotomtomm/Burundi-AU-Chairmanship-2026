@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
+import '../news/article_detail_screen.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -28,7 +30,16 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     setState(() => _loading = true);
     try {
       _bookmarks = await _api.getBookmarks();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e is ApiException
+              ? e.message
+              : AppLocalizations.of(context).translate('failed_to_load')),
+          backgroundColor: Ds.red,
+        ));
+      }
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -37,12 +48,50 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     return _bookmarks.where((b) => b['content_type'] == _filterType).toList();
   }
 
-  Future<void> _removeBookmark(int bookmarkId) async {
+  /// Removes on the server first; the row only leaves the list on success.
+  Future<bool> _removeBookmark(int bookmarkId) async {
     try {
       await _api.removeBookmark(bookmarkId);
       _bookmarks.removeWhere((b) => b['id'] == bookmarkId);
       if (mounted) setState(() {});
-    } catch (_) {}
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() {}); // rebuild so a half-swiped row snaps back
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e is ApiException
+              ? e.message
+              : AppLocalizations.of(context).translate('bm_could_not_remove')),
+          backgroundColor: Ds.red,
+        ));
+      }
+      return false;
+    }
+  }
+
+  Future<void> _open(Map<String, dynamic> bookmark) async {
+    final type = bookmark['content_type'];
+    final id = bookmark['content_id'];
+    if (type != 'article' || id == null) {
+      // ponytail: only articles have a detail screen we can reach by id today.
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context).translate('bm_type_not_supported'))));
+      return;
+    }
+    try {
+      final article = await _api.getArticle(id.toString());
+      if (!mounted) return;
+      Navigator.push(context,
+          CupertinoPageRoute(builder: (_) => ArticleDetailScreen(article: article)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e is ApiException
+            ? e.message
+            : AppLocalizations.of(context).translate('bm_could_not_open_article')),
+        backgroundColor: Ds.red,
+      ));
+    }
   }
 
   IconData _iconForType(String type) {
@@ -120,7 +169,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                 ),
                                 child: const Icon(Icons.delete_rounded, color: Colors.white),
                               ),
-                              onDismissed: (_) => _removeBookmark(bookmark['id']),
+                              confirmDismiss: (_) => _removeBookmark(bookmark['id']),
                               child: _bookmarkCard(bookmark),
                             );
                           },
@@ -134,8 +183,11 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   Widget _bookmarkCard(Map<String, dynamic> bookmark) {
     final type = (bookmark['content_type'] ?? '').toString();
+    final l10n = AppLocalizations.of(context);
+    const typeKeys = {'article': 'article', 'magazine': 'magazine', 'video': 'video', 'event': 'event'};
     return DsCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onTap: () => _open(bookmark),
       child: Row(
         children: [
           DsIconSquare(_iconForType(type),
@@ -146,7 +198,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  bookmark['content_title'] ?? 'Untitled',
+                  bookmark['content_title'] ?? l10n.translate('bm_untitled'),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -156,16 +208,23 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                       color: Ds.ink(context)),
                 ),
                 const SizedBox(height: 3),
-                Text(type.isEmpty ? '' : type[0].toUpperCase() + type.substring(1),
+                Text(
+                    typeKeys.containsKey(type)
+                        ? l10n.translate(typeKeys[type]!)
+                        : type.isEmpty ? '' : type[0].toUpperCase() + type.substring(1),
                     style: Ds.meta(context)),
               ],
             ),
           ),
-          GestureDetector(
-            onTap: () => _removeBookmark(bookmark['id']),
-            child: const Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: Icon(Icons.bookmark_rounded, size: 19, color: Ds.gold),
+          Semantics(
+            button: true,
+            label: l10n.translate('remove'),
+            child: GestureDetector(
+              onTap: () => _removeBookmark(bookmark['id']),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.bookmark_rounded, size: 19, color: Ds.gold),
+              ),
             ),
           ),
         ],

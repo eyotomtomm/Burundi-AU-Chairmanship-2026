@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_ds.dart';
 import '../../services/api_service.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/feed/post_card.dart';
 import '../../widgets/feed/repost_sheet.dart';
 import '../discussions/discussion_detail_screen.dart';
@@ -23,6 +24,7 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
   final _api = ApiService();
   List<Map<String, dynamic>> _posts = [];
   bool _loading = true;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -34,8 +36,10 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
     setState(() => _loading = true);
     try {
       _posts = await _api.getFeed(tag: widget.tag, topicId: widget.topicId);
+      _loadFailed = false;
     } catch (_) {
       _posts = [];
+      _loadFailed = true;
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -61,13 +65,17 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: Icon(Icons.arrow_back_rounded,
-                        color: Colors.white, size: 22),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(Icons.arrow_back_rounded,
+                          color: Colors.white, size: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -92,6 +100,13 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
                   ? const Center(
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Ds.green))
+                  : _loadFailed
+                      ? AsyncContentView(
+                          state: AsyncContentState.error,
+                          onRetry: _load,
+                          onRefresh: _load,
+                          child: const SizedBox.shrink(),
+                        )
                   : _posts.isEmpty
                       ? ListView(
                           physics: const AlwaysScrollableScrollPhysics(),

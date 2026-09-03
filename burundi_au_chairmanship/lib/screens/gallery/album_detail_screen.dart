@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_protector/screen_protector.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/environment.dart';
 import '../../providers/auth_provider.dart';
@@ -13,7 +13,6 @@ import '../../widgets/liked_by_avatars.dart';
 import '../../widgets/comment_tile.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
-import '../../services/data_saver_service.dart';
 import '../../utils/input_sanitizer.dart';
 import '../../config/app_ds.dart';
 import '../../services/share_service.dart';
@@ -33,6 +32,7 @@ class AlbumDetailScreen extends StatefulWidget {
 }
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
+  AppLocalizations get _l10n => AppLocalizations.of(context);
   final LikeService _likeService = LikeService();
   bool _descriptionExpanded = false;
   VoidCallback? _removeLikeListener;
@@ -88,7 +88,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     } catch (_) {
       if (mounted) setState(() => _loadingComments = false);
     }
+    _sheetSetState?.call(() {});
   }
+
+  /// Rebuilds the open comments sheet when comments change.
+  StateSetter? _sheetSetState;
 
   Future<void> _postComment() async {
     final content = InputSanitizer.sanitizeComment(_commentController.text);
@@ -132,7 +136,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         maxChildSize: 0.9,
         expand: false,
         builder: (ctx, scrollCtrl) => StatefulBuilder(
-          builder: (ctx, setSheetState) => Column(
+          builder: (ctx, setSheetState) {
+            _sheetSetState = setSheetState;
+            return Column(
             children: [
               const SizedBox(height: 8),
               Container(
@@ -141,14 +147,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Comments ($_commentCount)',
+                child: Text('${_l10n.translate('comments')} ($_commentCount)',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               Expanded(
                 child: _loadingComments
                     ? const Center(child: CircularProgressIndicator())
                     : _comments.isEmpty
-                        ? Center(child: Text('No comments yet', style: TextStyle(color: Colors.grey[500])))
+                        ? Center(child: Text(_l10n.translate('no_comments_yet'), style: TextStyle(color: Ds.muted(context))))
                         : ListView.builder(
                             controller: scrollCtrl,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -201,6 +207,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             suffixIcon: _replyingToId != null
                                 ? IconButton(
                                     icon: const Icon(Icons.close, size: 18),
+                                    tooltip: _l10n.translate('rs_cancel_reply'),
                                     onPressed: () {
                                       setState(() { _replyingToId = null; _replyingToName = null; });
                                       setSheetState(() {});
@@ -215,6 +222,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         icon: _postingComment
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                        tooltip: _l10n.translate('send'),
                         onPressed: _postingComment
                             ? null
                             : () async {
@@ -227,10 +235,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 ),
               ),
             ],
-          ),
+          );
+          },
         ),
       ),
-    );
+    ).whenComplete(() => _sheetSetState = null);
   }
 
 
@@ -323,19 +332,19 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       appBar: AppBar(
         title: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Text(title ?? 'Album'),
+          child: Text(title ?? _l10n.translate('rs_album')),
         ),
         actions: [
           // Share button
           Builder(
             builder: (btnContext) => IconButton(
               icon: const Icon(Icons.share_rounded, color: Colors.white),
-              tooltip: 'Share',
+              tooltip: _l10n.translate('share'),
               onPressed: () => ShareService.item(
                 btnContext,
                 kind: 'gallery',
                 id: widget.album['id'],
-                title: title ?? 'Album',
+                title: title ?? _l10n.translate('rs_album'),
               ),
             ),
           ),
@@ -346,7 +355,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               isLabelVisible: _commentCount > 0,
               child: const Icon(Icons.comment_outlined, color: Colors.white),
             ),
-            tooltip: 'Comments',
+            tooltip: _l10n.translate('comments'),
             onPressed: _showCommentsSheet,
           ),
           // Like button
@@ -356,7 +365,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               color: likeState.isLiked ? Colors.red : Colors.white,
               size: 26,
             ),
-            tooltip: likeState.isLiked ? 'Unlike' : 'Like',
+            tooltip: _l10n.translate(likeState.isLiked ? 'rs_unlike' : 'like'),
             onPressed: _toggleLike,
           ),
         ],
@@ -512,7 +521,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         tag: 'album_${widget.album['id']}_$index',
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
+          child: AppNetworkImage(
             imageUrl: imageUrl,
             fit: BoxFit.cover,
             placeholder: (context, url) => Container(

@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../config/app_colors.dart';
-import '../providers/language_provider.dart';
 import '../screens/home/widgets/support_options_modal.dart';
+import '../l10n/app_localizations.dart';
 
 /// Shared dialog for profanity ban (403) and language warning (400) responses.
 ///
 /// Replaces the duplicated `_showCommentErrorDialog` found across 9 files.
 void showCommentErrorDialog(BuildContext context, String message, int statusCode, {String? referenceId}) {
   final isBan = statusCode == 403 || message.contains('banned');
-  final langCode = context.read<LanguageProvider>().languageCode;
+  final l10n = AppLocalizations.of(context);
 
   showDialog(
     context: context,
@@ -20,9 +19,7 @@ void showCommentErrorDialog(BuildContext context, String message, int statusCode
         size: 48,
       ),
       title: Text(
-        isBan
-            ? (langCode == 'fr' ? 'Commentaire Banni' : 'Comment Banned')
-            : (langCode == 'fr' ? 'Avertissement de Langage' : 'Language Warning'),
+        l10n.translate(isBan ? 'w_comment_banned' : 'w_language_warning'),
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -31,9 +28,7 @@ void showCommentErrorDialog(BuildContext context, String message, int statusCode
           if (isBan && referenceId != null) ...[
             const SizedBox(height: 12),
             Text(
-              langCode == 'fr'
-                  ? 'Votre numéro de référence : $referenceId'
-                  : 'Your reference number: $referenceId',
+              '${l10n.translate('w_reference_number')} $referenceId',
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -53,12 +48,12 @@ void showCommentErrorDialog(BuildContext context, String message, int statusCode
               showSupportOptionsModal(context, prefilledSubject: subject);
             },
             icon: const Icon(Icons.support_agent_rounded, size: 18),
-            label: Text(langCode == 'fr' ? 'Nous Contacter' : 'Contact Us'),
+            label: Text(l10n.translate('contact_us')),
             style: TextButton.styleFrom(foregroundColor: AppColors.burundiGreen),
           ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: Text(langCode == 'fr' ? 'Fermer' : 'OK'),
+          child: Text(l10n.translate('close')),
         ),
       ],
     ),

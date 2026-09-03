@@ -48,6 +48,4 @@ def get_country_from_ip(ip_address):
         return ('', '', '')
 
 
-def get_client_ip(request):
-    """Extract the real client IP (REMOTE_ADDR, already set by CloudflareProxyMiddleware)."""
-    return request.META.get('REMOTE_ADDR', '')
+from .middleware.cloudflare import get_client_ip  # noqa: E402,F401 — single IP helper

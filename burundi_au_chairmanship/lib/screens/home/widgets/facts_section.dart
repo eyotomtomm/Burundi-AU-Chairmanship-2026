@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import '../../../config/app_ds.dart';
 import '../../../config/environment.dart';
 import '../../../models/fact_model.dart';
@@ -51,7 +51,7 @@ class FactCard extends StatelessWidget {
                         ? Icons.format_quote_rounded
                         : Icons.auto_awesome_rounded,
                   )
-                : CachedNetworkImage(
+                : AppNetworkImage(
                     imageUrl: imageUrl,
                     fit: BoxFit.cover,
                     placeholder: (_, _) =>

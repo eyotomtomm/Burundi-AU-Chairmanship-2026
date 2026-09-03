@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -51,28 +51,59 @@ class _ExploreTabState extends State<ExploreTab> {
   Timer? _topicsTimer;
   int _topicPage = 0;
 
+  // The server pages at 20; without these the feed could never show a
+  // twenty-first post.
+  final _scroll = ScrollController();
+  int _page = 1;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+
   /// Set once, forever, the first time someone posts. Survives restarts.
   static const _thanksShownKey = 'explore_first_post_thanks_shown';
 
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     _load();
     _loadSideData();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Explore lives in an IndexedStack, so it stays mounted while the user
+    // reads another tab. TickerMode tells us whether we are the visible one;
+    // without this the carousel animated on forever in the background.
+    if (TickerMode.of(context)) {
+      _startTopicsAutoSlide();
+    } else {
+      _topicsTimer?.cancel();
+      _topicsTimer = null;
+    }
+  }
+
+  @override
   void dispose() {
     _topicsTimer?.cancel();
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
     _topicsController.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_scroll.hasClients || _loadingMore || !_hasMore || _loading) return;
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 600) {
+      _loadMore();
+    }
+  }
+
   void _startTopicsAutoSlide() {
     _topicsTimer?.cancel();
-    if (_topics.length < 2) return;
+    if (_topics.length < 2 || !mounted || !TickerMode.of(context)) return;
     _topicsTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (!mounted || !_topicsController.hasClients) return;
+      if (!mounted || !_topicsController.hasClients || !TickerMode.of(context)) return;
       final next = (_topicPage + 1) % _topics.length;
       _topicsController.animateToPage(
         next,
@@ -186,14 +217,48 @@ class _ExploreTabState extends State<ExploreTab> {
         ),
       ).then((_) => _loadSideData());
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  /// Fetch the first page.
+  ///
+  /// [quiet] refreshes in place instead of replacing the list with a skeleton,
+  /// which is what coming back from a post should do — the shimmer used to
+  /// throw the reader back to the top of the feed every time.
+  Future<void> _load({bool quiet = false}) async {
+    if (!quiet) setState(() => _loading = true);
     try {
-      _posts = await _api.getFeed(following: _following);
+      final page = await _api.getFeedPage(following: _following);
+      _posts = page.posts;
+      _hasMore = page.hasMore;
+      _page = 1;
     } catch (_) {
-      _posts = [];
+      if (!quiet) _posts = [];
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final next = await _api.getFeedPage(following: _following, page: _page + 1);
+      _page += 1;
+      _posts = [...?_posts, ...next.posts];
+      _hasMore = next.hasMore;
+    } catch (_) {
+      _hasMore = false;
+    }
+    if (mounted) setState(() => _loadingMore = false);
+  }
+
+  /// One post changed — swap it in place rather than refetching the feed.
+  void _replacePost(Map<String, dynamic> updated) {
+    final posts = _posts;
+    if (posts == null) return;
+    final i = posts.indexWhere((p) => p['id'] == updated['id']);
+    if (i >= 0) setState(() => posts[i] = updated);
+  }
+
+  void _removePost(int id) {
+    setState(() => _posts?.removeWhere((p) => p['id'] == id));
   }
 
   void _switchFeed(bool following) {
@@ -204,7 +269,7 @@ class _ExploreTabState extends State<ExploreTab> {
   }
 
   Future<void> _repost(Map<String, dynamic> post) async {
-    if (await RepostSheet.open(context, post)) await _load();
+    if (await RepostSheet.open(context, post)) await _load(quiet: true);
   }
 
   void _openPost(Map<String, dynamic> post) => Navigator.push(
@@ -212,12 +277,12 @@ class _ExploreTabState extends State<ExploreTab> {
         MaterialPageRoute(
           builder: (_) => DiscussionDetailScreen(discussionId: post['id'] as int),
         ),
-      ).then((_) => _load());
+      ).then((_) => _load(quiet: true));
 
   void _openAuthor(int userId) => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => UserProfileScreen(userId: userId)),
-      ).then((_) => _load());
+      ).then((_) => _load(quiet: true));
 
   @override
   Widget build(BuildContext context) {
@@ -254,11 +319,13 @@ class _ExploreTabState extends State<ExploreTab> {
                   : (_posts == null || _posts!.isEmpty)
                       ? _empty(context, fr)
                       : ListView.builder(
+                          controller: _scroll,
                           padding: EdgeInsets.fromLTRB(
                               16, 14, 16, Ds.navSpace(context)),
                           physics: const AlwaysScrollableScrollPhysics(
                               parent: BouncingScrollPhysics()),
-                          itemCount: _posts!.length + 1,
+                          // Header row, the posts, then the load-more footer.
+                          itemCount: _posts!.length + 2,
                           itemBuilder: (_, i) {
                             if (i == 0) {
                               return Column(
@@ -269,6 +336,9 @@ class _ExploreTabState extends State<ExploreTab> {
                                 ],
                               );
                             }
+                            if (i == _posts!.length + 1) {
+                              return _feedFooter(context, fr);
+                            }
                             final post = _posts![i - 1];
                             return PostCard(
                               post: post,
@@ -277,12 +347,40 @@ class _ExploreTabState extends State<ExploreTab> {
                               onRepost: () => _repost(post),
                               onTagTap: _openTag,
                               onTopicTap: _openTopic,
+                              onChanged: _replacePost,
+                              onDeleted: () => _removePost(post['id'] as int),
                             );
                           },
                         ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Spinner while the next page loads, and a full stop when there is none.
+  Widget _feedFooter(BuildContext context, bool fr) {
+    if (_loadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 22),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Ds.green),
+          ),
+        ),
+      );
+    }
+    if (_hasMore || (_posts?.isEmpty ?? true)) return const SizedBox(height: 8);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 22),
+      child: Center(
+        child: Text(
+          fr ? 'Vous êtes à jour' : "You're all caught up",
+          style: Ds.meta(context),
+        ),
       ),
     );
   }
@@ -300,12 +398,16 @@ class _ExploreTabState extends State<ExploreTab> {
           Row(
             children: [
               if (widget.onBackToHome != null)
-                GestureDetector(
-                  onTap: widget.onBackToHome,
-                  child: const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+                Semantics(
+                  button: true,
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  child: GestureDetector(
+                    onTap: widget.onBackToHome,
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+                    ),
                   ),
                 ),
               if (widget.onBackToHome != null) const SizedBox(width: 8),
@@ -479,7 +581,7 @@ class _ExploreTabState extends State<ExploreTab> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => UserProfileScreen(userId: id)),
-        ).then((_) => _load());
+        ).then((_) => _load(quiet: true));
       },
       child: Container(
         width: size,
@@ -500,7 +602,7 @@ class _ExploreTabState extends State<ExploreTab> {
                         color: Ds.greenDeep),
                   ),
                 )
-              : CachedNetworkImage(
+              : AppNetworkImage(
                   imageUrl: url,
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(color: Ds.greenTint),

@@ -17,10 +17,8 @@ dependencies:
 
   # UI Components
   cupertino_icons: ^1.0.8
-  animated_notch_bottom_bar: ^1.0.4
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
-  carousel_slider: ^5.0.0
 
   # URL Launcher
   url_launcher: ^6.3.1
@@ -118,6 +116,12 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
+  # Adaptive icon (Android 8+): logo on a transparent 1024px canvas, scaled to
+  # ~62% so it stays inside the 66% safe zone under every launcher mask. White
+  # background matches the legacy icon (the brand green would swallow the
+  # green B/A letters).
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
   min_sdk_android: 21
   remove_alpha_ios: true
   background_color_ios: "#ffffff"

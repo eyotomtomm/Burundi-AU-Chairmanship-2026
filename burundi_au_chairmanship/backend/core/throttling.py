@@ -175,3 +175,15 @@ class WeatherProxyThrottle(SimpleRateThrottle):
     def get_cache_key(self, request, view):
         ident = self.get_ident(request)
         return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+class ShareCardThrottle(SimpleRateThrottle):
+    """
+    Per-IP cap on share-card image rendering (CPU-bound). Generous, because a
+    popular link is fetched by many recipients at once, but not unlimited.
+    """
+    scope = 'share_card'
+    rate = '60/min'
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}

@@ -629,4 +629,375 @@ class AppLocalizationsGeneratedFr extends AppLocalizationsGenerated {
   @override
   String get data_saver_desc =>
       'Réduire la qualité d\'image et la fréquence de mise à jour pour économiser les données';
+
+  @override
+  String get generic_error => 'Une erreur s\'est produite. Veuillez réessayer.';
+
+  @override
+  String get yd_documents_after_acceptance =>
+      'les pièces justificatives seront demandées une fois votre candidature acceptée.';
+
+  @override
+  String get camera_permission_denied =>
+      'L\'accès à la caméra est nécessaire pour scanner les codes. Activez-le pour cette application dans les Réglages de votre appareil.';
+
+  @override
+  String get explore_terms_title => 'Bienvenue sur Explore';
+
+  @override
+  String get explore_terms_subtitle =>
+      'Un espace public de débat sur les politiques jeunesse. Lisez ceci une fois avant de participer.';
+
+  @override
+  String get explore_terms_before_posting => 'Avant de pouvoir publier';
+
+  @override
+  String get explore_terms_complete_profile => 'Compléter mon profil';
+
+  @override
+  String get explore_terms_agree =>
+      'J\'ai lu et j\'accepte les règles de la communauté Explore.';
+
+  @override
+  String get explore_terms_continue => 'Accepter et continuer';
+
+  @override
+  String get explore_terms_english_prevails =>
+      'La version anglaise de ces conditions fait foi.';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get yes => 'Oui';
+
+  @override
+  String get no => 'Non';
+
+  @override
+  String get delete => 'Supprimer';
+
+  @override
+  String get remove => 'Retirer';
+
+  @override
+  String get edit => 'Modifier';
+
+  @override
+  String get send => 'Envoyer';
+
+  @override
+  String get submit => 'Soumettre';
+
+  @override
+  String get done => 'Terminé';
+
+  @override
+  String get confirm => 'Confirmer';
+
+  @override
+  String get share => 'Partager';
+
+  @override
+  String get copy => 'Copier';
+
+  @override
+  String get copied => 'Copié dans le presse-papiers';
+
+  @override
+  String get refresh => 'Actualiser';
+
+  @override
+  String get open => 'Ouvrir';
+
+  @override
+  String get bookmark => 'Enregistrer';
+
+  @override
+  String get unknown => 'Inconnu';
+
+  @override
+  String get not_available => 'Non disponible';
+
+  @override
+  String get try_again => 'Réessayer';
+
+  @override
+  String get failed_to_load => 'Échec du chargement';
+
+  @override
+  String get connection_failed =>
+      'Connexion impossible. Vérifiez votre réseau.';
+
+  @override
+  String get server_error_retry =>
+      'Erreur du serveur. Veuillez réessayer plus tard.';
+
+  @override
+  String get request_failed => 'La requête a échoué';
+
+  @override
+  String get offline_no_internet => 'Aucune connexion Internet';
+
+  @override
+  String get offline_back_online => 'De nouveau en ligne';
+
+  @override
+  String get offline_reconnecting => 'Reconnexion...';
+
+  @override
+  String get update_required => 'Mise à jour requise';
+
+  @override
+  String get update_available => 'Mise à jour disponible';
+
+  @override
+  String get update_now => 'Mettre à jour maintenant';
+
+  @override
+  String get maybe_later => 'Plus tard';
+
+  @override
+  String get whats_new => 'Nouveautés';
+
+  @override
+  String get got_it => 'Compris !';
+
+  @override
+  String get no_magazines_found => 'Aucun magazine trouvé';
+
+  @override
+  String get live_chat_start_failed =>
+      'Impossible de démarrer la discussion en direct. Veuillez réessayer.';
+
+  @override
+  String get blocked_external_nav => 'Navigation vers un site externe bloquée';
+
+  @override
+  String get could_not_open_platform => 'Impossible d\'ouvrir cette plateforme';
+
+  @override
+  String get open_externally => 'Ouvrir à l\'extérieur';
+
+  @override
+  String get no_stream_url =>
+      'Aucun lien de diffusion n\'est disponible pour ce flux';
+
+  @override
+  String get no_scheduled_time =>
+      'Aucun horaire n\'est disponible pour cet événement';
+
+  @override
+  String get reminder_add_failed =>
+      'Impossible d\'ajouter le rappel. Veuillez réessayer.';
+
+  @override
+  String get no_phrases_available => 'Aucune phrase disponible.';
+
+  @override
+  String get could_not_open_link => 'Impossible d\'ouvrir le lien';
+
+  @override
+  String get no_active_polls => 'Aucun sondage en cours';
+
+  @override
+  String get recording_unavailable =>
+      'Cet enregistrement de session n\'est pas disponible';
+
+  @override
+  String get pdf_not_available => 'PDF pas encore disponible.';
+
+  @override
+  String get rs_discussion => 'Discussion';
+
+  @override
+  String get rs_discussion_not_found => 'Discussion introuvable';
+
+  @override
+  String get rs_no_discussions_yet => 'Aucune discussion pour le moment';
+
+  @override
+  String get rs_no_replies_yet => 'Aucune réponse pour le moment';
+
+  @override
+  String get rs_replies => 'Réponses';
+
+  @override
+  String get rs_write_reply_hint => 'Écrire une réponse…';
+
+  @override
+  String get rs_comment_post_failed =>
+      'Votre réponse n\'a pas pu être publiée.';
+
+  @override
+  String get rs_load_more_replies => 'Charger plus de réponses';
+
+  @override
+  String get w_new_post => 'Nouvelle publication';
+
+  @override
+  String get w_title => 'Titre';
+
+  @override
+  String get w_category => 'Catégorie';
+
+  @override
+  String get w_post => 'Publier';
+
+  @override
+  String get w_photo => 'Photo';
+
+  @override
+  String get w_video => 'Vidéo';
+
+  @override
+  String get w_poll => 'Sondage';
+
+  @override
+  String get w_ask_question => 'Posez une question';
+
+  @override
+  String get w_option => 'Option';
+
+  @override
+  String get w_add_option => 'Ajouter une option';
+
+  @override
+  String get w_answering => 'En réponse à';
+
+  @override
+  String get w_poll_skipped => 'Sondage ignoré';
+
+  @override
+  String get w_attachment_skipped =>
+      'Certaines pièces jointes n\'ont pas été envoyées';
+
+  @override
+  String get w_file_too_large => 'Ce fichier est trop volumineux';
+
+  @override
+  String get w_complete_profile_title => 'Complétez votre profil';
+
+  @override
+  String get w_complete_profile_body =>
+      'Ajoutez le reste de vos informations avant de publier.';
+
+  @override
+  String get w_not_now => 'Plus tard';
+
+  @override
+  String get w_repost => 'Republier';
+
+  @override
+  String get w_repost_sub => 'Partagez ceci avec vos abonnés';
+
+  @override
+  String get w_repost_removed => 'Republication retirée';
+
+  @override
+  String get w_quote => 'Citer';
+
+  @override
+  String get w_quote_sub => 'Ajoutez votre point de vue';
+
+  @override
+  String get w_add_take_hint => 'Ajoutez votre avis…';
+
+  @override
+  String get w_report => 'Signaler';
+
+  @override
+  String get w_report_post => 'Signaler la publication';
+
+  @override
+  String get w_report_account => 'Signaler le compte';
+
+  @override
+  String get w_report_this_post => 'Signaler cette publication';
+
+  @override
+  String get w_this_account => 'ce compte';
+
+  @override
+  String get w_what_is_wrong => 'Quel est le problème ?';
+
+  @override
+  String get w_delete_post => 'Supprimer la publication';
+
+  @override
+  String get w_delete_post_body =>
+      'Elle sera retirée pour tout le monde. Cette action est irréversible.';
+
+  @override
+  String get w_block => 'Bloquer';
+
+  @override
+  String get w_block_account => 'Bloquer le compte';
+
+  @override
+  String get w_block_body =>
+      'Vous ne verrez plus leurs publications ni leurs réponses, et ils ne verront plus les vôtres.';
+
+  @override
+  String get w_blocked_done => 'Compte bloqué';
+
+  @override
+  String get w_unblock => 'Débloquer';
+
+  @override
+  String get w_blocked_accounts => 'Comptes bloqués';
+
+  @override
+  String get w_edited => 'modifié';
+
+  @override
+  String get w_leaving_app => 'Vous quittez l\'application';
+
+  @override
+  String get w_link_opens_browser =>
+      'Ce lien s\'ouvrira dans votre navigateur.';
+
+  @override
+  String get w_image_load_failed => 'Impossible de charger l\'image';
+
+  @override
+  String get w_clear => 'Effacer';
+
+  @override
+  String get w_congratulations => 'Félicitations';
+
+  @override
+  String get xt_accountable =>
+      'Les publications ici portent votre vrai nom et votre photo. Vous êtes responsable de ce que vous écrivez.';
+
+  @override
+  String get xt_we_still_need => 'Il nous manque encore';
+
+  @override
+  String get xt_field_name => 'votre nom complet';
+
+  @override
+  String get xt_field_photo => 'une photo de profil';
+
+  @override
+  String get xt_field_country => 'votre pays';
+
+  @override
+  String get xt_field_dob => 'votre date de naissance';
+
+  @override
+  String get xt_field_phone => 'votre numéro de téléphone';
+
+  @override
+  String get w_appeal_explain =>
+      'Expliquez-nous pourquoi vous pensez qu\'il s\'agit d\'une erreur.';
+
+  @override
+  String get w_appeal_hint => 'Votre explication…';
+
+  @override
+  String get w_appeal_more_details => 'Veuillez donner un peu plus de détails.';
+
+  @override
+  String get w_appeal_reason_required => 'Un motif est requis.';
 }

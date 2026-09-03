@@ -51,6 +51,7 @@
     <!-- Members table -->
     <div class="bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
       {% if users %}
+        <div class="overflow-x-auto">
         <table class="w-full">
           <thead class="bg-slate-50 dark:bg-slate-750 border-b border-slate-200 dark:border-slate-700">
             <tr>
@@ -89,6 +90,7 @@
             {% endfor %}
           </tbody>
         </table>
+        </div>
 
         {% if users.has_other_pages %}
         <div class="px-6 py-4 bg-slate-50 dark:bg-slate-750 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">

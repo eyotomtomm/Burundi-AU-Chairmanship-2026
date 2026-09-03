@@ -19,6 +19,8 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+_ZERO_NET = ipaddress.ip_network('0.0.0.0/8')  # 'this network' — reaches localhost on Linux
+
 def _validate_webhook_url(url):
     """Validate that a webhook URL does not target private/internal networks.
 
@@ -53,10 +55,11 @@ def _validate_webhook_url(url):
         if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
             ip = ip.ipv4_mapped
 
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified or ip in _ZERO_NET):
             raise ValueError(
                 f'Webhook URL resolves to blocked address {ip} '
-                f'(private/loopback/link-local/reserved)'
+                f'(private/loopback/link-local/multicast/reserved)'
             )
 
     return True
@@ -235,6 +238,7 @@ def send_webhook(event_type, data):
                 json=payload,
                 headers=headers,
                 timeout=5,
+                allow_redirects=False,  # a redirect would skip the SSRF check
             )
             duration_ms = int((time.time() - start_time) * 1000)
             status_code = response.status_code
@@ -326,6 +330,7 @@ def send_test_webhook(webhook):
             json=payload,
             headers=headers,
             timeout=5,
+            allow_redirects=False,  # a redirect would skip the SSRF check
         )
         duration_ms = int((time.time() - start_time) * 1000)
 
@@ -370,4 +375,5 @@ def send_test_webhook(webhook):
         return False, None, f'Connection error: {str(e)[:200]}'
 
     except Exception as e:
+        logger.warning('Webhook test ping failed for %s: %s', getattr(webhook, 'url', webhook), e)
         return False, None, f'Error: {str(e)[:200]}'

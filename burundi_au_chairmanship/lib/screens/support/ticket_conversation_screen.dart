@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../config/app_colors.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/api_service.dart';
 import '../../config/app_ds.dart';
 
@@ -26,11 +28,16 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_ticketId == null) {
+    if (_ticketId == null && _error == null) {
       final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is int) {
-        _ticketId = args;
+      final id = args is int ? args : int.tryParse('$args');
+      if (id != null) {
+        _ticketId = id;
         _loadTicket();
+      } else {
+        // Bad deep link / missing argument: error state instead of a spinner
+        _isLoading = false;
+        _error = 'missing_ticket';
       }
     }
   }
@@ -64,9 +71,9 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
         _messages = List<Map<String, dynamic>>.from(data['messages'] ?? []);
         _isLoading = false;
       });
-
-      await _apiService.markTicketRead(_ticketId!);
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      // Fire-and-forget: a failed read receipt must not turn into a load error.
+      _apiService.markTicketRead(_ticketId!).catchError((_) => <String, dynamic>{});
     } catch (e) {
       if (kDebugMode) debugPrint('Ticket load error: $e');
       setState(() {
@@ -105,7 +112,11 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
       setState(() => _isSending = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text(e is ApiException
+                  ? e.message
+                  : AppLocalizations.of(context).translate('sup_failed_to_send')),
+              backgroundColor: AppColors.error),
         );
       }
     }
@@ -122,8 +133,8 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Thank you for your feedback!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).translate('sup_thanks_feedback')),
             backgroundColor: AppColors.success,
           ),
         );
@@ -131,7 +142,11 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit rating: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text(e is ApiException
+                  ? e.message
+                  : AppLocalizations.of(context).translate('sup_failed_rating')),
+              backgroundColor: AppColors.error),
         );
       }
     }
@@ -140,34 +155,39 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   void _showRatingDialog() {
     int selectedStars = 0;
     final commentController = TextEditingController();
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Rate Your Experience', textAlign: TextAlign.center),
+          title: Text(l10n.translate('sup_rate_experience_title'), textAlign: TextAlign.center),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'How was your support experience?',
+              Text(
+                l10n.translate('sup_how_was_experience'),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(5, (i) {
                   final star = i + 1;
-                  return GestureDetector(
-                    onTap: () => setDialogState(() => selectedStars = star),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(
-                        star <= selectedStars ? Icons.star_rounded : Icons.star_border_rounded,
-                        color: star <= selectedStars ? Colors.amber : Colors.grey[400],
-                        size: 40,
+                  return Semantics(
+                    button: true,
+                    label: '$star/5',
+                    child: GestureDetector(
+                      onTap: () => setDialogState(() => selectedStars = star),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          star <= selectedStars ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: star <= selectedStars ? Colors.amber : Colors.grey[400],
+                          size: 40,
+                        ),
                       ),
                     ),
                   );
@@ -177,7 +197,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               TextField(
                 controller: commentController,
                 decoration: InputDecoration(
-                  hintText: 'Any additional feedback? (optional)',
+                  hintText: l10n.translate('sup_additional_feedback'),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
@@ -189,13 +209,14 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Later'),
+              child: Text(l10n.translate('maybe_later')),
             ),
             ElevatedButton(
               onPressed: selectedStars > 0
                   ? () {
+                      final comment = commentController.text.trim();
                       Navigator.pop(ctx);
-                      _submitRating(selectedStars, commentController.text.trim());
+                      _submitRating(selectedStars, comment);
                     }
                   : null,
               style: ElevatedButton.styleFrom(
@@ -203,12 +224,12 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text('Submit'),
+              child: Text(l10n.translate('submit')),
             ),
           ],
         ),
       ),
-    );
+    ).then((_) => commentController.dispose());
   }
 
   String _formatTime(String? dateStr) {
@@ -224,10 +245,9 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
       if (diff.inDays == 0) {
         return time;
       } else if (diff.inDays == 1) {
-        return 'Yesterday $time';
+        return '${AppLocalizations.of(context).translate('sup_yesterday')} $time';
       } else if (diff.inDays < 7) {
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        return '${days[date.weekday - 1]} $time';
+        return '${DateFormat.E(Localizations.localeOf(context).languageCode).format(date)} $time';
       }
       return '${date.day}/${date.month} $time';
     } catch (_) {
@@ -239,12 +259,13 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Ds.bg(context),
       appBar: AppBar(
         title: Text(
-          _ticket?['subject'] ?? 'Support Ticket',
+          _ticket?['subject'] ?? l10n.translate('sup_ticket_title'),
           style: const TextStyle(fontSize: 16),
         ),
         actions: [
@@ -253,7 +274,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               padding: const EdgeInsets.only(right: 12),
               child: Chip(
                 label: Text(
-                  _isClosed ? 'Closed' : 'Resolved',
+                  l10n.translate(_isClosed ? 'sup_status_closed' : 'sup_status_resolved'),
                   style: const TextStyle(fontSize: 11, color: Colors.white),
                 ),
                 backgroundColor: Colors.white24,
@@ -272,8 +293,15 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                     children: [
                       Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
                       const SizedBox(height: 16),
-                      const Text('Failed to load conversation'),
-                      TextButton(onPressed: _loadTicket, child: const Text('Retry')),
+                      Text(l10n.translate(_ticketId == null
+                          ? 'sup_ticket_not_found'
+                          : 'sup_failed_load_conversation')),
+                      if (_ticketId != null)
+                        TextButton(onPressed: _loadTicket, child: Text(l10n.translate('retry')))
+                      else
+                        TextButton(
+                            onPressed: () => Navigator.maybePop(context),
+                            child: Text(MaterialLocalizations.of(context).backButtonTooltip)),
                     ],
                   ),
                 )
@@ -282,7 +310,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                     // Messages list
                     Expanded(
                       child: _messages.isEmpty
-                          ? const Center(child: Text('No messages yet'))
+                          ? Center(child: Text(l10n.translate('sup_no_messages')))
                           : ListView.builder(
                               controller: _scrollController,
                               padding: const EdgeInsets.symmetric(
@@ -313,6 +341,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   }
 
   Widget _buildRatingPrompt(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -330,7 +359,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Ticket Resolved',
+                  l10n.translate('sup_ticket_resolved'),
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87,
@@ -338,7 +367,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Please rate your experience',
+                  l10n.translate('sup_please_rate'),
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark ? Colors.white60 : Colors.black54,
@@ -355,7 +384,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-            child: const Text('Rate', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(l10n.translate('sup_rate'), style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -376,7 +405,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
         children: [
           const Icon(Icons.check_circle, color: AppColors.success, size: 20),
           const SizedBox(width: 8),
-          Text('You rated this ', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
+          Text('${AppLocalizations.of(context).translate('sup_you_rated')} ', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54)),
           ...List.generate(5, (i) => Icon(
             i < rating ? Icons.star_rounded : Icons.star_border_rounded,
             color: Colors.amber,
@@ -401,7 +430,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
           Icon(Icons.lock_outline, color: Colors.grey[500], size: 18),
           const SizedBox(width: 8),
           Text(
-            'This ticket is closed',
+            AppLocalizations.of(context).translate('sup_ticket_closed'),
             style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500),
           ),
         ],
@@ -422,7 +451,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
       child: ElevatedButton.icon(
         onPressed: () => Navigator.pushReplacementNamed(context, '/contact-support'),
         icon: const Icon(Icons.add),
-        label: const Text('Start New Ticket'),
+        label: Text(AppLocalizations.of(context).translate('sup_start_new_ticket')),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.burundiGreen,
           foregroundColor: Colors.white,
@@ -453,7 +482,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
               bottom: 4,
             ),
             child: Text(
-              isAdmin ? 'Support Team' : 'You',
+              AppLocalizations.of(context).translate(isAdmin ? 'sup_support_team' : 'sup_you'),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -501,6 +530,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
   }
 
   Widget _buildInputBar(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: EdgeInsets.only(
         left: 12, right: 8, top: 8,
@@ -516,7 +546,7 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
             child: TextField(
               controller: _messageController,
               decoration: InputDecoration(
-                hintText: _isResolved ? 'Reply to reopen ticket...' : 'Type a message...',
+                hintText: l10n.translate(_isResolved ? 'sup_reply_reopen' : 'sup_type_message'),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -545,7 +575,8 @@ class _TicketConversationScreenState extends State<TicketConversationScreen> {
                 )
               : IconButton(
                   onPressed: _sendMessage,
-                  icon: Icon(Icons.send_rounded, color: AppColors.burundiGreen),
+                  tooltip: l10n.translate('send'),
+                  icon: const Icon(Icons.send_rounded, color: AppColors.burundiGreen),
                   iconSize: 28,
                 ),
         ],

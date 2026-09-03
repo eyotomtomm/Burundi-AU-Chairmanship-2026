@@ -32,6 +32,9 @@ echo "========================================="
 
 # Common dart-define flags
 DART_DEFINES="--dart-define=ENVIRONMENT=$ENVIRONMENT"
+# Obfuscate Dart symbols; keep the symbol maps (upload to Sentry/Crashlytics to
+# symbolicate stack traces).
+OBFUSCATE="--obfuscate --split-debug-info=build/symbols"
 if [ -n "$SENTRY_DSN" ]; then
   DART_DEFINES="$DART_DEFINES --dart-define=SENTRY_DSN=$SENTRY_DSN"
   echo "  Sentry: Enabled"
@@ -43,22 +46,23 @@ echo "========================================="
 build_android() {
   echo ""
   echo "[Android] Building release APK..."
-  flutter build apk --release $DART_DEFINES
+  flutter build apk --release $DART_DEFINES $OBFUSCATE/android
   echo ""
   echo "[Android] APK ready at:"
   echo "  build/app/outputs/flutter-apk/app-release.apk"
   echo ""
   echo "[Android] Building App Bundle (for Play Store)..."
-  flutter build appbundle --release $DART_DEFINES
+  flutter build appbundle --release $DART_DEFINES $OBFUSCATE/android
   echo ""
   echo "[Android] AAB ready at:"
   echo "  build/app/outputs/bundle/release/app-release.aab"
+  echo "  Symbol maps: build/symbols/android (keep for crash symbolication)"
 }
 
 build_ios() {
   echo ""
   echo "[iOS] Building release IPA..."
-  flutter build ipa --release $DART_DEFINES
+  flutter build ipa --release $DART_DEFINES $OBFUSCATE/ios
   echo ""
   echo "[iOS] Archive ready at:"
   echo "  build/ios/archive/Runner.xcarchive"

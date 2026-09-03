@@ -23,14 +23,14 @@ class DataSaverService {
     await prefs.setBool(_prefKey, value);
   }
 
-  /// Width constraint for list thumbnails (cards, grid items).
-  int? get thumbnailCacheWidth => _enabled ? 200 : null;
+  /// Decode width for list thumbnails (cards, grid items).
+  int get thumbnailCacheWidth => _enabled ? 300 : 600;
 
-  /// Width constraint for hero / carousel images.
-  int? get heroCacheWidth => _enabled ? 400 : null;
+  /// Decode width for hero / carousel images.
+  int get heroCacheWidth => _enabled ? 600 : 1200;
 
-  /// Width constraint for full-screen / detail images.
-  int? get fullImageCacheWidth => _enabled ? 600 : null;
+  /// Decode width for full-screen / detail images (null = native size).
+  int? get fullImageCacheWidth => _enabled ? 800 : null;
 
   /// Multiplier for polling intervals. 1× normal, 3× in data-saver mode.
   int get pollingMultiplier => _enabled ? 3 : 1;

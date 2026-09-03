@@ -24,6 +24,9 @@ services:
     # ASGI via gunicorn + uvicorn workers — serves both HTTP and WebSocket.
     # Migrate and collectstatic run once in the pre-deploy job below.
     run_command: gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker -c gunicorn.conf.py
+    # /api/health/ returns {"status":"ok"} for anonymous callers — it proves the
+    # ASGI worker is up and routing, not that Postgres/Redis are reachable
+    # (component checks are staff-only). DB/cache failures surface via Sentry.
     health_check:
       http_path: /api/health/
       initial_delay_seconds: 60
@@ -38,7 +41,7 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
       - key: SITE_URL
         value: "https://burundi4africa.com"
       - key: EMAIL_BACKEND
@@ -55,8 +58,13 @@ services:
         value: "Be 4 Africa <info@burundi4africa.com>"
       - key: SENTRY_ENVIRONMENT
         value: "production"
+      # ${_self.COMMIT_HASH} is the git SHA App Platform built this component from.
       - key: SENTRY_RELEASE
-        value: "burundi-au-backend@1.0.0"
+        value: "burundi-au-backend@${_self.COMMIT_HASH}"
+      # Play App Signing certificate SHA-256 (comma-separated if several). Set in
+      # the dashboard so App Links verify for the Play-signed build. See config/urls.py.
+      - key: ANDROID_PLAY_SIGNING_SHA256
+        value: ""
       - key: SENTRY_TRACES_SAMPLE_RATE
         value: "0.2"
       # Sensitive — set as ENCRYPTED in DigitalOcean dashboard
@@ -129,8 +137,27 @@ workers:
     envs:
       - key: DJANGO_DEBUG
         value: "False"
+      # Mirrors the api service: tasks send email and build absolute media URLs.
+      - key: SITE_URL
+        value: "https://burundi4africa.com"
+      - key: EMAIL_BACKEND
+        value: "django.core.mail.backends.smtp.EmailBackend"
+      - key: EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        value: "info@burundi4africa.com"
+      - key: DEFAULT_FROM_EMAIL
+        value: "Be 4 Africa <info@burundi4africa.com>"
+      - key: CDN_DOMAIN
+        value: "burundi-au-media.fra1.cdn.digitaloceanspaces.com"
+      - key: SENTRY_RELEASE
+        value: "burundi-au-backend@${_self.COMMIT_HASH}"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
       - key: DJANGO_SECRET_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
@@ -184,7 +211,7 @@ jobs:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "api.burundi4africa.com,burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
+        value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
       - key: DJANGO_SECRET_KEY
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"

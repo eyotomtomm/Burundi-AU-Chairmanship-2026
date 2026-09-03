@@ -1,0 +1,70 @@
+{
+  "project_info": {
+    "project_number": "55634991225",
+    "project_id": "b4africa-700f7",
+    "storage_bucket": "b4africa-700f7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55634991225:android:8e81a0b27aa48240645ca8",
+        "android_client_info": {
+          "package_name": "com.b4africa.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "55634991225-0sko7nijn4bo6lsuglrfpctc3a6r9l6q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.b4africa.app",
+            "certificate_hash": "eb164093afdf6f2c584b69f8be8aa289d17783a4"
+          }
+        },
+        {
+          "client_id": "55634991225-1q621td5ojiblrjneau8qfj1khj8tba4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.b4africa.app",
+            "certificate_hash": "64df93bcef14bf45b2ffe61f29f31df60f85f358"
+          }
+        },
+        {
+          "client_id": "55634991225-td8goaphj25j9d787qr5eg5dng58c2jv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.b4africa.app",
+            "certificate_hash": "6c834bc460cd3d6422e9182d3b0a2c64a2257425"
+          }
+        },
+        {
+          "client_id": "55634991225-ho69pb48q863skc57niakt61uaullrd7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfREkuAPDum5ds3P4YwA-YHGPAuc2grbQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "55634991225-ho69pb48q863skc57niakt61uaullrd7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "55634991225-q9p5oc5pqvu8q8vsnagqvleo743t9u1k.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.burundi.au.burundiAuChairmanship"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

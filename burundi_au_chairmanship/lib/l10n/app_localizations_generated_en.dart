@@ -624,4 +624,367 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   @override
   String get data_saver_desc =>
       'Reduce image quality and polling frequency to save data';
+
+  @override
+  String get generic_error => 'Something went wrong. Please try again.';
+
+  @override
+  String get yd_documents_after_acceptance =>
+      'supporting documents are requested after your application is accepted.';
+
+  @override
+  String get camera_permission_denied =>
+      'Camera access is required to scan codes. Enable it for this app in your device Settings.';
+
+  @override
+  String get explore_terms_title => 'Welcome to Explore';
+
+  @override
+  String get explore_terms_subtitle =>
+      'A public space for youth policy debate. Read this once before you take part.';
+
+  @override
+  String get explore_terms_before_posting => 'Before you can post';
+
+  @override
+  String get explore_terms_complete_profile => 'Complete my profile';
+
+  @override
+  String get explore_terms_agree =>
+      'I have read and agree to the Explore community terms.';
+
+  @override
+  String get explore_terms_continue => 'Agree and continue';
+
+  @override
+  String get explore_terms_english_prevails =>
+      'The English version of these terms is the reference text.';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get yes => 'Yes';
+
+  @override
+  String get no => 'No';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String get send => 'Send';
+
+  @override
+  String get submit => 'Submit';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get confirm => 'Confirm';
+
+  @override
+  String get share => 'Share';
+
+  @override
+  String get copy => 'Copy';
+
+  @override
+  String get copied => 'Copied to clipboard';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get open => 'Open';
+
+  @override
+  String get bookmark => 'Bookmark';
+
+  @override
+  String get unknown => 'Unknown';
+
+  @override
+  String get not_available => 'Not available';
+
+  @override
+  String get try_again => 'Try again';
+
+  @override
+  String get failed_to_load => 'Failed to load';
+
+  @override
+  String get connection_failed => 'Connection failed. Check your network.';
+
+  @override
+  String get server_error_retry => 'Server error. Please try again later.';
+
+  @override
+  String get request_failed => 'Request failed';
+
+  @override
+  String get offline_no_internet => 'No internet connection';
+
+  @override
+  String get offline_back_online => 'Back online';
+
+  @override
+  String get offline_reconnecting => 'Reconnecting...';
+
+  @override
+  String get update_required => 'Update Required';
+
+  @override
+  String get update_available => 'Update Available';
+
+  @override
+  String get update_now => 'Update Now';
+
+  @override
+  String get maybe_later => 'Maybe Later';
+
+  @override
+  String get whats_new => 'What\'s new';
+
+  @override
+  String get got_it => 'Got it';
+
+  @override
+  String get no_magazines_found => 'No magazines found';
+
+  @override
+  String get live_chat_start_failed =>
+      'Could not start live chat. Please try again.';
+
+  @override
+  String get blocked_external_nav => 'Blocked navigation to an external site';
+
+  @override
+  String get could_not_open_platform => 'Could not open this platform';
+
+  @override
+  String get open_externally => 'Open externally';
+
+  @override
+  String get no_stream_url => 'No stream link is available for this feed';
+
+  @override
+  String get no_scheduled_time =>
+      'No scheduled time is available for this event';
+
+  @override
+  String get reminder_add_failed =>
+      'Could not add the reminder. Please try again.';
+
+  @override
+  String get no_phrases_available => 'No phrases available.';
+
+  @override
+  String get could_not_open_link => 'Could not open the link';
+
+  @override
+  String get no_active_polls => 'No active polls';
+
+  @override
+  String get recording_unavailable => 'This session recording is not available';
+
+  @override
+  String get pdf_not_available => 'PDF not available yet.';
+
+  @override
+  String get rs_discussion => 'Discussion';
+
+  @override
+  String get rs_discussion_not_found => 'Discussion not found';
+
+  @override
+  String get rs_no_discussions_yet => 'No discussions yet';
+
+  @override
+  String get rs_no_replies_yet => 'No replies yet';
+
+  @override
+  String get rs_replies => 'Replies';
+
+  @override
+  String get rs_write_reply_hint => 'Write a reply…';
+
+  @override
+  String get rs_comment_post_failed => 'Your reply could not be posted.';
+
+  @override
+  String get rs_load_more_replies => 'Load more replies';
+
+  @override
+  String get w_new_post => 'New post';
+
+  @override
+  String get w_title => 'Title';
+
+  @override
+  String get w_category => 'Category';
+
+  @override
+  String get w_post => 'Post';
+
+  @override
+  String get w_photo => 'Photo';
+
+  @override
+  String get w_video => 'Video';
+
+  @override
+  String get w_poll => 'Poll';
+
+  @override
+  String get w_ask_question => 'Ask a question';
+
+  @override
+  String get w_option => 'Option';
+
+  @override
+  String get w_add_option => 'Add option';
+
+  @override
+  String get w_answering => 'Answering';
+
+  @override
+  String get w_poll_skipped => 'Poll skipped';
+
+  @override
+  String get w_attachment_skipped => 'Some attachments did not upload';
+
+  @override
+  String get w_file_too_large => 'That file is too large';
+
+  @override
+  String get w_complete_profile_title => 'Complete your profile';
+
+  @override
+  String get w_complete_profile_body =>
+      'Add the rest of your details before posting.';
+
+  @override
+  String get w_not_now => 'Not now';
+
+  @override
+  String get w_repost => 'Repost';
+
+  @override
+  String get w_repost_sub => 'Share this with your followers';
+
+  @override
+  String get w_repost_removed => 'Repost removed';
+
+  @override
+  String get w_quote => 'Quote';
+
+  @override
+  String get w_quote_sub => 'Add your own take';
+
+  @override
+  String get w_add_take_hint => 'Add your take…';
+
+  @override
+  String get w_report => 'Report';
+
+  @override
+  String get w_report_post => 'Report post';
+
+  @override
+  String get w_report_account => 'Report account';
+
+  @override
+  String get w_report_this_post => 'Report this post';
+
+  @override
+  String get w_this_account => 'this account';
+
+  @override
+  String get w_what_is_wrong => 'What is wrong with it?';
+
+  @override
+  String get w_delete_post => 'Delete post';
+
+  @override
+  String get w_delete_post_body =>
+      'This removes it for everyone. It cannot be undone.';
+
+  @override
+  String get w_block => 'Block';
+
+  @override
+  String get w_block_account => 'Block account';
+
+  @override
+  String get w_block_body =>
+      'You will not see their posts or replies, and they will not see yours.';
+
+  @override
+  String get w_blocked_done => 'Account blocked';
+
+  @override
+  String get w_unblock => 'Unblock';
+
+  @override
+  String get w_blocked_accounts => 'Blocked accounts';
+
+  @override
+  String get w_edited => 'edited';
+
+  @override
+  String get w_leaving_app => 'Leaving the app';
+
+  @override
+  String get w_link_opens_browser => 'This link opens in your browser.';
+
+  @override
+  String get w_image_load_failed => 'Image could not be loaded';
+
+  @override
+  String get w_clear => 'Clear';
+
+  @override
+  String get w_congratulations => 'Congratulations';
+
+  @override
+  String get xt_accountable =>
+      'Posts here carry your real name and photo. You are accountable for what you write.';
+
+  @override
+  String get xt_we_still_need => 'We still need';
+
+  @override
+  String get xt_field_name => 'your full name';
+
+  @override
+  String get xt_field_photo => 'a profile photo';
+
+  @override
+  String get xt_field_country => 'your country';
+
+  @override
+  String get xt_field_dob => 'your date of birth';
+
+  @override
+  String get xt_field_phone => 'your phone number';
+
+  @override
+  String get w_appeal_explain => 'Tell us why you think this was a mistake.';
+
+  @override
+  String get w_appeal_hint => 'Your explanation…';
+
+  @override
+  String get w_appeal_more_details => 'Please add a little more detail.';
+
+  @override
+  String get w_appeal_reason_required => 'A reason is required.';
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../services/data_saver_service.dart';
+import '../../widgets/app_network_image.dart';
+import '../../l10n/app_localizations.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
 import '../../config/app_ds.dart';
@@ -189,9 +192,10 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
           if (imageUrl.isEmpty)
             fallback
           else
-            CachedNetworkImage(
+            AppNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.cover,
+              hero: true,
               placeholder: (_, _) => fallback,
               errorWidget: (_, _, _) => fallback,
             ),
@@ -213,8 +217,9 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
           Positioned(
             left: 16,
             top: MediaQuery.paddingOf(context).top + 8,
-            child: _circleButton(
-                Icons.arrow_back_rounded, () => Navigator.pop(context)),
+            child: _circleButton(Icons.arrow_back_rounded,
+                () => Navigator.pop(context),
+                MaterialLocalizations.of(context).backButtonTooltip),
           ),
           Positioned(
             right: 16,
@@ -228,6 +233,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
                   id: cardData['id'],
                   title: _t(btnContext, 'title'),
                 ),
+                AppLocalizations.of(context).translate('share'),
               ),
             ),
           ),
@@ -236,7 +242,11 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
     );
   }
 
-  Widget _circleButton(IconData icon, VoidCallback onTap) => GestureDetector(
+  Widget _circleButton(IconData icon, VoidCallback onTap, String label) =>
+      Semantics(
+        button: true,
+        label: label,
+        child: GestureDetector(
         onTap: onTap,
         child: Container(
           width: 40,
@@ -246,6 +256,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 20, color: Colors.white),
+        ),
         ),
       );
 
@@ -390,7 +401,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
             fit: StackFit.expand,
             children: [
               if (imageUrl.isNotEmpty)
-                CachedNetworkImage(
+                AppNetworkImage(
                   imageUrl: Environment.fixMediaUrl(imageUrl),
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(
@@ -470,7 +481,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
               // YouTube gives us a poster frame for free; uploaded files
               // have no thumbnail, so they keep the placeholder.
               if (poster != null)
-                CachedNetworkImage(
+                AppNetworkImage(
                   imageUrl: poster,
                   fit: BoxFit.cover,
                   errorWidget: (_, _, _) => _videoPlaceholder(isDark),
@@ -533,6 +544,7 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
               child: CachedNetworkImage(
                 imageUrl: Environment.fixMediaUrl(imageUrl),
                 fit: BoxFit.contain,
+                memCacheWidth: DataSaverService().fullImageCacheWidth,
                 placeholder: (_, _) => const SizedBox(
                   height: 200,
                   child: Center(child: CircularProgressIndicator()),

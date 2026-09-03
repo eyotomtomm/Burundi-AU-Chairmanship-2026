@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../../widgets/app_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../config/app_ds.dart';
 import '../../../config/environment.dart';
@@ -69,7 +69,7 @@ class FeatureCardsSection extends StatelessWidget {
   Widget _buildCardIcon(Map<String, dynamic> card, double size) {
     final iconImageUrl = card['iconImageUrl'] as String? ?? '';
     if (iconImageUrl.isNotEmpty) {
-      return CachedNetworkImage(
+      return AppNetworkImage(
         imageUrl: Environment.fixMediaUrl(iconImageUrl),
         width: size,
         height: size,
@@ -281,7 +281,7 @@ class _FeatureCard extends StatelessWidget {
     );
     final Widget background = imageUrl.isEmpty
         ? fallbackBackground
-        : CachedNetworkImage(
+        : AppNetworkImage(
             imageUrl: imageUrl,
             fit: BoxFit.cover,
             placeholder: (_, _) => fallbackBackground,

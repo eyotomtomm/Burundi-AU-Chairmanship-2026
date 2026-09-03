@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Post text with #hashtags and links picked out.
 ///
@@ -103,15 +104,16 @@ class _PostBodyTextState extends State<PostBodyText> {
     final go = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Leaving the app'),
-        content: Text('This link opens in your browser.\n\n${uri.host}'),
+        title: Text(AppLocalizations.of(ctx).translate('w_leaving_app')),
+        content: Text(
+            '${AppLocalizations.of(ctx).translate('w_link_opens_browser')}\n\n${uri.host}'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: Text(AppLocalizations.of(ctx).translate('cancel'))),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Open')),
+              child: Text(AppLocalizations.of(ctx).translate('open'))),
         ],
       ),
     );

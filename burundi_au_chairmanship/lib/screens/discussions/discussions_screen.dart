@@ -6,6 +6,7 @@ import '../../config/app_colors.dart';
 import 'discussion_detail_screen.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/verified_badge.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/feed/post_composer.dart';
 
 class DiscussionsScreen extends StatefulWidget {
@@ -22,6 +23,7 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
   final ApiService _api = ApiService();
   List<Map<String, dynamic>> _discussions = [];
   bool _loading = true;
+  bool _loadFailed = false;
   String? _selectedCategory;
 
   final List<Map<String, String>> _categories = [
@@ -45,7 +47,10 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
     setState(() => _loading = true);
     try {
       _discussions = await _api.getDiscussions(category: _selectedCategory);
-    } catch (_) {}
+      _loadFailed = false;
+    } catch (_) {
+      _loadFailed = true;
+    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -91,6 +96,12 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
+                : _loadFailed
+                    ? AsyncContentView(
+                        state: AsyncContentState.error,
+                        onRetry: _loadDiscussions,
+                        child: const SizedBox.shrink(),
+                      )
                 : _discussions.isEmpty
                     ? Center(
                         child: Column(
@@ -98,7 +109,7 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                           children: [
                             Icon(Icons.forum, size: 64, color: Colors.grey[400]),
                             const SizedBox(height: 16),
-                            Text('No discussions yet', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                            Text(AppLocalizations.of(context).translate('rs_no_discussions_yet'), style: TextStyle(color: Ds.body(context), fontSize: 16)),
                           ],
                         ),
                       )

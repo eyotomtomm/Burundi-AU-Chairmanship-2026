@@ -251,7 +251,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Django 5.x STORAGES (replaces STATICFILES_STORAGE / DEFAULT_FILE_STORAGE).
+# 'default' is swapped to DigitalOcean Spaces below when not DEBUG.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
 
 # ─── Media Files ───────────────────────────────────────────────
 MEDIA_URL = '/media/'
@@ -276,7 +281,7 @@ if not DEBUG:
     AWS_S3_SIGNATURE_VERSION = 's3v4'  # SigV2 is legacy; sign private URLs with v4
     AWS_S3_FILE_OVERWRITE = False
     AWS_LOCATION = 'media'
-    DEFAULT_FILE_STORAGE = 'config.storage_backends.SpacesMediaStorage'
+    STORAGES['default'] = {'BACKEND': 'config.storage_backends.SpacesMediaStorage'}
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
     # CDN: Rewrite media URLs through Cloudflare CDN if configured
     CDN_DOMAIN = os.environ.get('CDN_DOMAIN', '')  # e.g. cdn.burundi4africa.com
@@ -387,8 +392,13 @@ REST_FRAMEWORK = {
         'proxy_registration': '5/hour',  # 5 proxy registrations per hour per user
         'weather': '60/hour',  # 60 weather proxy requests per hour per user/IP
     },
-    # Use real client IP behind Cloudflare / reverse proxies
-    'NUM_PROXIES': 1,
+    # CloudflareProxyMiddleware already resolves the real client into
+    # REMOTE_ADDR (and mirrors it into X-Forwarded-For only when trusted).
+    # NUM_PROXIES=0 makes DRF throttles read REMOTE_ADDR, so a forged
+    # X-Forwarded-For on a direct-to-origin request cannot pick the throttle key.
+    'NUM_PROXIES': 0,
+    # Guarantee every error body carries `detail` (the key the Flutter app reads).
+    'EXCEPTION_HANDLER': 'core.exceptions.detail_exception_handler',
     # OpenAPI schema generation
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -596,7 +606,13 @@ if SENTRY_DSN:
         profiles_sample_rate=float(os.environ.get('SENTRY_PROFILES_SAMPLE_RATE', '0.1')),
         send_default_pii=False,
         environment=os.environ.get('SENTRY_ENVIRONMENT', 'development' if DEBUG else 'production'),
-        release=os.environ.get('SENTRY_RELEASE', 'burundi-au-backend@1.0.0'),
+        # SENTRY_RELEASE wins; else derive from the deploy's git SHA (GIT_SHA, or
+        # DO's ${_self.COMMIT_HASH} bound in app.yaml); else the legacy static tag.
+        release=(
+            os.environ.get('SENTRY_RELEASE')
+            or (f"burundi-au-backend@{os.environ['GIT_SHA'][:12]}" if os.environ.get('GIT_SHA') else None)
+            or 'burundi-au-backend@1.0.0'
+        ),
         before_send=_sentry_before_send,
         # Attach server name for multi-server debugging
         server_name=os.environ.get('SENTRY_SERVER_NAME', ''),
@@ -651,6 +667,18 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'core.tasks.transition_live_feed_statuses',
         'schedule': 60,  # Every minute
     },
+    'publish-scheduled-content': {
+        'task': 'core.tasks.publish_scheduled_content',
+        'schedule': 60,  # Every minute
+    },
+    'promote-waitlist': {
+        'task': 'core.tasks.promote_waitlist_task',
+        'schedule': 60,  # Every minute
+    },
+    'purge-old-user-sessions': {
+        'task': 'core.tasks.purge_old_user_sessions',
+        'schedule': 86400,  # Every 24 hours
+    },
 }
 
 # ─── GraphQL (graphene-django) — REMOVED ─────────────────────
@@ -693,3 +721,13 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 
 # ─── Database Backup Configuration ────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')
+
+# --- Security hardening (2026-09) ---
+# Outbound SMTP must not hang a worker.
+EMAIL_TIMEOUT = 10
+# DigitalOcean App Platform: the TCP peer is DO's router, not Cloudflare.
+# CloudflareProxyMiddleware uses the X-Forwarded-For hop chain when this is on.
+TRUST_PLATFORM_PROXY = os.environ.get('TRUST_PLATFORM_PROXY', str(not DEBUG)).lower() in ('true', '1', 'yes')
+# DatabaseCache has no default cap; bound it so the table cannot grow unbounded.
+if CACHES['default']['BACKEND'].endswith('DatabaseCache'):
+    CACHES['default'].setdefault('OPTIONS', {}).update({'MAX_ENTRIES': 50000, 'CULL_FREQUENCY': 10})

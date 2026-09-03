@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_ds.dart';
@@ -13,7 +13,12 @@ import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../widgets/login_gate.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/async_content_view.dart';
+import '../live_feeds/in_app_webview_screen.dart';
+import '../live_feeds/video_player_screen.dart';
+import '../live_feeds/youtube_player_screen.dart';
 import 'video_detail_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class VideosScreen extends StatefulWidget {
   const VideosScreen({super.key});
@@ -26,6 +31,7 @@ class _VideosScreenState extends State<VideosScreen> {
   String selectedCategory = 'all';
   List<Map<String, dynamic>> _allVideos = [];
   bool _isLoading = true;
+  bool _hasError = false;
 
   final Map<String, String> categoryLabels = {
     'all': 'All Videos',
@@ -80,9 +86,12 @@ class _VideosScreenState extends State<VideosScreen> {
       final videos = results[0] as List<Map<String, dynamic>>;
       final recordedFeeds = results[1] as List<ApiLiveFeed>;
 
-      // Convert recorded live feeds to video format
-      final liveRecordedVideos = recordedFeeds.map((feed) => <String, dynamic>{
-        'id': feed.id,
+      // Convert recorded live feeds to video format. Ids collide with real
+      // videos, so keep the feed itself and route to the live-feed player.
+      final liveRecordedVideos = recordedFeeds
+          .where((feed) => feed.streamUrl.isNotEmpty)
+          .map((feed) => <String, dynamic>{
+        'id': 'feed_${feed.id}',
         'title': feed.title,
         'title_fr': feed.titleFr,
         'description': feed.description,
@@ -95,23 +104,43 @@ class _VideosScreenState extends State<VideosScreen> {
         'like_count': 0,
         'is_featured': false,
         '_is_live_recorded': true,
+        '_feed': feed,
       }).toList();
 
       if (mounted) {
         setState(() {
           _allVideos = [...videos, ...liveRecordedVideos];
           _isLoading = false;
+          _hasError = false;
         });
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to load videos: $e');
       if (mounted) {
         setState(() {
-          _allVideos = [];
           _isLoading = false;
+          _hasError = _allVideos.isEmpty;
         });
       }
     }
+  }
+
+  /// Recorded live feeds play in the live-feed players, not VideoDetailScreen.
+  void _openRecordedFeed(ApiLiveFeed feed) {
+    final Widget screen;
+    if (feed.isYouTube) {
+      screen = YouTubePlayerScreen(feed: feed);
+    } else if (feed.streamType == 'external') {
+      screen = InAppWebViewScreen(feed: feed);
+    } else if (feed.isZoom || feed.isTeams || feed.isWebex || feed.isGoogleMeet) {
+      // A finished meeting has nothing to play.
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context).translate('recording_unavailable'))));
+      return;
+    } else {
+      screen = VideoPlayerScreen(feed: feed);
+    }
+    Navigator.push(context, CupertinoPageRoute(builder: (_) => screen));
   }
 
   List<Map<String, dynamic>> get filteredVideos {
@@ -128,6 +157,11 @@ class _VideosScreenState extends State<VideosScreen> {
   }
 
   void _playVideo(Map<String, dynamic> video) {
+    final feed = video['_feed'];
+    if (feed is ApiLiveFeed) {
+      _openRecordedFeed(feed);
+      return;
+    }
     // Record view
     final id = video['id'];
     if (id != null) {
@@ -157,6 +191,22 @@ class _VideosScreenState extends State<VideosScreen> {
         backgroundColor: Ds.bg(context),
         appBar: AppBar(title: Text(fr ? 'Vidéos' : 'Videos')),
         body: const ShimmerVideoGridSkeleton(),
+      );
+    }
+
+    if (_hasError) {
+      return Scaffold(
+        backgroundColor: Ds.bg(context),
+        appBar: AppBar(title: Text(fr ? 'Vidéos' : 'Videos')),
+        body: AsyncContentView(
+          state: AsyncContentState.error,
+          onRetry: () {
+            setState(() => _isLoading = true);
+            _loadVideos();
+          },
+          onRefresh: _loadVideos,
+          child: const SizedBox.shrink(),
+        ),
       );
     }
 
@@ -305,7 +355,7 @@ class _VideosScreenState extends State<VideosScreen> {
         ? video['thumbnail_url'] as String
         : video['thumbnail'] as String?;
     if (url == null || url.isEmpty) return _videoThumbnailPlaceholder();
-    return CachedNetworkImage(
+    return AppNetworkImage(
       imageUrl: Environment.fixMediaUrl(url),
       fit: fit,
       placeholder: (context, url) => _videoThumbnailPlaceholder(),

@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
+import '../../widgets/async_content_view.dart';
 
 class PollsScreen extends StatefulWidget {
   const PollsScreen({super.key});
@@ -16,6 +17,8 @@ class _PollsScreenState extends State<PollsScreen> {
   final ApiService _api = ApiService();
   List<Map<String, dynamic>> _polls = [];
   bool _loading = true;
+  bool _loadFailed = false;
+  bool _voting = false;
 
   @override
   void initState() {
@@ -27,20 +30,30 @@ class _PollsScreenState extends State<PollsScreen> {
     setState(() => _loading = true);
     try {
       _polls = await _api.getPolls();
-    } catch (_) {}
+      _loadFailed = false;
+    } catch (_) {
+      _loadFailed = true;
+    }
     if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _vote(int pollId, int optionId) async {
+    if (_voting) return;
+    setState(() => _voting = true);
     try {
       await _api.votePoll(pollId, optionId);
-      _loadPolls();
+      await _loadPolls();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e is ApiException ? e.message : AppLocalizations.of(context).translate('generic_error')),
+            backgroundColor: Colors.red,
+          ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _voting = false);
     }
   }
 
@@ -57,6 +70,12 @@ class _PollsScreenState extends State<PollsScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _loadFailed
+              ? AsyncContentView(
+                  state: AsyncContentState.error,
+                  onRetry: _loadPolls,
+                  child: const SizedBox.shrink(),
+                )
           : _polls.isEmpty
               ? Center(
                   child: Column(
@@ -64,7 +83,7 @@ class _PollsScreenState extends State<PollsScreen> {
                     children: [
                       Icon(Icons.ballot, size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
-                      Text('No active polls', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                      Text(AppLocalizations.of(context).translate('no_active_polls'), style: TextStyle(color: Ds.body(context), fontSize: 16)),
                     ],
                   ),
                 )
@@ -125,7 +144,7 @@ class _PollsScreenState extends State<PollsScreen> {
               final isUserChoice = opt['id'] == poll['user_vote_option'];
 
               return GestureDetector(
-                onTap: userVoted ? null : () => _vote(poll['id'], opt['id']),
+                onTap: (userVoted || _voting) ? null : () => _vote(poll['id'], opt['id']),
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(

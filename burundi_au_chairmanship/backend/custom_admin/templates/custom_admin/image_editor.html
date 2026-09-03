@@ -3,7 +3,7 @@
 {% block title %}Image Editor | Diplomatic Portal{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6/dist/cropper.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" integrity="sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh" crossorigin="anonymous" />
 <style>
   .cropper-container { max-height: 65vh; }
   .img-container { max-height: 65vh; overflow: hidden; background: #1e293b; border-radius: 0.75rem; }
@@ -182,7 +182,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6/dist/cropper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js" integrity="sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir" crossorigin="anonymous"></script>
 <script>
 (function() {
   var cropper = null;
@@ -440,6 +440,8 @@
   });
 
   function getCsrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) return meta.content;
     var cookie = document.cookie.split(';').find(function(c) { return c.trim().startsWith('csrftoken='); });
     return cookie ? cookie.split('=')[1] : '';
   }

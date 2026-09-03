@@ -5,6 +5,7 @@ import '../config/app_constants.dart';
 import '../services/api_service.dart';
 import '../services/firebase_messaging_service.dart';
 import 'auth_provider.dart';
+import '../l10n/app_localizations.dart';
 
 class LanguageProvider extends ChangeNotifier {
   Locale _locale = const Locale('en');
@@ -24,12 +25,14 @@ class LanguageProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final langCode = prefs.getString(AppConstants.languageKey) ?? 'en';
     _locale = Locale(langCode);
+    AppLocalizations.languageCode = langCode;
     notifyListeners();
   }
 
   Future<void> setLanguage(String languageCode) async {
     if (languageCode != _locale.languageCode) {
       _locale = Locale(languageCode);
+      AppLocalizations.languageCode = languageCode;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(AppConstants.languageKey, languageCode);
       notifyListeners();

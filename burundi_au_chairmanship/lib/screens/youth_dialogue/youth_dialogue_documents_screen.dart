@@ -10,7 +10,9 @@ import 'package:screen_protector/screen_protector.dart';
 import '../../config/app_colors.dart';
 import '../../models/youth_dialogue_model.dart';
 import '../../services/api_service.dart';
-import '../../config/app_ds.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/app_network_image.dart';
+import '../../services/data_saver_service.dart';
 
 class YouthDialogueDocumentsScreen extends StatefulWidget {
   const YouthDialogueDocumentsScreen({super.key});
@@ -49,6 +51,8 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     final key = _docKey(doc);
     return key == 'photo' || key.contains('photo');
   }
+
+  AppLocalizations get _l10n => AppLocalizations.of(context);
 
   String _isFr() {
     try {
@@ -136,7 +140,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
       if (!mounted) return;
       _requiredDocs = List<Map<String, dynamic>>.from(_defaultDocs);
       setState(() {
-        _error = 'Failed to load. Please try again.';
+        _error = _l10n.translate('ydd_load_failed');
         _isLoading = false;
       });
     }
@@ -151,7 +155,12 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
           _application = YouthDialogueApplication.fromJson(data);
         }
       });
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_l10n.translate('ydd_status_refresh_failed'))),
+      );
+    }
   }
 
   static const _maxFileSize = 5 * 1024 * 1024; // 5MB
@@ -182,10 +191,9 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
         );
       } on PlatformException catch (e) {
         if (!mounted) return;
-        final isFr = _isFr() == 'fr';
-        final msg = e.code.contains('denied')
-            ? (isFr ? 'Caméra indisponible. Choisissez une photo de la galerie.' : 'Camera unavailable. Choose a photo from gallery instead.')
-            : (isFr ? 'Impossible d\'ouvrir la caméra. Choisissez de la galerie.' : 'Could not open camera. Choose from gallery instead.');
+        final msg = _l10n.translate(e.code.contains('denied')
+            ? 'ydd_camera_unavailable_gallery'
+            : 'ydd_camera_open_failed_gallery');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
         // Fall back to gallery
         _pickFromGallery(docType, replacesId: replacesId);
@@ -216,7 +224,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
   /// Photo source picker — camera (preferred) + gallery fallback.
   void _showPhotoSourcePicker(String docType, {int? replacesId}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFr = _isFr() == 'fr';
+    final l10n = _l10n;
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -238,13 +246,13 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
               ),
               const SizedBox(height: 16),
               Text(
-                isFr ? 'Photo d\'identité' : 'Passport Photo',
+                l10n.translate('ydd_passport_photo'),
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : Colors.black87),
               ),
               const SizedBox(height: 4),
               Text(
-                isFr ? 'Prenez une photo en direct ou choisissez de la galerie' : 'Take a live photo or choose from gallery',
+                l10n.translate('ydd_photo_source_hint'),
                 style: TextStyle(fontSize: 13,
                   color: isDark ? Colors.white38 : Colors.black45),
               ),
@@ -254,7 +262,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   Expanded(
                     child: _buildSourceOption(
                       icon: Icons.camera_alt_rounded,
-                      label: isFr ? 'Caméra' : 'Camera',
+                      label: l10n.translate('ydd_camera'),
                       color: Colors.blue,
                       isDark: isDark,
                       onTap: () {
@@ -267,7 +275,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   Expanded(
                     child: _buildSourceOption(
                       icon: Icons.photo_library_rounded,
-                      label: isFr ? 'Galerie' : 'Gallery',
+                      label: l10n.translate('gallery'),
                       color: AppColors.burundiGreen,
                       isDark: isDark,
                       onTap: () {
@@ -287,7 +295,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
 
   void _showSourcePicker(String docType, {int? replacesId}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFr = _isFr() == 'fr';
+    final l10n = _l10n;
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -309,13 +317,13 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
               ),
               const SizedBox(height: 16),
               Text(
-                isFr ? 'Télécharger le document' : 'Upload Document',
+                l10n.translate('ydd_upload_document'),
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : Colors.black87),
               ),
               const SizedBox(height: 4),
               Text(
-                'PDF, JPG, PNG  •  Max 5MB',
+                l10n.translate('ydd_formats_hint'),
                 style: TextStyle(fontSize: 13,
                   color: isDark ? Colors.white38 : Colors.black45),
               ),
@@ -325,7 +333,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   Expanded(
                     child: _buildSourceOption(
                       icon: Icons.camera_alt_rounded,
-                      label: isFr ? 'Caméra' : 'Camera',
+                      label: l10n.translate('ydd_camera'),
                       color: Colors.blue,
                       isDark: isDark,
                       onTap: () {
@@ -338,7 +346,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   Expanded(
                     child: _buildSourceOption(
                       icon: Icons.photo_library_rounded,
-                      label: isFr ? 'Galerie' : 'Gallery',
+                      label: l10n.translate('gallery'),
                       color: AppColors.burundiGreen,
                       isDark: isDark,
                       onTap: () {
@@ -351,7 +359,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   Expanded(
                     child: _buildSourceOption(
                       icon: Icons.folder_rounded,
-                      label: isFr ? 'Fichiers' : 'Files',
+                      label: l10n.translate('ydd_files'),
                       color: AppColors.auGold,
                       isDark: isDark,
                       onTap: () {
@@ -404,10 +412,9 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
       picked = await picker.pickImage(source: ImageSource.camera, maxWidth: 2048);
     } on PlatformException catch (e) {
       if (!mounted) return;
-      final isFr = _isFr() == 'fr';
-      final msg = e.code.contains('denied')
-          ? (isFr ? 'Accès à la caméra refusé. Activez-le dans les Réglages.' : 'Camera access denied. Enable it in Settings.')
-          : (isFr ? 'Impossible d\'ouvrir la caméra' : 'Could not open camera');
+      final msg = _l10n.translate(e.code.contains('denied')
+          ? 'ydd_camera_denied'
+          : 'ydd_camera_open_failed');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
       return;
     }
@@ -440,7 +447,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
       final sizeMB = (fileSize / (1024 * 1024)).toStringAsFixed(1);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('File too large (${sizeMB}MB). Maximum is 5MB.'),
+          content: Text('${_l10n.translate('ydd_file_too_large')} ${sizeMB}MB'),
           backgroundColor: AppColors.burundiRed,
         ),
       );
@@ -458,7 +465,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
       await _loadStatus();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document uploaded successfully.'), backgroundColor: AppColors.burundiGreen),
+        SnackBar(content: Text(_l10n.translate('ydd_upload_success')), backgroundColor: AppColors.burundiGreen),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -468,7 +475,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upload failed. Please try again.'), backgroundColor: AppColors.burundiRed),
+        SnackBar(content: Text(_l10n.translate('ydd_upload_failed')), backgroundColor: AppColors.burundiRed),
       );
     } finally {
       if (mounted) setState(() => _uploading[docType] = false);
@@ -510,7 +517,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Submission failed. Please try again.'), backgroundColor: AppColors.burundiRed),
+        SnackBar(content: Text(_l10n.translate('ydd_submit_failed')), backgroundColor: AppColors.burundiRed),
       );
     } finally {
       if (mounted && _isSubmitting) setState(() => _isSubmitting = false);
@@ -530,8 +537,9 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     return Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         appBar: AppBar(
-          title: Text(_isFr() == 'fr' ? 'Documents soumis' : 'Documents Submitted'),
+          title: Text(_l10n.translate('ydd_documents_submitted')),
           leading: IconButton(
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),
           ),
@@ -553,13 +561,13 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Documents Submitted',
+                  _l10n.translate('ydd_documents_submitted'),
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold,
                     color: isDark ? Colors.white : Colors.black87),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your documents have been submitted for verification.',
+                  _l10n.translate('ydd_submitted_desc'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 15, color: isDark ? Colors.white60 : Colors.black54),
                 ),
@@ -582,7 +590,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                           Icon(Icons.folder_open_rounded, size: 20,
                             color: isDark ? Colors.white70 : Colors.black54),
                           const SizedBox(width: 8),
-                          Text('Documents Uploaded',
+                          Text(_l10n.translate('ydd_documents_uploaded'),
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
                               color: isDark ? Colors.white : Colors.black87)),
                           const Spacer(),
@@ -650,16 +658,16 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                         children: [
                           Icon(Icons.info_outline_rounded, size: 20, color: Colors.blue[400]),
                           const SizedBox(width: 8),
-                          Text('What Happens Next',
+                          Text(_l10n.translate('ydd_what_happens_next'),
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
                               color: isDark ? Colors.white : Colors.black87)),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      _buildStatusStep('1', 'Our team will review your documents', AppColors.burundiGreen, isDark, done: true),
-                      _buildStatusStep('2', 'You\'ll receive a notification once verified', AppColors.auGold, isDark),
-                      _buildStatusStep('3', 'If any document is rejected, you can re-upload', Colors.blue, isDark),
-                      _buildStatusStep('4', 'Once approved, your credential will be issued', AppColors.burundiGreen, isDark),
+                      _buildStatusStep('1', _l10n.translate('ydd_step_review'), AppColors.burundiGreen, isDark, done: true),
+                      _buildStatusStep('2', _l10n.translate('ydd_step_notify'), AppColors.auGold, isDark),
+                      _buildStatusStep('3', _l10n.translate('ydd_step_rejected'), Colors.blue, isDark),
+                      _buildStatusStep('4', _l10n.translate('ydd_step_credential'), AppColors.burundiGreen, isDark),
                     ],
                   ),
                 ),
@@ -680,7 +688,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'You will also receive an email confirmation with your verification status.',
+                          _l10n.translate('ydd_email_confirmation'),
                           style: TextStyle(fontSize: 12.5, color: isDark ? Colors.white60 : Colors.black54),
                         ),
                       ),
@@ -699,7 +707,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                       backgroundColor: AppColors.burundiGreen,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Done', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                    child: Text(_l10n.translate('done'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
@@ -751,7 +759,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Upload Documents'),
+        title: Text(_l10n.translate('ydd_upload_documents')),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.burundiGreen))
@@ -773,7 +781,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
           ElevatedButton(
             onPressed: () { setState(() { _isLoading = true; _error = null; }); _loadData(); },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.burundiGreen),
-            child: const Text('Retry', style: TextStyle(color: Colors.white)),
+            child: Text(_l10n.translate('retry'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -782,7 +790,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
 
   Widget _buildContent(bool isDark) {
     if (_application == null) {
-      return const Center(child: Text('No application found.'));
+      return Center(child: Text(_l10n.translate('ydd_no_application')));
     }
 
     final docs = _application!.documents;
@@ -816,15 +824,15 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Text('Required Documents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
+                Text(_l10n.translate('ydd_required_documents'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87)),
                 const SizedBox(height: 8),
                 Text(
-                  isWaitingState
-                      ? 'Your documents are being reviewed. You will be notified when verification is complete.'
+                  _l10n.translate(isWaitingState
+                      ? 'ydd_intro_reviewing'
                       : isResubmit
-                          ? 'Some documents were rejected. Please re-upload the affected documents and submit again.'
-                          : 'Upload the following documents to proceed with your application.',
+                          ? 'ydd_intro_resubmit'
+                          : 'ydd_intro_upload'),
                   style: TextStyle(fontSize: 14, color: isDark ? Colors.white60 : Colors.black54)),
                 if (!isWaitingState) ...[
                   const SizedBox(height: 8),
@@ -841,7 +849,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Accepted formats: PDF, JPG, PNG  •  Max 5MB per file',
+                            _l10n.translate('ydd_accepted_formats'),
                             style: TextStyle(fontSize: 12,
                               color: isDark ? Colors.white38 : Colors.black45),
                           ),
@@ -868,9 +876,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            _isFr() == 'fr'
-                                ? 'Veuillez télécharger soit votre carte d\'identité nationale, soit votre passeport.'
-                                : 'Please upload either your National ID or Passport.',
+                            _l10n.translate('ydd_id_or_passport'),
                             style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
                           ),
                         ),
@@ -914,7 +920,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                   ),
                   child: _isSubmitting
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(isResubmit ? 'Re-submit Documents' : 'Submit All Documents',
+                      : Text(_l10n.translate(isResubmit ? 'ydd_resubmit_documents' : 'ydd_submit_all'),
                           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
@@ -938,7 +944,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Your documents are under review',
+              _l10n.translate('ydd_under_review_banner'),
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
                 color: isDark ? Colors.blue[200] : Colors.blue[800]),
             ),
@@ -969,7 +975,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Re-upload required: ${rejectedNames.join(", ")}',
+              '${_l10n.translate('ydd_reupload_required')} ${rejectedNames.join(", ")}',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                 color: isDark ? Colors.red[200] : AppColors.burundiRed),
             ),
@@ -989,23 +995,23 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
     final isPhoto = _isPhotoType(docConfig);
 
     Color statusColor = Colors.grey;
-    String statusText = isPhoto ? 'Photo required' : 'Not uploaded';
+    String statusText = _l10n.translate(isPhoto ? 'ydd_status_photo_required' : 'ydd_status_not_uploaded');
     IconData statusIcon = isPhoto ? Icons.camera_alt_outlined : Icons.radio_button_unchecked;
     if (hasDoc) {
       switch (doc.status) {
         case 'pending':
           statusColor = AppColors.auGold;
-          statusText = 'Under review';
+          statusText = _l10n.translate('ydd_status_under_review');
           statusIcon = Icons.hourglass_top_rounded;
           break;
         case 'approved':
           statusColor = AppColors.burundiGreen;
-          statusText = 'Approved';
+          statusText = _l10n.translate('ydd_status_approved');
           statusIcon = Icons.check_circle_rounded;
           break;
         case 'rejected':
           statusColor = AppColors.burundiRed;
-          statusText = 'Rejected — Re-upload';
+          statusText = _l10n.translate('ydd_status_rejected');
           statusIcon = Icons.cancel_rounded;
           break;
       }
@@ -1067,12 +1073,12 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                     color: AppColors.burundiGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.lock_rounded, size: 14, color: AppColors.burundiGreen),
-                      SizedBox(width: 4),
-                      Text('Locked', style: TextStyle(fontSize: 11, color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
+                      const Icon(Icons.lock_rounded, size: 14, color: AppColors.burundiGreen),
+                      const SizedBox(width: 4),
+                      Text(_l10n.translate('ydd_locked'), style: const TextStyle(fontSize: 11, color: AppColors.burundiGreen, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 )
@@ -1086,12 +1092,12 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                       color: AppColors.auGold.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.swap_horiz_rounded, size: 14, color: AppColors.auGold),
-                        SizedBox(width: 4),
-                        Text('Replace', style: TextStyle(fontSize: 11, color: AppColors.auGold, fontWeight: FontWeight.w600)),
+                        const Icon(Icons.swap_horiz_rounded, size: 14, color: AppColors.auGold),
+                        const SizedBox(width: 4),
+                        Text(_l10n.translate('ydd_replace'), style: const TextStyle(fontSize: 11, color: AppColors.auGold, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -1104,9 +1110,9 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                           color: isRejected ? AppColors.burundiRed : AppColors.burundiGreen)
                       : const SizedBox.shrink(),
                   label: Text(
-                    hasDoc
-                        ? (isRejected ? 'Re-upload' : 'Replace')
-                        : (isPhoto ? 'Take Photo' : 'Upload'),
+                    _l10n.translate(hasDoc
+                        ? (isRejected ? 'ydd_reupload' : 'ydd_replace')
+                        : (isPhoto ? 'ydd_take_photo' : 'ydd_upload')),
                     style: TextStyle(
                       color: isRejected ? AppColors.burundiRed : AppColors.burundiGreen,
                       fontWeight: FontWeight.w600,
@@ -1167,7 +1173,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            CachedNetworkImage(
+                            AppNetworkImage(
                               imageUrl: doc.file!,
                               fit: BoxFit.cover,
                               placeholder: (_, _) => Container(
@@ -1201,7 +1207,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _isFr() == 'fr' ? 'Aperçu sécurisé' : 'Secure preview',
+                              _l10n.translate('ydd_secure_preview'),
                               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
                                 color: isDark ? Colors.white54 : Colors.black45),
                             ),
@@ -1232,7 +1238,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Rejection reason:', style: TextStyle(fontSize: 11, color: AppColors.burundiRed, fontWeight: FontWeight.w600)),
+                  Text(_l10n.translate('ydd_rejection_reason'), style: const TextStyle(fontSize: 11, color: AppColors.burundiRed, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text(doc.rejectionReason!, style: const TextStyle(fontSize: 12, color: AppColors.burundiRed)),
                 ],
@@ -1244,7 +1250,7 @@ class _YouthDialogueDocumentsScreenState extends State<YouthDialogueDocumentsScr
               child: OutlinedButton.icon(
                 onPressed: () => _initiateUpload(type, docConfig, replacesId: doc.id),
                 icon: const Icon(Icons.upload_rounded, size: 18),
-                label: const Text('Re-upload This Document'),
+                label: Text(_l10n.translate('ydd_reupload_this')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.burundiRed,
                   side: const BorderSide(color: AppColors.burundiRed),
@@ -1271,8 +1277,7 @@ class _PhotoPreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isFr = Localizations.localeOf(context).languageCode == 'fr';
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -1284,20 +1289,24 @@ class _PhotoPreviewScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context, false),
-                    child: Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
+                  Semantics(
+                    button: true,
+                    label: MaterialLocalizations.of(context).closeButtonTooltip,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context, false),
+                      child: Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close, color: Colors.white, size: 22),
                       ),
-                      child: const Icon(Icons.close, color: Colors.white, size: 22),
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    isFr ? 'Vérifier la photo' : 'Review Photo',
+                    l10n.translate('ydd_review_photo'),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,
@@ -1341,9 +1350,7 @@ class _PhotoPreviewScreen extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        isFr
-                            ? 'Assurez-vous que votre visage est clairement visible et bien éclairé.'
-                            : 'Make sure your face is clearly visible and well-lit.',
+                        l10n.translate('ydd_face_visible'),
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.white.withValues(alpha: 0.6),
@@ -1367,7 +1374,7 @@ class _PhotoPreviewScreen extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: () => Navigator.pop(context, false),
                         icon: const Icon(Icons.refresh_rounded, size: 20),
-                        label: Text(isFr ? 'Reprendre' : 'Retake'),
+                        label: Text(l10n.translate('ydd_retake')),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
@@ -1386,7 +1393,7 @@ class _PhotoPreviewScreen extends StatelessWidget {
                         onPressed: () => Navigator.pop(context, true),
                         icon: const Icon(Icons.check_rounded, size: 20, color: Colors.white),
                         label: Text(
-                          isFr ? 'Utiliser cette photo' : 'Use This Photo',
+                          l10n.translate('ydd_use_photo'),
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -1456,7 +1463,7 @@ class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
 
   @override
   Widget build(BuildContext context) {
-    final isFr = Localizations.localeOf(context).languageCode == 'fr';
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -1471,6 +1478,7 @@ class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
                 child: CachedNetworkImage(
                   imageUrl: widget.imageUrl,
                   fit: BoxFit.contain,
+                  memCacheWidth: DataSaverService().fullImageCacheWidth,
                   placeholder: (_, _) => const Center(
                     child: CircularProgressIndicator(color: Colors.white),
                   ),
@@ -1481,7 +1489,7 @@ class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
                         const Icon(Icons.broken_image_rounded, color: Colors.white38, size: 64),
                         const SizedBox(height: 12),
                         Text(
-                          isFr ? 'Impossible de charger l\'image' : 'Failed to load image',
+                          l10n.translate('ydd_image_load_failed'),
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
                         ),
                       ],
@@ -1520,15 +1528,19 @@ class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
                 child: Row(
                   children: [
                     // Close button
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          shape: BoxShape.circle,
+                    Semantics(
+                      button: true,
+                      label: MaterialLocalizations.of(context).closeButtonTooltip,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
                         ),
-                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1558,7 +1570,7 @@ class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
                           const Icon(Icons.shield_rounded, size: 14, color: AppColors.burundiGreen),
                           const SizedBox(width: 4),
                           Text(
-                            isFr ? 'Protégé' : 'Protected',
+                            l10n.translate('ydd_protected'),
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -1597,9 +1609,7 @@ class _SecureDocumentViewerState extends State<_SecureDocumentViewer> {
                       color: Colors.white.withValues(alpha: 0.4)),
                     const SizedBox(width: 6),
                     Text(
-                      isFr
-                          ? 'Aperçu sécurisé — Capture d\'écran bloquée'
-                          : 'Secure preview — Screenshots blocked',
+                      l10n.translate('ydd_secure_preview_blocked'),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.4),

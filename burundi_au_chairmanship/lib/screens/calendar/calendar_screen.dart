@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/location_model.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../widgets/async_content_view.dart';
 import '../../widgets/ds/ds_widgets.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObserver {
   List<EventLocation>? _events;
   bool _isLoading = true;
+  bool _loadFailed = false;
 
   /// First day of the month currently shown in the grid.
   late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
@@ -61,13 +63,15 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
       setState(() {
         _events = events;
         _isLoading = false;
+        _loadFailed = false;
       });
     } catch (e) {
       if (kDebugMode) debugPrint('Failed to load events: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _events = []; // No fallback - show empty state
+        _loadFailed = true;
+        _events ??= [];
       });
     }
   }
@@ -184,7 +188,16 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
                 padding: const EdgeInsets.only(bottom: 32),
                 children: [
                   _buildMonthGrid(langCode),
-                  if (_events == null || _events!.isEmpty)
+                  if (_loadFailed && (_events?.isEmpty ?? true))
+                    SizedBox(
+                      height: 320,
+                      child: AsyncContentView(
+                        state: AsyncContentState.error,
+                        onRetry: _loadEvents,
+                        child: const SizedBox.shrink(),
+                      ),
+                    )
+                  else if (_events == null || _events!.isEmpty)
                     _buildEmptyState(langCode)
                   else
                     ..._buildAgenda(langCode),

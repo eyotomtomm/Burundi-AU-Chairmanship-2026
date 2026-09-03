@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../services/api_service.dart';
 import '../../widgets/shimmer_loading.dart';
+import '../../l10n/app_localizations.dart';
 
 class SupportTicketsScreen extends StatefulWidget {
   const SupportTicketsScreen({super.key});
@@ -48,20 +50,35 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
     }
   }
 
-  void _checkForUnratedResolved() {
+  static const _dismissedKey = 'dismissed_rating_ticket_ids';
+
+  Future<void> _checkForUnratedResolved() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getStringList(_dismissedKey) ?? const [];
     final unrated = _tickets.where((t) =>
-        t['status'] == 'resolved' && (t['rating'] == null || t['rating'] == 0));
-    if (unrated.isNotEmpty) {
+        t['status'] == 'resolved' &&
+        (t['rating'] == null || t['rating'] == 0) &&
+        !dismissed.contains('${t['id']}'));
+    if (unrated.isNotEmpty && mounted) {
       // Show rating dialog for the first unrated resolved ticket
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showRatingDialog(unrated.first);
-      });
+      _showRatingDialog(unrated.first);
+    }
+  }
+
+  /// Remember a skipped rating so the modal doesn't come back every load.
+  Future<void> _dismissRating(dynamic ticketId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = prefs.getStringList(_dismissedKey) ?? [];
+    if (!ids.contains('$ticketId')) {
+      await prefs.setStringList(_dismissedKey, [...ids, '$ticketId']);
     }
   }
 
   Future<void> _showRatingDialog(Map<String, dynamic> ticket) async {
     int selectedRating = 0;
+    bool submitting = false;
     final commentController = TextEditingController();
+    final l10n = AppLocalizations.of(context);
 
     await showDialog(
       context: context,
@@ -73,12 +90,12 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              title: const Text('Rate Your Support'),
+              title: Text(l10n.translate('sup_rate_title')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Your ticket "${ticket['subject']}" has been resolved. How was your experience?',
+                    '${l10n.translate('sup_ticket_resolved_prefix')} "${ticket['subject']}" ${l10n.translate('sup_ticket_resolved_suffix')}',
                     style: const TextStyle(fontSize: 14),
                   ),
                   const SizedBox(height: 16),
@@ -106,7 +123,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                   TextField(
                     controller: commentController,
                     decoration: InputDecoration(
-                      hintText: 'Optional comment...',
+                      hintText: l10n.translate('sup_optional_comment'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -121,12 +138,18 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Skip'),
+                  onPressed: submitting
+                      ? null
+                      : () {
+                          _dismissRating(ticket['id']);
+                          Navigator.pop(ctx);
+                        },
+                  child: Text(l10n.translate('skip')),
                 ),
                 ElevatedButton(
-                  onPressed: selectedRating > 0
+                  onPressed: selectedRating > 0 && !submitting
                       ? () async {
+                          setDialogState(() => submitting = true);
                           try {
                             await _apiService.rateTicket(
                               ticket['id'],
@@ -136,8 +159,8 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                             if (ctx.mounted) Navigator.pop(ctx);
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Thank you for your feedback!'),
+                                SnackBar(
+                                  content: Text(l10n.translate('sup_thanks_feedback')),
                                   backgroundColor: AppColors.success,
                                 ),
                               );
@@ -148,7 +171,9 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Failed to submit rating: $e'),
+                                  content: Text(e is ApiException
+                                      ? e.message
+                                      : l10n.translate('sup_failed_rating')),
                                   backgroundColor: AppColors.error,
                                 ),
                               );
@@ -160,7 +185,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                     backgroundColor: AppColors.burundiGreen,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Submit'),
+                  child: Text(l10n.translate('submit')),
                 ),
               ],
             );
@@ -186,13 +211,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   String _statusLabel(String status) {
     switch (status) {
       case 'open':
-        return 'Open';
       case 'in_progress':
-        return 'In Progress';
       case 'resolved':
-        return 'Resolved';
       case 'closed':
-        return 'Closed';
+        return AppLocalizations.of(context).translate('sup_status_$status');
       default:
         return status;
     }
@@ -200,13 +222,14 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
 
   String _timeAgo(String? dateStr) {
     if (dateStr == null) return '';
+    final l10n = AppLocalizations.of(context);
     try {
       final date = DateTime.parse(dateStr);
       final diff = DateTime.now().difference(date);
-      if (diff.inMinutes < 1) return 'Just now';
-      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      if (diff.inMinutes < 1) return l10n.translate('just_now');
+      if (diff.inMinutes < 60) return '${diff.inMinutes} ${l10n.translate('minutes_ago')}';
+      if (diff.inHours < 24) return '${diff.inHours}${l10n.translate('hours_ago')}';
+      if (diff.inDays < 7) return '${diff.inDays}${l10n.translate('days_ago')}';
       return '${date.day}/${date.month}/${date.year}';
     } catch (_) {
       return '';
@@ -215,9 +238,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: Ds.bg(context),
-      appBar: AppBar(title: const Text('Support')),
+      appBar: AppBar(title: Text(l10n.translate('sup_title'))),
       body: _isLoading
           ? const ShimmerListItemSkeleton()
           : _error != null
@@ -227,10 +251,10 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                     children: [
                       Icon(Icons.error_outline, size: 48, color: Ds.muted(context)),
                       const SizedBox(height: 16),
-                      Text('Failed to load tickets',
+                      Text(l10n.translate('sup_failed_load_tickets'),
                           style: TextStyle(color: Ds.body(context))),
                       const SizedBox(height: 16),
-                      DsOutlineButton('Retry', radius: Ds.rPill, onTap: _loadTickets),
+                      DsOutlineButton(l10n.translate('retry'), radius: Ds.rPill, onTap: _loadTickets),
                     ],
                   ),
                 )
@@ -247,8 +271,8 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
                       if (_tickets.isEmpty)
                         _buildEmptyState()
                       else ...[
-                        const DsGroupLabel('My tickets',
-                            padding: EdgeInsets.fromLTRB(22, 20, 22, 8)),
+                        DsGroupLabel(l10n.translate('sup_my_tickets'),
+                            padding: const EdgeInsets.fromLTRB(22, 20, 22, 8)),
                         for (final ticket in _tickets) _buildTicketCard(ticket),
                       ],
                     ],
@@ -258,6 +282,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Widget _buildNewTicketCard() {
+    final l10n = AppLocalizations.of(context);
     return DsCard(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -275,13 +300,13 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('New ticket',
+                Text(l10n.translate('sup_new_ticket'),
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: Ds.ink(context))),
                 const SizedBox(height: 2),
-                Text('Nouveau ticket', style: Ds.meta(context)),
+                Text(l10n.translate('sup_new_ticket_sub'), style: Ds.meta(context)),
               ],
             ),
           ),
@@ -292,17 +317,18 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Widget _buildEmptyState() {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
       child: Column(
         children: [
           Icon(Icons.support_agent_rounded, size: 64, color: Ds.muted(context)),
           const SizedBox(height: 16),
-          Text('No support tickets',
+          Text(l10n.translate('sup_no_tickets'),
               style: TextStyle(
                   fontSize: 17, fontWeight: FontWeight.w700, color: Ds.ink(context))),
           const SizedBox(height: 8),
-          Text('Open a ticket above and our team will get back to you.',
+          Text(l10n.translate('sup_no_tickets_sub'),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, height: 1.5, color: Ds.body(context))),
         ],
@@ -311,18 +337,24 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
   }
 
   Widget _buildTicketCard(Map<String, dynamic> ticket) {
+    final l10n = AppLocalizations.of(context);
     final status = (ticket['status'] ?? 'open').toString();
     final rating = ticket['rating'] as int? ?? 0;
     final reference = ticket['id'] == null ? '' : '#T-${ticket['id']}';
     final meta = [
       if (reference.isNotEmpty) reference,
       if (_timeAgo(ticket['updated_at']).isNotEmpty)
-        'Updated ${_timeAgo(ticket['updated_at'])}',
+        '${l10n.translate('sup_updated')} ${_timeAgo(ticket['updated_at'])}',
     ].join(' · ');
 
     return DsCard(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      onTap: ticket['id'] is int
+          ? () => Navigator.pushNamed(context, '/ticket-conversation',
+                  arguments: ticket['id'] as int)
+              .then((_) => _loadTickets())
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -330,7 +362,7 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  ticket['subject'] ?? 'No subject',
+                  ticket['subject'] ?? l10n.translate('sup_no_subject'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Ds.cardTitle(context),

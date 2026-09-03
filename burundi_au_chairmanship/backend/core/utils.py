@@ -178,8 +178,9 @@ def compute_model_diff(instance, new_values, fields=None):
 
 
 def _get_client_ip(request):
-    """Extract the real client IP (REMOTE_ADDR, already set by CloudflareProxyMiddleware)."""
-    return request.META.get('REMOTE_ADDR', '127.0.0.1')
+    """Client IP resolved by CloudflareProxyMiddleware (loopback fallback for IP fields)."""
+    from .middleware.cloudflare import get_client_ip
+    return get_client_ip(request) or '127.0.0.1'
 
 
 def send_sms(phone_number, message):
@@ -260,3 +261,38 @@ def send_sms_to_enabled_users(title, message):
     )
 
     return success_count, failure_count
+
+
+# ── Event waitlist ────────────────────────────────────────────
+
+def active_registration_count(event_reg):
+    """Submissions that occupy a seat: not waitlisted and not rejected."""
+    return event_reg.submissions.filter(is_waitlisted=False).exclude(status='rejected').count()
+
+
+def promote_waitlist(event_reg):
+    """Move the oldest waitlisted submissions into free seats. Returns promoted count.
+
+    Shared by the promote_waitlist command (beat, every minute) and the admin
+    reject flow so a freed seat is refilled immediately.
+    """
+    from django.db import transaction
+    from core.models import EventRegistration, EventWaitlist
+
+    if event_reg.max_registrations <= 0:
+        return 0
+    with transaction.atomic():
+        EventRegistration.objects.select_for_update().filter(pk=event_reg.pk).exists()
+        available = event_reg.max_registrations - active_registration_count(event_reg)
+        if available <= 0:
+            return 0
+        promoted = 0
+        for submission in event_reg.submissions.filter(is_waitlisted=True).order_by('submitted_at')[:available]:
+            submission.is_waitlisted = False
+            submission.status = 'pending'
+            submission.save(update_fields=['is_waitlisted', 'status'])
+            EventWaitlist.objects.filter(
+                user=submission.user, event_registration=event_reg,
+            ).update(promoted=True, notified=True)
+            promoted += 1
+    return promoted

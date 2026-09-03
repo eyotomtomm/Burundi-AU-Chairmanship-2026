@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../config/app_ds.dart';
 import '../widgets/ds/ds_widgets.dart';
 import '../config/environment.dart';
+import '../widgets/app_network_image.dart';
+import '../l10n/app_localizations.dart';
 
 class PriorityAgendaDetailScreen extends StatelessWidget {
   final Map<String, dynamic> agenda;
@@ -159,16 +160,20 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.maybePop(context),
-                child: const SizedBox(
-                  width: 30,
-                  height: 36,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Icon(Icons.arrow_back_rounded,
-                        size: 22, color: Colors.white),
+              Semantics(
+                button: true,
+                label: MaterialLocalizations.of(context).backButtonTooltip,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.maybePop(context),
+                  child: const SizedBox(
+                    width: 30,
+                    height: 36,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Icon(Icons.arrow_back_rounded,
+                          size: 22, color: Colors.white),
+                    ),
                   ),
                 ),
               ),
@@ -198,7 +203,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(Ds.rCard),
                 ),
                 child: hasHeroImage
-                    ? CachedNetworkImage(
+                    ? AppNetworkImage(
                         imageUrl: Environment.fixMediaUrl(heroImage.toString()),
                         fit: BoxFit.cover,
                         errorWidget: (_, _, _) => const Icon(Icons.flag_rounded,
@@ -212,7 +217,7 @@ class PriorityAgendaDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title.isNotEmpty ? title : 'Priority Agenda',
+                      title.isNotEmpty ? title : AppLocalizations.of(context).translate('priority_agenda'),
                       style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,

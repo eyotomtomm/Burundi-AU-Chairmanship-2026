@@ -94,7 +94,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
                 )
               : _categories.isEmpty
                   ? Center(
-                      child: Text('No phrases available.',
+                      child: Text(AppLocalizations.of(context).translate('no_phrases_available'),
                           style: TextStyle(color: Ds.body(context))))
                   : _buildPhrasebook(),
     );

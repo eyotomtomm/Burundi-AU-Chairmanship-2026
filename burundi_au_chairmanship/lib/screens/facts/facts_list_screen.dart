@@ -8,6 +8,7 @@ import '../../config/environment.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../models/fact_model.dart';
 import '../../services/api_service.dart';
+import '../../widgets/async_content_view.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/language_provider.dart';
 import '../auth/auth_screen.dart';
@@ -24,6 +25,7 @@ class _FactsListScreenState extends State<FactsListScreen> {
   List<FactCategory> _categories = [];
   List<Fact> _facts = [];
   bool _isLoading = true;
+  bool _loadFailed = false;
   int? _selectedCategoryId;
   String? _selectedType;
 
@@ -46,10 +48,11 @@ class _FactsListScreenState extends State<FactsListScreen> {
           _categories = results[0] as List<FactCategory>;
           _facts = results[1] as List<Fact>;
           _isLoading = false;
+          _loadFailed = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() { _isLoading = false; _loadFailed = true; });
     }
   }
 
@@ -60,9 +63,9 @@ class _FactsListScreenState extends State<FactsListScreen> {
         category: _selectedCategoryId,
         factType: _selectedType,
       );
-      if (mounted) setState(() { _facts = facts; _isLoading = false; });
+      if (mounted) setState(() { _facts = facts; _isLoading = false; _loadFailed = false; });
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() { _isLoading = false; _loadFailed = true; });
     }
   }
 
@@ -164,7 +167,7 @@ class _FactsListScreenState extends State<FactsListScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF8F6F2),
+      backgroundColor: Ds.bg(context),
       body: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
@@ -172,7 +175,7 @@ class _FactsListScreenState extends State<FactsListScreen> {
           SliverAppBar(
             expandedHeight: 140,
             pinned: true,
-            backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF8F6F2),
+            backgroundColor: Ds.bg(context),
             foregroundColor: isDark ? Colors.white : Colors.black87,
             leading: IconButton(
               icon: const Icon(CupertinoIcons.back),
@@ -216,8 +219,9 @@ class _FactsListScreenState extends State<FactsListScreen> {
             pinned: true,
             delegate: _FilterHeaderDelegate(
               isDark: isDark,
+              extent: MediaQuery.textScalerOf(context).scale(100),
               child: Container(
-                color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF8F6F2),
+                color: Ds.bg(context),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -259,6 +263,14 @@ class _FactsListScreenState extends State<FactsListScreen> {
           if (_isLoading)
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator(color: AppColors.burundiGreen)),
+            )
+          else if (_loadFailed)
+            SliverFillRemaining(
+              child: AsyncContentView(
+                state: AsyncContentState.error,
+                onRetry: _categories.isEmpty ? _loadData : _loadFacts,
+                child: const SizedBox.shrink(),
+              ),
             )
           else if (_facts.isEmpty)
             SliverFillRemaining(
@@ -328,12 +340,14 @@ class _FactsListScreenState extends State<FactsListScreen> {
 class _FilterHeaderDelegate extends SliverPersistentHeaderDelegate {
   final bool isDark;
   final Widget child;
-  _FilterHeaderDelegate({required this.isDark, required this.child});
+
+  final double extent;
+  _FilterHeaderDelegate({required this.isDark, required this.child, required this.extent});
 
   @override
-  double get minExtent => 100;
+  double get minExtent => extent;
   @override
-  double get maxExtent => 100;
+  double get maxExtent => extent;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;

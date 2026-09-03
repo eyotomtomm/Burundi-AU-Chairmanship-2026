@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../widgets/app_network_image.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -38,7 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _authProvider = context.read<AuthProvider>();
     _authProvider.addListener(_onAuthChanged);
-    _loadProfileCompletion();
+    _onAuthChanged(); // seeds the fingerprint and loads once
   }
 
   @override
@@ -47,8 +47,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  String? _profileFingerprint;
+
   void _onAuthChanged() {
-    // Re-fetch completion whenever profile data changes
+    // AuthProvider notifies for many reasons (loading flags, auth checks);
+    // only re-fetch completion when the profile fields actually changed.
+    final a = _authProvider;
+    final fp = '${a.userName}|${a.phoneNumber}|${a.gender}|${a.nationality}|'
+        '${a.dateOfBirth}|${a.profilePictureUrl}|${a.isVerified}';
+    if (_profileFingerprint == fp) return;
+    _profileFingerprint = fp;
     _loadProfileCompletion();
   }
 
@@ -61,7 +69,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _completionPercent = (data['percentage'] as num?)?.toDouble() ?? 0.0;
           final fields = data['fields'] as Map<String, dynamic>? ?? {};
           final missing = fields.entries.where((e) => e.value == false).map((e) => e.key).toList();
-          _completionMessage = missing.isEmpty ? '' : 'Missing: ${missing.join(', ')}';
+          _completionMessage = missing.isEmpty
+              ? ''
+              : '${AppLocalizations.of(context).translate('prof_missing')} ${missing.join(', ')}';
           _completionLoaded = true;
         });
       }
@@ -96,23 +106,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Row(
                         children: [
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => Navigator.pop(context),
-                            child: const SizedBox(
-                              width: 30,
-                              height: 36,
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Icon(Icons.arrow_back_rounded,
-                                    size: 22, color: Colors.white),
+                          Semantics(
+                            button: true,
+                            label: MaterialLocalizations.of(context).backButtonTooltip,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => Navigator.pop(context),
+                              child: const SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Icon(Icons.arrow_back_rounded,
+                                      size: 22, color: Colors.white),
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text('Profile',
-                                style: TextStyle(
+                          Expanded(
+                            child: Text(l10n.translate('profile'),
+                                style: const TextStyle(
                                     fontSize: 19,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: -0.3,
@@ -139,8 +153,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     child: authProvider.profilePictureUrl != null &&
                                             authProvider.profilePictureUrl!.isNotEmpty
                                         ? Semantics(
-                                            label: 'Profile picture',
-                                            child: CachedNetworkImage(
+                                            label: l10n.translate('prof_profile_picture'),
+                                            child: AppNetworkImage(
                                               imageUrl: authProvider.profilePictureUrl!,
                                               width: 72,
                                               height: 72,
@@ -165,10 +179,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       border:
                                           Border.all(color: Colors.white, width: 2),
                                     ),
-                                    child: const Icon(Icons.camera_alt,
+                                    child: Icon(Icons.camera_alt,
                                         size: 14,
                                         color: Colors.white,
-                                        semanticLabel: 'Change profile picture'),
+                                        semanticLabel: l10n.translate('prof_change_picture')),
                                   ),
                                 ),
                               ],
@@ -183,7 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        authProvider.userName ?? 'User',
+                                        authProvider.userName ?? l10n.translate('prof_user'),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -229,9 +243,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     spacing: 6,
                                     children: [
                                       if (authProvider.isEmailVerified)
-                                        _headerPill('VERIFIED'),
+                                        _headerPill(l10n.translate('prof_verified')),
                                       if (authProvider.isGovernmentOfficial)
-                                        _headerPill('OFFICIAL'),
+                                        _headerPill(l10n.translate('prof_official')),
                                     ],
                                   ),
                                 ],
@@ -310,7 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       iconTint: Ds.tint(context),
                       iconColor: Ds.green,
                       title: l10n.translate('full_name'),
-                      subtitle: authProvider.userName ?? 'Not set',
+                      subtitle: authProvider.userName ?? l10n.translate('prof_not_set'),
                       onTap: () =>
                           _showEditNameDialog(context, authProvider, l10n),
                     ),
@@ -318,14 +332,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     DsTile(
                       icon: Icons.email_outlined,
                       title: l10n.translate('email'),
-                      subtitle: authProvider.userEmail ?? 'Not set',
+                      subtitle: authProvider.userEmail ?? l10n.translate('prof_not_set'),
                       chevron: false,
                     ),
                     DsTile(
                       icon: Icons.phone_outlined,
                       iconTint: Ds.tint(context),
                       iconColor: Ds.green,
-                      title: 'Phone Number',
+                      title: l10n.translate('pc_phone_number'),
                       subtitle: _getPhoneLabel(authProvider.phoneNumber),
                       onTap: () =>
                           _showEditPhoneDialog(context, authProvider, l10n),
@@ -334,7 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.wc_outlined,
                       iconTint: Ds.tint(context),
                       iconColor: Ds.green,
-                      title: 'Gender',
+                      title: l10n.translate('pc_gender'),
                       subtitle: _getGenderLabel(authProvider.gender),
                       onTap: () =>
                           _showEditGenderDialog(context, authProvider, l10n),
@@ -343,7 +357,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.flag_outlined,
                       iconTint: Ds.tint(context),
                       iconColor: Ds.green,
-                      title: 'Nationality',
+                      title: l10n.translate('pc_nationality'),
                       subtitle: _getNationalityLabel(authProvider.nationality),
                       onTap: () => _showEditNationalityDialog(
                           context, authProvider, l10n),
@@ -352,7 +366,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.cake_outlined,
                       iconTint: Ds.tint(context),
                       iconColor: Ds.green,
-                      title: 'Date of Birth',
+                      title: l10n.translate('pc_dob'),
                       subtitle: _formatDob(authProvider.dateOfBirth),
                       onTap: () =>
                           _showEditDobDialog(context, authProvider, l10n),
@@ -375,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         iconTint: Ds.tint(context),
                         iconColor: Ds.green,
                         title: l10n.translate('change_password'),
-                        subtitle: 'Update your account password',
+                        subtitle: l10n.translate('prof_update_password'),
                         onTap: () => Navigator.push(
                           context,
                           CupertinoPageRoute(
@@ -387,8 +401,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.link_rounded,
                       iconTint: Ds.blueTint,
                       iconColor: Ds.blue,
-                      title: 'Linked Accounts',
-                      subtitle: 'Manage sign-in methods',
+                      title: l10n.translate('prof_linked_accounts'),
+                      subtitle: l10n.translate('prof_manage_sign_in'),
                       onTap: () => Navigator.push(
                         context,
                         CupertinoPageRoute(
@@ -399,7 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     DsTile(
                       icon: Icons.logout_rounded,
                       title: l10n.translate('sign_out'),
-                      subtitle: 'End this session on this device',
+                      subtitle: l10n.translate('prof_end_session'),
                       onTap: () => _handleSignOut(context, authProvider),
                     ),
                   ],
@@ -417,9 +431,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.pause_circle_outline,
                       iconTint: Ds.goldTintOf(context),
                       iconColor: Ds.goldInk,
-                      title: 'Take a Break',
-                      subtitle:
-                          'Deactivate your account temporarily. Log in anytime to come back.',
+                      title: l10n.translate('prof_take_break'),
+                      subtitle: l10n.translate('prof_take_break_sub'),
                       onTap: () =>
                           _handleDeactivateAccount(context, authProvider, l10n),
                     ),
@@ -429,8 +442,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       iconColor: Ds.red,
                       title: l10n.translate('delete_account'),
                       titleColor: Ds.red,
-                      subtitle:
-                          'Schedule permanent deletion. You have 30 days to change your mind.',
+                      subtitle: l10n.translate('prof_delete_sub'),
                       onTap: () =>
                           _handleDeleteAccount(context, authProvider, l10n),
                     ),
@@ -517,7 +529,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     content: Text(success
                         ? l10n.translate('profile_updated')
                         : (authProvider.errorMessage ??
-                            'Failed to update profile')),
+                            l10n.translate('pc_update_failed'))),
                     backgroundColor:
                         success ? AppColors.success : AppColors.error,
                   ),
@@ -528,7 +540,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   void _handleSignOut(BuildContext context, AuthProvider authProvider) {
@@ -537,7 +549,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(AppLocalizations.of(context).translate('sign_out')),
-        content: const Text('Are you sure you want to sign out?'),
+        content: Text(AppLocalizations.of(context).translate('prof_sign_out_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -594,19 +606,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.pause_circle_outline,
+            const Icon(Icons.pause_circle_outline,
                 color: AppColors.warning, size: 28),
-            SizedBox(width: 8),
-            Text('Take a Break'),
+            const SizedBox(width: 8),
+            Text(l10n.translate('prof_take_break')),
           ],
         ),
-        content: const Text(
-          'Your account will be deactivated and hidden from other users. '
-          'All your data will be preserved.\n\n'
-          'Simply log in again anytime to reactivate your account.',
-        ),
+        content: Text(l10n.translate('prof_take_break_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -631,8 +639,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (success) {
                   HapticFeedback.mediumImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Account deactivated. Log in anytime to come back!'),
+                    SnackBar(
+                      content: Text(l10n.translate('prof_deactivated')),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -643,7 +651,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(authProvider.errorMessage ??
-                          'Failed to deactivate account'),
+                          l10n.translate('prof_deactivate_failed')),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -651,7 +659,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               }
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.warning),
-            child: const Text('Take a Break'),
+            child: Text(l10n.translate('prof_take_break')),
           ),
         ],
       ),
@@ -672,11 +680,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(l10n.translate('delete_account')),
           ],
         ),
-        content: const Text(
-          'Your account will be scheduled for permanent deletion.\n\n'
-          'You have 30 days to change your mind - just log in again to cancel.\n\n'
-          'After 30 days, all your data will be permanently removed and cannot be recovered.',
-        ),
+        content: Text(l10n.translate('prof_delete_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -702,8 +706,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (success) {
                   HapticFeedback.mediumImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Account scheduled for deletion. Log in within 30 days to cancel.'),
+                    SnackBar(
+                      content: Text(l10n.translate('prof_scheduled_deletion')),
                       backgroundColor: AppColors.success,
                     ),
                   );
@@ -714,7 +718,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(authProvider.errorMessage ??
-                          'Failed to delete account'),
+                          l10n.translate('prof_delete_failed')),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -730,30 +734,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String _getGenderLabel(String? gender) {
-    if (gender == null || gender.isEmpty) return 'Not set';
+    final l10n = AppLocalizations.of(context);
     switch (gender) {
       case 'male':
-        return 'Male';
+        return l10n.translate('pc_male');
       case 'female':
-        return 'Female';
+        return l10n.translate('pc_female');
       case 'other':
-        return 'Other';
+        return l10n.translate('vr_other');
       case 'prefer_not_to_say':
-        return 'Prefer not to say';
+        return l10n.translate('prof_prefer_not');
       default:
-        return 'Not set';
+        return l10n.translate('prof_not_set');
     }
   }
 
   String _getNationalityLabel(String? code) {
-    if (code == null || code.isEmpty) return 'Not set';
+    if (code == null || code.isEmpty) return AppLocalizations.of(context).translate('prof_not_set');
     final name = AppConstants.nationalityChoices[code] ?? code;
     final flag = AppConstants.countryFlag(code);
     return '$flag  $name';
   }
 
   String _getPhoneLabel(String? phone) {
-    if (phone == null || phone.isEmpty) return 'Not set';
+    if (phone == null || phone.isEmpty) return AppLocalizations.of(context).translate('prof_not_set');
     // Try to find the country flag from the dial code prefix
     for (final entry in AppConstants.countryDialCodes.entries) {
       if (phone.startsWith(entry.value)) {
@@ -765,7 +769,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String _formatDob(String? dob) {
-    if (dob == null || dob.isEmpty) return 'Not set';
+    if (dob == null || dob.isEmpty) return AppLocalizations.of(context).translate('prof_not_set');
     try {
       final date = DateTime.parse(dob);
       return '${date.day}/${date.month}/${date.year}';
@@ -803,7 +807,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Update Phone Number'),
+        title: Text(l10n.translate('prof_update_phone')),
         content: Form(
           key: formKey,
           child: StatefulBuilder(
@@ -814,7 +818,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Country code picker
                   GestureDetector(
                     onTap: () {
-                      _showCountryCodePicker(context, selectedCountryCode, (code) {
+                      _showCountryCodePicker(context, selectedCountryCode, l10n, (code) {
                         setState(() => selectedCountryCode = code);
                       });
                     },
@@ -849,8 +853,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: controller,
                       autofocus: true,
                       keyboardType: TextInputType.phone,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (v) {
+                        final digits = (v ?? '').replaceAll(RegExp(r'[\s-]'), '');
+                        if (digits.isEmpty) return l10n.translate('prof_enter_phone');
+                        if (!RegExp(r'^\d{6,12}$').hasMatch(digits)) return l10n.translate('prof_digits_only');
+                        return null;
+                      },
                       decoration: InputDecoration(
-                        labelText: 'Phone Number',
+                        labelText: l10n.translate('pc_phone_number'),
                         hintText: 'XX XXX XXXX',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -879,8 +890,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () async {
+              if (!(formKey.currentState?.validate() ?? false)) return;
               final dialCode = AppConstants.countryDialCodes[selectedCountryCode] ?? '+257';
-              final fullPhone = '$dialCode${controller.text.trim()}';
+              final fullPhone = '$dialCode${controller.text.replaceAll(RegExp(r'[\s-]'), '')}';
               Navigator.pop(dialogContext);
               final success = await authProvider.updateProfile(
                 authProvider.userName ?? '',
@@ -890,8 +902,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(success
-                        ? 'Phone number updated to $fullPhone'
-                        : 'Failed to update phone number'),
+                        ? '${l10n.translate('prof_phone_updated')} $fullPhone'
+                        : l10n.translate('prof_phone_update_failed')),
                     backgroundColor: success ? AppColors.success : AppColors.error,
                   ),
                 );
@@ -901,10 +913,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
-  void _showCountryCodePicker(BuildContext context, String currentCode, ValueChanged<String> onSelected) {
+  void _showCountryCodePicker(BuildContext context, String currentCode, AppLocalizations l10n, ValueChanged<String> onSelected) {
     String searchQuery = '';
     final entries = AppConstants.countryDialCodes.entries
         .where((e) => AppConstants.nationalityChoices.containsKey(e.key))
@@ -948,7 +960,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: TextField(
                         autofocus: true,
                         decoration: InputDecoration(
-                          hintText: 'Search country...',
+                          hintText: l10n.translate('pc_search_country'),
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1006,7 +1018,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Select Gender'),
+        title: Text(l10n.translate('prof_select_gender')),
         content: StatefulBuilder(
           builder: (context, setState) {
             return RadioGroup<String>(
@@ -1018,12 +1030,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   RadioListTile<String>(
-                    title: const Text('Male'),
+                    title: Text(l10n.translate('pc_male')),
                     value: 'male',
                     activeColor: AppColors.success,
                   ),
                   RadioListTile<String>(
-                    title: const Text('Female'),
+                    title: Text(l10n.translate('pc_female')),
                     value: 'female',
                     activeColor: AppColors.success,
                   ),
@@ -1053,8 +1065,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(success
-                        ? 'Gender updated'
-                        : 'Failed to update gender'),
+                        ? l10n.translate('prof_gender_updated')
+                        : l10n.translate('prof_gender_update_failed')),
                     backgroundColor: success ? AppColors.success : AppColors.error,
                   ),
                 );
@@ -1077,7 +1089,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Select Nationality'),
+        title: Text(l10n.translate('prof_select_nationality')),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
@@ -1094,7 +1106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   TextField(
                     decoration: InputDecoration(
-                      hintText: 'Search country...',
+                      hintText: l10n.translate('pc_search_country'),
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1147,7 +1159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(success ? 'Nationality updated' : 'Failed to update'),
+                      content: Text(l10n.translate(success ? 'prof_nationality_updated' : 'prof_update_failed_short')),
                       backgroundColor: success ? AppColors.success : AppColors.error,
                     ),
                   );
@@ -1198,7 +1210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success ? 'Date of birth updated' : 'Failed to update'),
+            content: Text(l10n.translate(success ? 'prof_dob_updated' : 'prof_update_failed_short')),
             backgroundColor: success ? AppColors.success : AppColors.error,
           ),
         );
@@ -1207,6 +1219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   static void _showProfilePictureOptions(BuildContext context, AuthProvider authProvider) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -1215,7 +1228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_camera, color: AppColors.burundiGreen),
-                title: const Text('Take Photo'),
+                title: Text(l10n.translate('prof_take_photo')),
                 onTap: () {
                   Navigator.pop(context);
                   _pickAndUploadImage(context, authProvider, ImageSource.camera);
@@ -1223,7 +1236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library, color: AppColors.burundiGreen),
-                title: const Text('Choose from Gallery'),
+                title: Text(l10n.translate('prof_choose_gallery')),
                 onTap: () {
                   Navigator.pop(context);
                   _pickAndUploadImage(context, authProvider, ImageSource.gallery);
@@ -1231,7 +1244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.cancel, color: AppColors.error),
-                title: const Text('Cancel'),
+                title: Text(l10n.translate('cancel')),
                 onTap: () => Navigator.pop(context),
               ),
             ],
@@ -1246,6 +1259,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     AuthProvider authProvider,
     ImageSource source,
   ) async {
+    var loadingDialogShown = false;
+    final l10n = AppLocalizations.of(context);
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
@@ -1266,7 +1281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         maxHeight: 1024,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop Profile Photo',
+            toolbarTitle: l10n.translate('prof_crop_photo'),
             toolbarColor: AppColors.burundiGreen,
             toolbarWidgetColor: Colors.white,
             activeControlsWidgetColor: AppColors.burundiGreen,
@@ -1274,7 +1289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             lockAspectRatio: true,
           ),
           IOSUiSettings(
-            title: 'Crop Profile Photo',
+            title: l10n.translate('prof_crop_photo'),
             cropStyle: CropStyle.circle,
             aspectRatioLockEnabled: true,
             resetAspectRatioEnabled: false,
@@ -1286,6 +1301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // Show loading dialog
       if (context.mounted) {
+        loadingDialogShown = true;
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -1300,7 +1316,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final success = await authProvider.uploadProfilePicture(imageFile);
 
       if (context.mounted) {
-        Navigator.pop(context); // Close loading
+        if (loadingDialogShown) {
+          loadingDialogShown = false;
+          Navigator.pop(context); // Close loading
+        }
         if (success) {
           HapticFeedback.mediumImpact();
         } else {
@@ -1309,19 +1328,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(success
-                ? 'Profile picture updated!'
-                : (authProvider.errorMessage ?? 'Failed to upload image')),
+                ? l10n.translate('prof_picture_updated')
+                : (authProvider.errorMessage ?? l10n.translate('prof_upload_failed'))),
             backgroundColor: success ? AppColors.success : AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Close loading if open
+        if (loadingDialogShown) Navigator.pop(context); // Close loading only if open
         HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to upload image: $e'),
+            content: Text(e is ApiException ? e.message : l10n.translate('prof_upload_failed')),
             backgroundColor: AppColors.error,
           ),
         );

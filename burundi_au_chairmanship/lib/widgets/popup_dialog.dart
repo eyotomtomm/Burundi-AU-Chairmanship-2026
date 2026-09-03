@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'app_network_image.dart';
 import '../models/popup_model.dart';
 import '../config/app_colors.dart';
 import '../services/deep_link_router.dart';
+import '../l10n/app_localizations.dart';
 
 class PopupDialog extends StatelessWidget {
   final PopupModel popup;
@@ -44,8 +45,9 @@ class PopupDialog extends StatelessWidget {
             if (popup.image != null && popup.image!.isNotEmpty)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: CachedNetworkImage(
+                child: AppNetworkImage(
                   imageUrl: popup.image!,
+                  hero: true,
                   width: double.infinity,
                   height: 200,
                   fit: BoxFit.cover,
@@ -119,7 +121,7 @@ class PopupDialog extends StatelessWidget {
                   TextButton(
                     onPressed: onClose,
                     child: Text(
-                      languageCode == 'fr' ? 'Fermer' : 'Close',
+                      AppLocalizations.of(context).translate('close'),
                       style: TextStyle(
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                         fontSize: 14,

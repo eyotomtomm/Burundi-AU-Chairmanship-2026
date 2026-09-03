@@ -1,0 +1,252 @@
+# CI — Be 4 Africa
+# Runs on every push & PR to main.
+# - Backend: Django checks, migrations, tests (Postgres service)
+# - Frontend: Flutter analyze + test, then release builds on main pushes
+#
+# Firebase client config and signing material are NOT in the repo; CI writes
+# them from base64 secrets (see "Required secrets" below). Missing secrets
+# skip the dependent step instead of failing the workflow.
+#
+# Required secrets:
+#   FIREBASE_OPTIONS_DART_B64       base64 of lib/firebase_options.dart
+#   GOOGLE_SERVICES_JSON_B64        base64 of android/app/google-services.json
+#   GOOGLE_SERVICE_INFO_PLIST_B64   base64 of ios/Runner/GoogleService-Info.plist
+#   ANDROID_KEYSTORE_BASE64         base64 of the upload keystore (.jks)
+#   KEYSTORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS
+#   SENTRY_DSN_FLUTTER              optional
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Must satisfy pubspec `sdk: ^3.10.8` (Dart 3.10.8 ships with Flutter 3.38.9).
+  FLUTTER_VERSION: "3.38.9"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ─── Backend ───────────────────────────────────────────────
+  backend:
+    name: Backend (Django)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship/backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # settings.py hard-requires DJANGO_SECRET_KEY; the rest have defaults.
+      DJANGO_SECRET_KEY: "ci-only-secret-key-not-used-anywhere-else-0123456789abcdef"
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DATABASE_URL: "postgresql://test_user:test_pass@localhost:5432/test_db"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: burundi_au_chairmanship/backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system checks
+        run: python manage.py check
+
+      - name: Migrations are committed
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run migrations
+        run: python manage.py migrate --noinput
+
+      - name: Collect static files
+        run: python manage.py collectstatic --noinput
+
+      - name: Run tests
+        run: python manage.py test core -v2
+
+  # ─── Flutter analyze + test ────────────────────────────────
+  flutter-analyze:
+    name: Flutter Analyze & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      # main.dart imports firebase_options.dart, which is not in the repo.
+      - name: Write Firebase Dart options
+        if: env.B64 != ''
+        env:
+          B64: ${{ secrets.FIREBASE_OPTIONS_DART_B64 }}
+        run: echo "$B64" | base64 -d > lib/firebase_options.dart
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-pub --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
+  # ─── Build Android (AAB + APK) ─────────────────────────────
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    needs: [backend, flutter-analyze]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship
+    env:
+      # gradle.properties sets -Xmx4G; 7 GB runners can't take more.
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Write Firebase config
+        env:
+          DART_B64: ${{ secrets.FIREBASE_OPTIONS_DART_B64 }}
+          JSON_B64: ${{ secrets.GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          [ -n "$DART_B64" ] && echo "$DART_B64" | base64 -d > lib/firebase_options.dart
+          [ -n "$JSON_B64" ] && echo "$JSON_B64" | base64 -d > android/app/google-services.json
+          true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Write signing keystore + key.properties
+        if: env.KEYSTORE_B64 != ''
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build App Bundle + APK
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN_FLUTTER }}
+        run: |
+          DEFINES="--dart-define=ENVIRONMENT=production --dart-define=SENTRY_DSN=$SENTRY_DSN"
+          OBF="--obfuscate --split-debug-info=build/symbols/android"
+          flutter build appbundle --release $DEFINES $OBF
+          flutter build apk --release $DEFINES $OBF
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: |
+            burundi_au_chairmanship/build/app/outputs/bundle/release/app-release.aab
+            burundi_au_chairmanship/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Upload Dart symbol maps (Android)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-symbols-android
+          path: burundi_au_chairmanship/build/symbols/android
+          retention-days: 90
+
+  # ─── Build iOS (unsigned) ──────────────────────────────────
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    needs: [backend, flutter-analyze]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: burundi_au_chairmanship
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Write Firebase config
+        env:
+          DART_B64: ${{ secrets.FIREBASE_OPTIONS_DART_B64 }}
+          PLIST_B64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}
+        run: |
+          [ -n "$DART_B64" ] && echo "$DART_B64" | base64 -d > lib/firebase_options.dart
+          [ -n "$PLIST_B64" ] && echo "$PLIST_B64" | base64 -d > ios/Runner/GoogleService-Info.plist
+          true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Build iOS (no code sign)
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN_FLUTTER }}
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=ENVIRONMENT=production \
+            --dart-define=SENTRY_DSN=$SENTRY_DSN \
+            --obfuscate --split-debug-info=build/symbols/ios
+
+      - name: Upload Dart symbol maps (iOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-symbols-ios
+          path: burundi_au_chairmanship/build/symbols/ios
+          retention-days: 90

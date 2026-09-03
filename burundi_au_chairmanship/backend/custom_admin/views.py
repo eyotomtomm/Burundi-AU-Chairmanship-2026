@@ -26,8 +26,13 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.core.cache import cache
+from django.db import transaction
+from django_otp import login as otp_login
+from django_otp.plugins.otp_totp.models import TOTPDevice
 
 logger = logging.getLogger(__name__)
 
@@ -254,13 +259,96 @@ def admin_login(request):
                 request.session.set_expiry(0)
             request.session.save()
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
-            if hasattr(user, 'profile') and user.profile.force_password_change:
-                return redirect('custom_admin:force_password_change')
-            if _is_reviewer_only(user):
-                return redirect('custom_admin:reviewer_list')
-            return redirect('custom_admin:dashboard')
+            # Second factor is mandatory: enrol if the user has no confirmed device.
+            has_device = TOTPDevice.objects.devices_for_user(user, confirmed=True).exists()
+            return redirect('custom_admin:2fa_verify' if has_device else 'custom_admin:2fa_setup')
 
     return render(request, 'custom_admin/login.html', {'is_locked': is_locked})
+
+
+def _after_login_redirect(user):
+    if getattr(getattr(user, 'profile', None), 'force_password_change', False):
+        return redirect('custom_admin:force_password_change')
+    if _is_reviewer_only(user):
+        return redirect('custom_admin:reviewer_list')
+    return redirect('custom_admin:dashboard')
+
+
+_2FA_MAX_ATTEMPTS = 5
+_2FA_LOCK_SECONDS = 15 * 60
+
+
+def _check_totp(request, device):
+    """Verify the posted code against `device` with a per-user attempt cap.
+    Returns None on success, else an error message."""
+    key = f'admin_2fa_attempts:{request.user.pk}'
+    attempts = cache.get(key, 0)
+    if attempts >= _2FA_MAX_ATTEMPTS:
+        return 'Too many attempts. Please wait 15 minutes and try again.'
+    token = (request.POST.get('otp_code') or '').strip()
+    if token.isdigit() and device.verify_token(token):
+        cache.delete(key)
+        return None
+    cache.set(key, attempts + 1, _2FA_LOCK_SECONDS)
+    return 'Invalid code. Check your authenticator app and device clock, then try again.'
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def two_factor_setup(request):
+    """Enrol a TOTP device: show QR, confirm with one code, then sign in."""
+    if TOTPDevice.objects.devices_for_user(request.user, confirmed=True).exists():
+        return redirect('custom_admin:2fa_verify')
+    device = TOTPDevice.objects.filter(user=request.user, confirmed=False).first()
+    if device is None:
+        device = TOTPDevice.objects.create(user=request.user, name='Authenticator', confirmed=False)
+
+    error = None
+    if request.method == 'POST':
+        error = _check_totp(request, device)
+        if error is None:
+            device.confirmed = True
+            device.save(update_fields=['confirmed'])
+            otp_login(request, device)
+            log_admin_action(request, '2fa_setup', 'Auth', object_repr=request.user.username)
+            return _after_login_redirect(request.user)
+
+    import base64
+    import qrcode
+    import qrcode.image.svg
+    qr_svg = qrcode.make(device.config_url, image_factory=qrcode.image.svg.SvgPathImage).to_string(encoding='unicode')
+    return render(request, 'custom_admin/totp_setup.html', {
+        'qr_svg': qr_svg,
+        'secret_key': base64.b32encode(device.bin_key).decode(),
+        'error': error,
+    })
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def two_factor_verify(request):
+    """Second login step: accept a 6-digit TOTP code from the confirmed device."""
+    if request.user.is_verified():
+        return _after_login_redirect(request.user)
+    device = TOTPDevice.objects.devices_for_user(request.user, confirmed=True).first()
+    if device is None:
+        return redirect('custom_admin:2fa_setup')
+
+    error = None
+    if request.method == 'POST':
+        error = _check_totp(request, device)
+        if error is None:
+            otp_login(request, device)
+            log_admin_action(request, '2fa_verify', 'Auth', object_repr=request.user.username)
+            return _after_login_redirect(request.user)
+    return render(request, 'custom_admin/totp_verify.html', {'username': request.user.username, 'error': error})
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def ping(request):
+    """Cheap keepalive target for the session-timeout JS; the staff-session middleware bumps last_activity."""
+    return HttpResponse(status=204)
 
 
 def axes_lockout_response(request, credentials, *args, **kwargs):
@@ -1060,8 +1148,6 @@ def notifications_list(request):
     })
 
 
-@login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
 def _validate_notification_language_fields(request):
     """Return an error message when language targeting is inconsistent with
     the bilingual fields provided, or ``None`` if the form is OK.
@@ -1097,11 +1183,28 @@ def _validate_notification_language_fields(request):
     return None
 
 
+def _parse_scheduled_at(raw):
+    """(aware datetime | None, error | None) from the form's datetime-local value."""
+    raw = (raw or '').strip()
+    if not raw:
+        return None, None
+    from django.utils.dateparse import parse_datetime
+    dt = parse_datetime(raw)
+    if dt is None:
+        return None, 'Invalid schedule date/time.'
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt)
+    return dt, None
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 @_catch_upload_errors
 def notification_create(request):
     if request.method == 'POST':
         # Bilingual consistency validation
-        validation_error = _validate_notification_language_fields(request)
+        scheduled_at, sched_error = _parse_scheduled_at(request.POST.get('scheduled_at'))
+        validation_error = _validate_notification_language_fields(request) or sched_error
         if validation_error:
             messages.error(request, validation_error)
             from core.models import NATIONALITY_CHOICES
@@ -1110,13 +1213,6 @@ def notification_create(request):
                 'nationality_choices': NATIONALITY_CHOICES,
                 'form_data': request.POST,
             })
-
-        # Parse scheduled_at datetime
-        scheduled_at = None
-        scheduled_at_str = request.POST.get('scheduled_at', '').strip()
-        if scheduled_at_str:
-            from django.utils.dateparse import parse_datetime
-            scheduled_at = parse_datetime(scheduled_at_str)
 
         # Parse schedule_time
         schedule_time = None
@@ -1173,14 +1269,8 @@ def notification_create(request):
         send_push = request.POST.get('send_push') == 'on'
         if send_push and notification.is_active:
             from core.tasks import send_notification_push_async
-            result = send_notification_push_async.delay(notification.pk)
-            try:
-                success, failure = result.get(timeout=30)
-                push_msg = f'Notification created and push sent to {success} device(s).'
-                if failure:
-                    push_msg += f' ({failure} failed)'
-            except Exception:
-                push_msg = 'Notification created and push queued for delivery.'
+            send_notification_push_async.delay(notification.pk)
+            push_msg = 'Notification created and push queued for delivery.'
             log_admin_action(
                 request, 'send_notification', 'Notification',
                 object_id=notification.pk, object_repr=notification.title,
@@ -1205,7 +1295,8 @@ def notification_edit(request, pk):
     notification = get_object_or_404(Notification, pk=pk)
     if request.method == 'POST':
         # Bilingual consistency validation
-        validation_error = _validate_notification_language_fields(request)
+        scheduled_at, sched_error = _parse_scheduled_at(request.POST.get('scheduled_at'))
+        validation_error = _validate_notification_language_fields(request) or sched_error
         if validation_error:
             messages.error(request, validation_error)
             from core.models import NATIONALITY_CHOICES
@@ -1245,13 +1336,7 @@ def notification_edit(request, pk):
             notification.schedule_time = parse_time(schedule_time_str)
         else:
             notification.schedule_time = None
-        # Update scheduled_at
-        scheduled_at_str = request.POST.get('scheduled_at', '').strip()
-        if scheduled_at_str:
-            from django.utils.dateparse import parse_datetime
-            notification.scheduled_at = parse_datetime(scheduled_at_str)
-        else:
-            notification.scheduled_at = None
+        notification.scheduled_at = scheduled_at
         notification.save()
         # Send push if explicitly requested on edit
         send_push = request.POST.get('send_push') == 'on'
@@ -1571,32 +1656,16 @@ def notification_send_push(request, pk):
     if not notification.is_active:
         messages.error(request, 'Cannot send push for an inactive notification. Activate it first.')
         return redirect('custom_admin:notifications_list')
-    from core.tasks import send_notification_push_async
-    result = send_notification_push_async.delay(notification.pk)
-    # When Celery runs eagerly (no Redis), .delay() returns the result
-    # synchronously so we can show actual send counts to the admin.
-    try:
-        success, failure = result.get(timeout=30)
-        push_msg = f'Push sent to {success} device(s).'
-        if failure:
-            push_msg += f' ({failure} failed)'
-    except Exception:
-        push_msg = 'Push queued for delivery.'
+    from core.tasks import send_notification_push_async, send_sms_broadcast
+    # Enqueue only — a large audience must never block the admin request.
+    send_notification_push_async.delay(notification.pk)
+    push_msg = 'Push queued for delivery.'
 
     # Also send SMS if requested
-    send_sms_flag = request.POST.get('send_sms') == 'on'
     sms_msg = ''
-    if send_sms_flag:
-        try:
-            from core.utils import send_sms_to_enabled_users
-            sms_success, sms_failure = send_sms_to_enabled_users(
-                notification.title, notification.message
-            )
-            sms_msg = f' | SMS sent to {sms_success} user(s).'
-            if sms_failure:
-                sms_msg += f' ({sms_failure} SMS failed)'
-        except Exception as e:
-            sms_msg = f' | SMS failed: {e}'
+    if request.POST.get('send_sms') == 'on':
+        send_sms_broadcast.delay(notification.title, notification.message)
+        sms_msg = ' | SMS queued.'
 
     log_admin_action(
         request, 'send_notification', 'Notification',
@@ -1752,6 +1821,12 @@ def user_create(request):
             messages.error(request, f'Email "{email}" already in use.')
             return render(request, 'custom_admin/users/form.html', {'action': 'Create', 'nationality_choices': NATIONALITY_CHOICES})
 
+        try:
+            validate_password(password, User(username=username, email=email, first_name=first_name, last_name=last_name))
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
+            return render(request, 'custom_admin/users/form.html', {'action': 'Create', 'nationality_choices': NATIONALITY_CHOICES})
+
         user = User.objects.create_user(
             username=username,
             email=email,
@@ -1759,7 +1834,10 @@ def user_create(request):
             first_name=first_name,
             last_name=last_name,
         )
-        user.is_staff = request.POST.get('is_staff') == 'on'
+        # Privilege flags are superuser-only (mirrors user_edit).
+        if request.user.is_superuser:
+            user.is_staff = request.POST.get('is_staff') == 'on'
+            user.is_superuser = request.POST.get('is_superuser') == 'on'
         user.is_active = request.POST.get('is_active') != 'off'
         user.save()
         messages.success(request, f'User "{username}" created successfully!')
@@ -1792,6 +1870,11 @@ def user_edit(request, pk):
 
         new_password = request.POST.get('password', '').strip()
         if new_password:
+            try:
+                validate_password(new_password, target_user)
+            except ValidationError as exc:
+                messages.error(request, ' '.join(exc.messages))
+                return redirect('custom_admin:user_edit', pk=pk)
             target_user.set_password(new_password)
 
         target_user.save()
@@ -2052,8 +2135,8 @@ def admin_invite(request):
             logger.exception('Failed to send admin invitation email')
             messages.warning(
                 request,
-                f'Admin "{username}" created but email failed to send. '
-                f'Please manually share: Username: {username}, Password: {temp_password}'
+                f'Admin "{username}" created but the invitation email could not be sent. '
+                f'Set a new password for them in User Management and share it securely.'
             )
 
         return redirect('custom_admin:admin_management')
@@ -2127,39 +2210,33 @@ def verification_request_review(request, pk):
     )
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'approve':
+        old_status = ver_request.status
+        if old_status not in ('pending', 'appealed'):
+            messages.error(request, f'This request is already {ver_request.get_status_display().lower()} and cannot be actioned again.')
+        elif action == 'approve':
             badge_type = request.POST.get('badge_type', 'BLUE')
-            ver_request.status = 'approved'
-            ver_request.badge_type = badge_type
-            ver_request.reviewed_by = request.user
-            ver_request.reviewed_at = timezone.now()
-            ver_request.save()
-            # Update user profile with badge + verification request data
-            profile = ver_request.user.profile
-            profile.is_verified = True
-            profile.badge_type = badge_type
-            profile.verified_at = timezone.now()
-            # Copy verification request info to profile
-            if ver_request.position_role:
-                profile.role = ver_request.position_role
-            if ver_request.phone_number:
-                profile.phone_number = f'{ver_request.country_code}{ver_request.phone_number}'.strip()
-            # Extract the professional email domain as organization if not already set
-            if not profile.organization and ver_request.email:
-                domain = ver_request.email.split('@')[-1].split('.')[0].title()
-                profile.organization = domain
-            # Copy first social media URL to profile
-            first_social = ver_request.social_media_profiles.first()
-            if first_social and not profile.social_media_url:
-                url = first_social.username_or_url
-                if not url.startswith('http'):
-                    url = f'https://{first_social.platform}.com/{url.lstrip("@")}'
-                profile.social_media_url = url
-            profile.save()
+            with transaction.atomic():
+                ver_request.approve(request.user, badge_type)
+                badge_type = ver_request.badge_type  # model may upgrade officials to GOLD
+                # Admin-portal extras the model method doesn't copy
+                profile = ver_request.user.profile
+                if ver_request.position_role:
+                    profile.role = ver_request.position_role
+                if ver_request.phone_number:
+                    profile.phone_number = f'{ver_request.country_code}{ver_request.phone_number}'.strip()
+                if not profile.organization and ver_request.email:
+                    profile.organization = ver_request.email.split('@')[-1].split('.')[0].title()
+                first_social = ver_request.social_media_profiles.first()
+                if first_social and not profile.social_media_url:
+                    url = first_social.username_or_url
+                    if not url.startswith('http'):
+                        url = f'https://{first_social.platform}.com/{url.lstrip("@")}'
+                    profile.social_media_url = url
+                profile.save()
             log_admin_action(
                 request, 'approve', 'VerificationRequest', object_id=pk,
                 object_repr=ver_request.full_name,
-                changes={'status': {'old': 'pending', 'new': 'approved'}, 'badge_type': {'old': '', 'new': badge_type}}
+                changes={'status': {'old': old_status, 'new': 'approved'}, 'badge_type': {'old': '', 'new': badge_type}}
             )
             # Send verification approval email + push notification
             user = ver_request.user
@@ -2200,15 +2277,11 @@ def verification_request_review(request, pk):
                 logger.warning(f'Verification approval push failed for user {user.pk}: {e}')
             messages.success(request, f'Approved {ver_request.full_name} with {badge_type} badge.')
         elif action == 'reject':
-            ver_request.status = 'rejected'
-            ver_request.rejection_reason = request.POST.get('rejection_reason', '')
-            ver_request.reviewed_by = request.user
-            ver_request.reviewed_at = timezone.now()
-            ver_request.save()
+            ver_request.reject(request.user, request.POST.get('rejection_reason', ''))
             log_admin_action(
                 request, 'reject', 'VerificationRequest', object_id=pk,
                 object_repr=ver_request.full_name,
-                changes={'status': {'old': 'pending', 'new': 'rejected'}, 'reason': {'old': '', 'new': ver_request.rejection_reason}}
+                changes={'status': {'old': old_status, 'new': 'rejected'}, 'reason': {'old': '', 'new': ver_request.rejection_reason}}
             )
             # Send push notification to the user
             try:
@@ -2954,12 +3027,15 @@ def event_submission_review(request, pk):
                 pass  # Push is best-effort — don't fail the review
 
         elif action == 'reject':
+            from core.utils import promote_waitlist
             submission.status = 'rejected'
             submission.admin_notes = request.POST.get('admin_notes', '')
             submission.reviewed_by = request.user
             submission.reviewed_at = timezone.now()
             submission.save()
-            messages.success(request, f'Submission from {submission.user.username} rejected.')
+            promoted = promote_waitlist(submission.event_registration)
+            messages.success(request, f'Submission from {submission.user.username} rejected.'
+                             + (f' {promoted} waitlisted registration(s) promoted.' if promoted else ''))
 
             # Send rejection notification email
             if submission.user.email:
@@ -3230,6 +3306,7 @@ def discussion_topic_edit(request, pk):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def discussion_topic_delete(request, pk):
     item = get_object_or_404(DiscussionTopic, pk=pk)
     item.delete()
@@ -3266,6 +3343,7 @@ def content_reports_list(request):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def content_report_set_status(request, pk, new_status):
     report = get_object_or_404(ContentReport, pk=pk)
     valid = {c[0] for c in ContentReport.STATUS_CHOICES}
@@ -3279,6 +3357,47 @@ def content_report_set_status(request, pk, new_status):
 
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def content_report_ban_author(request, pk):
+    """Ban the reported account from posting and hide everything it wrote.
+
+    Deleting one post leaves the next one; a report that turns out to be a bad
+    actor rather than a bad post needs this.
+    """
+    report = get_object_or_404(ContentReport, pk=pk)
+    author = report.reported_user or (report.discussion.author if report.discussion_id else None)
+    if author is not None:
+        profile = getattr(author, 'profile', None)
+        if profile:
+            profile.is_comment_banned = True
+            profile.comment_banned_at = timezone.now()
+            profile.save(update_fields=['is_comment_banned', 'comment_banned_at'])
+        Discussion.objects.filter(author=author).update(is_hidden=True)
+        messages.success(request, f'{author.username} banned and their posts hidden.')
+    report.status = 'actioned'
+    report.reviewed_at = timezone.now()
+    report.save(update_fields=['status', 'reviewed_at'])
+    return redirect('custom_admin:content_reports_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
+def content_report_restore_post(request, pk):
+    """Put an auto-hidden post back in the feed and dismiss the report."""
+    report = get_object_or_404(ContentReport, pk=pk)
+    if report.discussion_id:
+        Discussion.objects.filter(pk=report.discussion_id).update(is_hidden=False)
+        messages.success(request, 'Post restored to the feed.')
+    report.status = 'dismissed'
+    report.reviewed_at = timezone.now()
+    report.save(update_fields=['status', 'reviewed_at'])
+    return redirect('custom_admin:content_reports_list')
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+@require_POST
 def content_report_delete_post(request, pk):
     """Take down the reported post and close the report in one action."""
     report = get_object_or_404(ContentReport, pk=pk)
@@ -6074,6 +6193,8 @@ def _user_allowed_sections(user):
         return set()
 
 
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
 def admin_global_search(request):
     """Full-page search results view.
 
@@ -6345,45 +6466,50 @@ def admin_global_search_api(request):
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
 def export_users_csv(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow([
-        'ID', 'Username', 'Email', 'First Name', 'Last Name',
-        'Is Active', 'Is Staff', 'Is Superuser', 'Date Joined',
-        'Last Login', 'Nationality', 'Gender', 'Is Verified',
-    ])
-
     users = User.objects.all().select_related('profile').order_by('-date_joined')
-    for user in users:
-        profile = getattr(user, 'profile', None)
-        writer.writerow(_sanitize_csv_row([
-            user.id,
-            user.username,
-            user.email,
-            user.first_name,
-            user.last_name,
-            user.is_active,
-            user.is_staff,
-            user.is_superuser,
-            user.date_joined.strftime('%Y-%m-%d %H:%M:%S') if user.date_joined else '',
-            user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '',
-            profile.nationality if profile else '',
-            profile.gender if profile else '',
-            profile.is_verified if profile else False,
-        ]))
+    total = users.count()
+
+    class _Echo:
+        def write(self, value):
+            return value
+
+    def rows():
+        writer = csv.writer(_Echo())
+        yield writer.writerow([
+            'ID', 'Username', 'Email', 'First Name', 'Last Name',
+            'Is Active', 'Is Staff', 'Is Superuser', 'Date Joined',
+            'Last Login', 'Nationality', 'Gender', 'Is Verified',
+        ])
+        for user in users.iterator(chunk_size=500):
+            profile = getattr(user, 'profile', None)
+            yield writer.writerow(_sanitize_csv_row([
+                user.id,
+                user.username,
+                user.email,
+                user.first_name,
+                user.last_name,
+                user.is_active,
+                user.is_staff,
+                user.is_superuser,
+                user.date_joined.strftime('%Y-%m-%d %H:%M:%S') if user.date_joined else '',
+                user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '',
+                profile.nationality if profile else '',
+                profile.gender if profile else '',
+                profile.is_verified if profile else False,
+            ]))
 
     # Log the export (both old AuditLogEntry and new AdminActivityLog)
     AuditLogEntry.objects.create(
         user=request.user,
         action='EXPORT',
         entity_type='User',
-        entity_label=f'CSV export of {users.count()} users',
+        entity_label=f'CSV export of {total} users',
         status='success',
     )
-    log_admin_action(request, 'export', 'User', object_repr=f'CSV export of {users.count()} users')
+    log_admin_action(request, 'export', 'User', object_repr=f'CSV export of {total} users')
 
+    response = StreamingHttpResponse(rows(), content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
     return response
 
 
@@ -7516,10 +7642,8 @@ def system_health_api(request):
         deploy_info['media_url'] = getattr(settings, 'MEDIA_URL', '/media/')
 
         # Storage backend
-        default_file_storage = getattr(
-            settings, 'DEFAULT_FILE_STORAGE', ''
-        )
-        if 's3' in default_file_storage.lower() or 'boto' in default_file_storage.lower():
+        default_file_storage = settings.STORAGES.get('default', {}).get('BACKEND', '')
+        if any(k in default_file_storage.lower() for k in ('s3', 'boto', 'spaces')):
             deploy_info['storage_backend'] = 'S3 / DigitalOcean Spaces'
         else:
             deploy_info['storage_backend'] = 'Local filesystem'
@@ -7550,7 +7674,7 @@ def system_health_api(request):
 # =============================================================================
 
 @login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
 def database_backup_page(request):
     """Render the database backup management page."""
     from django.conf import settings as django_settings
@@ -7591,7 +7715,7 @@ def database_backup_page(request):
 
 
 @login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
 @require_POST
 def create_backup(request):
     """Create a new database backup using Django dumpdata."""
@@ -7604,7 +7728,8 @@ def create_backup(request):
     backup_type = request.POST.get('backup_type', 'full')
     notes = request.POST.get('notes', '').strip()
 
-    # Create backups/ directory if needed
+    # NOTE: App Platform's disk is ephemeral — backups vanish on redeploy.
+    # Download immediately; move to Spaces if retention is ever required.
     backup_dir = os.path.join(django_settings.BASE_DIR, 'backups')
     os.makedirs(backup_dir, exist_ok=True)
 
@@ -7680,7 +7805,7 @@ def _format_file_size(size_bytes):
 
 
 @login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
 @require_POST
 def download_backup(request, pk):
     """Serve a backup file for download."""
@@ -7702,7 +7827,7 @@ def download_backup(request, pk):
 
 
 @login_required(login_url='custom_admin:login')
-@user_passes_test(is_staff, login_url='custom_admin:login')
+@user_passes_test(lambda u: u.is_superuser, login_url='custom_admin:login')
 @require_POST
 def delete_backup(request, pk):
     """Delete a backup record and its file from disk."""
@@ -9026,7 +9151,8 @@ def comments_list(request):
                 q_filter |= Q(**{f'{content_fk}__title__icontains': search_query})
             qs = qs.filter(q_filter)
         type_counts[type_key] = qs.count()
-        querysets[type_key] = qs
+        # ponytail: cap at the 500 newest per type so the merge stays in RAM; UNION query if the ceiling bites.
+        querysets[type_key] = qs.order_by('-created_at')[:500]
 
     total_all = sum(type_counts.values())
 
@@ -9061,6 +9187,94 @@ def comments_list(request):
         'type_counts': type_counts,
         'current_filter': content_filter,
         'search_query': search_query,
+    })
+
+
+def _engagement_source(type_key):
+    """(comment_model, content_fk, user_field, content_model) for a share/comment kind."""
+    for model, key, content_fk, _title_fn, user_field in _COMMENT_SOURCES:
+        if key == type_key:
+            return model, content_fk, user_field, model._meta.get_field(content_fk).related_model
+    return None
+
+
+def _content_label(obj):
+    return getattr(obj, 'title', None) or getattr(obj, 'name', '') or f'#{obj.pk}'
+
+
+@login_required(login_url='custom_admin:login')
+@user_passes_test(is_staff, login_url='custom_admin:login')
+def comment_engagement(request):
+    """Set the like count and post comments on any piece of content."""
+    from django.db.models import F
+
+    type_key = request.POST.get('type') or request.GET.get('type') or 'article'
+    source = _engagement_source(type_key)
+    if source is None:
+        type_key = 'article'
+        source = _engagement_source(type_key)
+    comment_model, content_fk, user_field, content_model = source
+
+    content_pk = request.POST.get('content') or request.GET.get('content') or ''
+    post = content_model.objects.filter(pk=content_pk).first() if content_pk.isdigit() else None
+
+    if request.method == 'POST':
+        if post is None:
+            messages.error(request, 'Pick a post first.')
+        elif request.POST.get('action') == 'likes':
+            raw = (request.POST.get('like_count') or '').strip()
+            if raw.isdigit():
+                content_model.objects.filter(pk=post.pk).update(like_count=int(raw))
+                log_admin_action(
+                    request, 'update', content_model.__name__, object_id=post.pk,
+                    object_repr=_content_label(post),
+                    changes={'like_count': {'old': str(post.like_count), 'new': raw}},
+                )
+                messages.success(request, f'Likes set to {raw}.')
+            else:
+                messages.error(request, 'Like count must be a whole number.')
+        else:
+            text = (request.POST.get('comment_text') or '').strip()
+            username = (request.POST.get('username') or '').strip()
+            author = User.objects.filter(username=username).first() if username else request.user
+            if not text:
+                messages.error(request, 'Comment text is required.')
+            elif author is None:
+                messages.error(request, f'No user named "{username}".')
+            else:
+                comment = comment_model.objects.create(
+                    **{content_fk: post, user_field: author, 'content': text}
+                )
+                if type_key == 'discussion':
+                    content_model.objects.filter(pk=post.pk).update(reply_count=F('reply_count') + 1)
+                log_admin_action(
+                    request, 'create', comment_model.__name__, object_id=comment.pk,
+                    object_repr=text[:60],
+                )
+                messages.success(request, f'Comment posted as {author.username}.')
+        target = f"?type={type_key}" + (f"&content={post.pk}" if post else '')
+        return redirect(reverse('custom_admin:comment_engagement') + target)
+
+    recent = []
+    if post:
+        for c in comment_model.objects.filter(**{content_fk: post}).select_related(user_field).order_by('-created_at')[:20]:
+            recent.append({
+                'pk': c.pk,
+                'text': c.content,
+                'username': getattr(c, user_field).username,
+                'created_at': c.created_at,
+            })
+
+    return render(request, 'custom_admin/comments/engagement.html', {
+        'types': [key for _m, key, _fk, _t, _u in _COMMENT_SOURCES],
+        'current_type': type_key,
+        'posts': [
+            {'pk': o.pk, 'label': _content_label(o)}
+            for o in content_model.objects.order_by('-pk')[:200]
+        ],
+        'post': post,
+        'post_label': _content_label(post) if post else '',
+        'comments': recent,
     })
 
 

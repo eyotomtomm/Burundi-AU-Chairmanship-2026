@@ -2943,4 +2943,10 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
 
   @override
   String get priority_label => 'PRIORITY';
+
+  @override
+  String get about_chairmanship_year_line => 'African Union Chairmanship 2026';
+
+  @override
+  String get about_credits => 'Credits';
 }

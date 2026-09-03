@@ -270,6 +270,8 @@ class AppLocalizations {
       'priority_agenda_intro': g.priority_agenda_intro,
       'priority_agenda_open': g.priority_agenda_open,
       'priority_label': g.priority_label,
+      'about_chairmanship_year_line': g.about_chairmanship_year_line,
+      'about_credits': g.about_credits,
       'try_again': g.try_again,
       'failed_to_load': g.failed_to_load,
       'connection_failed': g.connection_failed,

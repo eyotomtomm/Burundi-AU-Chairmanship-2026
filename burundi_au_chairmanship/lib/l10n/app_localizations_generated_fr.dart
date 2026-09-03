@@ -2997,4 +2997,11 @@ class AppLocalizationsGeneratedFr extends AppLocalizationsGenerated {
 
   @override
   String get priority_label => 'PRIORITÉ';
+
+  @override
+  String get about_chairmanship_year_line =>
+      'Présidence de l\'Union africaine 2026';
+
+  @override
+  String get about_credits => 'Crédits';
 }

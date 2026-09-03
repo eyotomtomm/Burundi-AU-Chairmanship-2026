@@ -5734,6 +5734,18 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'PRIORITY'**
   String get priority_label;
+
+  /// No description provided for @about_chairmanship_year_line.
+  ///
+  /// In en, this message translates to:
+  /// **'African Union Chairmanship 2026'**
+  String get about_chairmanship_year_line;
+
+  /// No description provided for @about_credits.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits'**
+  String get about_credits;
 }
 
 class _AppLocalizationsGeneratedDelegate

@@ -938,5 +938,7 @@
   "priority_agenda_footnote": "Sélectionnez une priorité pour consulter ses objectifs, ses domaines d'impact et ses initiatives en cours.",
   "priority_agenda_intro": "La présidence burundaise de l'Union africaine repose sur trois priorités. Chacune dispose de son propre programme, de ses objectifs et de ses travaux en cours.",
   "priority_agenda_open": "Consulter l'agenda complet",
-  "priority_label": "PRIORITÉ"
+  "priority_label": "PRIORITÉ",
+  "about_chairmanship_year_line": "Présidence de l'Union africaine 2026",
+  "about_credits": "Crédits"
 }

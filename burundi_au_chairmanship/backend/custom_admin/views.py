@@ -259,6 +259,8 @@ def admin_login(request):
                 request.session.set_expiry(0)
             request.session.save()
             log_admin_action(request, 'login', 'Auth', object_repr=user.username)
+            if not settings.ADMIN_2FA_REQUIRED:
+                return _after_login_redirect(user)
             # Second factor is mandatory: enrol if the user has no confirmed device.
             has_device = TOTPDevice.objects.devices_for_user(user, confirmed=True).exists()
             return redirect('custom_admin:2fa_verify' if has_device else 'custom_admin:2fa_setup')

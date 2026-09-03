@@ -14,6 +14,7 @@ The list of sections is the single source of truth for both:
   2. The sidebar filter (context processor in context_processors.py)
   3. The middleware that blocks direct URL access (below)
 """
+from django.conf import settings
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 from django.template.loader import render_to_string
@@ -311,7 +312,7 @@ class AdminSectionPermissionMiddleware:
 
         # 2FA + forced password change gate — applies to superusers too.
         if match.url_name not in AUTH_FLOW_URLS:
-            if not request.user.is_verified():
+            if settings.ADMIN_2FA_REQUIRED and not request.user.is_verified():
                 from django_otp.plugins.otp_totp.models import TOTPDevice
                 has_device = TOTPDevice.objects.devices_for_user(request.user, confirmed=True).exists()
                 return redirect('custom_admin:2fa_verify' if has_device else 'custom_admin:2fa_setup')

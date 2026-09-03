@@ -438,6 +438,10 @@ SIMPLE_JWT = {
 SESSION_COOKIE_AGE = 60 * 60 * 24          # 24 hours (cookie level)
 SESSION_SAVE_EVERY_REQUEST = True           # Refresh cookie Max-Age on every request
 STAFF_SESSION_MAX_AGE = 60 * 60 * 24       # 24 hours — hard cap enforced by middleware
+# Admin TOTP. Off by default; set ADMIN_2FA_REQUIRED=True to enforce enrolment
+# and per-login verification. The setup/verify views stay reachable either way,
+# so admins can enrol voluntarily before it is switched on.
+ADMIN_2FA_REQUIRED = os.environ.get('ADMIN_2FA_REQUIRED', 'False').lower() in ('true', '1', 'yes')
 # Note: SESSION_EXPIRE_AT_BROWSER_CLOSE intentionally NOT set (defaults to False).
 # Setting it to True caused "Remember me" to be ignored in some edge cases.
 

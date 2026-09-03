@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
 from django_otp.oath import totp
@@ -35,6 +35,7 @@ class UrlSectionMappingTests(SimpleTestCase):
         self.assertLessEqual(set(URL_SECTIONS.values()), MENU_KEYS)
 
 
+@override_settings(ADMIN_2FA_REQUIRED=True)
 class TwoFactorFlowTests(TestCase):
     def setUp(self):
         cache.clear()  # attempt counters live in the (process-wide) cache
@@ -73,6 +74,27 @@ class TwoFactorFlowTests(TestCase):
         self.assertRedirects(self.client.get(reverse('custom_admin:dashboard')),
                              reverse('custom_admin:force_password_change'), fetch_redirect_response=False)
         self.assertEqual(self.client.get(reverse('custom_admin:force_password_change')).status_code, 200)
+
+
+class TwoFactorDisabledTests(TestCase):
+    """ADMIN_2FA_REQUIRED off (the default): password alone reaches the dashboard."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_superuser('boss', 'boss@example.com', 'correct-horse-battery')
+
+    def test_login_goes_straight_to_dashboard(self):
+        r = self.client.post(reverse('custom_admin:login'),
+                             {'username': 'boss', 'password': 'correct-horse-battery'})
+        self.assertRedirects(r, reverse('custom_admin:dashboard'), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse('custom_admin:dashboard')).status_code, 200)
+
+    def test_force_password_change_still_gates(self):
+        self.user.profile.force_password_change = True
+        self.user.profile.save(update_fields=['force_password_change'])
+        self.client.force_login(self.user)
+        self.assertRedirects(self.client.get(reverse('custom_admin:dashboard')),
+                             reverse('custom_admin:force_password_change'), fetch_redirect_response=False)
 
 
 class DestructiveViewsRequirePostTests(TestCase):
@@ -151,3 +173,13 @@ class EngagementViewTests(TestCase):
             self.assertEqual(self.client.get(self.url, {'type': kind}).status_code, 200, kind)
         page = self.client.get(self.url, {'type': 'article', 'content': self.article.pk})
         self.assertContains(page, 'Summit opens')
+
+    def test_content_lists_still_render(self):
+        """The per-post shortcut markup did not break any content list template."""
+        for name in ('articles_list', 'events_list', 'magazines_list', 'live_feeds_list',
+                     'videos_list', 'gallery_list', 'discussions_list'):
+            self.assertEqual(self.client.get(reverse(f'custom_admin:{name}')).status_code, 200, name)
+
+    def test_article_row_links_to_engagement_page(self):
+        page = self.client.get(reverse('custom_admin:articles_list'))
+        self.assertContains(page, f'{self.url}?type=article&amp;content={self.article.pk}')

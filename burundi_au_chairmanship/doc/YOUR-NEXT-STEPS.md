@@ -67,21 +67,32 @@ Python 3.12 / Django 5.2 upgrade changes the buildpack.
 
 ---
 
-## 4. Enrol yourself in admin 2FA immediately after deploy
+## 4. Admin 2FA is off — turn it on when you are ready
 
-Admin login now requires TOTP. On first login you are redirected to
-`/admin/2fa/setup/`, shown a QR code, and must confirm one code before you can
-reach the dashboard. Have an authenticator app ready (Google Authenticator, 1Password, Authy).
+Admin login is password-only again. The TOTP setup and verify pages still work,
+so you can enrol voluntarily at `/admin/2fa/setup/` at any time.
 
-**This applies to superusers too.** If you lock yourself out, recover from a shell:
+To enforce it for every staff user, set one env var in the DigitalOcean
+dashboard (**Settings -> api component -> Environment Variables**) and redeploy:
+
+```
+ADMIN_2FA_REQUIRED=True
+```
+
+From then on, first login redirects to `/admin/2fa/setup/`, shows a QR code, and
+requires one confirmed code before the dashboard opens. That applies to
+superusers too. Have an authenticator app ready before you flip it. If you lock
+yourself out, clear the device from a shell:
 
 ```bash
 python manage.py shell -c "
 from django_otp.plugins.otp_totp.models import TOTPDevice
 TOTPDevice.objects.filter(user__username='admin').delete()
-print('device cleared — next login re-runs setup')
+print('device cleared - next login re-runs setup')
 "
 ```
+
+The forced-password-change gate for invited admins is unaffected and stays on.
 
 ---
 

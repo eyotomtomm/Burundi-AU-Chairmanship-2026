@@ -940,5 +940,21 @@
   "priority_agenda_open": "Consulter l'agenda complet",
   "priority_label": "PRIORITÉ",
   "about_chairmanship_year_line": "Présidence de l'Union africaine 2026",
-  "about_credits": "Crédits"
+  "about_credits": "Crédits",
+  "vr_back": "Retour",
+  "vr_badge_proof_note": "Il vous sera demandé de le prouver ultérieurement avec une pièce d'identité ou un document officiel.",
+  "vr_doc_formats": "Formats acceptés : JPG, PNG, WEBP ou HEIC — jusqu'à 10 Mo.",
+  "vr_doc_too_large": "Ce fichier dépasse 10 Mo. Choisissez une image plus légère.",
+  "vr_not_provided": "Non fourni",
+  "vr_replace": "Remplacer",
+  "vr_step_badge_type": "Type de badge",
+  "vr_step_contact": "Comment vous joindre",
+  "vr_step_of": "sur",
+  "vr_step_prefix": "Étape",
+  "vr_step_proof": "Justificatifs",
+  "vr_step_review_submit": "Vérification et envoi",
+  "vr_step_who_you_are": "Qui vous êtes",
+  "vr_verify_email_to_continue": "Veuillez vérifier votre e-mail pour continuer",
+  "vr_why_contact_note": "Utilisées uniquement pour vérifier votre identité et vous contacter au sujet de cette demande.",
+  "vr_why_identity_note": "Nous demandons ces informations pour faire correspondre votre demande à votre document d'identité et éviter toute usurpation."
 }

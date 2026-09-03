@@ -2949,4 +2949,58 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
 
   @override
   String get about_credits => 'Credits';
+
+  @override
+  String get vr_back => 'Back';
+
+  @override
+  String get vr_badge_proof_note =>
+      'You will be asked to prove this later with a photo ID or official document.';
+
+  @override
+  String get vr_doc_formats =>
+      'Accepted formats: JPG, PNG, WEBP or HEIC — up to 10 MB.';
+
+  @override
+  String get vr_doc_too_large =>
+      'This file is larger than 10 MB. Choose a smaller image.';
+
+  @override
+  String get vr_not_provided => 'Not provided';
+
+  @override
+  String get vr_replace => 'Replace';
+
+  @override
+  String get vr_step_badge_type => 'Badge type';
+
+  @override
+  String get vr_step_contact => 'How to reach you';
+
+  @override
+  String get vr_step_of => 'of';
+
+  @override
+  String get vr_step_prefix => 'Step';
+
+  @override
+  String get vr_step_proof => 'Proof';
+
+  @override
+  String get vr_step_review_submit => 'Review & submit';
+
+  @override
+  String get vr_step_who_you_are => 'Who you are';
+
+  @override
+  String get vr_verify_email_to_continue =>
+      'Please verify your email to continue';
+
+  @override
+  String get vr_why_contact_note =>
+      'Used only to verify your identity and to contact you about this application.';
+
+  @override
+  String get vr_why_identity_note =>
+      'We ask for these details to match your application to your identity document and prevent impersonation.';
 }

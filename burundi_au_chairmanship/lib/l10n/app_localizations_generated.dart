@@ -5746,6 +5746,102 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'Credits'**
   String get about_credits;
+
+  /// No description provided for @vr_back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get vr_back;
+
+  /// No description provided for @vr_badge_proof_note.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be asked to prove this later with a photo ID or official document.'**
+  String get vr_badge_proof_note;
+
+  /// No description provided for @vr_doc_formats.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted formats: JPG, PNG, WEBP or HEIC — up to 10 MB.'**
+  String get vr_doc_formats;
+
+  /// No description provided for @vr_doc_too_large.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is larger than 10 MB. Choose a smaller image.'**
+  String get vr_doc_too_large;
+
+  /// No description provided for @vr_not_provided.
+  ///
+  /// In en, this message translates to:
+  /// **'Not provided'**
+  String get vr_not_provided;
+
+  /// No description provided for @vr_replace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get vr_replace;
+
+  /// No description provided for @vr_step_badge_type.
+  ///
+  /// In en, this message translates to:
+  /// **'Badge type'**
+  String get vr_step_badge_type;
+
+  /// No description provided for @vr_step_contact.
+  ///
+  /// In en, this message translates to:
+  /// **'How to reach you'**
+  String get vr_step_contact;
+
+  /// No description provided for @vr_step_of.
+  ///
+  /// In en, this message translates to:
+  /// **'of'**
+  String get vr_step_of;
+
+  /// No description provided for @vr_step_prefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get vr_step_prefix;
+
+  /// No description provided for @vr_step_proof.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof'**
+  String get vr_step_proof;
+
+  /// No description provided for @vr_step_review_submit.
+  ///
+  /// In en, this message translates to:
+  /// **'Review & submit'**
+  String get vr_step_review_submit;
+
+  /// No description provided for @vr_step_who_you_are.
+  ///
+  /// In en, this message translates to:
+  /// **'Who you are'**
+  String get vr_step_who_you_are;
+
+  /// No description provided for @vr_verify_email_to_continue.
+  ///
+  /// In en, this message translates to:
+  /// **'Please verify your email to continue'**
+  String get vr_verify_email_to_continue;
+
+  /// No description provided for @vr_why_contact_note.
+  ///
+  /// In en, this message translates to:
+  /// **'Used only to verify your identity and to contact you about this application.'**
+  String get vr_why_contact_note;
+
+  /// No description provided for @vr_why_identity_note.
+  ///
+  /// In en, this message translates to:
+  /// **'We ask for these details to match your application to your identity document and prevent impersonation.'**
+  String get vr_why_identity_note;
 }
 
 class _AppLocalizationsGeneratedDelegate

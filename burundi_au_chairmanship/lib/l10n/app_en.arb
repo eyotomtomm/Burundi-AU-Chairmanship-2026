@@ -940,5 +940,21 @@
   "priority_agenda_open": "Read the full agenda",
   "priority_label": "PRIORITY",
   "about_chairmanship_year_line": "African Union Chairmanship 2026",
-  "about_credits": "Credits"
+  "about_credits": "Credits",
+  "vr_back": "Back",
+  "vr_badge_proof_note": "You will be asked to prove this later with a photo ID or official document.",
+  "vr_doc_formats": "Accepted formats: JPG, PNG, WEBP or HEIC — up to 10 MB.",
+  "vr_doc_too_large": "This file is larger than 10 MB. Choose a smaller image.",
+  "vr_not_provided": "Not provided",
+  "vr_replace": "Replace",
+  "vr_step_badge_type": "Badge type",
+  "vr_step_contact": "How to reach you",
+  "vr_step_of": "of",
+  "vr_step_prefix": "Step",
+  "vr_step_proof": "Proof",
+  "vr_step_review_submit": "Review & submit",
+  "vr_step_who_you_are": "Who you are",
+  "vr_verify_email_to_continue": "Please verify your email to continue",
+  "vr_why_contact_note": "Used only to verify your identity and to contact you about this application.",
+  "vr_why_identity_note": "We ask for these details to match your application to your identity document and prevent impersonation."
 }

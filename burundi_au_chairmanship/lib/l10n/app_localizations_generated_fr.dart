@@ -3004,4 +3004,58 @@ class AppLocalizationsGeneratedFr extends AppLocalizationsGenerated {
 
   @override
   String get about_credits => 'Crédits';
+
+  @override
+  String get vr_back => 'Retour';
+
+  @override
+  String get vr_badge_proof_note =>
+      'Il vous sera demandé de le prouver ultérieurement avec une pièce d\'identité ou un document officiel.';
+
+  @override
+  String get vr_doc_formats =>
+      'Formats acceptés : JPG, PNG, WEBP ou HEIC — jusqu\'à 10 Mo.';
+
+  @override
+  String get vr_doc_too_large =>
+      'Ce fichier dépasse 10 Mo. Choisissez une image plus légère.';
+
+  @override
+  String get vr_not_provided => 'Non fourni';
+
+  @override
+  String get vr_replace => 'Remplacer';
+
+  @override
+  String get vr_step_badge_type => 'Type de badge';
+
+  @override
+  String get vr_step_contact => 'Comment vous joindre';
+
+  @override
+  String get vr_step_of => 'sur';
+
+  @override
+  String get vr_step_prefix => 'Étape';
+
+  @override
+  String get vr_step_proof => 'Justificatifs';
+
+  @override
+  String get vr_step_review_submit => 'Vérification et envoi';
+
+  @override
+  String get vr_step_who_you_are => 'Qui vous êtes';
+
+  @override
+  String get vr_verify_email_to_continue =>
+      'Veuillez vérifier votre e-mail pour continuer';
+
+  @override
+  String get vr_why_contact_note =>
+      'Utilisées uniquement pour vérifier votre identité et vous contacter au sujet de cette demande.';
+
+  @override
+  String get vr_why_identity_note =>
+      'Nous demandons ces informations pour faire correspondre votre demande à votre document d\'identité et éviter toute usurpation.';
 }

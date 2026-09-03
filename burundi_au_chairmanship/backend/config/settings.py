@@ -283,8 +283,12 @@ if not DEBUG:
     AWS_LOCATION = 'media'
     STORAGES['default'] = {'BACKEND': 'config.storage_backends.SpacesMediaStorage'}
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
-    # CDN: Rewrite media URLs through Cloudflare CDN if configured
-    CDN_DOMAIN = os.environ.get('CDN_DOMAIN', '')  # e.g. cdn.burundi4africa.com
+    # CDN: serve media from the Spaces edge instead of the fra1 origin.
+    # Defaults to the CDN that is enabled on the burundi-au-media Space, so no
+    # env var is needed; set CDN_DOMAIN to override, or to '' to disable.
+    CDN_DOMAIN = os.environ.get(
+        'CDN_DOMAIN', 'burundi-au-media.fra1.cdn.digitaloceanspaces.com',
+    )
     if CDN_DOMAIN:
         AWS_S3_CUSTOM_DOMAIN = CDN_DOMAIN
         MEDIA_URL = f'https://{CDN_DOMAIN}/media/'

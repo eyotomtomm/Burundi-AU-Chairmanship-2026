@@ -8,6 +8,7 @@ import '../../config/app_ds.dart';
 import '../../widgets/verified_badge.dart';
 import '../../widgets/async_content_view.dart';
 import '../../widgets/feed/post_composer.dart';
+import '../../services/feed_pager.dart';
 
 class DiscussionsScreen extends StatefulWidget {
   /// Pre-selects a category chip, e.g. opening straight into A-RISE.
@@ -21,10 +22,12 @@ class DiscussionsScreen extends StatefulWidget {
 
 class _DiscussionsScreenState extends State<DiscussionsScreen> {
   final ApiService _api = ApiService();
-  List<Map<String, dynamic>> _discussions = [];
-  bool _loading = true;
-  bool _loadFailed = false;
   String? _selectedCategory;
+  late final FeedPager _pager = FeedPager(_fetchPage);
+
+  List<Map<String, dynamic>> get _discussions => _pager.posts;
+  bool get _loading => _pager.loading;
+  bool get _loadFailed => _pager.failed;
 
   final List<Map<String, String>> _categories = [
     {'value': 'general', 'label': 'General'},
@@ -40,19 +43,25 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
   void initState() {
     super.initState();
     _selectedCategory = widget.initialCategory;
+    _pager.addListener(_onPager);
     _loadDiscussions();
   }
 
-  Future<void> _loadDiscussions() async {
-    setState(() => _loading = true);
-    try {
-      _discussions = await _api.getDiscussions(category: _selectedCategory);
-      _loadFailed = false;
-    } catch (_) {
-      _loadFailed = true;
-    }
-    if (mounted) setState(() => _loading = false);
+  @override
+  void dispose() {
+    _pager.removeListener(_onPager);
+    _pager.dispose();
+    super.dispose();
   }
+
+  void _onPager() {
+    if (mounted) setState(() {});
+  }
+
+  Future<FeedPage> _fetchPage(int page) =>
+      _api.getFeedPage(page: page, category: _selectedCategory);
+
+  Future<void> _loadDiscussions() => _pager.load();
 
   Future<void> _showCreateDialog() async {
     // Same sheet the Explore feed uses; the forum keeps its title field.
@@ -121,8 +130,13 @@ class _DiscussionsScreenState extends State<DiscussionsScreen> {
                         child: ListView.builder(
                           key: const PageStorageKey<String>('discussions_scroll'),
                           padding: const EdgeInsets.all(16),
-                          itemCount: _discussions.length,
+                          controller: _pager.scroll,
+                          itemCount: _discussions.length + 1,
                           itemBuilder: (context, index) {
+                            if (index == _discussions.length) {
+                              return FeedPagerFooter(_pager,
+                                  accent: AppColors.burundiGreen);
+                            }
                             final d = _discussions[index];
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),

@@ -1486,10 +1486,12 @@ class ApiService {
     int? authorId,
     String? tag,
     int? topicId,
+    String? category,
     int page = 1,
   }) async {
     final params = <String>['page=$page'];
     if (following) params.add('feed=following');
+    if (category != null) params.add('category=$category');
     if (authorId != null) params.add('author=$authorId');
     if (tag != null && tag.isNotEmpty) params.add('tag=${Uri.encodeComponent(tag)}');
     if (topicId != null) params.add('topic=$topicId');

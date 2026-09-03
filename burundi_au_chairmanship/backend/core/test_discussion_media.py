@@ -12,6 +12,7 @@ import tempfile
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import Discussion, DiscussionMedia
@@ -54,6 +55,8 @@ class DiscussionPostingTests(TestCase):
         self.profile.gender = 'male'
         self.profile.date_of_birth = datetime.date(2000, 1, 1)
         self.profile.phone_number = '+25700000000'
+        # Posting also requires accepting the Explore community terms.
+        self.profile.explore_terms_accepted_at = timezone.now()
         self.profile.save()
 
     def _post(self):

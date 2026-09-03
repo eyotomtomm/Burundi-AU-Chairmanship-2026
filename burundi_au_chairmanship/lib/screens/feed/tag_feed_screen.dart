@@ -7,6 +7,7 @@ import '../../widgets/feed/post_card.dart';
 import '../../widgets/feed/repost_sheet.dart';
 import '../discussions/discussion_detail_screen.dart';
 import 'user_profile_screen.dart';
+import '../../services/feed_pager.dart';
 
 /// Everything posted under one hashtag, or under one admin topic.
 class TagFeedScreen extends StatefulWidget {
@@ -22,27 +23,32 @@ class TagFeedScreen extends StatefulWidget {
 
 class _TagFeedScreenState extends State<TagFeedScreen> {
   final _api = ApiService();
-  List<Map<String, dynamic>> _posts = [];
-  bool _loading = true;
-  bool _loadFailed = false;
+  late final FeedPager _pager = FeedPager((page) =>
+      _api.getFeedPage(tag: widget.tag, topicId: widget.topicId, page: page));
+
+  List<Map<String, dynamic>> get _posts => _pager.posts;
+  bool get _loading => _pager.loading;
+  bool get _loadFailed => _pager.failed;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _pager.addListener(_onPager);
+    _pager.load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      _posts = await _api.getFeed(tag: widget.tag, topicId: widget.topicId);
-      _loadFailed = false;
-    } catch (_) {
-      _posts = [];
-      _loadFailed = true;
-    }
-    if (mounted) setState(() => _loading = false);
+  @override
+  void dispose() {
+    _pager.removeListener(_onPager);
+    _pager.dispose();
+    super.dispose();
   }
+
+  void _onPager() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load({bool quiet = false}) => _pager.load(quiet: quiet);
 
   @override
   Widget build(BuildContext context) {
@@ -123,15 +129,20 @@ class _TagFeedScreenState extends State<TagFeedScreen> {
                           ],
                         )
                       : ListView.builder(
+                          controller: _pager.scroll,
                           padding: EdgeInsets.fromLTRB(
                               16, 14, 16, Ds.navSpace(context)),
-                          itemCount: _posts.length,
+                          itemCount: _posts.length + 1,
                           itemBuilder: (_, i) {
+                            if (i == _posts.length) {
+                              return FeedPagerFooter(_pager,
+                                  accent: Ds.green, endStyle: Ds.meta(context));
+                            }
                             final post = _posts[i];
                             return PostCard(
                               post: post,
                               onRepost: () async {
-                                if (await RepostSheet.open(context, post)) _load();
+                                if (await RepostSheet.open(context, post)) _load(quiet: true);
                               },
                               onTap: () => Navigator.push(
                                 context,

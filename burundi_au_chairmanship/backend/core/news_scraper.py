@@ -11,6 +11,7 @@ Two adapters:
 
 import json
 import logging
+import os
 import re
 import subprocess
 from datetime import datetime, timezone as dt_timezone
@@ -115,6 +116,12 @@ def _fetch_x(handle, date_from, date_to):
         'gallery-dl', '--no-download', '--dump-json',
         '--range', f'1-{MAX_MEDIA_ITEMS}', url,
     ]
+    # X dropped guest-token access to timelines, so a logged-in session is now
+    # required even for public accounts. Point X_COOKIES_FILE at a Netscape
+    # cookies.txt exported from a browser signed in to our own account.
+    cookies_file = os.environ.get('X_COOKIES_FILE', '').strip()
+    if cookies_file:
+        cmd[1:1] = ['--cookies', cookies_file]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=FETCH_TIMEOUT)
     except FileNotFoundError:
@@ -135,6 +142,19 @@ def _fetch_x(handle, date_from, date_to):
         rows = json.loads(proc.stdout)
     except json.JSONDecodeError:
         raise ScrapeError('Could not parse the response from gallery-dl.')
+
+    # gallery-dl reports failures as a row of [-1, {"error": ...}].
+    for row in rows:
+        if isinstance(row, list) and row and row[0] == -1 and isinstance(row[-1], dict):
+            err = row[-1].get('error', '')
+            if err == 'AuthRequired':
+                raise ScrapeError(
+                    'X no longer allows reading timelines without a login, even for '
+                    'public accounts. Export a cookies.txt from a browser signed in '
+                    'to the account and set X_COOKIES_FILE to its path on the server. '
+                    'RSS sources keep working without any of this.'
+                )
+            raise ScrapeError(f'X refused the request: {err or row[-1]}')
 
     # gallery-dl emits one row per *media file*; several can share a tweet.
     posts = {}

@@ -47,7 +47,19 @@
           {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
         </select>
       </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Daily fetch at (hour)</label>
+        <input type="number" name="auto_fetch_hour" value="6" min="0" max="23" class="w-full py-2.5 px-3.5">
+      </div>
+      <div>
+        <label class="font-label text-[10px] tracking-[1.5px] uppercase text-on-surface-variant block mb-1.5">Looking back (days)</label>
+        <input type="number" name="auto_fetch_days" value="2" min="1" max="90" class="w-full py-2.5 px-3.5">
+      </div>
       <div class="flex items-end gap-5 xl:col-span-2">
+        <label class="inline-flex items-center gap-2 text-[12px] pb-2.5">
+          <input type="checkbox" name="auto_fetch" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+          Fetch daily
+        </label>
         <label class="inline-flex items-center gap-2 text-[12px] pb-2.5">
           <input type="checkbox" name="is_own_content" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
           Our own posts
@@ -60,6 +72,7 @@
       </div>
     </div>
     <p class="text-[11px] text-on-surface-variant mt-4">
+      <b>Fetch daily</b> pulls this source once a day at the hour you set, straight into the review queue — still nothing publishes until you approve it.
       Leave <b>Our own posts</b> off for a repost — approved articles then carry a &ldquo;via &lt;credit line&gt;&rdquo; line and link back to the original.
     </p>
   </form>
@@ -75,6 +88,7 @@
           <th class="text-left">Type</th>
           <th class="text-left">Target</th>
           <th class="text-left">Use</th>
+          <th class="text-left">Daily</th>
           <th class="text-left">Last fetched</th>
           <th class="text-right">Action</th>
         </tr>
@@ -94,6 +108,23 @@
             {% else %}
             <span class="pill bg-amber-50 text-amber-700">via {{ s.attribution|default:s.name }}</span>
             {% endif %}
+          </td>
+          <td>
+            <form method="post" class="flex items-center gap-1.5">
+              {% csrf_token %}
+              <input type="hidden" name="pk" value="{{ s.pk }}">
+              <input type="hidden" name="action" value="schedule">
+              <input type="checkbox" name="auto_fetch" {% if s.auto_fetch %}checked{% endif %}
+                     title="Fetch this source once a day"
+                     class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+              <input type="number" name="auto_fetch_hour" value="{{ s.auto_fetch_hour }}" min="0" max="23"
+                     title="Hour of day" class="w-[58px] py-1 px-1.5 text-[11px]">
+              <input type="number" name="auto_fetch_days" value="{{ s.auto_fetch_days }}" min="1" max="90"
+                     title="Days to look back" class="w-[58px] py-1 px-1.5 text-[11px]">
+              <button type="submit" class="p-1.5 rounded-lg text-amber-700 hover:bg-amber-50 transition-colors" title="Save schedule">
+                <span class="material-symbols-rounded text-[18px]">save</span>
+              </button>
+            </form>
           </td>
           <td class="font-label text-[11px] text-on-surface-variant">{{ s.last_fetched_at|date:"d M Y H:i"|default:"—" }}</td>
           <td>

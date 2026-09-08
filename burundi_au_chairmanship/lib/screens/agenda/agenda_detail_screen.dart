@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../config/environment.dart';
 import '../../services/api_service.dart';
 import '../../config/app_ds.dart';
-import '../discussions/discussions_screen.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../services/share_service.dart';
 import '../../widgets/async_content_view.dart';
 import '../../widgets/app_network_image.dart';
 import '../../l10n/app_localizations.dart';
+import '../feed/tag_feed_screen.dart';
 
 /// Section wording for one priority agenda. Only the copy differs between the
 /// three agendas — the layout is identical, so it lives here once.
@@ -202,8 +202,10 @@ class _AgendaDetailScreenState extends State<AgendaDetailScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  DiscussionsScreen(initialCategory: widget.debateCategory),
+              builder: (_) => TagFeedScreen(
+                category: widget.debateCategory,
+                topicTitle: _isFr ? 'Le débat' : 'The debate',
+              ),
             ),
           ),
           child: Padding(

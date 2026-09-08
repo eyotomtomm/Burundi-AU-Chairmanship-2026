@@ -1,7 +1,7 @@
 name: burundi_au_chairmanship
 description: Be 4 Africa Official App - Digital Magazine, Embassy Locations, Live Feeds, Resources, and Emergency SOS.
 publish_to: 'none'
-version: 2.0.0+57
+version: 2.0.0+58
 
 environment:
   sdk: ^3.10.8
@@ -146,9 +146,6 @@ flutter:
     - assets/fonts/
 
   fonts:
-    - family: HeatherGreen
-      fonts:
-        - asset: assets/fonts/HeatherGreen-Regular.ttf
     # Cinzel (SIL OFL 1.1, licence at assets/fonts/Cinzel-OFL.txt).
     # Variable wght 400-900 — pick weights with TextStyle.fontVariations.
     - family: Cinzel

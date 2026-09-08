@@ -1808,14 +1808,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             'media', _recent_likes_prefetch(ArticleLike, 'article'),
         ).annotate(
             comment_count=_article_comment_count(),
-        ).filter(
-            is_draft=False,  # Exclude legacy drafts from public API
-            status='published',  # Only show published articles
-        ).exclude(
-            scheduled_publish_at__gt=now,  # Exclude scheduled (future) articles
-        ).exclude(
-            expires_at__lt=now,  # Exclude expired articles
-        ).order_by('-publish_date', '-id')  # Explicitly order by newest first
+        ).public(now).order_by('-publish_date', '-id')  # Newest first
         user = self.request.user
         if user.is_authenticated:
             qs = qs.annotate(
@@ -1841,14 +1834,10 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         """Get related articles in the same category and content_type, excluding the current article."""
         article = self.get_object()
         now = timezone.now()
-        related_qs = Article.objects.select_related('category').prefetch_related('media').filter(
-            is_draft=False,
-            status='published',
+        related_qs = Article.objects.select_related('category').prefetch_related(
+            'media',
+        ).public(now).filter(
             content_type=article.content_type,
-        ).exclude(
-            scheduled_publish_at__gt=now,
-        ).exclude(
-            expires_at__lt=now,
         ).exclude(pk=article.pk)
 
         if article.category_id:
@@ -3306,13 +3295,7 @@ def home_feed(request):
     now = timezone.now()
     base_articles = Article.objects.select_related('category').prefetch_related(
         'media', _recent_likes_prefetch(ArticleLike, 'article'),
-    ).filter(
-        is_draft=False,
-    ).exclude(
-        scheduled_publish_at__gt=now,
-    ).exclude(
-        expires_at__lt=now,
-    ).annotate(
+    ).public(now).annotate(
         comment_count=_article_comment_count(),
     ).order_by('-publish_date', '-id')  # Explicitly order by newest first
     if request.user.is_authenticated:
@@ -3502,7 +3485,7 @@ def search_articles(request):
 
     # Bilingual search in title and content — Postgres full-text (GIN index
     # article_search_gin), icontains elsewhere (SQLite dev/test).
-    articles = Article.objects.filter(status='published', is_draft=False)
+    articles = Article.objects.public()
     if connection.vendor == 'postgresql':
         from django.contrib.postgres.search import SearchQuery, SearchVector
         articles = articles.alias(
@@ -3960,7 +3943,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Confirmed</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -3999,11 +3982,11 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
 
                 html_message += f'''
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundichairship.africa"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundichairship.africa"}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -4180,7 +4163,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
             try:
                 registrant_name = escape(request.user.get_full_name() or request.user.username)
                 proxy_name = escape(data['proxy_name'])
-                contact_email = event_reg.contact_email or 'info@burundi4africa.com'
+                contact_email = event_reg.contact_email or 'info@burundichairship.africa'
                 subject = f'Someone registered you for: {event_reg.event_title}'
 
                 html_message = f'''<!DOCTYPE html>
@@ -4194,7 +4177,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Notice</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 12px;">
@@ -4233,7 +4216,7 @@ class EventSubmissionViewSet(mixins.CreateModelMixin, mixins.ListModelMixin,
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -4991,6 +4974,26 @@ def get_reactions(request):
         user_reaction = r.reaction_type if r else None
 
     return Response({'reactions': result, 'user_reaction': user_reaction})
+
+
+# An article counts as read once the reader has been most of the way down it.
+READ_THRESHOLD_PERCENT = 60
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def read_articles(request):
+    """Ids of the articles this reader has already got through.
+
+    The list screens use it to mark items read, so it returns ids only rather
+    than the full progress rows.
+    """
+    ids = ReadingProgress.objects.filter(
+        user=request.user
+    ).filter(
+        Q(completed=True) | Q(progress_percent__gte=READ_THRESHOLD_PERCENT)
+    ).values_list('article_id', flat=True)
+    return Response({'article_ids': list(ids)})
 
 
 @api_view(['POST'])
@@ -6508,6 +6511,38 @@ def mark_explore_notifications_read(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def widget_feature(request):
+    """Small payload for the phone home-screen widget.
+
+    Deliberately flat and tiny: a widget refreshes on the system's schedule and
+    renders in a few hundred milliseconds, so it gets one item, not a feed.
+    Featured articles win; otherwise the newest published one.
+    """
+    now = timezone.now()
+    published = Article.objects.select_related('category').public(now)
+
+    article = (published.filter(is_featured=True).order_by('-publish_date', '-id').first()
+               or published.order_by('-publish_date', '-id').first())
+
+    if article is None:
+        return Response({'title': None})
+
+    image = None
+    if article.image:
+        image = request.build_absolute_uri(article.image.url)
+
+    return Response({
+        'title': article.title,
+        'category': article.category.name if article.category else '',
+        'published_at': article.publish_date,
+        'image': image,
+        'is_featured': article.is_featured,
+        'deep_link': f'/article/{article.id}',
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def trending_tags(request):
     """The hashtags people are actually using, so tags are discoverable
     instead of only reachable by already knowing one exists.
@@ -7258,6 +7293,8 @@ def _resolve_share(kind, pk, lang):
         raise Http404('Not available')
     if getattr(obj, 'status', 'published') not in ('published', None):
         raise Http404('Not available')
+    if getattr(obj, 'is_hidden', False):
+        raise Http404('Not available')
 
     body = re.sub(r'<[^>]+>', ' ', _share_localised(obj, body_field, lang))
     body = re.sub(r'\s+', ' ', body).strip()
@@ -7563,7 +7600,7 @@ def _send_yd_admin_notification(application):
         <span style="font-size:28px;font-weight:900;color:#101c2e;">B</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;">New Continental Dialogue Application</h1>
-      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <div style="background:#f7fafc;border-radius:12px;padding:20px;margin:0 0 24px;">
@@ -7675,7 +7712,7 @@ def _notify_yd(application, event_key):
     lang = _get_yd_user_lang(application)
     is_fr = lang == 'fr'
     event = application.event
-    _support_email = (event.support_email if event and event.support_email else 'info@burundi4africa.com')
+    _support_email = (event.support_email if event and event.support_email else 'info@burundichairship.africa')
 
     EVENT_CONFIG = {
         'submitted': {
@@ -8166,7 +8203,7 @@ def _send_yd_applicant_email(application, subject, heading, badge_color, body_ht
         app_btn_label = "Ouvrir l'application B4Africa" if is_fr else 'Open B4Africa App'
 
         # Support email
-        support_email = (event.support_email if event and event.support_email else 'info@burundi4africa.com')
+        support_email = (event.support_email if event and event.support_email else 'info@burundichairship.africa')
 
         html_message = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
@@ -9276,7 +9313,12 @@ def verify_qr(request):
             'checked_in_at': submission.checked_in_at.isoformat() if submission.checked_in_at else None,
             'is_duplicate': is_duplicate,
             'scan_count': scan_count,
-            'details': {
+        }
+        # A ticket QR is printed, photographed and forwarded, so the endpoint
+        # stays open — but the attendee's contact details are for the door
+        # staff only. Same rule the youth_dialogue branch below applies.
+        if is_staff:
+            result['details'] = {
                 'email': submission.proxy_email if submission.is_proxy else submission.user.email,
                 'organization': fd_organization,
                 'nationality': fd_nationality,
@@ -9288,8 +9330,7 @@ def verify_qr(request):
                 'event_date': reg.event_date.isoformat() if reg.event_date else None,
                 'event_end_date': reg.event_end_date.isoformat() if reg.event_end_date else None,
                 'submission_id': submission.id,
-            },
-        }
+            }
         return Response(result)
 
     elif qr_type == 'youth_dialogue':

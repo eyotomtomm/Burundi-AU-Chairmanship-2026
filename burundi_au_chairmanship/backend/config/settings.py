@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'django_otp.plugins.otp_totp',
     'drf_spectacular',
     'rest_framework',
+    'django_filters',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # For token revocation
     'corsheaders',
@@ -379,6 +380,11 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # Without this every viewset's `filterset_fields` is dead: ?category=,
+    # ?is_featured= and friends were accepted and then ignored.
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -500,29 +506,60 @@ else:
         'EMAIL_BACKEND',
         'core.email_backend.LoggingEmailBackend'
     )
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+# Primary SMTP: the chairmanship domain's own server. OTP and system mail send
+# from info@burundichairship.africa, and that host is SPF/DKIM-aligned for the
+# address, so the From matches who actually sent it.
+def _smtp_security(tls_var, ssl_var, port):
+    """Resolve (use_tls, use_ssl) so they can never both be on.
+
+    Django raises outright if both are set, and an environment that states only
+    one of them — which is most of them — would otherwise inherit a default for
+    the other and break every outgoing email. Whichever is stated wins; if
+    neither is, the port decides: 465 is implicit SSL, everything else STARTTLS.
+    """
+    def flag(name):
+        raw = os.environ.get(name)
+        return None if raw is None else raw.lower() in ('true', '1', 'yes')
+
+    tls, ssl = flag(tls_var), flag(ssl_var)
+    if tls is None and ssl is None:
+        ssl = port == 465
+        tls = not ssl
+    elif ssl is None:
+        ssl = not tls
+    elif tls is None:
+        tls = not ssl
+    elif tls and ssl:
+        # Both explicitly on is a misconfiguration; the port breaks the tie.
+        ssl = port == 465
+        tls = not ssl
+    return tls, ssl
+
+
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.burundichairship.africa')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '465'))
+EMAIL_USE_TLS, EMAIL_USE_SSL = _smtp_security('EMAIL_USE_TLS', 'EMAIL_USE_SSL', EMAIL_PORT)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'info@burundichairship.africa')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 'yes')
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
-    'Be 4 Africa <info@burundi4africa.com>'
+    'Be 4 Africa <info@burundichairship.africa>'
 )
 
-# ─── Fallback SMTP (used when primary Gmail SMTP fails) ──────
-# If the primary EMAIL_HOST fails (e.g. Gmail auth error), OTP emails
-# will automatically retry via this fallback server.
-FALLBACK_EMAIL_HOST = os.environ.get('FALLBACK_EMAIL_HOST', 'smtp.burundichairship.africa')
-FALLBACK_EMAIL_PORT = int(os.environ.get('FALLBACK_EMAIL_PORT', '465'))
-FALLBACK_EMAIL_USE_TLS = os.environ.get('FALLBACK_EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
-FALLBACK_EMAIL_USE_SSL = os.environ.get('FALLBACK_EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
-FALLBACK_EMAIL_HOST_USER = os.environ.get('FALLBACK_EMAIL_HOST_USER', 'info@burundichairship.africa')
+# ─── Fallback SMTP (used when the primary host fails) ────────
+# Gmail, kept as the safety net: if smtp.burundichairship.africa refuses the
+# connection, OTPs still go out rather than the sign-up dead-ending. The From
+# changes with the host, because Gmail is authenticated as the other address
+# and sending burundichairship.africa through it would fail DMARC.
+FALLBACK_EMAIL_HOST = os.environ.get('FALLBACK_EMAIL_HOST', 'smtp.gmail.com')
+FALLBACK_EMAIL_PORT = int(os.environ.get('FALLBACK_EMAIL_PORT', '587'))
+FALLBACK_EMAIL_USE_TLS, FALLBACK_EMAIL_USE_SSL = _smtp_security(
+    'FALLBACK_EMAIL_USE_TLS', 'FALLBACK_EMAIL_USE_SSL', FALLBACK_EMAIL_PORT)
+FALLBACK_EMAIL_HOST_USER = os.environ.get('FALLBACK_EMAIL_HOST_USER', 'info@burundi4africa.com')
 FALLBACK_EMAIL_HOST_PASSWORD = os.environ.get('FALLBACK_EMAIL_HOST_PASSWORD', '')
 FALLBACK_FROM_EMAIL = os.environ.get(
     'FALLBACK_FROM_EMAIL',
-    'Be 4 Africa <info@burundichairship.africa>'
+    'Be 4 Africa <info@burundi4africa.com>'
 )
 
 # ─── Campaign / Newsletter SMTP (separate account) ──────────
@@ -686,6 +723,11 @@ CELERY_BEAT_SCHEDULE = {
     'purge-old-user-sessions': {
         'task': 'core.tasks.purge_old_user_sessions',
         'schedule': 86400,  # Every 24 hours
+    },
+    # Hourly, but each source only fetches on its own configured hour.
+    'auto-fetch-news-sources': {
+        'task': 'core.tasks.auto_fetch_news_sources',
+        'schedule': 3600,
     },
 }
 

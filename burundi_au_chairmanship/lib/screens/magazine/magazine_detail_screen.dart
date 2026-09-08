@@ -23,6 +23,7 @@ import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import '../../services/share_service.dart';
 import '../../services/data_saver_service.dart';
+import '../../widgets/bookmark_button.dart';
 
 class MagazineDetailScreen extends StatefulWidget {
   final MagazineEdition magazine;
@@ -330,6 +331,12 @@ class _MagazineDetailScreenState extends State<MagazineDetailScreen> {
             child: DsHeader(
               title: l10n.translate('magazine'),
               actions: [
+                BookmarkButton(
+                  contentType: 'magazine',
+                  contentId: int.tryParse(_magazine.id) ?? 0,
+                  onDarkHeader: true,
+                ),
+                const SizedBox(width: 4),
                 Builder(
                   builder: (btnContext) => DsHeaderAction(
                     Icons.share_rounded,

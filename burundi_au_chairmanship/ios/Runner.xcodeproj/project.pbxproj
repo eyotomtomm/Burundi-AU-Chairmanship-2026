@@ -20,6 +20,8 @@
 		B4AF1CA12F8300000000001A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B4AF1CA02F8300000000001A /* PrivacyInfo.xcprivacy */; };
 		B4AF2B0100000000000001AA /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AF2A0100000000000001AA /* NotificationService.swift */; };
 		B4AF2B0100000000000002AA /* ImageNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B4AF2A0100000000000003AA /* ImageNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B4WD2B0100000000000001AA /* B4AfricaWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4WD2A0100000000000001AA /* B4AfricaWidget.swift */; };
+		B4WD2B0100000000000002AA /* B4AfricaWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B4WD2A0100000000000003AA /* B4AfricaWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B510207155CD6AE3B87E71D6 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DD9CF7786EAB798AE9A57B44 /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +39,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = B4AF2E0100000000000001AA;
 			remoteInfo = ImageNotificationService;
+		};
+		B4WD2F0100000000000001AA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4WD2E0100000000000001AA;
+			remoteInfo = B4AfricaWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -58,6 +67,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				B4AF2B0100000000000002AA /* ImageNotificationService.appex in Embed Foundation Extensions */,
+				B4WD2B0100000000000002AA /* B4AfricaWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -92,6 +102,9 @@
 		B4AF2A0100000000000001AA /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		B4AF2A0100000000000002AA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B4AF2A0100000000000003AA /* ImageNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ImageNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4WD2A0100000000000001AA /* B4AfricaWidget.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = B4AfricaWidget.swift; sourceTree = "<group>"; };
+		B4WD2A0100000000000002AA /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B4WD2A0100000000000003AA /* B4AfricaWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = B4AfricaWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C11A740738D19023D5F0C627 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		DD9CF7786EAB798AE9A57B44 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -106,6 +119,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B4AF2D0300000000000001AA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4WD2D0300000000000001AA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -159,6 +179,7 @@
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				B4AF2C0100000000000001AA /* ImageNotificationService */,
+				B4WD2C0100000000000001AA /* B4AfricaWidget */,
 				9D53400E00727A7B81408B5B /* Pods */,
 				89374E517F6F17749DB41A1F /* Frameworks */,
 			);
@@ -170,6 +191,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				B4AF2A0100000000000003AA /* ImageNotificationService.appex */,
+				B4WD2A0100000000000003AA /* B4AfricaWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -214,6 +236,15 @@
 			path = ImageNotificationService;
 			sourceTree = "<group>";
 		};
+		B4WD2C0100000000000001AA /* B4AfricaWidget */ = {
+			isa = PBXGroup;
+			children = (
+				B4WD2A0100000000000001AA /* B4AfricaWidget.swift */,
+				B4WD2A0100000000000002AA /* Info.plist */,
+			);
+			path = B4AfricaWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -256,6 +287,7 @@
 			);
 			dependencies = (
 				B4AF2F0200000000000001AA /* PBXTargetDependency */,
+				B4WD2F0200000000000001AA /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -277,6 +309,23 @@
 			name = ImageNotificationService;
 			productName = ImageNotificationService;
 			productReference = B4AF2A0100000000000003AA /* ImageNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		B4WD2E0100000000000001AA /* B4AfricaWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B4WD2A0500000000000001AA /* Build configuration list for PBXNativeTarget "B4AfricaWidget" */;
+			buildPhases = (
+				B4WD2D0100000000000001AA /* Sources */,
+				B4WD2D0300000000000001AA /* Frameworks */,
+				B4WD2D0200000000000001AA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = B4AfricaWidget;
+			productName = B4AfricaWidget;
+			productReference = B4WD2A0100000000000003AA /* B4AfricaWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -318,6 +367,7 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				B4AF2E0100000000000001AA /* ImageNotificationService */,
+				B4WD2E0100000000000001AA /* B4AfricaWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -345,6 +395,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B4AF2D0200000000000001AA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4WD2D0200000000000001AA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -509,6 +566,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B4WD2D0100000000000001AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4WD2B0100000000000001AA /* B4AfricaWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -521,6 +586,11 @@
 			isa = PBXTargetDependency;
 			target = B4AF2E0100000000000001AA /* ImageNotificationService */;
 			targetProxy = B4AF2F0100000000000001AA /* PBXContainerItemProxy */;
+		};
+		B4WD2F0200000000000001AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4WD2E0100000000000001AA /* B4AfricaWidget */;
+			targetProxy = B4WD2F0100000000000001AA /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -921,6 +991,88 @@
 			};
 			name = Profile;
 		};
+		B4WD2A0400000000000001AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 4P52QG4BDR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = B4AfricaWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.b4africa.app.B4AfricaWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B4WD2A0400000000000002AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 4P52QG4BDR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = B4AfricaWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.b4africa.app.B4AfricaWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B4WD2A0400000000000003AA /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 4P52QG4BDR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = B4AfricaWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.b4africa.app.B4AfricaWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -960,6 +1112,16 @@
 				B4AF2A0400000000000001AA /* Debug */,
 				B4AF2A0400000000000002AA /* Release */,
 				B4AF2A0400000000000003AA /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B4WD2A0500000000000001AA /* Build configuration list for PBXNativeTarget "B4AfricaWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B4WD2A0400000000000001AA /* Debug */,
+				B4WD2A0400000000000002AA /* Release */,
+				B4WD2A0400000000000003AA /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

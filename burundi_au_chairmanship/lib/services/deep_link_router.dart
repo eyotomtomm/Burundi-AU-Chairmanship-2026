@@ -31,7 +31,6 @@ class DeepLinkRouter {
     'event': '/events',
     'gallery': '/gallery',
     'video': '/videos',
-    'discussion': '/discussions',
   };
 
   /// Priority agendas ship as three fixed screens, keyed by their backend slug.
@@ -61,7 +60,6 @@ class DeepLinkRouter {
     '/arise-initiative',
     '/peace-security',
     '/gallery',
-    '/discussions',
     '/videos',
     '/social-media',
     '/notifications',
@@ -75,6 +73,11 @@ class DeepLinkRouter {
     '/youth-dialogue-apply',
     '/youth-dialogue-documents',
     '/youth-dialogue-credential',
+    '/qr-scanner',
+    '/yd-scan-history',
+    '/emergency',
+    '/polls',
+    '/bookmarks',
   };
 
   /// Navigate to the destination described by [url].

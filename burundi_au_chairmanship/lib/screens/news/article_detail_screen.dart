@@ -23,6 +23,7 @@ import '../../services/like_service.dart';
 import '../../utils/input_sanitizer.dart';
 import '../../services/share_service.dart';
 import '../../widgets/app_network_image.dart';
+import '../../services/read_service.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -93,6 +94,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     _loadComments();
     _loadRelatedArticles();
     _loadReadingProgress();
+    // Opening the article is enough to mark it read in the lists; the
+    // percentage-based progress below refines it for cross-device sync.
+    ReadService.instance.markRead(_article.id);
     _scrollController.addListener(_onScroll);
     _loadBookmarkState();
     if (widget.scrollToComments) {

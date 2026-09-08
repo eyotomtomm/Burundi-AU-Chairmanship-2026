@@ -297,7 +297,7 @@ class AppSettingsModel {
     this.appOwnershipText = 'Property of Burundi Embassy in Addis Ababa',
     this.contactWebsite = 'burundi4africa.com',
     this.contactWebsiteUrl = 'https://burundi4africa.com',
-    this.contactEmail = 'info@burundi4africa.com',
+    this.contactEmail = 'info@burundichairship.africa',
     this.sosTitle = 'Emergency / SOS',
     this.sosTitleFr = 'Urgence / SOS',
   });
@@ -332,7 +332,7 @@ class AppSettingsModel {
       appOwnershipText: json['app_ownership_text'] ?? 'Property of Burundi Embassy in Addis Ababa',
       contactWebsite: json['contact_website'] ?? 'burundi4africa.com',
       contactWebsiteUrl: json['contact_website_url'] ?? 'https://burundi4africa.com',
-      contactEmail: json['contact_email'] ?? 'info@burundi4africa.com',
+      contactEmail: json['contact_email'] ?? 'info@burundichairship.africa',
       sosTitle: json['sos_title'] ?? 'Emergency / SOS',
       sosTitleFr: json['sos_title_fr'] ?? 'Urgence / SOS',
     );

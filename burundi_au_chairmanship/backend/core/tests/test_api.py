@@ -3,6 +3,8 @@ Smoke tests for the highest-risk API paths.
 
 Run with:  python manage.py test core -v2
 """
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -374,6 +376,33 @@ class PublicEndpointTests(TestCase):
         self.assertIn('hero_slides', data)
         self.assertIn('feature_cards', data)
         self.assertIn('settings', data)
+
+    def test_home_feed_hides_everything_but_published_articles(self):
+        # The admin status dropdown sets status='draft' while leaving the
+        # legacy is_draft flag False, so a filter on is_draft alone served
+        # drafts to every phone on the home screen.
+        AppSettings.objects.create(summit_year='2026')
+        now = timezone.now()
+        live = Article.objects.create(
+            title='Live', content='x', publish_date=now,
+            content_type='news', status='published')
+        for title, kwargs in (
+            ('Dropdown draft', {'status': 'draft'}),
+            ('Archived', {'status': 'archived'}),
+            ('Legacy draft', {'status': 'published', 'is_draft': True}),
+            ('Expired', {'status': 'published',
+                         'expires_at': now - timedelta(days=1)}),
+            ('Scheduled', {'status': 'published',
+                           'scheduled_publish_at': now + timedelta(days=1)}),
+        ):
+            Article.objects.create(
+                title=title, content='x', publish_date=now,
+                content_type='news', **kwargs)
+
+        resp = self.client.get('/api/home-feed/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        titles = {a['title'] for a in resp.json()['news_items']}
+        self.assertEqual(titles, {live.title})
 
     def test_app_settings(self):
         AppSettings.objects.create(summit_year='2026')

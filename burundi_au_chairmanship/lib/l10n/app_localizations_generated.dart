@@ -302,7 +302,7 @@ abstract class AppLocalizationsGenerated {
   /// No description provided for @au_chairmanship.
   ///
   /// In en, this message translates to:
-  /// **'Be 4 Africa 2025'**
+  /// **'AU Chairmanship'**
   String get au_chairmanship;
 
   /// No description provided for @burundi_chairmanship.
@@ -656,7 +656,7 @@ abstract class AppLocalizationsGenerated {
   /// No description provided for @chairmanship_2025.
   ///
   /// In en, this message translates to:
-  /// **'Chairmanship 2025'**
+  /// **'Chairmanship'**
   String get chairmanship_2025;
 
   /// No description provided for @live.
@@ -1184,7 +1184,7 @@ abstract class AppLocalizationsGenerated {
   /// No description provided for @onboarding_welcome_desc.
   ///
   /// In en, this message translates to:
-  /// **'Your companion for the African Union Chairmanship 2026. Let\'s show you around!'**
+  /// **'Your companion for the African Union Chairmanship. Let\'s show you around!'**
   String get onboarding_welcome_desc;
 
   /// No description provided for @onboarding_news.
@@ -2632,6 +2632,18 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'Subscribed to Monthly Newsletter!'**
   String get more_subscribed_toast;
+
+  /// No description provided for @more_security.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get more_security;
+
+  /// No description provided for @more_about_app.
+  ///
+  /// In en, this message translates to:
+  /// **'About this app'**
+  String get more_about_app;
 
   /// No description provided for @more_support.
   ///
@@ -5738,7 +5750,7 @@ abstract class AppLocalizationsGenerated {
   /// No description provided for @about_chairmanship_year_line.
   ///
   /// In en, this message translates to:
-  /// **'African Union Chairmanship 2026'**
+  /// **'African Union Chairmanship'**
   String get about_chairmanship_year_line;
 
   /// No description provided for @about_credits.
@@ -5842,6 +5854,450 @@ abstract class AppLocalizationsGenerated {
   /// In en, this message translates to:
   /// **'We ask for these details to match your application to your identity document and prevent impersonation.'**
   String get vr_why_identity_note;
+
+  /// No description provided for @about_issued_by.
+  ///
+  /// In en, this message translates to:
+  /// **'Issued by'**
+  String get about_issued_by;
+
+  /// No description provided for @explore.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore'**
+  String get explore;
+
+  /// No description provided for @read.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get read;
+
+  /// No description provided for @onboarding_explore.
+  ///
+  /// In en, this message translates to:
+  /// **'Join the conversation'**
+  String get onboarding_explore;
+
+  /// No description provided for @onboarding_explore_desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore is where the debate happens. Post your view on the agenda, answer the questions put to young Africans, and follow the people shaping them.'**
+  String get onboarding_explore_desc;
+
+  /// No description provided for @guide_new_badge.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get guide_new_badge;
+
+  /// No description provided for @guide_step_of.
+  ///
+  /// In en, this message translates to:
+  /// **'of'**
+  String get guide_step_of;
+
+  /// No description provided for @guide_back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get guide_back;
+
+  /// No description provided for @more_verif_pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification pending'**
+  String get more_verif_pending;
+
+  /// No description provided for @more_verif_in_review.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification in review'**
+  String get more_verif_in_review;
+
+  /// No description provided for @more_verif_pending_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'Your request is waiting to be picked up'**
+  String get more_verif_pending_sub;
+
+  /// No description provided for @more_verif_review_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'Our team is looking at your request'**
+  String get more_verif_review_sub;
+
+  /// No description provided for @more_verif_pending_msg.
+  ///
+  /// In en, this message translates to:
+  /// **'Your verification request has been received. We will let you know as soon as it is reviewed.'**
+  String get more_verif_pending_msg;
+
+  /// No description provided for @more_verif_review_msg.
+  ///
+  /// In en, this message translates to:
+  /// **'Our team is reviewing your verification request. You will be notified of the decision.'**
+  String get more_verif_review_msg;
+
+  /// No description provided for @more_online.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get more_online;
+
+  /// No description provided for @more_offline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get more_offline;
+
+  /// No description provided for @more_live_agent_online_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent is available to chat now'**
+  String get more_live_agent_online_sub;
+
+  /// No description provided for @more_live_agent_offline_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave a message and we will reply by email'**
+  String get more_live_agent_offline_sub;
+
+  /// No description provided for @more_subscribed.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribed'**
+  String get more_subscribed;
+
+  /// No description provided for @more_subscribe_sub.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe to receive our monthly digest'**
+  String get more_subscribe_sub;
+
+  /// No description provided for @auth_show_password.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get auth_show_password;
+
+  /// No description provided for @auth_hide_password.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get auth_hide_password;
+
+  /// No description provided for @auth_need_verify_email.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email to continue'**
+  String get auth_need_verify_email;
+
+  /// No description provided for @auth_sent_code_to.
+  ///
+  /// In en, this message translates to:
+  /// **'We sent a code to'**
+  String get auth_sent_code_to;
+
+  /// No description provided for @sec_show_password.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get sec_show_password;
+
+  /// No description provided for @sec_hide_password.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get sec_hide_password;
+
+  /// No description provided for @sec_failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get sec_failed;
+
+  /// No description provided for @prof_dob_updated.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth updated'**
+  String get prof_dob_updated;
+
+  /// No description provided for @prof_nationality_updated.
+  ///
+  /// In en, this message translates to:
+  /// **'Nationality updated'**
+  String get prof_nationality_updated;
+
+  /// No description provided for @prof_update_failed_short.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed'**
+  String get prof_update_failed_short;
+
+  /// No description provided for @rs_unlike.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlike'**
+  String get rs_unlike;
+
+  /// No description provided for @rs_checkin_ready.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to check in'**
+  String get rs_checkin_ready;
+
+  /// No description provided for @rs_checkin_pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in not open yet'**
+  String get rs_checkin_pending;
+
+  /// No description provided for @rs_checkin_action.
+  ///
+  /// In en, this message translates to:
+  /// **'Check in'**
+  String get rs_checkin_action;
+
+  /// No description provided for @rs_checkin_done.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked in'**
+  String get rs_checkin_done;
+
+  /// No description provided for @rs_checkin_already.
+  ///
+  /// In en, this message translates to:
+  /// **'You are already checked in for this event.'**
+  String get rs_checkin_already;
+
+  /// No description provided for @rs_checkin_success.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked in. Enjoy the event!'**
+  String get rs_checkin_success;
+
+  /// No description provided for @rs_notif_no_announcements.
+  ///
+  /// In en, this message translates to:
+  /// **'No announcements yet'**
+  String get rs_notif_no_announcements;
+
+  /// No description provided for @rs_notif_announcements_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates from the Chairmanship will appear here.'**
+  String get rs_notif_announcements_hint;
+
+  /// No description provided for @rs_notif_no_system.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing from the app yet'**
+  String get rs_notif_no_system;
+
+  /// No description provided for @rs_notif_system_hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Account and delivery notices will appear here.'**
+  String get rs_notif_system_hint;
+
+  /// No description provided for @scan_credential.
+  ///
+  /// In en, this message translates to:
+  /// **'Credential'**
+  String get scan_credential;
+
+  /// No description provided for @scan_ticket.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket'**
+  String get scan_ticket;
+
+  /// No description provided for @scan_result.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan result'**
+  String get scan_result;
+
+  /// No description provided for @scan_credential_result.
+  ///
+  /// In en, this message translates to:
+  /// **'Credential result'**
+  String get scan_credential_result;
+
+  /// No description provided for @scan_invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'INVALID'**
+  String get scan_invalid;
+
+  /// No description provided for @scan_time.
+  ///
+  /// In en, this message translates to:
+  /// **'time'**
+  String get scan_time;
+
+  /// No description provided for @scan_look_up.
+  ///
+  /// In en, this message translates to:
+  /// **'Look up'**
+  String get scan_look_up;
+
+  /// No description provided for @scan_looking_up.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up...'**
+  String get scan_looking_up;
+
+  /// No description provided for @scan_searching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching...'**
+  String get scan_searching;
+
+  /// No description provided for @scan_dup_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate scan detected'**
+  String get scan_dup_title;
+
+  /// No description provided for @scan_multi_dup_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple duplicate scans'**
+  String get scan_multi_dup_title;
+
+  /// No description provided for @sup_you.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get sup_you;
+
+  /// No description provided for @sup_support_team.
+  ///
+  /// In en, this message translates to:
+  /// **'Support team'**
+  String get sup_support_team;
+
+  /// No description provided for @sup_type_message.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a message...'**
+  String get sup_type_message;
+
+  /// No description provided for @sup_reply_reopen.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to reopen this ticket...'**
+  String get sup_reply_reopen;
+
+  /// No description provided for @sup_ticket_not_found.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket not found'**
+  String get sup_ticket_not_found;
+
+  /// No description provided for @sup_failed_load_conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this conversation'**
+  String get sup_failed_load_conversation;
+
+  /// No description provided for @w_gold_badge_verified.
+  ///
+  /// In en, this message translates to:
+  /// **'Gold badge verified'**
+  String get w_gold_badge_verified;
+
+  /// No description provided for @w_blue_badge_verified.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue badge verified'**
+  String get w_blue_badge_verified;
+
+  /// No description provided for @w_comment_banned.
+  ///
+  /// In en, this message translates to:
+  /// **'You can no longer comment'**
+  String get w_comment_banned;
+
+  /// No description provided for @w_language_warning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please keep the conversation respectful.'**
+  String get w_language_warning;
+
+  /// No description provided for @ydc_download_pdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Download PDF'**
+  String get ydc_download_pdf;
+
+  /// No description provided for @ydc_downloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading...'**
+  String get ydc_downloading;
+
+  /// No description provided for @ydd_intro_upload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload the documents below to complete your application.'**
+  String get ydd_intro_upload;
+
+  /// No description provided for @ydd_intro_reviewing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your documents are with our team. Nothing more to do for now.'**
+  String get ydd_intro_reviewing;
+
+  /// No description provided for @ydd_intro_resubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Some documents need replacing. Re-upload them and submit again.'**
+  String get ydd_intro_resubmit;
+
+  /// No description provided for @ydd_reupload.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-upload'**
+  String get ydd_reupload;
+
+  /// No description provided for @ydd_resubmit_documents.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-submit documents'**
+  String get ydd_resubmit_documents;
+
+  /// No description provided for @ydd_submit_all.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit all documents'**
+  String get ydd_submit_all;
+
+  /// No description provided for @ydd_status_not_uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not uploaded'**
+  String get ydd_status_not_uploaded;
+
+  /// No description provided for @ydd_status_photo_required.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo required'**
+  String get ydd_status_photo_required;
+
+  /// No description provided for @w_bookmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark'**
+  String get w_bookmark;
+
+  /// No description provided for @w_bookmarked.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarked'**
+  String get w_bookmarked;
 }
 
 class _AppLocalizationsGeneratedDelegate

@@ -511,7 +511,11 @@ class DsTile extends StatelessWidget {
                   style: TextStyle(fontSize: 13, color: Ds.muted(context)),
                 ),
               ),
-            ?trailing,
+            // Without this a wrapping subtitle runs under the switch.
+            if (trailing != null) ...[
+              const SizedBox(width: 12),
+              trailing!,
+            ],
             if (trailing == null && chevron)
               const Icon(
                 Icons.chevron_right_rounded,

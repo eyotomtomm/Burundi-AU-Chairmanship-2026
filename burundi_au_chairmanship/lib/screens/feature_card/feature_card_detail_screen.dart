@@ -9,6 +9,7 @@ import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
 import 'media_video_player_screen.dart';
 import '../../services/share_service.dart';
+import '../../widgets/bookmark_button.dart';
 
 class FeatureCardDetailScreen extends StatefulWidget {
   final Map<String, dynamic> cardData;
@@ -220,6 +221,24 @@ class _FeatureCardDetailScreenState extends State<FeatureCardDetailScreen> {
             child: _circleButton(Icons.arrow_back_rounded,
                 () => Navigator.pop(context),
                 MaterialLocalizations.of(context).backButtonTooltip),
+          ),
+          Positioned(
+            right: 62,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+              child: BookmarkButton(
+                contentType: 'feature_card',
+                contentId: (cardData['id'] as num?)?.toInt() ?? 0,
+                onDarkHeader: true,
+              ),
+            ),
           ),
           Positioned(
             right: 16,

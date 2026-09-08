@@ -15,7 +15,17 @@ class TagFeedScreen extends StatefulWidget {
   final int? topicId;
   final String? topicTitle;
 
-  const TagFeedScreen({super.key, this.tag, this.topicId, this.topicTitle});
+  /// Narrows the feed to one discussion category — used by the agenda pages'
+  /// debate board, which used to open the standalone forum screen.
+  final String? category;
+
+  const TagFeedScreen({
+    super.key,
+    this.tag,
+    this.topicId,
+    this.topicTitle,
+    this.category,
+  });
 
   @override
   State<TagFeedScreen> createState() => _TagFeedScreenState();
@@ -23,8 +33,11 @@ class TagFeedScreen extends StatefulWidget {
 
 class _TagFeedScreenState extends State<TagFeedScreen> {
   final _api = ApiService();
-  late final FeedPager _pager = FeedPager((page) =>
-      _api.getFeedPage(tag: widget.tag, topicId: widget.topicId, page: page));
+  late final FeedPager _pager = FeedPager((page) => _api.getFeedPage(
+      tag: widget.tag,
+      topicId: widget.topicId,
+      category: widget.category,
+      page: page));
 
   List<Map<String, dynamic>> get _posts => _pager.posts;
   bool get _loading => _pager.loading;

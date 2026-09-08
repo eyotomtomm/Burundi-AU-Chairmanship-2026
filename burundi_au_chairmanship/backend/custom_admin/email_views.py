@@ -38,7 +38,7 @@ def _get_campaign_smtp_connection():
 
     Uses CAMPAIGN_EMAIL_* settings so campaigns go through
     newsletter@burundichairship.africa while OTP / system emails
-    continue using the default info@burundi4africa.com account.
+    continue using the default info@burundichairship.africa account.
     """
     from django.core.mail import get_connection
     return get_connection(

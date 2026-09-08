@@ -166,6 +166,9 @@
             </td>
             <td class="py-4 px-6">
               <div class="flex items-center justify-end gap-2">
+                <a href="{% url 'custom_admin:comment_engagement' %}?type=article&amp;content={{ article.pk }}" class="p-2 hover:bg-surface-container rounded-lg transition-colors" title="Likes &amp; comments">
+                    <span class="material-symbols-outlined text-xl">add_reaction</span>
+                </a>
                 <a href="{% url 'custom_admin:article_edit' article.pk %}" class="p-2 hover:bg-surface-container rounded-lg transition-colors" title="Edit">
                   <span class="material-symbols-outlined text-primary">edit</span>
                 </a>

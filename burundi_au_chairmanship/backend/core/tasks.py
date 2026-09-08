@@ -589,3 +589,32 @@ def optimize_image_async(self, image_path):
     except Exception as exc:
         logger.error(f"Image optimization failed: {exc}")
         raise self.retry(exc=exc)
+
+
+@shared_task
+def auto_fetch_news_sources():
+    """Daily pull for sources with auto-fetch on.
+
+    Runs hourly and only acts on sources whose `auto_fetch_hour` is the
+    current local hour, so each source fires once a day. Everything lands
+    as *pending* — exactly like a manual fetch, nothing self-publishes.
+    """
+    from django.utils import timezone as tz
+    from .models import NewsSource
+    from .news_scraper import fetch_source, ScrapeError
+
+    now = tz.localtime()
+    total = 0
+    for source in NewsSource.objects.filter(is_active=True, auto_fetch=True,
+                                            auto_fetch_hour=now.hour):
+        # A beat restart can fire the same hour twice; one run a day is enough.
+        if source.last_fetched_at and tz.localtime(source.last_fetched_at).date() == now.date():
+            continue
+        try:
+            created, _ = fetch_source(source, now - timedelta(days=source.auto_fetch_days), now)
+            total += created
+            logger.info('auto-fetch %s: %s new item(s)', source.name, created)
+        except ScrapeError as exc:
+            # A dead feed must not stop the sources behind it.
+            logger.warning('auto-fetch %s failed: %s', source.name, exc)
+    return total

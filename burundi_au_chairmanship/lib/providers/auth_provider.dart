@@ -12,6 +12,7 @@ import '../services/firebase_auth_service.dart';
 import '../services/firebase_messaging_service.dart';
 import '../services/like_service.dart';
 import '../services/content_cache_service.dart';
+import '../services/read_service.dart';
 
 /// Authentication provider using Firebase Auth + Django backend
 ///
@@ -810,6 +811,8 @@ class AuthProvider extends ChangeNotifier {
 
     await _firebaseAuth.signOut();
     LikeService().clearAll();
+    // Read marks are per-person; the next account should start clean.
+    await ReadService.instance.clear();
     await ContentCacheService().clearAll();
     await _clearUserData();
     _isAuthenticated = false;

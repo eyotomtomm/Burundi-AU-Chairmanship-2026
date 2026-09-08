@@ -28,6 +28,8 @@ import '../../security/change_password_screen.dart';
 import '../../about/about_screen.dart';
 import '../../onboarding/onboarding_screen.dart';
 import '../../../services/share_service.dart';
+import '../../settings/notification_preferences_screen.dart';
+import '../../../widgets/african_pattern.dart';
 
 class MoreTab extends StatefulWidget {
   const MoreTab({super.key});
@@ -69,7 +71,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       if (mounted) {
         setState(() {
-          _newsletterEnabled = prefs.getBool('feature_newsletter_enabled') ?? true;
+          _newsletterEnabled =
+              prefs.getBool('feature_newsletter_enabled') ?? true;
         });
       }
     } catch (_) {}
@@ -110,7 +113,10 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       final settings = await ApiService().getSettings();
       if (settings != null && mounted) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('feature_newsletter_enabled', settings.newsletterEnabled);
+        await prefs.setBool(
+          'feature_newsletter_enabled',
+          settings.newsletterEnabled,
+        );
         setState(() {
           _newsletterEnabled = settings.newsletterEnabled;
         });
@@ -125,7 +131,10 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     final title = auth.verificationTitle;
     // Prefer real name from verification over signup name
     final realName = auth.verificationName;
-    final name = (realName != null && realName.isNotEmpty) ? realName : (auth.userName ?? AppLocalizations.of(context).translate('more_user'));
+    final name = (realName != null && realName.isNotEmpty)
+        ? realName
+        : (auth.userName ??
+              AppLocalizations.of(context).translate('more_user'));
 
     if (title != null && title.isNotEmpty) {
       // Title + family name — the protocol form, and short enough for the row.
@@ -150,7 +159,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
         },
         color: Ds.green,
         child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           slivers: [
             // Green profile header
             SliverToBoxAdapter(
@@ -160,25 +171,40 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               ),
             ),
 
-            // ── Community ───────────────────────────────────
-            SliverToBoxAdapter(child: DsGroupLabel(l10n.translate('more_community'))),
+            // A pending badge is an action, not a settings row — it gets a
+            // tinted callout above the grid rather than a line in a list.
             SliverToBoxAdapter(
-              child: DsTileGroup(
-                children: [
-                  DsTile(
-                    icon: Icons.flag_rounded,
-                    title: l10n.translate('priority_agenda'),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.pushNamed(context, '/priority-agenda');
-                    },
-                  ),
-                ],
+              child: Consumer2<AuthProvider, VerificationProvider>(
+                builder: (context, auth, verification, _) {
+                  final pending =
+                      verification.requestStatus == 'pending' ||
+                      verification.requestStatus == 'rejected';
+                  final verified =
+                      !pending &&
+                      (auth.isVerified || verification.isProfileVerified);
+                  if (!auth.isAuthenticated || verified) {
+                    return const SizedBox(height: 18);
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                    child: _verificationCallout(
+                      context,
+                      verification.requestStatus,
+                      l10n,
+                    ),
+                  );
+                },
               ),
             ),
 
+            // The four places people actually come here for, as targets big
+            // enough to hit without reading a list.
+            SliverToBoxAdapter(child: _quickActions(context, l10n)),
+
             // ── Preferences ─────────────────────────────────
-            SliverToBoxAdapter(child: DsGroupLabel(l10n.translate('more_preferences'))),
+            SliverToBoxAdapter(
+              child: DsGroupLabel(l10n.translate('more_preferences')),
+            ),
             SliverToBoxAdapter(
               child: DsTileGroup(
                 children: [
@@ -212,6 +238,19 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     ),
                   ),
                   DsTile(
+                    icon: Icons.notifications_none_rounded,
+                    title: l10n.translate('st_push_notifications'),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(
+                          builder: (_) => const NotificationPreferencesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  DsTile(
                     icon: Icons.data_saver_on_rounded,
                     title: l10n.dataSaver,
                     subtitle: l10n.dataSaverDesc,
@@ -227,45 +266,19 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               ),
             ),
 
-            Consumer2<AuthProvider, VerificationProvider>(
-              builder: (context, authProvider, verificationProvider, _) {
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, _) {
                 final isLoggedIn = authProvider.isAuthenticated;
-                // A pending or rejected request means the user is NOT yet verified,
-                // even if authProvider.isVerified is stale-cached as true.
-                final hasPendingRequest =
-                    verificationProvider.requestStatus == 'pending' ||
-                        verificationProvider.requestStatus == 'rejected';
-                final isVerified = !hasPendingRequest &&
-                    (authProvider.isVerified ||
-                        verificationProvider.isProfileVerified);
-                final showVerificationItem = isLoggedIn && !isVerified;
 
                 return SliverList.list(
                   children: [
-                    // ── Verification ────────────────────────────
-                    if (showVerificationItem) ...[
-                      DsGroupLabel(l10n.translate('more_verification')),
-                      DsTileGroup(children: [
-                        _buildVerificationMenuItem(
-                          context: context,
-                          verificationStatus: verificationProvider.requestStatus,
-                          l10n: l10n,
-                        ),
-                      ]),
-                    ],
-
                     // ── Account ─────────────────────────────────
+                    // Sign-in security is part of the account, not a separate
+                    // idea: one label, one card.
                     if (isLoggedIn) ...[
                       DsGroupLabel(l10n.translate('more_account')),
                       DsTileGroup(
                         children: [
-                          DsTile(
-                            icon: Icons.bookmark_rounded,
-                            iconTint: Ds.tint(context),
-                            iconColor: Ds.gold,
-                            title: l10n.translate('bookmarks'),
-                            onTap: () => Navigator.pushNamed(context, '/bookmarks'),
-                          ),
                           DsTile(
                             icon: Icons.manage_accounts_rounded,
                             iconTint: Ds.redTintOf(context),
@@ -273,7 +286,10 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                             title: l10n.translate('more_manage_account'),
                             subtitle: l10n.translate('more_manage_account_sub'),
                             onTap: () => _showAccountManageSheet(
-                                context, isDark, authProvider),
+                              context,
+                              isDark,
+                              authProvider,
+                            ),
                           ),
                           if (_newsletterEnabled)
                             _buildNewsletterToggle(
@@ -288,27 +304,31 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                               iconColor: Ds.green,
                               title: l10n.translate('change_password'),
                               onTap: () => Navigator.push(
-                                  context,
-                                  CupertinoPageRoute(
-                                      builder: (_) =>
-                                          const ChangePasswordScreen())),
+                                context,
+                                CupertinoPageRoute(
+                                  builder: (_) => const ChangePasswordScreen(),
+                                ),
+                              ),
                             ),
                           DsTile(
                             icon: Icons.history_rounded,
                             title: l10n.translate('login_history'),
                             onTap: () => Navigator.push(
-                                context,
-                                CupertinoPageRoute(
-                                    builder: (_) => const LoginHistoryScreen())),
+                              context,
+                              CupertinoPageRoute(
+                                builder: (_) => const LoginHistoryScreen(),
+                              ),
+                            ),
                           ),
                           DsTile(
                             icon: Icons.devices_rounded,
                             title: l10n.translate('active_sessions'),
                             onTap: () => Navigator.push(
-                                context,
-                                CupertinoPageRoute(
-                                    builder: (_) =>
-                                        const ActiveSessionsScreen())),
+                              context,
+                              CupertinoPageRoute(
+                                builder: (_) => const ActiveSessionsScreen(),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -318,34 +338,6 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     DsGroupLabel(l10n.translate('more_support')),
                     DsTileGroup(
                       children: [
-                        DsTile(
-                          icon: Icons.headset_mic_rounded,
-                          iconTint: Ds.tint(context),
-                          iconColor: Ds.green,
-                          title: l10n.translate('contact_support'),
-                          subtitle: l10n.translate('more_support_sub'),
-                          onTap: () {
-                            if (!authProvider.isAuthenticated) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    l10n.translate('more_sign_in_to_contact'),
-                                  ),
-                                  backgroundColor: AppColors.burundiGreen,
-                                  behavior: SnackBarBehavior.floating,
-                                  action: SnackBarAction(
-                                    label: l10n.translate('sign_in'),
-                                    textColor: Colors.white,
-                                    onPressed: () =>
-                                        Navigator.pushNamed(context, '/auth'),
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            _showSupportOptions(context, isDark);
-                          },
-                        ),
                         DsTile(
                           icon: Icons.help_outline_rounded,
                           title: l10n.appGuide,
@@ -359,29 +351,6 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           ),
                         ),
                         DsTile(
-                          icon: Icons.info_outline_rounded,
-                          title: l10n.translate('about'),
-                          subtitle:
-                              '${AppConstants.appName} v${AppConstants.appVersion}',
-                          onTap: () => _showAboutDialog(context, l10n),
-                        ),
-                      ],
-                    ),
-
-                    // ── Share the app ───────────────────────────
-                    DsGroupLabel(l10n.translate('more_spread_word')),
-                    DsTileGroup(
-                      children: [
-                        DsTile(
-                          key: _shareMenuKey,
-                          icon: Icons.share_rounded,
-                          iconTint: Ds.tint(context),
-                          iconColor: Ds.green,
-                          title: l10n.translate('share_app'),
-                          onTap: () => ShareService.app(
-                              _shareMenuKey.currentContext ?? context),
-                        ),
-                        DsTile(
                           icon: Icons.star_rounded,
                           iconTint: Ds.goldTintOf(context),
                           iconColor: Ds.goldInk,
@@ -391,8 +360,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                       ],
                     ),
 
-                    // ── Legal ───────────────────────────────────
-                    DsGroupLabel(l10n.translate('more_legal')),
+                    // ── About this app ──────────────────────────
+                    DsGroupLabel(l10n.translate('more_about_app')),
                     DsTileGroup(
                       children: [
                         DsTile(
@@ -400,7 +369,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           title: l10n.translate('privacy_policy'),
                           onTap: () => launchUrl(
                             Uri.parse(
-                                '${Environment.siteBaseUrl}/privacy-policy/'),
+                              '${Environment.siteBaseUrl}/privacy-policy/',
+                            ),
                             mode: LaunchMode.externalApplication,
                           ),
                         ),
@@ -409,9 +379,17 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           title: l10n.translate('terms_of_service'),
                           onTap: () => launchUrl(
                             Uri.parse(
-                                '${Environment.siteBaseUrl}/terms-of-service/'),
+                              '${Environment.siteBaseUrl}/terms-of-service/',
+                            ),
                             mode: LaunchMode.externalApplication,
                           ),
+                        ),
+                        DsTile(
+                          icon: Icons.info_outline_rounded,
+                          title: l10n.translate('about'),
+                          subtitle:
+                              '${AppConstants.appName} v${AppConstants.appVersion}',
+                          onTap: () => _showAboutDialog(context, l10n),
                         ),
                       ],
                     ),
@@ -419,7 +397,7 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     // ── Sign out ────────────────────────────────
                     if (isLoggedIn)
                       DsTileGroup(
-                        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        margin: const EdgeInsets.fromLTRB(16, 26, 16, 16),
                         children: [
                           DsTile(
                             icon: Icons.logout_rounded,
@@ -437,41 +415,32 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               },
             ),
 
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // Summit theme banner
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-                decoration: BoxDecoration(
-                  color: Ds.green,
-                  borderRadius: BorderRadius.circular(Ds.rCard),
-                  boxShadow: Ds.shadowLg(context),
-                ),
-                child: Row(
+            // Clean footer
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 32, bottom: Ds.navSpace(context)),
+                child: Column(
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(Ds.rIcon),
+                    Text(
+                      AppConstants.appName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.3,
+                        ),
+                        letterSpacing: 0.5,
                       ),
-                      child: const Icon(Icons.stars_rounded, color: Colors.white, size: 20),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        AppConstants.summitTheme,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          fontStyle: FontStyle.italic,
-                          height: 1.4,
+                    const SizedBox(height: 4),
+                    Text(
+                      'v${AppConstants.appVersion}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.2,
                         ),
                       ),
                     ),
@@ -479,42 +448,17 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 ),
               ),
             ),
-          ),
-
-          // Clean footer
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(top: 32, bottom: Ds.navSpace(context)),
-              child: Column(
-                children: [
-                  Text(
-                    AppConstants.appName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.3),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'v${AppConstants.appVersion}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.2),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
 
-  void _showAccountManageSheet(BuildContext context, bool isDark, AuthProvider authProvider) {
+  void _showAccountManageSheet(
+    BuildContext context,
+    bool isDark,
+    AuthProvider authProvider,
+  ) {
     final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
@@ -529,7 +473,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white24 : Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
@@ -539,7 +484,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               Text(
                 l10n.translate('more_manage_your_account'),
                 style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                   color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
@@ -553,11 +499,23 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.pause_circle_outline, color: Colors.orange, size: 28),
+                  child: const Icon(
+                    Icons.pause_circle_outline,
+                    color: Colors.orange,
+                    size: 28,
+                  ),
                 ),
-                title: Text(l10n.translate('more_take_break'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                title: Text(
+                  l10n.translate('more_take_break'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
                 subtitle: Text(l10n.translate('more_take_break_sub')),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmDeactivate(context, isDark, authProvider);
@@ -573,11 +531,24 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.delete_forever_rounded, color: Colors.red, size: 28),
+                  child: const Icon(
+                    Icons.delete_forever_rounded,
+                    color: Colors.red,
+                    size: 28,
+                  ),
                 ),
-                title: Text(l10n.translate('more_delete_forever'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, color: Colors.red)),
+                title: Text(
+                  l10n.translate('more_delete_forever'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Colors.red,
+                  ),
+                ),
                 subtitle: Text(l10n.translate('more_delete_forever_sub')),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmDelete(context, isDark, authProvider);
@@ -591,7 +562,11 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _confirmDeactivate(BuildContext context, bool isDark, AuthProvider authProvider) {
+  void _confirmDeactivate(
+    BuildContext context,
+    bool isDark,
+    AuthProvider authProvider,
+  ) {
     final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
@@ -609,7 +584,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (_) => const Center(child: CircularProgressIndicator()),
+                builder: (_) =>
+                    const Center(child: CircularProgressIndicator()),
               );
               final success = await authProvider.deactivateAccount();
               if (context.mounted) {
@@ -621,11 +597,18 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                       backgroundColor: Colors.orange,
                     ),
                   );
-                  Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/auth',
+                    (route) => false,
+                  );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(authProvider.errorMessage ?? l10n.translate('more_deactivate_failed')),
+                      content: Text(
+                        authProvider.errorMessage ??
+                            l10n.translate('more_deactivate_failed'),
+                      ),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -640,7 +623,11 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _confirmDelete(BuildContext context, bool isDark, AuthProvider authProvider) {
+  void _confirmDelete(
+    BuildContext context,
+    bool isDark,
+    AuthProvider authProvider,
+  ) {
     final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
@@ -664,7 +651,8 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (_) => const Center(child: CircularProgressIndicator()),
+                builder: (_) =>
+                    const Center(child: CircularProgressIndicator()),
               );
               final success = await authProvider.deleteAccount();
               if (context.mounted) {
@@ -672,15 +660,24 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(l10n.translate('more_delete_scheduled_toast')),
+                      content: Text(
+                        l10n.translate('more_delete_scheduled_toast'),
+                      ),
                       backgroundColor: Colors.red,
                     ),
                   );
-                  Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/auth',
+                    (route) => false,
+                  );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(authProvider.errorMessage ?? l10n.translate('more_delete_failed')),
+                      content: Text(
+                        authProvider.errorMessage ??
+                            l10n.translate('more_delete_failed'),
+                      ),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -696,47 +693,223 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   }
 
   bool _hasPendingOrRejectedRequest(BuildContext context) {
-    final status = Provider.of<VerificationProvider>(context, listen: false).requestStatus;
+    final status = Provider.of<VerificationProvider>(
+      context,
+      listen: false,
+    ).requestStatus;
     return status == 'pending' || status == 'rejected';
   }
 
-  Widget _buildVerificationMenuItem({
-    required BuildContext context,
-    required String? verificationStatus,
-    required AppLocalizations l10n,
-  }) {
-    final pending = verificationStatus == 'pending';
-    if (pending || verificationStatus == 'rejected') {
-      return DsTile(
-        icon: Icons.hourglass_top_rounded,
-        iconTint: Ds.goldTintOf(context),
-        iconColor: Ds.goldInk,
-        title: l10n.translate(pending ? 'more_verif_pending' : 'more_verif_in_review'),
-        subtitle: l10n.translate(pending ? 'more_verif_pending_sub' : 'more_verif_review_sub'),
-        chevron: false,
+  /// Waiting on a badge, or never asked for one — either way it is the one
+  /// thing on this page the user can still act on, so it is a coloured card
+  /// above the grid instead of a grey row buried in a list.
+  Widget _verificationCallout(
+    BuildContext context,
+    String? status,
+    AppLocalizations l10n,
+  ) {
+    final pending = status == 'pending';
+    final waiting = pending || status == 'rejected';
+
+    final fill = waiting ? Ds.goldTintOf(context) : Ds.tint(context);
+    final ink = waiting ? Ds.goldInk : Ds.greenDeep;
+    final icon = waiting ? Icons.hourglass_top_rounded : Icons.verified_rounded;
+    final title = l10n.translate(
+      waiting
+          ? (pending ? 'more_verif_pending' : 'more_verif_in_review')
+          : 'get_verified',
+    );
+    final subtitle = l10n.translate(
+      waiting
+          ? (pending ? 'more_verif_pending_sub' : 'more_verif_review_sub')
+          : 'get_verified_desc',
+    );
+
+    return Material(
+      color: fill,
+      borderRadius: BorderRadius.circular(Ds.rCard),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Ds.rCard),
         onTap: () {
+          HapticFeedback.lightImpact();
+          if (!waiting) {
+            Navigator.pushNamed(context, '/verification-request');
+            return;
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l10n.translate(
-                  pending ? 'more_verif_pending_msg' : 'more_verif_review_msg')),
+              content: Text(
+                l10n.translate(
+                  pending ? 'more_verif_pending_msg' : 'more_verif_review_msg',
+                ),
+              ),
               behavior: SnackBarBehavior.floating,
             ),
           );
         },
-      );
-    }
-    // No request exists — show Get Verified
-    return DsTile(
-      icon: Icons.verified_rounded,
-      iconTint: Ds.tint(context),
-      iconColor: Ds.green,
-      title: l10n.translate('get_verified'),
-      subtitle: l10n.translate('get_verified_desc'),
-      onTap: () => Navigator.pushNamed(context, '/verification-request'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 24, color: ink),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        color: ink.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!waiting)
+                Icon(Icons.chevron_right_rounded, size: 20, color: ink),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  void _showSignOutConfirmation(BuildContext context, AuthProvider authProvider) {
+  /// Brand tint that survives both themes (Ds only ships green/gold/red).
+  Color _softTint(BuildContext context, Color base) => base.withValues(
+    alpha: Theme.of(context).brightness == Brightness.dark ? 0.20 : 0.12,
+  );
+
+  /// The four destinations people open this tab for, as one card of targets
+  /// rather than four lines spread across three labelled sections.
+  Widget _quickActions(BuildContext context, AppLocalizations l10n) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cells = <Widget>[
+      _quickCell(
+        context,
+        Icons.bookmark_rounded,
+        l10n.translate('bookmarks'),
+        Ds.goldTintOf(context),
+        Ds.goldInk,
+        () => Navigator.pushNamed(context, '/bookmarks'),
+      ),
+      _quickCell(
+        context,
+        Icons.flag_rounded,
+        l10n.translate('priority_agenda'),
+        Ds.tint(context),
+        Ds.greenDeep,
+        () => Navigator.pushNamed(context, '/priority-agenda'),
+      ),
+      _quickCell(
+        context,
+        Icons.headset_mic_rounded,
+        l10n.translate('contact_support'),
+        _softTint(context, Ds.blue),
+        Ds.blue,
+        () {
+          final auth = Provider.of<AuthProvider>(context, listen: false);
+          if (!auth.isAuthenticated) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.translate('more_sign_in_to_contact')),
+                backgroundColor: AppColors.burundiGreen,
+                behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(
+                  label: l10n.translate('sign_in'),
+                  textColor: Colors.white,
+                  onPressed: () => Navigator.pushNamed(context, '/auth'),
+                ),
+              ),
+            );
+            return;
+          }
+          _showSupportOptions(context, isDark);
+        },
+      ),
+      _quickCell(
+        context,
+        Icons.share_rounded,
+        l10n.translate('share_app'),
+        _softTint(context, Ds.red),
+        Ds.redDeep,
+        () => ShareService.app(_shareMenuKey.currentContext ?? context),
+        key: _shareMenuKey,
+      ),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: Ds.surface(context),
+        borderRadius: BorderRadius.circular(Ds.rCard),
+        boxShadow: Ds.shadow(context),
+      ),
+      child: Row(children: [for (final cell in cells) Expanded(child: cell)]),
+    );
+  }
+
+  Widget _quickCell(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color tint,
+    Color color,
+    VoidCallback onTap, {
+    Key? key,
+  }) {
+    return InkWell(
+      key: key,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(Ds.rTile),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Column(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: tint, shape: BoxShape.circle),
+              child: Icon(icon, size: 21, color: color),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+                color: Ds.body(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSignOutConfirmation(
+    BuildContext context,
+    AuthProvider authProvider,
+  ) {
     final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
@@ -752,13 +925,19 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () async {
               Navigator.pop(dialogContext);
               await authProvider.signOut();
               if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/auth',
+                  (route) => false,
+                );
               }
             },
             child: Text(l10n.translate('sign_out')),
@@ -827,12 +1006,24 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     color: AppColors.burundiGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.email_rounded, color: AppColors.burundiGreen, size: 28),
+                  child: Icon(
+                    Icons.email_rounded,
+                    color: AppColors.burundiGreen,
+                    size: 28,
+                  ),
                 ),
-                title: Text(l10n.translate('more_support_ticket'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                title: Text(
+                  l10n.translate('more_support_ticket'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
                 subtitle: Text(l10n.translate('more_support_ticket_sub')),
                 trailing: const Icon(Icons.chevron_right),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   Navigator.pushNamed(context, '/support-tickets');
@@ -852,7 +1043,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   ),
                   child: Icon(
                     Icons.support_agent_rounded,
-                    color: liveAgentOnline ? AppColors.burundiGreen : Colors.grey,
+                    color: liveAgentOnline
+                        ? AppColors.burundiGreen
+                        : Colors.grey,
                     size: 28,
                   ),
                 ),
@@ -870,24 +1063,43 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: liveAgentOnline ? Colors.green : Colors.grey[400],
+                        color: liveAgentOnline
+                            ? Colors.green
+                            : Colors.grey[400],
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        l10n.translate(liveAgentOnline ? 'more_online' : 'more_offline'),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                        l10n.translate(
+                          liveAgentOnline ? 'more_online' : 'more_offline',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 subtitle: Text(
-                  l10n.translate(liveAgentOnline ? 'more_live_agent_online_sub' : 'more_live_agent_offline_sub'),
+                  l10n.translate(
+                    liveAgentOnline
+                        ? 'more_live_agent_online_sub'
+                        : 'more_live_agent_offline_sub',
+                  ),
                   style: TextStyle(color: liveAgentOnline ? null : Colors.grey),
                 ),
-                trailing: liveAgentOnline ? const Icon(Icons.chevron_right) : null,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                trailing: liveAgentOnline
+                    ? const Icon(Icons.chevron_right)
+                    : null,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 enabled: liveAgentOnline,
                 onTap: liveAgentOnline
                     ? () async {
@@ -910,10 +1122,13 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                  content: Text(e is ApiException
+                                content: Text(
+                                  e is ApiException
                                       ? e.message
-                                      : l10n.translate('more_live_chat_failed')),
-                                  backgroundColor: AppColors.error),
+                                      : l10n.translate('more_live_chat_failed'),
+                                ),
+                                backgroundColor: AppColors.error,
+                              ),
                             );
                           }
                         }
@@ -940,18 +1155,27 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       iconTint: Ds.tint(context),
       iconColor: Ds.green,
       title: l10n.translate('more_newsletter'),
-      subtitle: l10n.translate(isSubscribed ? 'more_subscribed' : 'more_subscribe_sub'),
+      subtitle: l10n.translate(
+        isSubscribed ? 'more_subscribed' : 'more_subscribe_sub',
+      ),
       trailing: isSubscribed
           ? const Icon(Icons.check_circle_rounded, color: Ds.green, size: 22)
           : null,
       onTap: isSubscribed
           ? () => _showUnsubscribeDialog(context, isDark, authProvider)
-          : () =>
-              _showNewsletterSubscriptionDialog(context, isDark, authProvider),
+          : () => _showNewsletterSubscriptionDialog(
+              context,
+              isDark,
+              authProvider,
+            ),
     );
   }
 
-  void _showUnsubscribeDialog(BuildContext context, bool isDark, AuthProvider authProvider) {
+  void _showUnsubscribeDialog(
+    BuildContext context,
+    bool isDark,
+    AuthProvider authProvider,
+  ) {
     final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
@@ -983,7 +1207,11 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(e is ApiException ? e.message : l10n.translate('more_unsubscribe_failed')),
+                      content: Text(
+                        e is ApiException
+                            ? e.message
+                            : l10n.translate('more_unsubscribe_failed'),
+                      ),
                       backgroundColor: AppColors.burundiRed,
                       behavior: SnackBarBehavior.floating,
                     ),
@@ -999,11 +1227,21 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showNewsletterSubscriptionDialog(BuildContext context, bool isDark, AuthProvider authProvider) {
+  void _showNewsletterSubscriptionDialog(
+    BuildContext context,
+    bool isDark,
+    AuthProvider authProvider,
+  ) {
     final l10n = AppLocalizations.of(context);
-    final nameController = TextEditingController(text: authProvider.userName ?? '');
-    final emailController = TextEditingController(text: authProvider.userEmail ?? '');
-    final phoneController = TextEditingController(text: authProvider.phoneNumber ?? '');
+    final nameController = TextEditingController(
+      text: authProvider.userName ?? '',
+    );
+    final emailController = TextEditingController(
+      text: authProvider.userEmail ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: authProvider.phoneNumber ?? '',
+    );
     final formKey = GlobalKey<FormState>();
     bool isSubmitting = false;
 
@@ -1011,7 +1249,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
           title: Row(
             children: [
@@ -1022,7 +1262,11 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                   color: AppColors.burundiGreen.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.newspaper_rounded, color: AppColors.burundiGreen, size: 22),
+                child: Icon(
+                  Icons.newspaper_rounded,
+                  color: AppColors.burundiGreen,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1047,7 +1291,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     l10n.translate('more_newsletter_desc'),
                     style: TextStyle(
                       fontSize: 13,
-                      color: isDark ? Colors.white60 : AppColors.burundiGreen.withValues(alpha: 0.7),
+                      color: isDark
+                          ? Colors.white60
+                          : AppColors.burundiGreen.withValues(alpha: 0.7),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1056,9 +1302,13 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     decoration: InputDecoration(
                       labelText: l10n.translate('full_name'),
                       prefixIcon: const Icon(Icons.person_outline_rounded),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? l10n.translate('more_name_required') : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? l10n.translate('more_name_required')
+                        : null,
                   ),
                   const SizedBox(height: 14),
                   TextFormField(
@@ -1067,11 +1317,15 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     decoration: InputDecoration(
                       labelText: l10n.translate('more_email_address'),
                       prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return l10n.translate('more_email_required');
-                      if (!v.contains('@') || !v.contains('.')) return l10n.translate('more_valid_email');
+                      if (v == null || v.trim().isEmpty)
+                        return l10n.translate('more_email_required');
+                      if (!v.contains('@') || !v.contains('.'))
+                        return l10n.translate('more_valid_email');
                       return null;
                     },
                   ),
@@ -1082,7 +1336,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
                     decoration: InputDecoration(
                       labelText: l10n.translate('more_phone_optional'),
                       prefixIcon: const Icon(Icons.phone_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ],
@@ -1091,56 +1347,81 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
           ),
           actions: [
             TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(dialogContext),
+              onPressed: isSubmitting
+                  ? null
+                  : () => Navigator.pop(dialogContext),
               child: Text(
                 l10n.translate('cancel'),
                 style: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
               ),
             ),
             ElevatedButton(
-              onPressed: isSubmitting ? null : () async {
-                if (!formKey.currentState!.validate()) return;
-                setDialogState(() => isSubmitting = true);
-                try {
-                  await ApiService().subscribeNewsletter(
-                    name: nameController.text.trim(),
-                    email: emailController.text.trim(),
-                    phoneNumber: phoneController.text.trim(),
-                  );
-                  await authProvider.toggleNewsletter(true);
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
-                  if (context.mounted) {
-                    setState(() {});
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.translate('more_subscribed_toast')),
-                        backgroundColor: AppColors.burundiGreen,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  setDialogState(() => isSubmitting = false);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(e is ApiException ? e.message : l10n.translate('more_subscribe_failed')),
-                        backgroundColor: AppColors.burundiRed,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                }
-              },
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isSubmitting = true);
+                      try {
+                        await ApiService().subscribeNewsletter(
+                          name: nameController.text.trim(),
+                          email: emailController.text.trim(),
+                          phoneNumber: phoneController.text.trim(),
+                        );
+                        await authProvider.toggleNewsletter(true);
+                        if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        if (context.mounted) {
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                l10n.translate('more_subscribed_toast'),
+                              ),
+                              backgroundColor: AppColors.burundiGreen,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                e is ApiException
+                                    ? e.message
+                                    : l10n.translate('more_subscribe_failed'),
+                              ),
+                              backgroundColor: AppColors.burundiRed,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.burundiGreen,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
               ),
               child: isSubmitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(l10n.translate('more_subscribe'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      l10n.translate('more_subscribe'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ],
         ),
@@ -1151,100 +1432,147 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
   /// Green header with the member's avatar, name and role — the comp's
   /// "More / Profile" top block.
   Widget _buildProfileHeader(
-      BuildContext context, AuthProvider authProvider, AppLocalizations l10n) {
+    BuildContext context,
+    AuthProvider authProvider,
+    AppLocalizations l10n,
+  ) {
     final isLoggedIn = authProvider.isAuthenticated;
-    final name = isLoggedIn ? _buildDisplayName(authProvider) : l10n.translate('more_guest_user');
+    final name = isLoggedIn
+        ? _buildDisplayName(authProvider)
+        : l10n.translate('more_guest_user');
     final photo = authProvider.profilePictureUrl;
     final role = authProvider.verificationRole;
 
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, isLoggedIn ? '/profile' : '/auth'),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.fromLTRB(
-            20, MediaQuery.paddingOf(context).top + 20, 20, 22),
-        decoration: const BoxDecoration(
-          color: Ds.green,
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(Ds.rHeader)),
+      onTap: () =>
+          Navigator.pushNamed(context, isLoggedIn ? '/profile' : '/auth'),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(Ds.rHeader),
         ),
-        child: Row(
-          children: [
-            ClipOval(
-              child: SizedBox(
-                width: 58,
-                height: 58,
-                child: isLoggedIn && photo != null && photo.isNotEmpty
-                    ? AppNetworkImage(
-                        imageUrl: Environment.fixMediaUrl(photo),
-                        fit: BoxFit.cover,
-                        placeholder: (_, _) => _avatarInitials(name, isLoggedIn),
-                        errorWidget: (_, _, _) => _avatarInitials(name, isLoggedIn),
-                      )
-                    : _avatarInitials(name, isLoggedIn),
+        child: Container(
+          width: double.infinity,
+          color: Ds.green,
+          // The flat green block read as a placeholder; the woven motif is
+          // already the app's, at an opacity that stays behind the text.
+          child: AfricanPatternBackground(
+            patternColor: Colors.white,
+            opacity: 0.07,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 18,
+                16,
+                24,
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
+                  Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.28),
+                    ),
+                    child: ClipOval(
+                      child: SizedBox(
+                        width: 58,
+                        height: 58,
+                        child: isLoggedIn && photo != null && photo.isNotEmpty
+                            ? AppNetworkImage(
+                                imageUrl: Environment.fixMediaUrl(photo),
+                                fit: BoxFit.cover,
+                                placeholder: (_, _) =>
+                                    _avatarInitials(name, isLoggedIn),
+                                errorWidget: (_, _, _) =>
+                                    _avatarInitials(name, isLoggedIn),
+                              )
+                            : _avatarInitials(name, isLoggedIn),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            if (isLoggedIn &&
+                                authProvider.isVerified &&
+                                !_hasPendingOrRejectedRequest(context)) ...[
+                              const SizedBox(width: 6),
+                              VerifiedBadge(
+                                badgeType:
+                                    authProvider.badgeType ??
+                                    Provider.of<VerificationProvider>(
+                                      context,
+                                      listen: false,
+                                    ).badgeType,
+                                size: 17,
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isLoggedIn
+                              ? (role != null && role.isNotEmpty
+                                    ? role
+                                    : (authProvider.userEmail ?? ''))
+                              : l10n.translate('tap_to_sign_in'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
                         ),
-                      ),
-                      if (isLoggedIn &&
-                          authProvider.isVerified &&
-                          !_hasPendingOrRejectedRequest(context)) ...[
-                        const SizedBox(width: 6),
-                        VerifiedBadge(
-                            badgeType: authProvider.badgeType ??
-                                Provider.of<VerificationProvider>(context, listen: false)
-                                    .badgeType,
-                            size: 17),
                       ],
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isLoggedIn
-                        ? (role != null && role.isNotEmpty
-                            ? role
-                            : (authProvider.userEmail ?? ''))
-                        : l10n.translate('tap_to_sign_in'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.8)),
+                  DsHeaderAction(
+                    Icons.edit_rounded,
+                    label: l10n.translate('edit_profile'),
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      isLoggedIn ? '/profile' : '/auth',
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.edit_rounded, size: 20, color: Colors.white),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _avatarInitials(String name, bool isLoggedIn) => Container(
-        color: Colors.white,
-        alignment: Alignment.center,
-        child: isLoggedIn && name.isNotEmpty
-            ? Text(name[0].toUpperCase(),
-                style: const TextStyle(
-                    fontSize: 19, fontWeight: FontWeight.w800, color: Ds.green))
-            : const Icon(Icons.person_rounded, size: 28, color: Ds.green),
-      );
+    color: Colors.white,
+    alignment: Alignment.center,
+    child: isLoggedIn && name.isNotEmpty
+        ? Text(
+            name[0].toUpperCase(),
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: Ds.green,
+            ),
+          )
+        : const Icon(Icons.person_rounded, size: 28, color: Ds.green),
+  );
 
   Future<void> _handleRateApp(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
@@ -1255,7 +1583,9 @@ class _MoreTabState extends State<MoreTab> with WidgetsBindingObserver {
           content: Text(msg),
           backgroundColor: AppColors.burundiGreen,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }

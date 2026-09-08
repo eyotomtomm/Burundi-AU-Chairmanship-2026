@@ -2120,7 +2120,7 @@ def admin_invite(request):
                 f'  Username: {username}\n'
                 f'  Temporary Password: {temp_password}\n\n'
                 f'Please change your password after your first login.\n\n'
-                f'For questions, contact info@burundi4africa.com\n\n'
+                f'For questions, contact info@burundichairship.africa\n\n'
                 f'Best regards,\n'
                 f'Be 4 Africa Team\n'
                 f'Ministère des Affaires Étrangères'
@@ -2912,7 +2912,7 @@ def event_submission_review(request, pk):
         <span style="font-size:28px;font-weight:900;color:#276749;">&#10003;</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Approved</h1>
-      <p style="color:#9ae6b4;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#9ae6b4;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -2950,11 +2950,11 @@ def event_submission_review(request, pk):
         You can view your ticket and event details in the Be 4 Africa app.
       </p>
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+        If you have any questions, please contact us at <a href="mailto:{event_reg.contact_email or "info@burundichairship.africa"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundichairship.africa"}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -3058,7 +3058,7 @@ def event_submission_review(request, pk):
         <span style="font-size:28px;font-weight:900;color:#9b2c2c;">!</span>
       </div>
       <h1 style="color:white;font-size:22px;margin:0 0 8px;font-weight:700;">Registration Not Approved</h1>
-      <p style="color:#feb2b2;font-size:14px;margin:0;">Be 4 Africa 2026-2027</p>
+      <p style="color:#feb2b2;font-size:14px;margin:0;">Be 4 Africa</p>
     </div>
     <div style="padding:32px;">
       <p style="color:#2d3748;font-size:16px;line-height:1.6;margin:0 0 20px;">
@@ -3080,11 +3080,11 @@ def event_submission_review(request, pk):
         If you believe this was made in error or have any questions, please don't hesitate to reach out.
       </p>
       <p style="color:#718096;font-size:13px;line-height:1.6;margin:0;">
-        Contact us at <a href="mailto:{event_reg.contact_email or "info@burundi4africa.com"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundi4africa.com"}</a>
+        Contact us at <a href="mailto:{event_reg.contact_email or "info@burundichairship.africa"}" style="color:#3182ce;">{event_reg.contact_email or "info@burundichairship.africa"}</a>
       </p>
     </div>
     <div style="background:#f7fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa 2026-2027</p>
+      <p style="color:#a0aec0;font-size:12px;margin:0;">Republic of Burundi &mdash; Be 4 Africa</p>
     </div>
   </div>
 </div>
@@ -3094,7 +3094,7 @@ def event_submission_review(request, pk):
                     plain_message = f"Dear {user.get_full_name() or user.username},\n\nWe regret to inform you that your registration for {event_reg.event_title} could not be approved at this time.\n\n"
                     if submission.admin_notes:
                         plain_message += f"Reason: {submission.admin_notes}\n\n"
-                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundi4africa.com'}.\n\nBest regards,\nBe 4 Africa Team"
+                    plain_message += f"If you have any questions, please contact us at {event_reg.contact_email or 'info@burundichairship.africa'}.\n\nBest regards,\nBe 4 Africa Team"
 
                     send_mail(
                         subject=subject,
@@ -4092,7 +4092,7 @@ def app_settings(request):
         settings.about_features_title_fr = request.POST.get('about_features_title_fr', '') or 'Fonctionnalit\u00e9s'
         settings.contact_website = request.POST.get('contact_website', '') or 'burundi4africa.com'
         settings.contact_website_url = request.POST.get('contact_website_url', '') or 'https://burundi4africa.com'
-        settings.contact_email = request.POST.get('contact_email', '') or 'info@burundi4africa.com'
+        settings.contact_email = request.POST.get('contact_email', '') or 'info@burundichairship.africa'
         # QR Scanner titles
         settings.qr_scanner_title = request.POST.get('qr_scanner_title', '') or 'QR Scanner'
         settings.qr_scanner_title_fr = request.POST.get('qr_scanner_title_fr', '') or 'Scanner QR'
@@ -12212,6 +12212,18 @@ def news_scraper(request):
                         total_seen += skipped
                     except ScrapeError as exc:
                         messages.error(request, f'{src.name}: {exc}')
+                # Guest access to X only returns a shallow, mostly-old slice.
+                # Say so, rather than let an empty queue look like "no news".
+                from core.news_scraper import x_cookies_path
+                if not x_cookies_path() and any(src.kind == 'x' for src in chosen):
+                    messages.warning(
+                        request,
+                        'X sources were read without a login, which returns only an old '
+                        'partial sample — recent posts will be missing. Set X_COOKIES_FILE '
+                        'or X_COOKIES on the server — a cookies.txt from any signed-in X '
+                        'account, not necessarily the one being read — to fetch the full '
+                        'date range.'
+                    )
                 if total_new or total_seen:
                     messages.success(
                         request,
@@ -12271,6 +12283,14 @@ def news_scraper_review(request):
             item.status = 'rejected'
         else:
             src = item.source
+            # The reviewer can edit the card before approving; fall back to
+            # the scraped text when the field wasn't touched or sent.
+            edited_title = request.POST.get(f'title_{item.pk}', '').strip()
+            edited_body = request.POST.get(f'content_{item.pk}', '').strip()
+            if edited_title:
+                item.title = edited_title[:300]
+            if edited_body:
+                item.content = edited_body
             # Credit reposts in the body; our own posts carry no credit line.
             body = item.content or ''
             if not src.is_own_content and src.attribution:
@@ -12313,11 +12333,26 @@ def news_sources_list(request):
     """Manage the feeds the scraper pulls from."""
     from core.models import NewsSource, Category
 
+    def _clamped(name, default, low, high):
+        """Clamp a posted number instead of erroring on a stray value."""
+        try:
+            return max(low, min(high, int(request.POST.get(name, default))))
+        except (TypeError, ValueError):
+            return default
+
     if request.method == 'POST':
         pk = request.POST.get('pk')
         if request.POST.get('delete') and pk:
             NewsSource.objects.filter(pk=pk).delete()
             messages.success(request, 'Source removed.')
+        elif request.POST.get('action') == 'schedule' and pk:
+            # Inline row form — touches the daily schedule only.
+            NewsSource.objects.filter(pk=pk).update(
+                auto_fetch=bool(request.POST.get('auto_fetch')),
+                auto_fetch_hour=_clamped('auto_fetch_hour', 6, 0, 23),
+                auto_fetch_days=_clamped('auto_fetch_days', 2, 1, 90),
+            )
+            messages.success(request, 'Schedule updated.')
         else:
             fields = dict(
                 name=request.POST.get('name', '').strip(),
@@ -12326,7 +12361,10 @@ def news_sources_list(request):
                 attribution=request.POST.get('attribution', '').strip(),
                 is_own_content=bool(request.POST.get('is_own_content')),
                 is_active=bool(request.POST.get('is_active')),
+                auto_fetch=bool(request.POST.get('auto_fetch')),
             )
+            fields['auto_fetch_hour'] = _clamped('auto_fetch_hour', 6, 0, 23)
+            fields['auto_fetch_days'] = _clamped('auto_fetch_days', 2, 1, 90)
             cat = request.POST.get('default_category')
             fields['default_category'] = Category.objects.filter(pk=cat).first() if cat else None
             if not fields['name'] or not fields['target']:

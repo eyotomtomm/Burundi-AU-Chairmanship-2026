@@ -67,7 +67,6 @@ import 'screens/maintenance/maintenance_screen.dart';
 import 'screens/scanner/qr_scanner_screen.dart';
 import 'screens/scanner/yd_scan_history_screen.dart';
 import 'screens/emergency/emergency_screen.dart';
-import 'screens/discussions/discussions_screen.dart';
 import 'screens/polls/polls_screen.dart';
 import 'screens/bookmarks/bookmarks_screen.dart';
 
@@ -409,7 +408,6 @@ class BurundiAUApp extends StatelessWidget {
                 '/qr-scanner': (context) => const QrScannerScreen(),
                 '/yd-scan-history': (context) => const YdScanHistoryScreen(),
                 '/emergency': (context) => const EmergencyScreen(),
-                '/discussions': (context) => const DiscussionsScreen(),
                 '/polls': (context) => const PollsScreen(),
                 '/bookmarks': (context) => const BookmarksScreen(),
               };

@@ -106,6 +106,25 @@ class CheckInPermissionTests(TestCase):
         self.submission.refresh_from_db()
         self.assertIsNone(self.submission.checked_in_at)
 
+    def test_qr_scan_hides_attendee_contact_details_from_the_public(self):
+        # A ticket QR is printed and forwarded; anyone holding the string can
+        # scan it, so the endpoint stays open — but the attendee's email and
+        # phone are for door staff only.
+        resp = APIClient().post('/api/verify-qr/', {'qr_data': self.qr}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data['valid'])
+        self.assertNotIn('details', resp.data)
+
+    def test_qr_scan_gives_staff_the_attendee_details(self):
+        staff = User.objects.create_user('door', 'door@example.com', 'P@ssw0rd!x', is_staff=True)
+        staff.profile.is_email_verified = True
+        staff.profile.save()
+        client = APIClient()
+        client.credentials(**_auth_header(staff))
+        resp = client.post('/api/verify-qr/', {'qr_data': self.qr}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['details']['email'], self.attendee.email)
+
     def test_staff_can_check_in_someone_elses_ticket(self):
         staff = User.objects.create_user('staff', 'staff@example.com', 'P@ssw0rd!x', is_staff=True)
         staff.profile.is_email_verified = True

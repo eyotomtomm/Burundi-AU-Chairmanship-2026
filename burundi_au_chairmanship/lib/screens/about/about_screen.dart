@@ -13,6 +13,11 @@ import '../../widgets/ds/ds_widgets.dart';
 /// details, feature list, contact links) is loaded from `/settings/` and
 /// `/about-features/` via [ApiService]; the literals are only the fallback
 /// values shown until — or if — that request completes.
+///
+/// The page holds to one accent. Green carries every interactive and iconic
+/// element; gold appears exactly once, as the rule under the wordmark. The
+/// feature list used to give each row its own colour, which turned the page
+/// into a swatch board and left nothing for the eye to rank.
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
@@ -21,17 +26,20 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  String _description = 'Official application for the Be 4 Africa 2026.';
+  String _description =
+      'The official application of the Republic of Burundi\u2019s African Union '
+      'Chairmanship — carrying the summit\u2019s news, events, publications and '
+      'the voices of the young Africans shaping its agenda.';
   String _summitTheme = AppConstants.summitTheme;
   String _developerName = 'Eyosias Tamene';
   String _developerUrl = 'https://eyosias.dev';
   String _developerRole = 'Lead Developer';
-  String _ownershipText = 'Property of Burundi Embassy in Addis Ababa';
+  String _ownershipText = 'Embassy of the Republic of Burundi in Addis Ababa';
   String _missionTitle = 'Our Mission';
   String _featuresTitle = 'Key Features';
   String _contactWebsite = 'burundi4africa.com';
   String _contactWebsiteUrl = 'https://burundi4africa.com';
-  String _contactEmail = 'info@burundi4africa.com';
+  String _contactEmail = 'info@burundichairship.africa';
   List<Map<String, dynamic>>? _aboutFeatures;
 
   @override
@@ -94,6 +102,7 @@ class _AboutScreenState extends State<AboutScreen> {
     } catch (_) {}
   }
 
+  /// Map icon_name strings from the API to Material icons.
   static IconData _mapIconName(String iconName) {
     const iconMap = <String, IconData>{
       'article': Icons.article_rounded,
@@ -106,16 +115,11 @@ class _AboutScreenState extends State<AboutScreen> {
       'group': Icons.group_rounded,
       'school': Icons.school_rounded,
       'gavel': Icons.gavel_rounded,
+      'forum': Icons.forum_rounded,
+      'photo_library': Icons.photo_library_rounded,
+      'live_tv': Icons.live_tv_rounded,
     };
     return iconMap[iconName] ?? Icons.star_rounded;
-  }
-
-  static Color _parseColor(String hex) {
-    try {
-      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
-    } catch (_) {
-      return const Color(0xFF1EB53A);
-    }
   }
 
   Future<void> _launch(String url) async {
@@ -136,38 +140,28 @@ class _AboutScreenState extends State<AboutScreen> {
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: DsHeader(
-              title: l10n.translate('about'),
-              large: true,
-              bottom: Center(child: _crestLockup(context, l10n)),
-            ),
+            child: DsHeader(title: l10n.translate('about'), large: true),
           ),
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _summitThemeBanner(context),
-                ),
+                _wordmarkCard(context, l10n),
+                _themeQuote(context),
+                DsSectionTitle(_missionTitle),
                 DsCard(
-                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   padding: const EdgeInsets.all(20),
-                  child: _missionCard(context),
+                  child: Text(
+                    _description,
+                    style: Ds.cardBody(context).copyWith(fontSize: 14.5, height: 1.65),
+                  ),
                 ),
                 DsSectionTitle(_featuresTitle),
-                DsTileGroup(children: _featureTiles(context)),
-                DsGroupLabel(l10n.translate('about_credits')),
-                DsCard(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  padding: const EdgeInsets.all(16),
-                  child: _creditsCard(context, l10n),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: _ownershipBanner(context),
-                ),
+                _featureGrid(context),
+                DsSectionTitle(l10n.translate('about_issued_by')),
+                _issuedByCard(context),
+                _credits(context, l10n),
                 DsSectionTitle(l10n.translate('contact_us')),
                 DsTileGroup(
                   children: [
@@ -177,29 +171,23 @@ class _AboutScreenState extends State<AboutScreen> {
                       iconColor: Ds.green,
                       title: _contactWebsite,
                       chevron: false,
-                      trailing: Icon(
-                        Icons.open_in_new_rounded,
-                        size: 16,
-                        color: Ds.muted(context),
-                      ),
+                      trailing: Icon(Icons.open_in_new_rounded,
+                          size: 16, color: Ds.muted(context)),
                       onTap: () => _launch(_contactWebsiteUrl),
                     ),
                     DsTile(
                       icon: Icons.mail_outline_rounded,
-                      iconTint: Ds.goldTintOf(context),
-                      iconColor: Ds.goldInk,
+                      iconTint: Ds.tint(context),
+                      iconColor: Ds.green,
                       title: _contactEmail,
                       chevron: false,
-                      trailing: Icon(
-                        Icons.open_in_new_rounded,
-                        size: 16,
-                        color: Ds.muted(context),
-                      ),
+                      trailing: Icon(Icons.open_in_new_rounded,
+                          size: 16, color: Ds.muted(context)),
                       onTap: () => _launch('mailto:$_contactEmail'),
                     ),
                   ],
                 ),
-                _footer(context, l10n),
+                const SizedBox(height: 28),
               ],
             ),
           ),
@@ -208,116 +196,100 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
-  /// App icon in a gold ring, the app name, the chairmanship year line and
-  /// the build version — the compact, institution-specific replacement for
-  /// the old generic star hero.
-  Widget _crestLockup(BuildContext context, AppLocalizations l10n) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ExcludeSemantics(
-          child: Container(
-            width: 76,
-            height: 76,
-            padding: const EdgeInsets.all(3),
+  /// The identity block: the real B4Africa wordmark rather than the app icon,
+  /// the chairmanship line, and the version. The single gold rule is the only
+  /// place gold appears on the page.
+  Widget _wordmarkCard(BuildContext context, AppLocalizations l10n) {
+    return DsCard(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+      child: Column(
+        children: [
+          // The artwork is drawn on white, so it keeps its own plate in dark
+          // mode instead of sitting on a dark card.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Ds.gold, width: 2.5),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(Ds.rTile),
             ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/icons/icon-180.png',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) => Container(
-                  color: Colors.white,
-                  child: const Icon(
-                    Icons.account_balance_rounded,
-                    color: Ds.green,
-                    size: 32,
-                  ),
+            child: Image.asset(
+              'assets/images/b4africa_logo.png',
+              height: 40,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Text(
+                AppConstants.appName,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Ds.green,
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          AppConstants.appName,
-          style: const TextStyle(
-            fontFamily: 'HeatherGreen',
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
+          const SizedBox(height: 12),
+          // Chairmanship line and version share one row — two stacked bands
+          // with a rule between them was three times the height for the same
+          // two facts.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  l10n.translate('about_chairmanship_year_line'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                    color: Ds.body(context),
+                  ),
+                ),
+              ),
+              Container(
+                width: 3,
+                height: 3,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: const BoxDecoration(
+                  color: Ds.gold,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Text('v${AppConstants.appVersion}', style: Ds.meta(context)),
+            ],
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          l10n.translate('about_chairmanship_year_line'),
-          style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85)),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 3,
-          width: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Ds.gold, Ds.red]),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'v${AppConstants.appVersion}',
-          style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.65)),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _summitThemeBanner(BuildContext context) {
+  /// The summit theme as a pull quote. It used to be a cream-on-gold banner,
+  /// which competed with the wordmark directly above it for attention.
+  Widget _themeQuote(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Ds.goldTintOf(context),
-        borderRadius: BorderRadius.circular(Ds.rTile),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: Ds.green, width: 3)),
       ),
       child: Text(
         _summitTheme,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
+          fontSize: 15,
+          height: 1.5,
           fontStyle: FontStyle.italic,
-          fontSize: 13,
-          height: 1.4,
-          color: Ds.goldInk,
+          fontWeight: FontWeight.w500,
+          color: Ds.ink(context),
         ),
       ),
     );
   }
 
-  Widget _missionCard(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.flag_rounded, size: 20, color: Ds.green),
-            const SizedBox(width: 8),
-            Expanded(child: Text(_missionTitle, style: Ds.sectionTitle(context))),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          _description,
-          style: Ds.cardBody(context).copyWith(fontSize: 14, height: 1.6),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _featureTiles(BuildContext context) {
+  /// Two-column grid, one icon treatment throughout. The API still drives the
+  /// list and the icons; its per-feature `color` is deliberately ignored.
+  Widget _featureGrid(BuildContext context) {
     final langCode = AppLocalizations.of(context).locale.languageCode;
 
-    // Use API features if available, otherwise fall back to defaults.
     final List<Map<String, dynamic>> features;
     if (_aboutFeatures != null && _aboutFeatures!.isNotEmpty) {
       features = _aboutFeatures!.map((f) {
@@ -327,94 +299,195 @@ class _AboutScreenState extends State<AboutScreen> {
         return {
           'icon': _mapIconName(f['icon_name'] as String? ?? 'star'),
           'title': title,
-          'color': _parseColor(f['color'] as String? ?? '#1EB53A'),
         };
       }).toList();
     } else {
+      final l10n = AppLocalizations.of(context);
       features = [
-        {'icon': Icons.article_rounded, 'title': 'News', 'color': Ds.green},
-        {'icon': Icons.event_rounded, 'title': 'Events Calendar', 'color': Ds.red},
-        {'icon': Icons.auto_stories_rounded, 'title': 'Magazine', 'color': Ds.gold},
-        {'icon': Icons.translate_rounded, 'title': 'Translation', 'color': Ds.green},
-        {'icon': Icons.wb_sunny_rounded, 'title': 'Weather', 'color': Ds.gold},
-        {'icon': Icons.account_balance_rounded, 'title': 'Diplomacy', 'color': Ds.red},
+        {'icon': Icons.article_rounded, 'title': l10n.translate('news')},
+        {'icon': Icons.event_rounded, 'title': l10n.translate('events')},
+        {'icon': Icons.auto_stories_rounded, 'title': l10n.translate('magazine')},
+        {'icon': Icons.forum_rounded, 'title': l10n.translate('explore')},
+        {'icon': Icons.translate_rounded, 'title': l10n.translate('translate')},
+        {'icon': Icons.photo_library_rounded, 'title': l10n.translate('gallery')},
       ];
     }
 
-    return [
-      for (final f in features)
-        DsTile(
-          icon: f['icon'] as IconData,
-          iconTint: (f['color'] as Color).withValues(alpha: 0.12),
-          iconColor: f['color'] as Color,
-          title: f['title'] as String,
-          chevron: false,
-        ),
-    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 10.0;
+          final width = (constraints.maxWidth - gap) / 2;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final f in features)
+                SizedBox(
+                  width: width,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Ds.surface(context),
+                      borderRadius: BorderRadius.circular(Ds.rTile),
+                      border: Border.all(color: Ds.hairline(context)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(f['icon'] as IconData, size: 20, color: Ds.green),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            f['title'] as String,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.25,
+                              color: Ds.ink(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
-  Widget _creditsCard(BuildContext context, AppLocalizations l10n) {
-    return Column(
-      children: [
-        Text(l10n.translate('designed_by'), style: Ds.meta(context)),
-        const SizedBox(height: 6),
-        Semantics(
-          button: true,
-          link: true,
-          label: _developerName,
-          child: GestureDetector(
-            onTap: () => _launch(_developerUrl),
-            child: Text(
-              _developerName,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+  /// The Embassy seal and the ownership line. This is the page's institutional
+  /// signature, so it gets a block of its own rather than a grey strip.
+  Widget _issuedByCard(BuildContext context) {
+    return DsCard(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Image.asset(
+              'assets/images/Burundi Embassy in Addis Ababa.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.account_balance_rounded,
                 color: Ds.green,
-                decoration: TextDecoration.underline,
+                size: 28,
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          _developerRole,
-          style: Ds.cardBody(context).copyWith(fontStyle: FontStyle.italic),
-        ),
-      ],
-    );
-  }
-
-  Widget _ownershipBanner(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Ds.subtle(context),
-        borderRadius: BorderRadius.circular(Ds.rTile),
-      ),
-      child: Text(
-        _ownershipText,
-        textAlign: TextAlign.center,
-        style: Ds.meta(context).copyWith(fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  Widget _footer(BuildContext context, AppLocalizations l10n) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 32 + MediaQuery.paddingOf(context).bottom),
-      child: Center(
-        child: Column(
-          children: [
-            const Icon(Icons.public_rounded, size: 22, color: Ds.gold),
-            const SizedBox(height: 6),
-            Text(
-              'B4Africa',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Ds.muted(context)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              _ownershipText,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color: Ds.ink(context),
+              ),
             ),
-            const SizedBox(height: 2),
-            Text('v${AppConstants.appVersion}', style: Ds.meta(context)),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Author credit. A tappable card rather than a line of footer text — the
+  /// name and its link are attribution, not fine print.
+  Widget _credits(BuildContext context, AppLocalizations l10n) {
+    final initials = _developerName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Semantics(
+        button: true,
+        link: true,
+        label: '$_developerName, $_developerRole',
+        child: Material(
+          color: Ds.surface(context),
+          borderRadius: BorderRadius.circular(Ds.rCard),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Ds.rCard),
+            onTap: () => _launch(_developerUrl),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [Ds.greenDeep, Ds.green],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Text(
+                      initials.isEmpty ? '·' : initials,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.translate('designed_by').toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.9,
+                            color: Ds.muted(context),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _developerName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            color: Ds.ink(context),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(_developerRole, style: Ds.meta(context)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.open_in_new_rounded, size: 17, color: Ds.green),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

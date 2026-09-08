@@ -29,6 +29,7 @@ import '../../services/share_service.dart';
 import '../../services/data_saver_service.dart';
 import '../../widgets/app_network_image.dart';
 import '../../l10n/app_localizations.dart';
+import '../../widgets/bookmark_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final EventRegistrationModel event;
@@ -616,7 +617,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 color: Colors.white,
                                 fontSize: 30,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'HeatherGreen',
                                 height: 1.2,
                                 letterSpacing: 0.5,
                                 shadows: [
@@ -706,6 +706,21 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             // Action buttons below the card
             Row(
               children: [
+                Container(
+                  height: 44,
+                  width: 44,
+                  alignment: Alignment.center,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Ds.surface(context),
+                    border: Border.all(color: Ds.outline(context)),
+                    borderRadius: BorderRadius.circular(Ds.rTile),
+                  ),
+                  child: BookmarkButton(
+                    contentType: 'event',
+                    contentId: _event.id,
+                  ),
+                ),
                 Expanded(
                   child: _greetingActionButton(
                     icon: Icons.share_rounded,

@@ -123,6 +123,7 @@ urlpatterns = [
     path('reactions/toggle/', views.toggle_reaction, name='toggle-reaction'),
     path('reactions/', views.get_reactions, name='get-reactions'),
     path('reading-progress/', views.update_reading_progress, name='reading-progress'),
+    path('reading-progress/read/', views.read_articles, name='read-articles'),
     path('trending/', views.trending_content, name='trending-content'),
 
     # Events Features (NEW)
@@ -179,6 +180,7 @@ urlpatterns = [
     path('password-strength/', views.validate_password_strength, name='password-strength'),
     path('explore/notifications/', views.explore_notifications, name='explore-notifications'),
     path('explore/notifications/read/', views.mark_explore_notifications_read, name='explore-notifications-read'),
+    path('widget/feature/', views.widget_feature, name='widget-feature'),
     path('explore/tags/', views.trending_tags, name='trending-tags'),
     path('discussion-topics/', views.discussion_topics, name='discussion-topics'),
     path('explore/terms/', views.explore_terms, name='explore-terms'),

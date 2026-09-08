@@ -108,7 +108,7 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   String get create_account_text => 'Create your account to get started';
 
   @override
-  String get au_chairmanship => 'Be 4 Africa 2025';
+  String get au_chairmanship => 'AU Chairmanship';
 
   @override
   String get burundi_chairmanship => 'Be 4 Africa';
@@ -285,7 +285,7 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   String get african_union => 'African Union';
 
   @override
-  String get chairmanship_2025 => 'Chairmanship 2025';
+  String get chairmanship_2025 => 'Chairmanship';
 
   @override
   String get live => 'LIVE';
@@ -553,7 +553,7 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
 
   @override
   String get onboarding_welcome_desc =>
-      'Your companion for the African Union Chairmanship 2026. Let\'s show you around!';
+      'Your companion for the African Union Chairmanship. Let\'s show you around!';
 
   @override
   String get onboarding_news => 'News';
@@ -1315,6 +1315,12 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
 
   @override
   String get more_subscribed_toast => 'Subscribed to Monthly Newsletter!';
+
+  @override
+  String get more_security => 'Security';
+
+  @override
+  String get more_about_app => 'About this app';
 
   @override
   String get more_support => 'Support';
@@ -2945,7 +2951,7 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   String get priority_label => 'PRIORITY';
 
   @override
-  String get about_chairmanship_year_line => 'African Union Chairmanship 2026';
+  String get about_chairmanship_year_line => 'African Union Chairmanship';
 
   @override
   String get about_credits => 'Credits';
@@ -3003,4 +3009,236 @@ class AppLocalizationsGeneratedEn extends AppLocalizationsGenerated {
   @override
   String get vr_why_identity_note =>
       'We ask for these details to match your application to your identity document and prevent impersonation.';
+
+  @override
+  String get about_issued_by => 'Issued by';
+
+  @override
+  String get explore => 'Explore';
+
+  @override
+  String get read => 'Read';
+
+  @override
+  String get onboarding_explore => 'Join the conversation';
+
+  @override
+  String get onboarding_explore_desc =>
+      'Explore is where the debate happens. Post your view on the agenda, answer the questions put to young Africans, and follow the people shaping them.';
+
+  @override
+  String get guide_new_badge => 'New';
+
+  @override
+  String get guide_step_of => 'of';
+
+  @override
+  String get guide_back => 'Back';
+
+  @override
+  String get more_verif_pending => 'Verification pending';
+
+  @override
+  String get more_verif_in_review => 'Verification in review';
+
+  @override
+  String get more_verif_pending_sub =>
+      'Your request is waiting to be picked up';
+
+  @override
+  String get more_verif_review_sub => 'Our team is looking at your request';
+
+  @override
+  String get more_verif_pending_msg =>
+      'Your verification request has been received. We will let you know as soon as it is reviewed.';
+
+  @override
+  String get more_verif_review_msg =>
+      'Our team is reviewing your verification request. You will be notified of the decision.';
+
+  @override
+  String get more_online => 'Online';
+
+  @override
+  String get more_offline => 'Offline';
+
+  @override
+  String get more_live_agent_online_sub => 'An agent is available to chat now';
+
+  @override
+  String get more_live_agent_offline_sub =>
+      'Leave a message and we will reply by email';
+
+  @override
+  String get more_subscribed => 'Subscribed';
+
+  @override
+  String get more_subscribe_sub => 'Subscribe to receive our monthly digest';
+
+  @override
+  String get auth_show_password => 'Show password';
+
+  @override
+  String get auth_hide_password => 'Hide password';
+
+  @override
+  String get auth_need_verify_email => 'Verify your email to continue';
+
+  @override
+  String get auth_sent_code_to => 'We sent a code to';
+
+  @override
+  String get sec_show_password => 'Show password';
+
+  @override
+  String get sec_hide_password => 'Hide password';
+
+  @override
+  String get sec_failed => 'Failed';
+
+  @override
+  String get prof_dob_updated => 'Date of birth updated';
+
+  @override
+  String get prof_nationality_updated => 'Nationality updated';
+
+  @override
+  String get prof_update_failed_short => 'Update failed';
+
+  @override
+  String get rs_unlike => 'Unlike';
+
+  @override
+  String get rs_checkin_ready => 'Ready to check in';
+
+  @override
+  String get rs_checkin_pending => 'Check-in not open yet';
+
+  @override
+  String get rs_checkin_action => 'Check in';
+
+  @override
+  String get rs_checkin_done => 'Checked in';
+
+  @override
+  String get rs_checkin_already => 'You are already checked in for this event.';
+
+  @override
+  String get rs_checkin_success => 'Checked in. Enjoy the event!';
+
+  @override
+  String get rs_notif_no_announcements => 'No announcements yet';
+
+  @override
+  String get rs_notif_announcements_hint =>
+      'Updates from the Chairmanship will appear here.';
+
+  @override
+  String get rs_notif_no_system => 'Nothing from the app yet';
+
+  @override
+  String get rs_notif_system_hint =>
+      'Account and delivery notices will appear here.';
+
+  @override
+  String get scan_credential => 'Credential';
+
+  @override
+  String get scan_ticket => 'Ticket';
+
+  @override
+  String get scan_result => 'Scan result';
+
+  @override
+  String get scan_credential_result => 'Credential result';
+
+  @override
+  String get scan_invalid => 'INVALID';
+
+  @override
+  String get scan_time => 'time';
+
+  @override
+  String get scan_look_up => 'Look up';
+
+  @override
+  String get scan_looking_up => 'Looking up...';
+
+  @override
+  String get scan_searching => 'Searching...';
+
+  @override
+  String get scan_dup_title => 'Duplicate scan detected';
+
+  @override
+  String get scan_multi_dup_title => 'Multiple duplicate scans';
+
+  @override
+  String get sup_you => 'You';
+
+  @override
+  String get sup_support_team => 'Support team';
+
+  @override
+  String get sup_type_message => 'Type a message...';
+
+  @override
+  String get sup_reply_reopen => 'Reply to reopen this ticket...';
+
+  @override
+  String get sup_ticket_not_found => 'Ticket not found';
+
+  @override
+  String get sup_failed_load_conversation => 'Could not load this conversation';
+
+  @override
+  String get w_gold_badge_verified => 'Gold badge verified';
+
+  @override
+  String get w_blue_badge_verified => 'Blue badge verified';
+
+  @override
+  String get w_comment_banned => 'You can no longer comment';
+
+  @override
+  String get w_language_warning => 'Please keep the conversation respectful.';
+
+  @override
+  String get ydc_download_pdf => 'Download PDF';
+
+  @override
+  String get ydc_downloading => 'Downloading...';
+
+  @override
+  String get ydd_intro_upload =>
+      'Upload the documents below to complete your application.';
+
+  @override
+  String get ydd_intro_reviewing =>
+      'Your documents are with our team. Nothing more to do for now.';
+
+  @override
+  String get ydd_intro_resubmit =>
+      'Some documents need replacing. Re-upload them and submit again.';
+
+  @override
+  String get ydd_reupload => 'Re-upload';
+
+  @override
+  String get ydd_resubmit_documents => 'Re-submit documents';
+
+  @override
+  String get ydd_submit_all => 'Submit all documents';
+
+  @override
+  String get ydd_status_not_uploaded => 'Not uploaded';
+
+  @override
+  String get ydd_status_photo_required => 'Photo required';
+
+  @override
+  String get w_bookmark => 'Bookmark';
+
+  @override
+  String get w_bookmarked => 'Bookmarked';
 }

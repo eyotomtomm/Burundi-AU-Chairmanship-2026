@@ -1523,6 +1523,13 @@ class ApiService {
     return await _post('discussions/$discussionId/repost/', {'content': content}, auth: true);
   }
 
+  /// Ids of articles this reader has already been through.
+  Future<List<int>> getReadArticleIds() async {
+    final data = await _get('reading-progress/read/', auth: true);
+    final ids = (data is Map ? data['article_ids'] : null) as List<dynamic>?;
+    return (ids ?? []).map((e) => e is int ? e : int.tryParse('$e')).whereType<int>().toList();
+  }
+
   Future<Map<String, dynamic>> getUserProfile(int userId) async {
     return await _get('users/$userId/profile/', auth: true);
   }

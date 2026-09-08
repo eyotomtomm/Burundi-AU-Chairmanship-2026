@@ -438,8 +438,10 @@ class _KaryendaDrumAnimatedState extends State<KaryendaDrumAnimated>
                   decoration: BoxDecoration(
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.auGold
-                            .withValues(alpha: 0.16 + 0.34 * hit),
+                        // White, not gold: the drum's own colours are the
+                        // flag's, and a gold halo tinted every one of them.
+                        color: Colors.white
+                            .withValues(alpha: 0.14 + 0.30 * hit),
                         blurRadius: 26 + 28 * hit,
                         spreadRadius: 4 + 7 * hit,
                       ),
@@ -488,7 +490,7 @@ class _DrumRipplePainter extends CustomPainter {
       c,
       size.width * (0.22 + 0.32 * k),
       Paint()
-        ..color = AppColors.auGold.withValues(alpha: (1 - k) * 0.32 * strength)
+        ..color = Colors.white.withValues(alpha: (1 - k) * 0.30 * strength)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.5 + 2.5 * (1 - k),
     );
@@ -772,7 +774,7 @@ class _KaryendaDrumPainter extends CustomPainter {
     final lacingCenterY = lacingY + lacingH / 2;
     final circleR = 4.0;
     final circleStrokePaint = Paint()
-      ..color = AppColors.auGold
+      ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     // Left circle - inside the lacing, left third

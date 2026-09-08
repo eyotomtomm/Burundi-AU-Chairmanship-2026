@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -125,6 +126,27 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     return (_editions ?? []).map((e) => e.publishDate.year).toSet();
   }
 
+  /// Months that actually have an issue, narrowed to the selected year when
+  /// there is one. Offering all twelve every time meant most taps landed on an
+  /// empty list.
+  Set<int> get _availableMonths {
+    return (_editions ?? [])
+        .where((e) => _selectedYear == null || e.publishDate.year == _selectedYear)
+        .map((e) => e.publishDate.month)
+        .toSet();
+  }
+
+  /// Picking a year can strand a month selection on a month that year has no
+  /// issue for, which would show an empty list with two filters lit up.
+  void _selectYear(int? year) {
+    setState(() {
+      _selectedYear = year;
+      if (_selectedMonth != null && !_availableMonths.contains(_selectedMonth)) {
+        _selectedMonth = null;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -225,33 +247,43 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     );
   }
 
-  /// Year / month filters as design-system pills.
+  /// Year / month filters as design-system pills. Only periods that have an
+  /// issue behind them are offered.
   Widget _buildFilterChips(String langCode) {
     final years = _availableYears.toList()..sort((a, b) => b.compareTo(a));
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = _availableMonths.toList()..sort();
+    final monthNames = langCode == 'fr'
+        ? const ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+                 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+        : const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // One year and one month is not a filter, it is a label — hide the row.
+    if (years.length < 2 && months.length < 2) return const SizedBox.shrink();
+
     return SizedBox(
       height: 46,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         children: [
-          for (final year in years)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: DsFilterChip('$year',
-                  selected: _selectedYear == year,
-                  onTap: () => setState(
-                      () => _selectedYear = _selectedYear == year ? null : year)),
-            ),
-          for (var i = 0; i < months.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: DsFilterChip(months[i],
-                  selected: _selectedMonth == i + 1,
-                  onTap: () => setState(() =>
-                      _selectedMonth = _selectedMonth == i + 1 ? null : i + 1)),
-            ),
+          if (years.length > 1)
+            for (final year in years)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: DsFilterChip('$year',
+                    selected: _selectedYear == year,
+                    onTap: () => _selectYear(_selectedYear == year ? null : year)),
+              ),
+          if (months.length > 1)
+            for (final month in months)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: DsFilterChip(monthNames[month - 1],
+                    selected: _selectedMonth == month,
+                    onTap: () => setState(() =>
+                        _selectedMonth = _selectedMonth == month ? null : month)),
+              ),
         ],
       ),
     );
@@ -295,9 +327,10 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.78,
+              mainAxisSpacing: 20,
+              crossAxisSpacing: 14,
+              // A 3:4 cover plus two caption lines.
+              childAspectRatio: 0.56,
               children: [
                 for (final mag in past) _buildMagazineCard(context, mag, langCode),
               ],
@@ -309,6 +342,15 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
     );
   }
 
+  /// The artwork at its own aspect, nothing cropped away.
+  Widget _coverContained(MagazineEdition magazine) => AppNetworkImage(
+        imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
+        fit: BoxFit.contain,
+        placeholder: (_, _) => const SizedBox.shrink(),
+        errorWidget: (_, _, _) =>
+            const DsImagePlaceholder(radius: 0, icon: Icons.auto_stories_rounded),
+      );
+
   Widget _cover(MagazineEdition magazine) => AppNetworkImage(
         imageUrl: Environment.fixMediaUrl(magazine.coverImageUrl),
         fit: BoxFit.cover,
@@ -318,122 +360,216 @@ class _MagazineTabState extends State<MagazineTab> with SingleTickerProviderStat
             const DsImagePlaceholder(radius: 0, icon: Icons.auto_stories_rounded),
       );
 
+  /// A cover is a designed object; the old hero cropped it to a 210px
+  /// landscape strip, which threw away the part people recognise. Here it runs
+  /// at magazine proportions with the title set over its foot.
   Widget _buildFeaturedHero(
       BuildContext context, MagazineEdition magazine, String langCode) {
     final fr = langCode == 'fr';
-    return DsCard(
-      margin: const EdgeInsets.all(16),
-      featured: true,
-      clip: true,
-      onTap: () => _openMagazineDetail(context, magazine),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 210,
-            width: double.infinity,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _cover(magazine),
-                Positioned(
-                  left: 14,
-                  top: 14,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Ds.gold,
-                      borderRadius: BorderRadius.circular(Ds.rPill),
+          GestureDetector(
+            onTap: () => _openMagazineDetail(context, magazine),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: _coverPlate(
+                    magazine,
+                    radius: Ds.rCard,
+                    overlay: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          magazine.getTitle(langCode),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            height: 1.22,
+                            letterSpacing: -0.3,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${DateFormat('MMMM yyyy', langCode).format(magazine.publishDate)}  ·  EN / FR',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: Colors.white.withValues(alpha: 0.86),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      fr ? 'NOUVEAU NUMÉRO' : 'NEW ISSUE',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                          color: Ds.goldInkDeep),
-                    ),
+                    badge: fr ? 'NOUVEAU NUMÉRO' : 'NEW ISSUE',
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  magazine.getTitle(langCode),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                      letterSpacing: -0.2,
-                      color: Ds.ink(context)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: DsPrimaryButton(
+                  fr ? 'Lire' : 'Read now',
+                  onTap: () => _openMagazineDetail(context, magazine),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${DateFormat('MMMM yyyy').format(magazine.publishDate)} · EN / FR',
-                  style: TextStyle(fontSize: 13, color: Ds.body(context)),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    DsPrimaryButton(fr ? 'Lire' : 'Read now',
-                        expand: false,
-                        onTap: () => _openMagazineDetail(context, magazine)),
-                    if (magazine.hasPdf) ...[
-                      const SizedBox(width: 8),
-                      DsOutlineButton(fr ? 'Hors ligne' : 'Offline',
-                          icon: Icons.download_rounded,
-                          onTap: () => _openMagazineDetail(context, magazine)),
-                    ],
-                  ],
+              ),
+              if (magazine.hasPdf) ...[
+                const SizedBox(width: 10),
+                DsOutlineButton(
+                  fr ? 'Hors ligne' : 'Offline',
+                  icon: Icons.download_rounded,
+                  onTap: () => _openMagazineDetail(context, magazine),
                 ),
               ],
-            ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  /// One cover, drawn as a physical issue: full bleed at its own aspect, a
+  /// darkening foot so text over it stays readable whatever the artwork does,
+  /// and a spine edge down the binding side.
+  Widget _coverPlate(
+    MagazineEdition magazine, {
+    required double radius,
+    Widget? overlay,
+    String? badge,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // The editions are not all portrait covers — several are landscape
+            // event posters — so cropping to fill sliced the titles off at both
+            // edges. The artwork is shown whole, over a blurred copy of itself
+            // so the frame is still filled rather than letterboxed on grey.
+            ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              child: _cover(magazine),
+            ),
+            Container(color: Colors.black.withValues(alpha: 0.18)),
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: _coverContained(magazine),
+            ),
+            // Spine: a narrow shaded band on the binding edge.
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 9,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withValues(alpha: 0.28),
+                      Colors.black.withValues(alpha: 0.02),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (overlay != null)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.10),
+                        Colors.black.withValues(alpha: 0.78),
+                      ],
+                      stops: const [0.42, 0.62, 1.0],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    child: overlay,
+                  ),
+                ),
+              ),
+            if (badge != null)
+              Positioned(
+                left: 14,
+                top: 14,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Ds.gold,
+                    borderRadius: BorderRadius.circular(Ds.rPill),
+                  ),
+                  child: Text(
+                    badge,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                      color: Ds.goldInkDeep,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMagazineCard(
       BuildContext context, MagazineEdition magazine, String langCode) {
-    return DsCard(
-      clip: true,
+    return GestureDetector(
       onTap: () => _openMagazineDetail(context, magazine),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 120, width: double.infinity, child: _cover(magazine)),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Flexible(
-                    child: Text(
-                      magazine.getTitle(langCode),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          height: 1.3,
-                          color: Ds.ink(context)),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(DateFormat('MMM yyyy').format(magazine.publishDate),
-                      style: TextStyle(fontSize: 11, color: Ds.muted(context))),
-                ],
-              ),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
+              child: _coverPlate(magazine, radius: Ds.rTile),
             ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            magazine.getTitle(langCode),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              height: 1.28,
+              color: Ds.ink(context),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            DateFormat('MMM yyyy', langCode).format(magazine.publishDate),
+            style: TextStyle(fontSize: 11, color: Ds.muted(context)),
           ),
         ],
       ),

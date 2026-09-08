@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
 from django.core.files.base import ContentFile
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
@@ -426,6 +427,24 @@ class Category(models.Model):
         return self.name
 
 
+class ArticleQuerySet(models.QuerySet):
+    """Visibility rules shared by every public article query."""
+
+    def public(self, now=None):
+        """Only what a reader may see: published, live, not yet expired.
+
+        `status` is the current workflow field and `is_draft` the legacy flag —
+        an article can carry either, so both are checked. Mirrors
+        `Article.is_publicly_visible`.
+        """
+        now = now or timezone.now()
+        return self.filter(is_draft=False, status='published').exclude(
+            scheduled_publish_at__gt=now,
+        ).exclude(
+            expires_at__lt=now,
+        )
+
+
 class Article(models.Model):
     CONTENT_TYPE_CHOICES = [('article', 'Article'), ('news', 'News')]
 
@@ -461,6 +480,8 @@ class Article(models.Model):
     # otherwise Postgres will not use the GIN index.
     SEARCH_FIELDS = ('title', 'title_fr', 'content', 'content_fr')
 
+    objects = ArticleQuerySet.as_manager()
+
     class Meta:
         ordering = ['-publish_date', '-id']
         indexes = [
@@ -495,7 +516,11 @@ class Article(models.Model):
 
     @property
     def is_publicly_visible(self):
-        """Check if article should be visible in public API."""
+        """Check if article should be visible in public API.
+
+        The queryset form of this rule is `Article.objects.public()`; keep the
+        two in step.
+        """
         if self.status in ('draft', 'scheduled', 'archived'):
             return False
         return not self.is_draft and not self.is_scheduled and not self.is_expired
@@ -1694,7 +1719,7 @@ class AppSettings(models.Model):
     about_features_title_fr = models.CharField(max_length=100, blank=True, default='Fonctionnalit\u00e9s', help_text='About page features section title (French)')
     contact_website = models.CharField(max_length=200, blank=True, default='burundi4africa.com', help_text='Contact website display name')
     contact_website_url = models.URLField(blank=True, default='https://burundi4africa.com', help_text='Contact website URL')
-    contact_email = models.EmailField(blank=True, default='info@burundi4africa.com', help_text='Contact email address')
+    contact_email = models.EmailField(blank=True, default='info@burundichairship.africa', help_text='Contact email address')
 
     # QR code configuration
     QR_CODE_MODE_CHOICES = [
@@ -5765,6 +5790,20 @@ class NewsSource(models.Model):
         help_text='Category applied to articles approved from this source',
     )
     is_active = models.BooleanField(default=True)
+    auto_fetch = models.BooleanField(
+        default=False,
+        help_text='On = fetch this source once a day automatically, into the same review queue.',
+    )
+    auto_fetch_hour = models.PositiveSmallIntegerField(
+        default=6,
+        validators=[MinValueValidator(0), MaxValueValidator(23)],
+        help_text='Hour of the day (0-23, server local time) the daily fetch runs.',
+    )
+    auto_fetch_days = models.PositiveSmallIntegerField(
+        default=2,
+        validators=[MinValueValidator(1), MaxValueValidator(90)],
+        help_text='How far back each daily fetch looks, in days. 2 covers a missed run.',
+    )
     last_fetched_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

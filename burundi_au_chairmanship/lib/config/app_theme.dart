@@ -116,22 +116,18 @@ class AppTheme {
     textTheme: TextTheme(
       displayLarge: const TextStyle(
         fontSize: 32,
-        fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       displayMedium: const TextStyle(
         fontSize: 28,
-        fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       headlineLarge: const TextStyle(
         fontSize: 24,
-        fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       headlineMedium: const TextStyle(
         fontSize: 20,
-        fontFamily: 'HeatherGreen',
         color: AppColors.lightText,
       ),
       titleLarge: const TextStyle(
@@ -255,22 +251,18 @@ class AppTheme {
     textTheme: TextTheme(
       displayLarge: const TextStyle(
         fontSize: 32,
-        fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       displayMedium: const TextStyle(
         fontSize: 28,
-        fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       headlineLarge: const TextStyle(
         fontSize: 24,
-        fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       headlineMedium: const TextStyle(
         fontSize: 20,
-        fontFamily: 'HeatherGreen',
         color: AppColors.darkText,
       ),
       titleLarge: const TextStyle(

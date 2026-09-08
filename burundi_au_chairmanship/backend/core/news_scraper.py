@@ -14,8 +14,9 @@ import logging
 import os
 import re
 import subprocess
-from datetime import datetime, timezone as dt_timezone
-from urllib.parse import urlparse
+import tempfile
+from datetime import datetime, timedelta, timezone as dt_timezone
+from urllib.parse import quote, urlparse
 from xml.etree import ElementTree
 
 import requests
@@ -27,8 +28,8 @@ from .models import ScrapedItem
 
 logger = logging.getLogger(__name__)
 
-# gallery-dl walks the timeline newest-first. We stop paging once we're past
-# the window, but cap the walk so an old date range can't run forever.
+# gallery-dl emits one row per media file, so this caps files, not posts.
+# Measured against a real account: 400 files ≈ 100 posts.
 MAX_MEDIA_ITEMS = 400
 FETCH_TIMEOUT = 240
 IMAGE_TIMEOUT = 20
@@ -37,6 +38,52 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 class ScrapeError(Exception):
     """A source could not be fetched; the message is shown to the admin."""
+
+
+_COOKIE_TMP = None
+
+
+def x_cookies_path():
+    """Path to a Netscape cookies.txt for X, or '' when none is configured.
+
+    Two ways to supply it, because our host has no persistent disk:
+
+    * ``X_COOKIES_FILE`` — a path. Fine locally; on App Platform an uploaded
+      file is wiped by the next deploy.
+    * ``X_COOKIES`` — the file's *contents*, held as an env-var secret and
+      written to a private temp file on first use. This is the one that
+      survives a redeploy.
+
+    Reading a public account needs a logged-in session, not ownership of the
+    account being read, so a throwaway X account is the right thing to use.
+    """
+    global _COOKIE_TMP
+
+    path = os.environ.get('X_COOKIES_FILE', '').strip()
+    if path:
+        if os.path.exists(path):
+            return path
+        logger.warning('scraper: X_COOKIES_FILE=%s does not exist; ignoring.', path)
+
+    blob = os.environ.get('X_COOKIES', '')
+    if not blob.strip():
+        return ''
+    if _COOKIE_TMP and os.path.exists(_COOKIE_TMP):
+        return _COOKIE_TMP
+
+    # Netscape format is tab-separated. Env vars routinely arrive with those
+    # tabs and newlines backslash-escaped, which silently yields an unusable
+    # jar, so undo that before writing.
+    text = blob.replace('\\t', '\t').replace('\\n', '\n')
+    if not text.endswith('\n'):
+        text += '\n'
+    fd, _COOKIE_TMP = tempfile.mkstemp(prefix='x_cookies_', suffix='.txt')
+    try:
+        os.write(fd, text.encode('utf-8'))
+    finally:
+        os.close(fd)
+    os.chmod(_COOKIE_TMP, 0o600)  # session token — keep it off other users' eyes
+    return _COOKIE_TMP
 
 
 # ─────────────────────────────────────────────────────────────
@@ -109,17 +156,38 @@ def _download_image(url):
 # ─────────────────────────────────────────────────────────────
 
 def _fetch_x(handle, date_from, date_to):
-    """Read a public X timeline via gallery-dl's guest token."""
+    """Read an X account through gallery-dl.
+
+    Two routes, because X gates them differently:
+
+    * With ``X_COOKIES_FILE`` set — the *search* route, which honours
+      ``since:``/``until:`` server-side. Chronological, date-bounded and
+      complete: this is the one to use for a scheduled daily fetch.
+    * Without cookies — the public *timeline* route, readable with a guest
+      token (free, no login). Verified working, but X hands a guest only a
+      shallow, unordered slice of the account: roughly a hundred posts, and
+      in practice nothing recent. Fine for a one-off backfill, not enough to
+      catch yesterday's post — hence the warning the admin sees.
+    """
     handle = handle.strip().lstrip('@')
-    url = f'https://x.com/{handle}/timeline'
+    cookies_file = x_cookies_path()
+
+    if cookies_file:
+        # since: is inclusive, until: is exclusive — push it a day out so the
+        # last day of the admin's range is actually covered.
+        query = (
+            f'from:{handle} '
+            f'since:{date_from.date().isoformat()} '
+            f'until:{(date_to.date() + timedelta(days=1)).isoformat()}'
+        )
+        url = f'https://x.com/search?q={quote(query)}&f=live'
+    else:
+        url = f'https://x.com/{handle}/timeline'
+
     cmd = [
         'gallery-dl', '--no-download', '--dump-json',
         '--range', f'1-{MAX_MEDIA_ITEMS}', url,
     ]
-    # X dropped guest-token access to timelines, so a logged-in session is now
-    # required even for public accounts. Point X_COOKIES_FILE at a Netscape
-    # cookies.txt exported from a browser signed in to our own account.
-    cookies_file = os.environ.get('X_COOKIES_FILE', '').strip()
     if cookies_file:
         cmd[1:1] = ['--cookies', cookies_file]
     try:
@@ -149,10 +217,12 @@ def _fetch_x(handle, date_from, date_to):
             err = row[-1].get('error', '')
             if err == 'AuthRequired':
                 raise ScrapeError(
-                    'X no longer allows reading timelines without a login, even for '
-                    'public accounts. Export a cookies.txt from a browser signed in '
-                    'to the account and set X_COOKIES_FILE to its path on the server. '
-                    'RSS sources keep working without any of this.'
+                    'X refused this request without a login. Export a cookies.txt '
+                    'from a browser signed in to any X account — it does not have to '
+                    'be the account being read — and set X_COOKIES_FILE to its path '
+                    'on the server. That also switches this source to the '
+                    'date-bounded search route, which is the only one that reliably '
+                    'returns recent posts. RSS sources need none of this.'
                 )
             raise ScrapeError(f'X refused the request: {err or row[-1]}')
 

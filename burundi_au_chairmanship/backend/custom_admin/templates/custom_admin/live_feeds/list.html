@@ -133,6 +133,9 @@
 
                     <!-- Actions -->
                     <div class="flex items-center gap-2 pt-4 border-t border-outline-variant">
+                        <a href="{% url 'custom_admin:comment_engagement' %}?type=livefeed&amp;content={{ feed.pk }}" class="inline-flex items-center justify-center p-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg transition-colors duration-200" title="Likes &amp; comments">
+                            <span class="material-symbols-outlined text-lg">add_reaction</span>
+                        </a>
                         <a href="{% url 'custom_admin:live_feed_edit' feed.pk %}"
                            class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg transition-colors duration-200">
                             <span class="material-symbols-outlined text-lg">edit</span>

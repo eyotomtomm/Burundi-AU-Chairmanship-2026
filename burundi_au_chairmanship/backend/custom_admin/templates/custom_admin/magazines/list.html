@@ -97,6 +97,9 @@
                         </div>
 
                         <div class="flex items-center justify-between pt-4 border-t border-outline-variant">
+                            <a href="{% url 'custom_admin:comment_engagement' %}?type=magazine&amp;content={{ mag.pk }}" class="inline-flex items-center gap-1 text-secondary hover:text-primary font-medium transition-colors" title="Likes &amp; comments">
+                                <span class="material-symbols-outlined text-sm">add_reaction</span>
+                            </a>
                             <a href="{% url 'custom_admin:magazine_edit' mag.pk %}" class="inline-flex items-center gap-1 text-secondary hover:text-primary font-medium transition-colors">
                                 <span class="material-symbols-outlined text-sm">edit</span>
                                 Edit

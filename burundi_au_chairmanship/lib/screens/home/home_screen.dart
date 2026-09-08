@@ -132,7 +132,8 @@ class _HomeScreenState extends State<HomeScreen>
     // flag disagrees with the backend verification status.
     // - User just got approved / admin-verified  → set badge to true
     // - Cached isVerified is stale (e.g. pending) → correct badge to false
-    final backendVerified = status == 'approved' || verificationProvider.isProfileVerified;
+    final backendVerified =
+        status == 'approved' || verificationProvider.isProfileVerified;
     if (backendVerified != authProvider.isVerified) {
       await authProvider.refreshProfile();
     }
@@ -141,7 +142,8 @@ class _HomeScreenState extends State<HomeScreen>
     final shouldShow = await verificationProvider.shouldShowStatusPopup();
     if (!shouldShow || !mounted || _showingVerificationPopup) return;
 
-    final isAdminVerified = verificationProvider.isProfileVerified && status == null;
+    final isAdminVerified =
+        verificationProvider.isProfileVerified && status == null;
 
     if (status == 'approved' || isAdminVerified) {
       // Mark as shown BEFORE displaying the dialog to prevent duplicate
@@ -153,10 +155,7 @@ class _HomeScreenState extends State<HomeScreen>
       final badgeType = verificationProvider.badgeType ?? 'BLUE';
       HapticService.success();
       ConfettiOverlay.show(context);
-      await showVerificationApprovedDialog(
-        context,
-        badgeType: badgeType,
-      );
+      await showVerificationApprovedDialog(context, badgeType: badgeType);
 
       _showingVerificationPopup = false;
 
@@ -272,9 +271,10 @@ class _HomeScreenState extends State<HomeScreen>
   /// Check for app updates on home screen load
   Future<void> _checkForAppUpdate() async {
     // Don't compare against Remote Config defaults before the first fetch lands.
-    await RemoteConfigService()
-        .ensureFetched()
-        .timeout(const Duration(seconds: 3), onTimeout: () {});
+    await RemoteConfigService().ensureFetched().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {},
+    );
     if (!mounted) return;
     final langCode = Localizations.localeOf(context).languageCode;
     await AppUpdateDialog.check(
@@ -323,33 +323,65 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           const OfflineBanner(),
           Expanded(
-            // IndexedStack keeps every tab alive, so switching back is instant
-            // and scroll positions survive; the fade/rise is layered on top so
-            // the swap reads as a transition without costing a rebuild.
-            child: FadeTransition(
-              opacity: CurvedAnimation(parent: _tabAnim, curve: Curves.easeOut),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 0.012),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(parent: _tabAnim, curve: Curves.easeOutCubic)),
-                child: IndexedStack(
-                  index: _currentIndex,
-                  children: [
-                    MagazineTab(onBackToHome: () => _goToTab(2)),
-                    NewsScreen(isTab: true, onBackToHome: () => _goToTab(2)),
-                    HomeTab(onSwitchTab: _goToTab),
-                    // The stack keeps every tab mounted, so a tab that
-                    // animates would keep animating off-screen. TickerMode
-                    // stops it, and the tab watches this to park its timers.
-                    TickerMode(
-                      enabled: _currentIndex == 3,
-                      child: ExploreTab(onBackToHome: () => _goToTab(2)),
+            child: Stack(
+              children: [
+                // IndexedStack keeps every tab alive, so switching back is
+                // instant and scroll positions survive; the fade/rise is
+                // layered on top so the swap reads as a transition without
+                // costing a rebuild.
+                FadeTransition(
+                  opacity: CurvedAnimation(
+                    parent: _tabAnim,
+                    curve: Curves.easeOut,
+                  ),
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0, 0.012),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: _tabAnim,
+                            curve: Curves.easeOutCubic,
+                          ),
+                        ),
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: [
+                        MagazineTab(onBackToHome: () => _goToTab(2)),
+                        NewsScreen(
+                          isTab: true,
+                          onBackToHome: () => _goToTab(2),
+                        ),
+                        HomeTab(onSwitchTab: _goToTab),
+                        // The stack keeps every tab mounted, so a tab that
+                        // animates would keep animating off-screen. TickerMode
+                        // stops it, and the tab watches this to park its timers.
+                        TickerMode(
+                          enabled: _currentIndex == 3,
+                          child: ExploreTab(onBackToHome: () => _goToTab(2)),
+                        ),
+                        MoreTab(),
+                      ],
                     ),
-                    MoreTab(),
-                  ],
+                  ),
                 ),
-              ),
+                // Every tab header scrolls away with its content, so without
+                // this the list runs under the clock and the Dynamic Island.
+                // Green: invisible against a header at rest, and it holds the
+                // status-bar inset once that header has scrolled off.
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: MediaQuery.paddingOf(context).top,
+                      color: Ds.green,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

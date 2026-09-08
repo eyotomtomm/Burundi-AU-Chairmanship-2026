@@ -60,15 +60,29 @@ Set<String> _arbKeys(File file) {
   return data.keys.where((k) => !k.startsWith('@')).toSet();
 }
 
-/// Every `translate('...')` key in lib/, mapped to the files using it.
+/// String literals that sit inside a `translate(...)` call but are comparison
+/// values rather than keys, e.g. `translate(badge == 'GOLD' ? a : b)`.
+const _notKeys = {'GOLD', 'BLUE', 'GREEN', 'hint', 'label', 'denied', 'value'};
+
+/// Every `translate(...)` key in lib/, mapped to the files using it.
+///
+/// Matches the whole argument list rather than a literal glued to the paren,
+/// because keys are routinely chosen inline:
+/// `translate(pending ? 'more_verif_pending' : 'more_verif_in_review')`.
+/// A tighter pattern missed 64 keys, which then rendered as raw text on screen.
 Map<String, Set<String>> _usedKeys(Directory root) {
-  final pattern = RegExp(r"\.translate\('([^']+)'\)");
+  final call = RegExp(r"\.translate\(([^;]{0,200}?)\)", dotAll: true);
+  final literal = RegExp(r"'([A-Za-z][A-Za-z0-9_]{2,})'");
   final out = <String, Set<String>>{};
   for (final entry in Directory('${root.path}/lib').listSync(recursive: true)) {
     if (entry is! File || !entry.path.endsWith('.dart')) continue;
     if (entry.path.contains('/l10n/')) continue;
-    for (final m in pattern.allMatches(entry.readAsStringSync())) {
-      out.putIfAbsent(m.group(1)!, () => <String>{}).add(entry.uri.pathSegments.last);
+    for (final m in call.allMatches(entry.readAsStringSync())) {
+      for (final k in literal.allMatches(m.group(1)!)) {
+        final key = k.group(1)!;
+        if (_notKeys.contains(key)) continue;
+        out.putIfAbsent(key, () => <String>{}).add(entry.uri.pathSegments.last);
+      }
     }
   }
   return out;

@@ -44,17 +44,37 @@ services:
         value: "api.burundi4africa.com,burundi4africa.com,www.burundi4africa.com,burundi-au-api-mgo34.ondigitalocean.app"
       - key: SITE_URL
         value: "https://burundi4africa.com"
+      # OTP and system mail send from the chairmanship domain, whose SMTP is
+      # SPF/DKIM-aligned for that From address. Gmail is the fallback below.
+      # Writes an EmailLog row for every message so the admin's Email Logs page
+      # has something in it, and carries the SMTP fallback for all mail rather
+      # than OTP alone. Honours fail_silently, so failures still surface.
       - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.smtp.EmailBackend"
+        value: "core.email_backend.LoggingEmailBackend"
       - key: EMAIL_HOST
-        value: "smtp.gmail.com"
+        value: "smtp.burundichairship.africa"
       - key: EMAIL_PORT
-        value: "587"
+        value: "465"
       - key: EMAIL_USE_TLS
+        value: "False"
+      - key: EMAIL_USE_SSL
         value: "True"
       - key: EMAIL_HOST_USER
-        value: "info@burundi4africa.com"
+        value: "info@burundichairship.africa"
       - key: DEFAULT_FROM_EMAIL
+        value: "Be 4 Africa <info@burundichairship.africa>"
+      # Fallback, used only when the primary host refuses the connection.
+      - key: FALLBACK_EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: FALLBACK_EMAIL_PORT
+        value: "587"
+      - key: FALLBACK_EMAIL_USE_TLS
+        value: "True"
+      - key: FALLBACK_EMAIL_USE_SSL
+        value: "False"
+      - key: FALLBACK_EMAIL_HOST_USER
+        value: "info@burundi4africa.com"
+      - key: FALLBACK_FROM_EMAIL
         value: "Be 4 Africa <info@burundi4africa.com>"
       - key: SENTRY_ENVIRONMENT
         value: "production"
@@ -82,6 +102,10 @@ services:
         type: SECRET
         value: ""
       - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      # The Gmail app password, now used only by the fallback path.
+      - key: FALLBACK_EMAIL_HOST_PASSWORD
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: SENTRY_DSN
@@ -140,17 +164,37 @@ workers:
       # Mirrors the api service: tasks send email and build absolute media URLs.
       - key: SITE_URL
         value: "https://burundi4africa.com"
+      # OTP and system mail send from the chairmanship domain, whose SMTP is
+      # SPF/DKIM-aligned for that From address. Gmail is the fallback below.
+      # Writes an EmailLog row for every message so the admin's Email Logs page
+      # has something in it, and carries the SMTP fallback for all mail rather
+      # than OTP alone. Honours fail_silently, so failures still surface.
       - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.smtp.EmailBackend"
+        value: "core.email_backend.LoggingEmailBackend"
       - key: EMAIL_HOST
-        value: "smtp.gmail.com"
+        value: "smtp.burundichairship.africa"
       - key: EMAIL_PORT
-        value: "587"
+        value: "465"
       - key: EMAIL_USE_TLS
+        value: "False"
+      - key: EMAIL_USE_SSL
         value: "True"
       - key: EMAIL_HOST_USER
-        value: "info@burundi4africa.com"
+        value: "info@burundichairship.africa"
       - key: DEFAULT_FROM_EMAIL
+        value: "Be 4 Africa <info@burundichairship.africa>"
+      # Fallback, used only when the primary host refuses the connection.
+      - key: FALLBACK_EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: FALLBACK_EMAIL_PORT
+        value: "587"
+      - key: FALLBACK_EMAIL_USE_TLS
+        value: "True"
+      - key: FALLBACK_EMAIL_USE_SSL
+        value: "False"
+      - key: FALLBACK_EMAIL_HOST_USER
+        value: "info@burundi4africa.com"
+      - key: FALLBACK_FROM_EMAIL
         value: "Be 4 Africa <info@burundi4africa.com>"
       - key: CDN_DOMAIN
         value: "burundi-au-media.fra1.cdn.digitaloceanspaces.com"
@@ -187,6 +231,10 @@ workers:
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: EMAIL_HOST_PASSWORD
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
+      # The Gmail app password, now used only by the fallback path.
+      - key: FALLBACK_EMAIL_HOST_PASSWORD
         type: SECRET
         value: "REPLACE_IN_DASHBOARD"
       - key: SENTRY_DSN

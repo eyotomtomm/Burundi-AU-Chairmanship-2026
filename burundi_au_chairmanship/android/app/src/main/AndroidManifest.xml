@@ -42,6 +42,15 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- app_links owns incoming URLs. Flutter's built-in handling also
+                 receives them and pushes the URI's *path* as a named route —
+                 which for b4africa://magazine is empty, so it pushed '/' and
+                 sent the app back through the splash, wiping whatever the link
+                 had just opened. One handler only. -->
+            <meta-data
+              android:name="flutter_deeplinking_enabled"
+              android:value="false"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

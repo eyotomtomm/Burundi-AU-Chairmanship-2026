@@ -18,7 +18,9 @@ services:
       deploy_on_push: false
     source_dir: /burundi_au_chairmanship/backend
     environment_slug: python
-    instance_count: 1
+    # Matches deployed production (2 instances). Do not lower this
+    # without meaning to: applying the spec would halve web capacity.
+    instance_count: 2
     instance_size_slug: professional-xs  # $12/mo, 1 vCPU, 1GB RAM
     http_port: 8080
     # ASGI via gunicorn + uvicorn workers — serves both HTTP and WebSocket.
@@ -156,7 +158,9 @@ workers:
     source_dir: /burundi_au_chairmanship/backend
     environment_slug: python
     instance_count: 1
-    instance_size_slug: professional-xs
+    # basic-xs (1 vCPU / 1GB) is enough for periodic jobs, email and
+    # image work. professional-xs costs ~2.5x for headroom we do not use.
+    instance_size_slug: basic-xs
     run_command: celery -A config worker -B -l info --concurrency=2
     envs:
       - key: DJANGO_DEBUG
@@ -245,6 +249,12 @@ workers:
 
 # Pre-deploy job — runs ONCE per deploy, before any web container starts.
 # This prevents migration races when instance_count > 1.
+      # The daily news auto-fetch runs here and writes headlines with Gemini.
+      # Without this the worker silently falls back to truncated titles while
+      # the api service (which has the key) produces good ones.
+      - key: GEMINI_API_KEY
+        type: SECRET
+        value: "REPLACE_IN_DASHBOARD"
 jobs:
   - name: pre-deploy
     kind: PRE_DEPLOY

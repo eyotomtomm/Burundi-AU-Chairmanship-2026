@@ -140,6 +140,20 @@ else:
 
 # ─── Caching (Redis/Valkey in production, LocMem for dev) ────
 REDIS_URL = os.environ.get('REDIS_URL', '')
+
+# DigitalOcean's managed Redis speaks TLS only, and hands out a rediss:// URL
+# signed by DigitalOcean's own CA rather than a public one. Two consequences:
+#   * kombu refuses a rediss:// broker outright unless ssl_cert_reqs is in the
+#     URL — without this the Celery worker crash-loops on boot.
+#   * 'required' would fail anyway, since the CA is not in the system trust
+#     store and App Platform has no persistent disk to put a CA bundle on.
+# So verification is off while the traffic stays encrypted. This link is
+# component-to-component inside DigitalOcean's private network and never
+# crosses the internet. To tighten it, mount DO's CA bundle and switch to
+# ssl_cert_reqs=required&ssl_ca_certs=<path>.
+if REDIS_URL.startswith('rediss://') and 'ssl_cert_reqs' not in REDIS_URL:
+    REDIS_URL += ('&' if '?' in REDIS_URL else '?') + 'ssl_cert_reqs=none'
+
 if not REDIS_URL and not DEBUG:
     import logging as _redis_log
     _redis_log.getLogger('django').warning(
@@ -771,7 +785,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 # Model id for every Gemini call (admin auto-translate, scraper headlines).
 # Google retires these on a schedule — the 2.0 family went in June 2026 — so
 # it is one env var to bump rather than a code change in two places.
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash')
 
 # ─── Database Backup Configuration ────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')

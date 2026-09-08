@@ -12392,6 +12392,7 @@ def news_sources_list(request):
                 'X session saved.' if settings_obj.x_cookies else 'X session cleared.',
             )
             return redirect('custom_admin:news_sources_list')
+
         elif request.POST.get('action') == 'schedule' and pk:
             # Inline row form — touches the daily schedule only.
             NewsSource.objects.filter(pk=pk).update(

@@ -9,6 +9,7 @@ Two adapters:
   * ``rss`` — an RSS or Atom feed, parsed with the stdlib.
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -31,6 +32,8 @@ logger = logging.getLogger(__name__)
 # gallery-dl emits one row per media file, so this caps files, not posts.
 # Measured against a real account: 400 files ≈ 100 posts.
 MAX_MEDIA_ITEMS = 400
+IMAGE_EXTENSIONS = ('jpg', 'jpeg', 'png', 'webp')
+VIDEO_EXTENSIONS = ('mp4', 'm3u8', 'mov')
 FETCH_TIMEOUT = 240
 IMAGE_TIMEOUT = 20
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -40,24 +43,40 @@ class ScrapeError(Exception):
     """A source could not be fetched; the message is shown to the admin."""
 
 
+# Cached temp jar, keyed by a hash of its contents so an admin pasting a new
+# session takes effect immediately instead of serving a stale file.
 _COOKIE_TMP = None
+_COOKIE_KEY = None
+
+
+def _cookie_blob():
+    """The raw cookies.txt text, from the admin portal or the environment."""
+    try:
+        from .models import AppSettings
+        blob = (AppSettings.load().x_cookies or '').strip()
+        if blob:
+            return blob
+    except Exception as exc:
+        # Never let a DB hiccup take the scraper down; fall through to env.
+        logger.warning('scraper: could not read X cookies from settings: %s', exc)
+    return os.environ.get('X_COOKIES', '').strip()
 
 
 def x_cookies_path():
     """Path to a Netscape cookies.txt for X, or '' when none is configured.
 
-    Two ways to supply it, because our host has no persistent disk:
+    Preference order:
 
-    * ``X_COOKIES_FILE`` — a path. Fine locally; on App Platform an uploaded
-      file is wiped by the next deploy.
-    * ``X_COOKIES`` — the file's *contents*, held as an env-var secret and
-      written to a private temp file on first use. This is the one that
-      survives a redeploy.
+    * ``X_COOKIES_FILE`` — a path on disk. Handy for local runs.
+    * the **admin portal** field, else the ``X_COOKIES`` env var — the file's
+      *contents*, written to a private temp file. Our host has no persistent
+      disk, so an uploaded file would not survive a deploy; storing the text
+      lets the session be replaced from the admin without one.
 
     Reading a public account needs a logged-in session, not ownership of the
     account being read, so a throwaway X account is the right thing to use.
     """
-    global _COOKIE_TMP
+    global _COOKIE_TMP, _COOKIE_KEY
 
     path = os.environ.get('X_COOKIES_FILE', '').strip()
     if path:
@@ -65,15 +84,17 @@ def x_cookies_path():
             return path
         logger.warning('scraper: X_COOKIES_FILE=%s does not exist; ignoring.', path)
 
-    blob = os.environ.get('X_COOKIES', '')
-    if not blob.strip():
+    blob = _cookie_blob()
+    if not blob:
         return ''
-    if _COOKIE_TMP and os.path.exists(_COOKIE_TMP):
+
+    key = hashlib.sha256(blob.encode('utf-8')).hexdigest()
+    if _COOKIE_TMP and _COOKIE_KEY == key and os.path.exists(_COOKIE_TMP):
         return _COOKIE_TMP
 
-    # Netscape format is tab-separated. Env vars routinely arrive with those
-    # tabs and newlines backslash-escaped, which silently yields an unusable
-    # jar, so undo that before writing.
+    # Netscape format is tab-separated. Pasted or env-carried jars routinely
+    # arrive with those tabs and newlines backslash-escaped, which silently
+    # yields an unusable jar, so undo that before writing.
     text = blob.replace('\\t', '\t').replace('\\n', '\n')
     if not text.endswith('\n'):
         text += '\n'
@@ -83,6 +104,7 @@ def x_cookies_path():
     finally:
         os.close(fd)
     os.chmod(_COOKIE_TMP, 0o600)  # session token — keep it off other users' eyes
+    _COOKIE_KEY = key
     return _COOKIE_TMP
 
 
@@ -226,7 +248,8 @@ def _fetch_x(handle, date_from, date_to):
                 )
             raise ScrapeError(f'X refused the request: {err or row[-1]}')
 
-    # gallery-dl emits one row per *media file*; several can share a tweet.
+    # gallery-dl emits one row per *media file*, and a third of this account's
+    # posts carry more than one, so collect them all rather than the first.
     posts = {}
     for row in rows:
         if not (isinstance(row, list) and len(row) >= 3 and isinstance(row[2], dict)):
@@ -235,12 +258,15 @@ def _fetch_x(handle, date_from, date_to):
         tweet_id = str(meta.get('tweet_id') or meta.get('conversation_id') or '')
         if not tweet_id:
             continue
-        if tweet_id not in posts:
-            posts[tweet_id] = {'meta': meta, 'image_url': None}
-        # row[1] is the media URL for file rows
-        if posts[tweet_id]['image_url'] is None and isinstance(row[1], str) and row[1].startswith('http'):
-            if meta.get('extension') in ('jpg', 'jpeg', 'png', 'webp'):
-                posts[tweet_id]['image_url'] = row[1]
+        bundle = posts.setdefault(tweet_id, {'meta': meta, 'media': []})
+        # row[1] is the media URL on file rows.
+        url = row[1] if isinstance(row[1], str) else ''
+        if not url.startswith('http'):
+            continue
+        ext = (meta.get('extension') or '').lower()
+        kind = 'image' if ext in IMAGE_EXTENSIONS else 'video' if ext in VIDEO_EXTENSIONS else None
+        if kind and not any(m['url'] == url for m in bundle['media']):
+            bundle['media'].append({'type': kind, 'url': url})
 
     for tweet_id, bundle in posts.items():
         meta = bundle['meta']
@@ -261,15 +287,20 @@ def _fetch_x(handle, date_from, date_to):
 
         text = meta.get('content') or ''
         author = (meta.get('author') or {}).get('nick') or handle
+        media = bundle['media']
+        # The first image is the article's header; the rest become a gallery.
+        hero = next((m['url'] for m in media if m['type'] == 'image'), '')
         yield {
             'external_id': tweet_id,
             'title': _title_from(text, f'Post by @{handle}'),
             'content': text,
-            'image_url': bundle['image_url'] or '',
+            'media': media,
+            'image_url': hero,
             'source_url': f'https://x.com/{handle}/status/{tweet_id}',
             'published_at': published,
             'raw': {
                 'author': author,
+                'media': media,
                 'hashtags': meta.get('hashtags') or [],
                 'favorite_count': meta.get('favorite_count'),
                 'retweet_count': meta.get('retweet_count'),
@@ -369,6 +400,7 @@ def _fetch_rss(url, date_from, date_to):
             'image_url': image_url,
             'source_url': link,
             'published_at': published,
+            'media': [{'type': 'image', 'url': image_url}] if image_url else [],
             'raw': {'feed': url},
         }
 
@@ -406,7 +438,7 @@ def fetch_source(source, date_from, date_to, download_images=True):
             image_url=post['image_url'],
             source_url=post['source_url'],
             published_at=post['published_at'],
-            raw=post['raw'],
+            raw={**post['raw'], 'media': post.get('media') or []},
         )
         if download_images and post['image_url']:
             downloaded = _download_image(post['image_url'])

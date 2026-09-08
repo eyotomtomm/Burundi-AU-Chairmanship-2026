@@ -6,11 +6,17 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.core.files.base import ContentFile
 from django.utils import timezone
 
 from core.models import NewsSource, ScrapedItem
 from core.tasks import auto_fetch_news_sources
 from custom_admin.tests import login_with_2fa
+
+# Smallest valid PNG, so ImageField validation passes.
+_PNG = (b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+        b'\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01'
+        b'\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82')
 
 
 class AutoFetchScheduleTests(TestCase):
@@ -171,6 +177,38 @@ class CookieJarTests(TestCase):
     def test_missing_file_is_ignored_not_passed_on(self):
         self.assertEqual(self._path(X_COOKIES_FILE='/nope/cookies.txt'), '')
 
+    def test_admin_saved_session_wins_over_env(self):
+        import os
+        from core.models import AppSettings
+        from unittest.mock import patch as _p
+        from core.news_scraper import x_cookies_path
+        settings_obj = AppSettings.load()
+        settings_obj.x_cookies = '.x.com\tTRUE\t/\tauth_token\tFROM_ADMIN'
+        settings_obj.save()
+        with _p.dict(os.environ, {'X_COOKIES': 'FROM_ENV'}, clear=True):
+            path = x_cookies_path()
+        self.assertIn('FROM_ADMIN', open(path).read())
+        os.unlink(path)
+
+    def test_replacing_the_session_is_picked_up_immediately(self):
+        import os
+        from core.models import AppSettings
+        from unittest.mock import patch as _p
+        from core.news_scraper import x_cookies_path
+        settings_obj = AppSettings.load()
+        with _p.dict(os.environ, {}, clear=True):
+            settings_obj.x_cookies = 'FIRST_TOKEN'
+            settings_obj.save()
+            first = x_cookies_path()
+            self.assertIn('FIRST_TOKEN', open(first).read())
+            # An admin pastes a fresh jar; the cached temp file must not win.
+            settings_obj.x_cookies = 'SECOND_TOKEN'
+            settings_obj.save()
+            second = x_cookies_path()
+        self.assertIn('SECOND_TOKEN', open(second).read())
+        for f in {first, second}:
+            os.path.exists(f) and os.unlink(f)
+
     def test_env_blob_is_written_to_a_private_file(self):
         import os
         blob = '.x.com\tTRUE\t/\tTRUE\t0\tauth_token\tsecret'
@@ -187,3 +225,81 @@ class CookieJarTests(TestCase):
         self.assertIn('\t', body)
         self.assertNotIn('\\t', body)
         os.unlink(path)
+
+
+class ScrapedMediaTests(TestCase):
+    """A post's extra images and its video must survive into the article."""
+
+    def setUp(self):
+        self.admin = get_user_model().objects.create_superuser(
+            'mediaeditor', 'm@example.com', 'pw',
+        )
+        login_with_2fa(self.client, self.admin)
+        self.source = NewsSource.objects.create(
+            name='Ours', kind='x', target='BurundinAddis', is_own_content=True,
+        )
+
+    def _approve(self, item):
+        return self.client.post(
+            reverse('custom_admin:news_scraper_review'),
+            {'decision': 'approve', 'item_ids': [item.pk]},
+        )
+
+    def test_video_becomes_article_media_with_its_url(self):
+        vid = ('https://video.twimg.com/ext_tw_video/1660297159902650368/pu/'
+               'vid/1280x720/yqQtLPE_WgtezYEI.mp4?tag=12')
+        item = ScrapedItem.objects.create(
+            source=self.source, external_id='v1', title='Has video',
+            published_at=timezone.now(),
+            raw={'media': [{'type': 'video', 'url': vid}]},
+        )
+        self._approve(item)
+        item.refresh_from_db()
+        media = list(item.article.media.all())
+        self.assertEqual(len(media), 1)
+        self.assertEqual(media[0].media_type, 'video')
+        # Stored whole — a truncated CDN link is a dead link.
+        self.assertEqual(media[0].video_url, vid)
+
+    def test_absurdly_long_video_url_is_skipped_not_truncated(self):
+        item = ScrapedItem.objects.create(
+            source=self.source, external_id='v2', title='Long url',
+            published_at=timezone.now(),
+            raw={'media': [{'type': 'video', 'url': 'https://v.tw/' + 'a' * 600}]},
+        )
+        self._approve(item)
+        item.refresh_from_db()
+        self.assertEqual(item.article.media.count(), 0)
+
+    def test_extra_images_are_downloaded_and_hero_is_not_duplicated(self):
+        from unittest.mock import patch as _p
+        hero, extra = 'https://pbs.twimg.com/media/A?format=jpg', 'https://pbs.twimg.com/media/B?format=jpg'
+        item = ScrapedItem.objects.create(
+            source=self.source, external_id='i1', title='Two images',
+            published_at=timezone.now(), image_url=hero,
+            raw={'media': [{'type': 'image', 'url': hero},
+                           {'type': 'image', 'url': extra}]},
+        )
+        item.image.save('hero.jpg', ContentFile(_PNG), save=True)
+        with _p('custom_admin.views._download_image',
+                return_value=('b.jpg', _PNG)) as dl:
+            self._approve(item)
+        item.refresh_from_db()
+        # Only the non-hero image is fetched again.
+        self.assertEqual(dl.call_count, 1)
+        self.assertEqual(dl.call_args[0][0], extra)
+        self.assertEqual(item.article.media.count(), 1)
+
+    def test_a_failed_image_download_does_not_lose_the_article(self):
+        from unittest.mock import patch as _p
+        item = ScrapedItem.objects.create(
+            source=self.source, external_id='i2', title='Broken image',
+            published_at=timezone.now(),
+            raw={'media': [{'type': 'image', 'url': 'https://pbs.twimg.com/media/X'}]},
+        )
+        with _p('custom_admin.views._download_image', return_value=None):
+            self._approve(item)
+        item.refresh_from_db()
+        self.assertEqual(item.status, 'approved')
+        self.assertIsNotNone(item.article)
+        self.assertEqual(item.article.media.count(), 0)

@@ -57,19 +57,24 @@ rm "burundi_au_chairmanship/DIGITALOCEAN_RECOVERY.md"
 
 ## 2. Check migration 0136 against production — before you merge
 
-Migration `0136` was rewritten after it may already have been applied. Re-running
-a modified applied migration is how schemas get corrupted. Confirm first:
+Every database operation in `0136` is `IF NOT EXISTS`, so re-running it cannot
+corrupt anything — that part of the old warning was overstated. The real risk is
+quieter: `0136` repairs a schema whose `Fact` tables were created outside the
+migration tracker, and `CREATE TABLE IF NOT EXISTS` **skips silently** if a table
+of that name already exists with the wrong columns. The mismatch then survives
+the deploy and surfaces as a 500 the first time someone opens Facts.
+
+Run this against the production database. It is read-only and prints a verdict:
 
 ```bash
-# against the PRODUCTION database
-python manage.py showmigrations core | grep -E "0135|0136|0137"
+psql "$DATABASE_URL" -f burundi_au_chairmanship/doc/check-0136.sql
 ```
 
-- **`[X] 0136`** — already applied. Do **not** let it re-run. It is written to be
-  idempotent on Postgres (`IF NOT EXISTS`), so this is very likely fine, but
-  confirm the `Fact`/`FactCategory` tables and `AppSettings.facts_enabled` exist
-  before deploying.
-- **`[ ] 0136`** — not applied. Nothing to worry about.
+- **`SAFE - tables do not exist yet`** — nothing to do; `0136` creates them.
+- **`SAFE - tables exist with the columns the model expects`** — nothing to do.
+- **`REPAIR NEEDED`** — section 3 of the output lists exactly which columns are
+  missing. Add them with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` matching the
+  types in `core/migrations/0136_*.py` **before** deploying.
 
 ---
 

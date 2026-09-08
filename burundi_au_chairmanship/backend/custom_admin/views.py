@@ -12262,6 +12262,45 @@ def news_scraper(request):
     })
 
 
+def _attach_scraped_media(item, article):
+    """Copy a scraped post's extra media onto the article it became.
+
+    The first image is already the article header, so it is skipped here.
+    Videos are stored as URLs — ArticleMedia has no video file field, and X
+    serves playable .mp4 links. A failed image download is skipped rather
+    than aborting the approval: a missing gallery photo must not cost the
+    reviewer the article.
+    """
+    from core.models import ArticleMedia
+    from core.news_scraper import _download_image
+
+    media = (item.raw or {}).get('media') or []
+    hero_used = bool(item.image)
+    order = 0
+    for entry in media:
+        url = (entry or {}).get('url') or ''
+        kind = (entry or {}).get('type')
+        if not url or kind not in ('image', 'video'):
+            continue
+        if kind == 'image' and hero_used and url == item.image_url:
+            continue  # already the header image
+        if kind == 'video':
+            if len(url) > 500:
+                continue  # would not survive the column; a dead link is worse
+            ArticleMedia.objects.create(
+                article=article, media_type='video', video_url=url, order=order,
+            )
+            order += 1
+            continue
+        downloaded = _download_image(url)
+        if not downloaded:
+            continue
+        name, data = downloaded
+        row = ArticleMedia(article=article, media_type='image', order=order)
+        row.image.save(name, ContentFile(data), save=True)
+        order += 1
+
+
 @login_required(login_url='custom_admin:login')
 @user_passes_test(is_staff, login_url='custom_admin:login')
 @require_POST
@@ -12314,6 +12353,7 @@ def news_scraper_review(request):
                 article.image.save(item.image.name.rsplit('/', 1)[-1],
                                    ContentFile(item.image.read()), save=True)
                 item.image.close()
+            _attach_scraped_media(item, article)
             item.article = article
             item.status = 'approved'
         item.reviewed_at = timezone.now()
@@ -12345,6 +12385,17 @@ def news_sources_list(request):
         if request.POST.get('delete') and pk:
             NewsSource.objects.filter(pk=pk).delete()
             messages.success(request, 'Source removed.')
+        elif request.POST.get('action') == 'x_cookies':
+            from core.models import AppSettings
+            settings_obj = AppSettings.load()
+            settings_obj.x_cookies = request.POST.get('x_cookies', '').strip()
+            settings_obj.save(update_fields=['x_cookies'])
+            log_admin_action(request, 'update', 'AppSettings', object_repr='X session cookies')
+            messages.success(
+                request,
+                'X session saved.' if settings_obj.x_cookies else 'X session cleared.',
+            )
+            return redirect('custom_admin:news_sources_list')
         elif request.POST.get('action') == 'schedule' and pk:
             # Inline row form — touches the daily schedule only.
             NewsSource.objects.filter(pk=pk).update(
@@ -12377,7 +12428,13 @@ def news_sources_list(request):
                 messages.success(request, 'Source added.')
         return redirect('custom_admin:news_sources_list')
 
+    from core.models import AppSettings
+    from core.news_scraper import x_cookies_path
     return render(request, 'custom_admin/news_scraper/sources.html', {
         'sources': NewsSource.objects.all(),
         'categories': Category.objects.all(),
+        # Never render the session itself back into the page — only whether
+        # one is set, and enough of a fingerprint to tell two apart.
+        'x_session_set': bool(x_cookies_path()),
+        'x_session_len': len(AppSettings.load().x_cookies or ''),
     })

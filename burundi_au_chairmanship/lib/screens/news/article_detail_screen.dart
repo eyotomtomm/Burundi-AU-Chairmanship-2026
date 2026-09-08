@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_colors.dart';
 import '../../config/app_ds.dart';
 import '../../widgets/ds/ds_widgets.dart';
@@ -18,6 +17,7 @@ import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/translate_button.dart';
 import '../../widgets/comment_tile.dart';
+import '../feature_card/media_video_player_screen.dart';
 import '../../widgets/comment_ban_dialog.dart';
 import '../../services/like_service.dart';
 import '../../utils/input_sanitizer.dart';
@@ -790,12 +790,18 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: GestureDetector(
-                            onTap: () async {
-                              final uri = Uri.parse(m.videoUrl);
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              }
-                            },
+                            // Play in-app, as discussions and feature cards
+                            // already do, rather than handing the viewer off
+                            // to an external browser.
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MediaVideoPlayerScreen(
+                                  videoUrl: m.videoUrl,
+                                  caption: m.caption,
+                                ),
+                              ),
+                            ),
                             child: Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(

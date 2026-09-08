@@ -600,7 +600,8 @@ class ArticleMedia(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='media')
     media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES, default='image')
     image = models.ImageField(upload_to='article_media/', blank=True, validators=[validate_image_file])
-    video_url = models.URLField(blank=True)
+    # 500, not the 200 default: X's CDN video links carry long path + query.
+    video_url = models.URLField(max_length=500, blank=True)
     caption = models.CharField(max_length=300, blank=True)
     caption_fr = models.CharField(max_length=300, blank=True)
     order = models.IntegerField(default=0)
@@ -1751,6 +1752,16 @@ class AppSettings(models.Model):
         super().save(*args, **kwargs)
         # Delete any other instances (shouldn't exist, but just in case)
         self.__class__.objects.exclude(pk=1).delete()
+
+    # News scraper: the X session used to read public timelines. Held here so
+    # it can be replaced from the admin portal without a redeploy — an env var
+    # would mean a trip to the host every time the session expires. Never
+    # added to AppSettingsSerializer, which is an explicit allowlist.
+    x_cookies = models.TextField(
+        blank=True,
+        help_text='Netscape cookies.txt contents for X. Use a throwaway X account: '
+                  'this is a live session, not a scoped API key.',
+    )
 
     def delete(self, *args, **kwargs):
         """Prevent deletion of settings."""

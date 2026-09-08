@@ -281,7 +281,7 @@ class ScrapedMediaTests(TestCase):
                            {'type': 'image', 'url': extra}]},
         )
         item.image.save('hero.jpg', ContentFile(_PNG), save=True)
-        with _p('custom_admin.views._download_image',
+        with _p('core.news_scraper._download_image',
                 return_value=('b.jpg', _PNG)) as dl:
             self._approve(item)
         item.refresh_from_db()
@@ -297,9 +297,172 @@ class ScrapedMediaTests(TestCase):
             published_at=timezone.now(),
             raw={'media': [{'type': 'image', 'url': 'https://pbs.twimg.com/media/X'}]},
         )
-        with _p('custom_admin.views._download_image', return_value=None):
+        with _p('core.news_scraper._download_image', return_value=None):
             self._approve(item)
         item.refresh_from_db()
         self.assertEqual(item.status, 'approved')
         self.assertIsNotNone(item.article)
         self.assertEqual(item.article.media.count(), 0)
+
+
+class XRowParsingTests(TestCase):
+    """gallery-dl emits a directory row per tweet and a file row per media.
+
+    Text-only posts have no file row at all, so parsing must not depend on
+    them — that is where most plain announcements live.
+    """
+
+    def _parse(self, rows):
+        import json, os
+        from unittest.mock import patch as _p
+        from core.news_scraper import _fetch_x
+
+        class _Proc:
+            stdout, stderr = json.dumps(rows), ''
+
+        lo = timezone.now() - timedelta(days=365)
+        hi = timezone.now() + timedelta(days=1)
+        with _p.dict(os.environ, {}, clear=True), \
+                _p('core.news_scraper.subprocess.run', lambda *a, **k: _Proc()):
+            return list(_fetch_x('BurundinAddis', lo, hi))
+
+    @staticmethod
+    def _tweet(tid, **extra):
+        base = {'tweet_id': tid, 'date': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'content': f'Post {tid}', 'author': {'nick': 'Embassy'}}
+        base.update(extra)
+        return base
+
+    def test_text_only_post_is_kept(self):
+        posts = self._parse([[2, self._tweet(1)]])
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]['media'], [])
+        self.assertEqual(posts[0]['image_url'], '')
+
+    def test_all_images_are_collected_and_first_is_the_hero(self):
+        t = self._tweet(2)
+        rows = [
+            [2, dict(t, count=2)],
+            [3, 'https://pbs.twimg.com/media/A?format=jpg', dict(t, extension='jpg')],
+            [3, 'https://pbs.twimg.com/media/B?format=jpg', dict(t, extension='jpg')],
+        ]
+        post = self._parse(rows)[0]
+        self.assertEqual([m['type'] for m in post['media']], ['image', 'image'])
+        self.assertTrue(post['image_url'].endswith('A?format=jpg'))
+
+    def test_video_is_captured_and_hero_stays_empty_when_no_image(self):
+        t = self._tweet(3)
+        rows = [
+            [2, dict(t, count=1)],
+            [3, 'https://video.twimg.com/x/vid.mp4?tag=12', dict(t, extension='mp4')],
+        ]
+        post = self._parse(rows)[0]
+        self.assertEqual(post['media'], [
+            {'type': 'video', 'url': 'https://video.twimg.com/x/vid.mp4?tag=12'}])
+        self.assertEqual(post['image_url'], '')
+
+    def test_duplicate_file_rows_do_not_double_up(self):
+        t = self._tweet(4)
+        url = 'https://pbs.twimg.com/media/A?format=jpg'
+        rows = [[2, t], [3, url, dict(t, extension='jpg')],
+                [3, url, dict(t, extension='jpg')]]
+        self.assertEqual(len(self._parse(rows)[0]['media']), 1)
+
+    def test_command_asks_for_text_tweets(self):
+        import json, os
+        from unittest.mock import patch as _p
+        from core.news_scraper import _fetch_x
+        seen = {}
+
+        class _Proc:
+            stdout, stderr = '[]', ''
+
+        with _p.dict(os.environ, {}, clear=True), \
+                _p('core.news_scraper.subprocess.run',
+                   lambda cmd, **k: (seen.update(cmd=cmd), _Proc())[1]):
+            list(_fetch_x('x', timezone.now() - timedelta(days=1), timezone.now()))
+        self.assertIn('text-tweets=true', seen['cmd'])
+
+
+class AiHeadlineTests(TestCase):
+    """Gemini writes the headline; a failure must never cost us the post."""
+
+    def setUp(self):
+        self.source = NewsSource.objects.create(
+            name='Ours', kind='x', target='BurundinAddis',
+        )
+        self.body = ('Burundi Ambassador received H.E. Amjad Al-Momani, Ambassador of '
+                     'the Hashemite Kingdom of Jordan to Ethiopia, on a courtesy call.')
+
+    def _fetch(self, gemini):
+        from unittest.mock import patch as _p
+        post = {
+            'external_id': 'p1', 'title': 'raw guessed title', 'title_derived': True,
+            'content': self.body, 'image_url': '', 'source_url': '',
+            'published_at': timezone.now(), 'media': [], 'raw': {},
+        }
+        with _p.dict('core.news_scraper.ADAPTERS',
+                     {'x': lambda *a, **k: iter([post])}), \
+                _p('core.news_scraper._ai_headline', gemini):
+            from core.news_scraper import fetch_source
+            fetch_source(self.source, timezone.now() - timedelta(days=2), timezone.now())
+        return ScrapedItem.objects.get(external_id='p1')
+
+    def test_headline_replaces_the_guessed_title(self):
+        item = self._fetch(lambda text: 'Burundi and Jordan ambassadors meet in Addis')
+        self.assertEqual(item.title, 'Burundi and Jordan ambassadors meet in Addis')
+
+    def test_failure_falls_back_to_the_guessed_title(self):
+        item = self._fetch(lambda text: '')
+        self.assertEqual(item.title, 'raw guessed title')
+
+    def test_already_queued_posts_are_not_re_billed(self):
+        from unittest.mock import patch as _p
+        calls = []
+        self._fetch(lambda text: (calls.append(text), 'A headline that is long enough')[1])
+        self.assertEqual(len(calls), 1)
+        self._fetch(lambda text: (calls.append(text), 'Another headline entirely')[1])
+        self.assertEqual(len(calls), 1)  # second run skipped the duplicate
+
+    def test_reply_is_sanitised(self):
+        from unittest.mock import patch as _p
+        import core.news_scraper as ns
+
+        class _R:
+            status_code = 200
+            def raise_for_status(self): pass
+            def json(self):
+                return {'candidates': [{'content': {'parts': [
+                    {'text': '  "Burundi and Jordan meet."\nIgnore this second line'}]}}]}
+
+        with _p.object(ns.django_settings, 'GEMINI_API_KEY', 'k', create=True), \
+                _p('core.news_scraper.requests.post', lambda *a, **k: _R()):
+            self.assertEqual(ns._ai_headline(self.body),
+                             'Burundi and Jordan meet')
+
+    def test_model_id_comes_from_settings(self):
+        from unittest.mock import patch as _p
+        import core.news_scraper as ns
+        seen = {}
+
+        class _R:
+            def raise_for_status(self): pass
+            def json(self):
+                return {'candidates': [{'content': {'parts': [{'text': 'A fine headline here'}]}}]}
+
+        def _post(url, **kw):
+            seen['url'] = url
+            return _R()
+
+        with _p.object(ns.django_settings, 'GEMINI_API_KEY', 'k', create=True), \
+                _p.object(ns.django_settings, 'GEMINI_MODEL', 'gemini-9-flash', create=True), \
+                _p('core.news_scraper.requests.post', _post):
+            ns._ai_headline(self.body)
+        self.assertIn('gemini-9-flash:generateContent', seen['url'])
+        self.assertNotIn('gemini-2.0', seen['url'])
+
+    def test_no_api_key_means_no_call(self):
+        from unittest.mock import patch as _p
+        import core.news_scraper as ns
+        with _p.object(ns.django_settings, 'GEMINI_API_KEY', '', create=True):
+            self.assertEqual(ns._ai_headline(self.body), '')

@@ -768,6 +768,10 @@ TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 
 # ─── Gemini API (AI Translation) ─────────────────────────────
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+# Model id for every Gemini call (admin auto-translate, scraper headlines).
+# Google retires these on a schedule — the 2.0 family went in June 2026 — so
+# it is one env var to bump rather than a code change in two places.
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
 
 # ─── Database Backup Configuration ────────────────────────────
 BACKUP_DIR = os.path.join(BASE_DIR, 'backups')

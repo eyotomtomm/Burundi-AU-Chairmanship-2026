@@ -6000,8 +6000,10 @@ def auto_translate(request):
         source_name = lang_names[source_lang]
         target_name = lang_names[target_lang]
 
+        model = getattr(django_settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
         resp = ext_requests.post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+            f'https://generativelanguage.googleapis.com/v1beta/models/'
+            f'{model}:generateContent',
             headers={'x-goog-api-key': api_key},
             json={
                 # System instruction is separate from user content to prevent

@@ -807,9 +807,6 @@ def articles_list(request):
         articles = articles.filter(
             Q(title__icontains=search) | Q(title_fr__icontains=search) | Q(content__icontains=search)
         )
-    content_type_filter = request.GET.get('content_type')
-    if content_type_filter in ('article', 'news'):
-        articles = articles.filter(content_type=content_type_filter)
     paginator = Paginator(articles, 20)
     page = request.GET.get('page')
     articles = paginator.get_page(page)
@@ -839,7 +836,7 @@ def article_create(request):
             image=_get_existing_or_uploaded(request, 'image'),
             author=request.POST.get('author', 'Admin'),
             publish_date=request.POST.get('publish_date') or timezone.now(),
-            content_type=request.POST.get('content_type', 'article'),
+            content_type='news',
             is_featured=request.POST.get('is_featured') == 'on',
             is_draft=is_draft,
             status=content_status,
@@ -905,7 +902,6 @@ def article_edit(request, pk):
         if _img:
             article.image = _img
             changes['image'] = {'old': '', 'new': 'new image uploaded'}
-        article.content_type = request.POST.get('content_type', article.content_type)
         article.is_featured = new_values['is_featured']
         article.is_draft = new_values['is_draft']
         content_status = request.POST.get('content_status', 'published')

@@ -404,6 +404,32 @@ class PublicEndpointTests(TestCase):
         titles = {a['title'] for a in resp.json()['news_items']}
         self.assertEqual(titles, {live.title})
 
+    def test_news_and_articles_are_one_feed(self):
+        # content_type defaulted to 'article' and the admin form preselected
+        # it, so the split only recorded which option happened to be
+        # highlighted. Both surfaces — and old app builds still sending
+        # ?content_type=news — must now see every published post.
+        AppSettings.objects.create(summit_year='2026')
+        now = timezone.now()
+        for title, ctype in (('Tagged news', 'news'), ('Tagged article', 'article')):
+            Article.objects.create(title=title, content='x', publish_date=now,
+                                   content_type=ctype, status='published')
+
+        listed = self.client.get('/api/articles/').json()
+        titles = {a['title'] for a in listed.get('results', listed)}
+        self.assertEqual(titles, {'Tagged news', 'Tagged article'})
+
+        # An installed build still sends the old filter; it must be ignored.
+        legacy = self.client.get('/api/articles/?content_type=news').json()
+        self.assertEqual(
+            {a['title'] for a in legacy.get('results', legacy)}, titles)
+
+        feed = self.client.get('/api/home-feed/').json()
+        self.assertEqual({a['title'] for a in feed['news_items']}, titles)
+        # Old builds concatenate news_items + articles, so articles must stay
+        # empty or every post shows twice.
+        self.assertEqual(feed['articles'], [])
+
     def test_app_settings(self):
         AppSettings.objects.create(summit_year='2026')
         resp = self.client.get('/api/settings/')

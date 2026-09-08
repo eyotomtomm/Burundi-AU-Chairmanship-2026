@@ -29,7 +29,6 @@ import '../../../services/data_saver_service.dart';
 import '../../../services/like_service.dart';
 import '../../../utils/color_utils.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
-import '../../articles/articles_screen.dart';
 import '../../news/article_detail_screen.dart';
 import '../../events/event_detail_screen.dart';
 import '../../magazine/magazine_detail_screen.dart';
@@ -784,7 +783,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
             ),
           ],
 
-          // --- Latest news (news + articles are one feed) ---
+          // --- Latest news ---
           if (_articles.isNotEmpty) ...[
             SliverToBoxAdapter(
               child: Padding(
@@ -792,7 +791,7 @@ class _HomeTabState extends State<HomeTab> with WidgetsBindingObserver {
                 child: SectionTitle(
                   title: _appSettings?[langCode == 'fr' ? 'section_title_news_fr' : 'section_title_news'] ?? (langCode == 'fr' ? 'Récents' : 'Latest'),
                   showSeeAll: true,
-                  onSeeAll: () => Navigator.push(context, CupertinoPageRoute(builder: (_) => const ArticlesScreen())),
+                  onSeeAll: () => widget.onSwitchTab?.call(1),
                 ),
               ),
             ),

@@ -804,9 +804,9 @@ class ArticleAdmin(admin.ModelAdmin):
     Articles marked as "featured" appear in a special section on the home screen.
     """
     inlines = [ArticleMediaInline]
-    list_display = ['title', 'content_type', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
-    list_filter = ['content_type', 'is_featured', 'category', 'publish_date']
-    list_editable = ['content_type', 'is_featured']
+    list_display = ['title', 'category', 'is_featured', 'publish_date', 'view_count', 'like_count']
+    list_filter = ['is_featured', 'category', 'publish_date']
+    list_editable = ['is_featured']
     search_fields = ['title', 'title_fr', 'content']
     date_hierarchy = 'publish_date'
 
@@ -816,7 +816,6 @@ class ArticleAdmin(admin.ModelAdmin):
                 ('title', 'title_fr'),
                 'cover_image',
                 'category',
-                'content_type',
                 'content',
                 'content_fr',
             ],

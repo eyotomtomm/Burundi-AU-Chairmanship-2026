@@ -1794,7 +1794,9 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     """Public endpoint: Anyone can read articles, but authentication required to like/comment"""
     permission_classes = [AllowAny]
     serializer_class = ArticleSerializer
-    filterset_fields = ['category', 'is_featured', 'content_type']
+    # 'content_type' is deliberately absent: news and articles are one
+    # feed now, and old app builds still send ?content_type=news.
+    filterset_fields = ['category', 'is_featured']
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -1831,14 +1833,12 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='related', permission_classes=[AllowAny])
     def related(self, request, pk=None):
-        """Get related articles in the same category and content_type, excluding the current article."""
+        """Get related articles in the same category, excluding the current one."""
         article = self.get_object()
         now = timezone.now()
         related_qs = Article.objects.select_related('category').prefetch_related(
             'media',
-        ).public(now).filter(
-            content_type=article.content_type,
-        ).exclude(pk=article.pk)
+        ).public(now).exclude(pk=article.pk)
 
         if article.category_id:
             related_qs = related_qs.filter(category=article.category)
@@ -3306,10 +3306,15 @@ def home_feed(request):
         from django.db.models import Value, BooleanField
         base_articles = base_articles.annotate(is_liked=Value(False, output_field=BooleanField()))
 
-    featured_articles = base_articles.filter(is_featured=True, content_type='article')[:5]
-    featured_news = base_articles.filter(is_featured=True, content_type='news')[:5]
-    articles = base_articles.filter(content_type='article')[:10]
-    news_items = base_articles.filter(content_type='news')[:10]
+    # One feed. The article/news split was never an editorial choice — the
+    # admin form preselected 'article', so everything not consciously switched
+    # landed there. `articles` and `featured_articles` stay empty rather than
+    # being dropped: an installed build reads both keys and concatenates them,
+    # so duplicating the list into both would show every post twice.
+    featured_news = base_articles.filter(is_featured=True)[:5]
+    news_items = base_articles[:10]
+    featured_articles = Article.objects.none()
+    articles = Article.objects.none()
     feature_cards = FeatureCard.objects.filter(is_active=True).prefetch_related(
         'key_point_items', 'impact_area_items', 'media',
     )
@@ -3478,8 +3483,6 @@ def search_articles(request):
     """
     query = request.GET.get('q', '').strip()
     lang = request.GET.get('lang', 'en')
-    content_type_filter = request.GET.get('content_type', '').strip()
-
     if not query or len(query) < 2:
         return Response({'results': [], 'count': 0})
 
@@ -3502,8 +3505,6 @@ def search_articles(request):
         comment_count=_article_comment_count(),
     )
 
-    if content_type_filter in ('article', 'news'):
-        articles = articles.filter(content_type=content_type_filter)
 
     # Add is_liked annotation if authenticated
     if request.user.is_authenticated:

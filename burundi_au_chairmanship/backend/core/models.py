@@ -456,6 +456,14 @@ class Article(models.Model):
     author = models.CharField(max_length=100)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, null=True, blank=True, related_name='articles')
     publish_date = models.DateTimeField()
+    # Legacy. News and articles are one feed and nothing filters on this any
+    # more; the column stays so the historical tagging is not destroyed, and
+    # new posts are written as 'news' by custom_admin.article_create.
+    #
+    # Left exactly as it was on purpose: an AlterField here rebuilds the table
+    # on SQLite, and rebuilding re-emits the Postgres-only GinIndex below,
+    # which fails the test database with "unrecognized token: :". Changing so
+    # much as this field's help_text takes the whole suite down.
     content_type = models.CharField(
         max_length=10, choices=CONTENT_TYPE_CHOICES, default='article',
         help_text='Type of content: "article" for long-form articles, "news" for news items'
